@@ -15,9 +15,9 @@ import (
 
 // Put then Get, with every field set to something distinctive.
 //
-// This exists because the emails table is written by a 28-column
-// INSERT, read by a 32-column SELECT and scanned positionally, and
-// those three lists are kept in step by hand. Adding a column has
+// This exists because the emails table is written by one INSERT, read
+// by a longer SELECT and scanned POSITIONALLY, and those three lists
+// are kept in step by hand. Adding a column has
 // silently broken them three times: a missing placeholder, a
 // placeholder with no argument, and a scan destination in the wrong
 // position. The first two surface as a 500 on the send path, the

@@ -782,14 +782,24 @@ details.cs-side-collapsible[open] > ul {
   border-radius: var(--r-md);
   border: 1px solid var(--line-2);
 }
+/* The frame lives on the wrapper, not the table: a table wider than the
+   column scrolls INSIDE this, and the border and radius have to be drawn
+   at the scroll boundary or they scroll away with the content. Written
+   by the render-table hook, so every prose table has one. */
+.cs-table-wrap {
+  overflow-x: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+}
+.cs-table-wrap:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
 .cs-prose table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  background: var(--bg-2);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-md);
-  overflow: hidden;
 }
 .cs-prose table th,
 .cs-prose table td {
