@@ -1,0 +1,313 @@
+# Mailyard configuration example. Copy to mailyard.yaml and adjust.
+# Every key can also be set via an environment variable with the
+# MAILYARD_ prefix, for example MAILYARD_AUTH_JWT_SECRET or
+# MAILYARD_DATABASE_DSN. Env vars override YAML.
+#
+# Runtime settings - retention, maintenance mode, platform mail, which
+# certificate each listener serves - are NOT here. They live in the
+# database, under Admin -> Platform Settings.
+
+# -----------------------------------------------------------------------------
+# HTTP server configuration
+# -----------------------------------------------------------------------------
+server:
+  # HTTP server bind address:port
+  addr: ":3000"
+
+  # Public base URL of this instance. Required for tracking links and
+  # hosted unsubscribe pages, and it is where TLS takes its hostname
+  # from. Also decides the Secure flag on session cookies.
+  public_url: ""
+
+  # Reverse-proxy CIDRs whose X-Forwarded-For is trusted. Leave empty
+  # when exposed directly.
+  # trusted_proxies: ["10.0.0.0/8"]
+  # Whether TLS is terminated HERE. WHICH certificate is served is not
+  # configured in this file at all - it is assigned in the console,
+  # under Administration -> Certificates, and stored in the database so
+  # every node serves the same one and a replacement needs no restart.
+  #
+  # Off by default, because the common deployment puts a reverse proxy
+  # in front that terminates TLS and talks HTTP upstream. Turn it on to
+  # serve HTTPS directly and a self-signed pair is generated
+  # immediately, so the console is reachable before anything is
+  # assigned.
+  #
+  # Note for relay nodes: a node verifies this certificate with its
+  # system trust store, so if you turn this on, either assign a
+  # publicly trusted certificate or install your CA on each node.
+  tls:
+    enabled: false
+
+# -----------------------------------------------------------------------------
+# Mail ARRIVING from an application we authenticate. AUTH PLAIN with a
+# submission credential (username smtp_...) or an API key.
+# -----------------------------------------------------------------------------
+submission:
+  enabled: false
+  # 587 is privileged: an unprivileged process needs
+  # CAP_NET_BIND_SERVICE or a port mapping. Use ":2525" if neither is
+  # available.
+  addr: ":587"
+  hostname: mailyard
+  max_message_size: 26214400
+  rate_per_minute: 60
+  # PROXY protocol. SMTP has no X-Forwarded-For, so behind a TCP load
+  # balancer every session looks like it came from the balancer -
+  # and rate_per_minute above stops being per client and becomes one
+  # bucket for everybody.
+  #
+  # Trusted may NOT be empty when this is on: a PROXY header is an
+  # unauthenticated claim about who is calling, so reading one from any
+  # peer lets a stranger forge a source address. A peer outside the
+  # list is never asked for a header, so its address is the real one.
+  proxy_protocol:
+    enabled: false
+    trusted: []
+      # - 10.0.0.0/8
+      # - 192.0.2.7
+  # STARTTLS. ON by default: a client prefers encryption and almost
+  # none verify the certificate, so even the generated self-signed pair
+  # is a real improvement over sending AUTH in cleartext.
+  tls:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# MX-facing listener. No auth: mail is accepted only for domains
+# verified via DNS TXT in the console.
+# -----------------------------------------------------------------------------
+inbound:
+  enabled: false
+  # An MX record carries no port, so remote senders always connect on
+  # 25. Bind ":2526" and map 25 to it if 25 is not available.
+  addr: ":25"
+  hostname: mailyard
+  max_message_size: 26214400
+  rate_per_minute: 120
+  # PROXY protocol. SMTP has no X-Forwarded-For, so behind a TCP load
+  # balancer every session looks like it came from the balancer -
+  # SPF is computed from the CONNECTING IP, so without this every
+  # message is checked against the balancer instead of the sender,
+  # and rate_per_minute above stops being per client and becomes one
+  # bucket for everybody.
+  #
+  # Trusted may NOT be empty when this is on: a PROXY header is an
+  # unauthenticated claim about who is calling, so reading one from any
+  # peer lets a stranger forge a source address. A peer outside the
+  # list is never asked for a header, so its address is the real one.
+  proxy_protocol:
+    enabled: false
+    trusted: []
+      # - 10.0.0.0/8
+      # - 192.0.2.7
+  # STARTTLS, on for the same reason as submission. A sending MX
+  # prefers it and does not verify.
+  tls:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# Let's Encrypt.
+#
+# Almost nothing here, deliberately. Whether ACME is on, which hosts it
+# issues for, the account contact and the directory are all PLATFORM
+# SETTINGS, edited under Administration -> Certificates in the console -
+# so an administrator turns it on and orders a certificate without
+# touching this file or restarting anything.
+#
+# What is left is a port, and a port is the one thing a process cannot be
+# told to bind by a row it has not read yet.
+# -----------------------------------------------------------------------------
+acme:
+  # Where an HTTP-01 challenge is answered. EMPTY is right for almost
+  # everyone: when this process terminates TLS, the CA validates over
+  # tls-alpn-01 against the listener that is already up, and no second
+  # port is involved.
+  #
+  # Set it only when the CA cannot reach our TLS handshake - a proxy that
+  # TERMINATES TLS answers the handshake itself, so ALPN validation never
+  # arrives and port 80 is the only route left. A TCP-passthrough proxy
+  # on 443 preserves ALPN and needs nothing here.
+  challenge_addr: ""
+
+# -----------------------------------------------------------------------------
+# Database configuration
+# -----------------------------------------------------------------------------
+database:
+  # Prefer MAILYARD_DATABASE_DSN so the password does not live here.
+  dsn: postgres://user:pass@localhost:5432/mailyard?sslmode=disable
+
+  crypto:
+    # REQUIRED. Encrypts the secrets stored in this database: SMTP
+    # passwords, TOTP seeds, DKIM private keys, OAuth secrets,
+    # certificate private keys.
+    #
+    # At least 32 characters, and random:
+    #
+    #   openssl rand -hex 32
+    #
+    # Changing it orphans every row already sealed under the old one,
+    # so treat it like a database credential.
+    # Prefer MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY.
+    #
+    # IMPORTANT:
+    #   DON'T LOSE THIS KEY, IF YOU LOSE THIS KEY, YOU WILL LOSE ALL
+    #   SMTP, TOTP, DKIM, OAuth secrets.
+    encryption_key: "change-me-to-a-long-random-string-32b"
+
+  # Read-only followers, round-robined. Empty sends every query to the
+  # primary, which is always correct.
+  # replica_dsns:
+  #   - postgres://user:pass@replica-a:5432/mailyard?sslmode=disable
+
+  # Which reads use a follower. Ignored while replica_dsns is empty.
+  # Reporting and log browsing only - the queue claim, quota counts and
+  # suppression filtering are wrong on a follower rather than slow, so
+  # they are not offered.
+  #
+  # replica_reads:
+  #   analytics: true
+  #   email_log: true
+  #   inbound_log: true
+  #   sandbox: true
+  #   bounces: true
+  #   contacts: true
+  #   webhook_deliveries: true
+  #   audit_log: true
+  #   suppressions: false   # off by default: that page writes a block
+  #                         # and reads the list straight back
+
+# -----------------------------------------------------------------------------
+# Logging configuration
+# -----------------------------------------------------------------------------
+logging:
+  level: info
+
+# -----------------------------------------------------------------------------
+# Auth configuration
+# -----------------------------------------------------------------------------
+auth:
+  # Run without any authentication. Single trusted user, trusted
+  # network only.
+  disabled: false
+  # Generate with: openssl rand -hex 32
+  jwt_secret: "change-me-to-a-long-random-string-32b"
+  session_ttl: 12h
+  local:
+    enabled: true
+    # Bootstrap admin, created on first start with an empty users
+    # table. The generated password is printed to stderr once.
+    email: admin@example.com
+
+worker:
+  concurrency: 4
+  poll_interval: 2s
+  max_attempts: 5
+  retry_base_delay: 30s
+  retry_max_delay: 1h
+  claim_timeout: 5m
+
+sending:
+  max_recipients: 50
+  max_attachment_size: 10485760
+  max_total_attachment_size: 26214400
+  auto_suppress_on_reject: true
+  # Return path for mail leaving through the shared platform pool only,
+  # where the sending IPs are ours. A project using its own SMTP server
+  # sets its own address in Project settings.
+  # bounce_address: "bounces@mail.example.com"
+
+# -----------------------------------------------------------------------------
+# Relay nodes: machines you run that deliver straight to recipient mail
+# exchangers, and optionally receive on port 25 and forward back here.
+#
+# This block is the CONTROL PLANE half. A node's own settings
+# (relay_node, singular) live in a file on that machine - see
+# /docs/smtp-domains/relay-nodes.
+#
+# ENTERPRISE EDITION. The block stays here in both, so the same file
+# moves between them unedited - but a community binary REFUSES TO START
+# with enabled: true.
+# -----------------------------------------------------------------------------
+relay_nodes:
+  enabled: false
+  # Required when enabled, at least 32 characters. It is the only thing
+  # between a stranger and a machine in your sending pool, so a node
+  # still lands as pending until an admin approves it.
+  #   openssl rand -hex 32
+  # A node enrolled by a PROJECT presents an API key holding relay:write
+  # instead and never sees this.
+  auto_register_token: ""
+
+webhook:
+  timeout: 10s
+  max_attempts: 3
+  retry_delay: 10s
+
+campaign:
+  batch_size: 100
+  poll_interval: 5s
+
+# Recipient address verification (POST /api/v1/emails/verify). Off by
+# default because the MX check makes outbound DNS queries.
+email_verify:
+  enabled: false
+  cache_ttl: 24h
+  mx_cache_ttl: 1h
+  lookup_timeout: 5s
+
+# Fixed windows held in process memory, so a multi-node deployment
+# multiplies them by the node count. Zero disables one limit.
+#
+# These cap the HTTP edge only. The two SMTP listeners count new
+# sessions per client IP and are configured where they are declared -
+# submission.rate_per_minute and inbound.rate_per_minute above.
+ratelimit:
+  enabled: true
+  # Per client IP.
+  login_per_minute: 10
+  oidc_per_minute: 30
+  # Per API key, and per IP for a caller presenting no usable token.
+  api_per_minute: 120
+
+  # The three below are paced by somebody else's software rather than
+  # by a person at a keyboard, which is why they are an order of
+  # magnitude higher.
+
+  # POST /webhooks/ses. High because SNS retries hard and for hours,
+  # and throttling real notifications loses bounces - which is the one
+  # thing that endpoint exists to avoid.
+  ses_webhook_per_minute: 600
+  # Relay node heartbeats, certificate renewal, status. A hundred nodes
+  # reporting every two minutes from behind one NAT address is fifty
+  # legitimate requests a minute, and setting this too low drops the
+  # whole fleet out of the pool at once.
+  relay_node_chatter_per_minute: 600
+  # Mail a relay node forwards back to us. The one node endpoint whose
+  # rate STRANGERS set, since the node's MX takes whatever the internet
+  # sends it.
+  #
+  # Raise it rather than lower it: the node has already answered 250 by
+  # the time this refuses, so a refusal here loses a message the sender
+  # believes was accepted. The node's own listener does the per-IP
+  # filtering (relay_node.inbound.rate_per_minute, in the file on the
+  # node itself).
+  relay_node_inbound_per_minute: 1200
+
+# Empty backend keeps attachments inline in the database, "fs" or "s3"
+# offload the bytes.
+storage:
+  backend: ""
+  fs_path: data/attachments
+  s3:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    access_key: ""
+    secret_key: ""
+    use_path_style: false
+
+# Prometheus scrape at GET /metrics.
+metrics:
+  enabled: false
+  # When set, scrapes must send it as a bearer token.
+  token: ""

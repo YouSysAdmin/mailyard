@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mailyard"
+version = "0.1.0"
+description = "Client for the Mailyard API"
+requires-python = ">=3.9"
+# No dependencies on purpose - see README.
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["mailyard*"]

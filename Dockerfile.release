@@ -1,0 +1,42 @@
+# The RELEASE image: it copies a binary goreleaser already built.
+#
+# Kept apart from the repository Dockerfile, which builds everything from
+# source in three stages. That one is right for `docker build .` and wrong
+# here - goreleaser hands this build context an artifact it has already
+# compiled, signed off on and is about to publish, and a from-source
+# Dockerfile would quietly build a DIFFERENT binary and ship that instead.
+#
+# The console and the documentation are inside the binary, so there is
+# nothing to copy but the one file.
+FROM alpine:3.21
+
+# ca-certificates is not optional here, and the failures without it are
+# each far from the cause: no ACME (the CA is reached over HTTPS), no SES
+# over its API, and no verified STARTTLS to a relay. tzdata because
+# campaign local-time delivery resolves a recipient's zone.
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -H -u 1000 mailyard
+
+# $TARGETPLATFORM, not a bare filename. dockers_v2 builds both
+# architectures from ONE build and lays the context out per platform -
+# linux/amd64/mailyard, linux/arm64/mailyard - so `COPY mailyard` finds
+# nothing. Caught by running a snapshot build rather than by reading:
+# "failed to compute cache key: /mailyard: not found".
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/mailyard /usr/local/bin/mailyard
+
+USER mailyard
+WORKDIR /data
+
+# HTTP console and API, HTTPS when this process terminates TLS, the ACME
+# HTTP-01 challenge, SMTP submission, inbound MX.
+#
+# 443, 587, 25 and 80 are privileged and this image runs as uid 1000.
+# Docker sets net.ipv4.ip_unprivileged_port_start=0 in containers so they
+# bind anyway, but Kubernetes does not - a pod needs NET_BIND_SERVICE or
+# the same sysctl, otherwise bind high ports and map them.
+EXPOSE 3000 443 587 25 80
+VOLUME /data
+
+ENTRYPOINT ["mailyard"]
+CMD ["serve"]

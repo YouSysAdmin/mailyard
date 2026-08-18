@@ -1,0 +1,121 @@
+# Local development database.
+#
+# Postgres only. Mailyard itself runs on the host (`task run`) so you get
+# the normal Go edit-compile-run loop instead of rebuilding an image on
+# every change. Attachment blobs land beside the database files, in
+# dev-data/blobs, because the host process writes them directly.
+#
+#   task dev-up       start it and wait until it answers
+#   task run          run Mailyard against it
+#   task dev-down     stop it, keeping the data
+#
+#   task dev-replica  add a streaming read replica on :5433
+#   task run-replica  run Mailyard with that replica configured
+#
+# Everything lives under dev-data/, which is gitignored. To start over,
+# stop the stack and delete that directory yourself - there is
+# deliberately no target that removes a database for you.
+
+# Pinned so container names do not change if the checkout directory is
+# renamed - Compose otherwise derives the project name from it.
+name: mailyard
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    # Override with MAILYARD_PG_PORT if 5432 is already taken locally.
+    ports:
+      - "${MAILYARD_PG_PORT:-5432}:5432"
+    # No replication settings here on purpose. wal_level=replica,
+    # hot_standby=on and ten wal senders are already the Postgres
+    # defaults, so a streaming replica needs nothing added - and
+    # anything added would restart the database you are developing
+    # against for no gain.
+    #
+    # The one thing initdb does NOT allow is a replication connection
+    # from another host, and POSTGRES_HOST_AUTH_METHOD cannot fix that
+    # here: the entrypoint writes pg_hba.conf during initdb only, so
+    # setting it would silently do nothing for anyone whose dev-data/pg
+    # already exists. `task dev-replica` grants it at runtime instead.
+    environment:
+      POSTGRES_USER: mailyard
+      POSTGRES_PASSWORD: mailyard
+      POSTGRES_DB: mailyard
+      # A subdirectory of the mount, not the mount itself. initdb needs an
+      # empty directory it owns, and a bind mount arrives owned by the host
+      # user and sometimes not empty - pointing PGDATA one level down lets
+      # the entrypoint create and chown it cleanly.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./dev-data/pg:/var/lib/postgresql/data
+      # Creates the separate database the store tests use. Runs only on
+      # first init, which is the only time it is needed.
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      # -d matters: without it pg_isready reports ready during the brief
+      # window when the entrypoint has started a temporary server to run
+      # the init scripts, and `--wait` returns before the real one is up.
+      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  # A streaming read replica, for working on anything that touches
+  # database.replica_dsns. In its own profile because it is not part of
+  # the ordinary loop: `docker compose up` leaves it alone, and
+  # `task dev-replica` brings it up.
+  #
+  # Physical streaming, not logical: it is what production would run,
+  # and it is the shape that has the property worth testing against -
+  # the replica is genuinely read-only, and LISTEN/NOTIFY genuinely
+  # does not reach it.
+  postgres-replica:
+    image: postgres:17-alpine
+    profiles: ["replica"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${MAILYARD_PG_REPLICA_PORT:-5433}:5432"
+    environment:
+      PGUSER: mailyard
+      PGPASSWORD: mailyard
+    # Runs as postgres rather than root: the entrypoint would normally
+    # drop privileges for us, but this replaces the entrypoint outright
+    # and the server refuses to run as root.
+    user: postgres
+    # No named volume and no bind mount, deliberately. A replica holds
+    # nothing the primary does not, so throwing it away and rebuilding
+    # from a fresh base backup is always the right recovery - and a
+    # stale data directory from a primary that has since been recreated
+    # is a confusing failure with no upside.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          rm -rf /var/lib/postgresql/data/*
+          # -R writes standby.signal and the primary_conninfo, -Xs
+          # streams WAL during the copy so the backup is consistent
+          # without needing archives.
+          until pg_basebackup -h postgres -U mailyard -D /var/lib/postgresql/data -Fp -Xs -R; do
+            echo "waiting for the primary to accept a base backup..."
+            sleep 2
+          done
+          chmod 0700 /var/lib/postgresql/data
+        fi
+        exec postgres
+    healthcheck:
+      # A replica in recovery answers pg_isready, so also assert it is
+      # actually in recovery - otherwise a container that somehow came
+      # up as a standalone primary would look healthy and quietly serve
+      # its own divergent copy.
+      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard && psql -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped

@@ -1,0 +1,116 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+
+version: 2
+
+project_name: mailyard
+
+# The console and the documentation are EMBEDDED in the binary, so they
+# have to exist before the Go build runs. Skipping this does not fail -
+# go:embed matches the committed .gitkeep and compiles happily - it ships
+# a release whose /app serves nothing and whose /docs route is not even
+# registered.
+#
+# The touch afterwards is not decoration: the console build empties its
+# output directory and Hugo is asked to (--cleanDestinationDir), which
+# deletes the committed .gitkeep, and without that placeholder a later
+# plain `go build` in a clean checkout has nothing for go:embed to match
+# and stops compiling.
+#
+# The docs theme is vendored under docs/themes/mailyard, so a plain
+# checkout carries it. It used to be a submodule, and a checkout that had
+# not fetched it built a site with no layouts, so a hook here had to
+# refuse first.
+before:
+  hooks:
+    - go mod download
+    - sh -c 'cd web && npm ci && npm run build && touch dist/.gitkeep'
+    - sh -c 'cd docs && hugo --minify --cleanDestinationDir && touch dist/.gitkeep'
+
+release:
+  prerelease: "false"
+
+env:
+  - CGO_ENABLED=0
+
+builds:
+  - id: mailyard
+    main: ./cmd/mailyard
+    binary: mailyard
+    goos:
+      - linux
+    # amd64 and arm64 only. A mail server is a long-running daemon on a
+    # server, and 32-bit arm is neither where one is deployed nor a target
+    # anybody asked for - and every extra pair here is another archive and
+    # another image to sign and publish.
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/yousysadmin/mailyard/pkg.Version={{ .Version }}
+
+archives:
+  - ids: [mailyard]
+    name_template: >-
+      {{ .Binary }}_v{{ .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      # What an operator needs beside the binary to stand one up. The
+      # example config is the one that matters: every setting it does not
+      # mention lives in the database now, and it says so.
+      - examples/mailyard.yaml.example
+      - README.md
+
+checksum:
+  name_template: "checksums.sha256"
+
+snapshot:
+  # .Version, not .Tag. The tag carries its leading v and the archive
+  # template adds one, so a snapshot came out named
+  # mailyard_vv0.0.0-devel_linux_amd64.
+  version_template: "{{ .Version }}-devel"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+# ONE block for both architectures, and no manifest section: dockers_v2
+# builds the platforms together and publishes the manifest itself. The
+# older `dockers` plus `docker_manifests` pair is deprecated, and it also
+# meant the same nine labels written out twice, once per arch, with
+# nothing keeping the copies equal.
+#
+# Dockerfile.release, NOT the repository Dockerfile. That one builds
+# everything from source in three stages, which is what you want from
+# `docker build .` and exactly wrong here: goreleaser has already built
+# the binary and puts it in the build context, so a from-source Dockerfile
+# would compile a DIFFERENT one and ship that instead of the artifact
+# being released.
+dockers_v2:
+  - ids: [mailyard]
+    images:
+      - ghcr.io/yousysadmin/mailyard
+    # Moving tags so `docker pull mailyard` and a minor-series pin both
+    # resolve. goreleaser leaves them alone on a snapshot, so a local dry
+    # run cannot move :latest.
+    tags:
+      - "{{ .Version }}"
+      - "v{{ .Major }}.{{ .Minor }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: Dockerfile.release
+    labels:
+      org.opencontainers.image.title: mailyard
+      org.opencontainers.image.description: Self-hosted email delivery
+      org.opencontainers.image.source: https://github.com/YouSysAdmin/mailyard
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"

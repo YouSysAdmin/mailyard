@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="{{ site.Language.Lang | default "en" }}">
+<head>
+  {{ partial "head.html" . }}
+</head>
+{{- /* THERE IS NO LANDING PAGE, so the home page is a documentation page like
+    any other: it keeps the sidebar, the TOC column and the ordinary body
+    class, where the upstream theme drops all three for a hero. These docs
+    ship inside the product and a marketing splash in front of them is a page
+    nobody signed in to read. */ -}}
+<body class="cs-doc">
+  {{ partial "nav.html" . }}
+  <div class="cs-shell">
+    {{ partial "sidebar.html" . }}
+    <main class="cs-main" id="content">
+      {{ block "main" . }}{{ end }}
+    </main>
+    {{- /* "On this page" TOC, on for any page with enough headings. Set
+        `toc: false` in front matter to hide it. The grid always reserves the
+        right column, so this just fills it. */ -}}
+    {{ $toc := true }}
+    {{ if isset .Params "toc" }}{{ $toc = .Params.toc }}{{ end }}
+    {{ if and $toc (gt (len .TableOfContents) 50) }}
+      {{ partial "toc.html" . }}
+    {{ end }}
+  </div>
+  {{ partial "search.html" . }}
+  {{ partial "footer.html" . }}
+</body>
+</html>

@@ -1,0 +1,13 @@
+web/node_modules/
+web/dist/
+# The docs site is built in its own stage and copied in, so a local build
+# of it is megabytes of context that the stage overwrites anyway.
+docs/dist/
+docs/resources/
+docs/.hugo_build.lock
+*.db
+*.db-shm
+*.db-wal
+data/
+Dockerfile
+.dockerignore

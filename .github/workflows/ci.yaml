@@ -1,0 +1,120 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+#
+# The COMMUNITY build, which is what this repository contains.
+#
+# It runs in both repositories on purpose. In the public one it compiles
+# a tree that physically lacks the enterprise files, which is the
+# strongest proof available that the community edition stands on its
+# own. In the private overlay it compiles the same program from a tree
+# that HAS those files and excludes every one of them by tag - and that
+# is the run which catches the real failure mode, a change made to a
+# shared file that only compiles with the tag.
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with: { go-version: '1.26' }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the console dependencies
+        run: npm ci
+        working-directory: web
+
+      - uses: go-task/setup-task@v1
+        with: { version: '3.x' }
+
+      # install-only, so the gate stays `task check` and CI cannot
+      # drift from what a developer runs - the action just puts the
+      # PREBUILT release binary on the PATH. It was `go install`, which
+      # compiled the linter from source for about two minutes on every
+      # run. Pinned, because a linter that changes its mind between
+      # runs fails builds nobody broke.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          install-only: true
+
+      # vet, golangci-lint, tests, gofmt, vue-tsc and prettier. The store
+      # tests SKIP without MAILYARD_TEST_DSN, and the two database-backed
+      # guards with them - see the store job below.
+      - run: task check
+
+  # The two guards that need a real Postgres: schemaguard PREPAREs every
+  # query against the migrated schema, tenancyguard asks the schema
+  # which tables carry project_id. Without a database they skip, and a
+  # guard that skips reads exactly like a guard that passes.
+  store:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: mailyard
+          POSTGRES_PASSWORD: mailyard
+          POSTGRES_DB: mailyard_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U mailyard"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with: { go-version: '1.26' }
+
+      - env:
+          MAILYARD_TEST_DSN: postgres://mailyard:mailyard@localhost:5432/mailyard_test?sslmode=disable
+        run: go test ./...
+
+  # Public repository only: nothing enterprise may land here.
+  #
+  # A Go test cannot express this - it would have to fail in the
+  # repository that legitimately HAS those files - so it is a job, and
+  # it is guarded by name rather than by a branch or an environment,
+  # because the thing being asserted is which repository this is.
+  no-enterprise-source:
+    if: github.repository == 'YouSysAdmin/mailyard'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Refuse enterprise source in the community repository
+        run: |
+          fail=0
+          if [ -d internal/ee ]; then
+            echo "internal/ee exists in the community repository"
+            fail=1
+          fi
+          if git ls-files '*_ee.go' '*_ee_test.go' | grep -q .; then
+            echo "enterprise files present:"
+            git ls-files '*_ee.go' '*_ee_test.go'
+            fail=1
+          fi
+          # The POSITIVE constraint, anchored and exact. A bare search
+          # for the word matches the community halves too, whose
+          # constraint is `!enterprise`, and matches this file and the
+          # guards in tests/ that merely NAME the tag in a comment - so
+          # the first cut of this job failed on its own source.
+          if git grep -lE '^//go:build enterprise$' -- '*.go' | grep -q .; then
+            echo "files carrying the enterprise tag:"
+            git grep -lE '^//go:build enterprise$' -- '*.go'
+            fail=1
+          fi
+          exit $fail

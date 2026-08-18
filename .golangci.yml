@@ -1,0 +1,38 @@
+# The default linter set, which is errcheck, govet, ineffassign,
+# staticcheck and unused. Nothing extra is enabled: this runs on every
+# `task check`, so a linter earns its place by catching something the
+# compiler and the guards in tests/ do not.
+#
+# gosec is deliberately absent. Its G201/G202 were measured against this
+# tree and reported nothing on a textbook Sprintf injection, while
+# TestNoDynamicSQL catches exactly that.
+version: "2"
+
+linters:
+  default: standard
+
+  # Three resource linters on top of the default set. They are the ones
+  # that were clean or nearly clean here, so they cost four fixes once
+  # and then only ever fire on a regression.
+  #
+  # The other four from the same family were measured and DECLINED:
+  # nilerr, noctx and contextcheck report 31 sites between them and
+  # every one is deliberate - the (ok, resp) refusal helpers return nil
+  # after a non-nil error by design, and the webhook dispatcher uses a
+  # background context because the request it came from is gone. That
+  # is 31 suppressions to buy nothing, which is the noise this file
+  # exists to avoid.
+  enable:
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+
+  settings:
+    staticcheck:
+      checks:
+        - all
+        # QF1001 rewrites `!(r >= 'a' && r <= 'z')` into
+        # `r < 'a' || r > 'z'`. The first says "not in this range" and
+        # the second makes the reader reconstruct that, so the hint is
+        # declined rather than worked around at each of its three sites.
+        - -QF1001

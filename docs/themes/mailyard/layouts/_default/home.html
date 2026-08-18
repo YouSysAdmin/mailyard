@@ -1,0 +1,11 @@
+{{ define "main" }}
+  <article class="cs-article">
+    <header class="cs-article-head">
+      <h1>{{ .Title }}</h1>
+      {{ with .Description }}<p class="cs-lead">{{ . }}</p>{{ end }}
+    </header>
+    <div class="cs-prose">
+      {{ .Content }}
+    </div>
+  </article>
+{{ end }}

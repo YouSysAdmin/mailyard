@@ -1,0 +1,110 @@
+# Mailyard documentation site.
+#
+# The build output is EMBEDDED IN THE BINARY (docs/dist, see docsite.go) and
+# served under /docs by the running instance, which is why baseURL is a bare
+# path: every asset and link the theme emits goes through relURL/RelPermalink,
+# so /docs/ is the only prefix that has to be stated. `hugo server` keeps that
+# path too, so links are identical in dev and in the product.
+baseURL = "/docs/"
+publishDir = "dist"
+
+title = "Mailyard"
+themesDir = "themes"
+theme = "mailyard"
+
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = false
+
+# Nothing here is published to the open web - the site answers behind a
+# console session - so a sitemap, a robots.txt and RSS feeds are files
+# nobody can fetch and no crawler will ask for. Tags are not used.
+enableRobotsTXT = false
+disableKinds = ["RSS", "sitemap", "taxonomy", "term"]
+
+[params]
+author = "YouSysAdmin"
+brand = "Mailyard"
+description = "Self-hosted email delivery platform for developers"
+
+# Fifteen sections, so the sidebar starts collapsed and opens the one
+# holding the current page.
+sidebarCollapsible = true
+sidebarCollapsed = true
+
+# No repository column in the footer and no edit-on-github links: these
+# docs ship inside the product, and a reader of them is signed in to an
+# instance rather than looking at a source tree.
+show_footer_project = false
+repoURL = ""
+edit_base = ""
+
+# No top-right CTA. The one link worth having would point at the console,
+# whose mount path is decided once in Go (env.ConsolePath) - repeating it
+# here would be a second place to change it.
+cta_url = ""
+
+# Top navigation. Four entries, not all fifteen sections: the sidebar is
+# the map, and this is the shortlist somebody arrives wanting.
+[[menu.main]]
+name = "Getting Started"
+url = "/getting-started/"
+weight = 10
+[menu.main.params]
+icon = "rocket"
+
+[[menu.main]]
+name = "Email Sending"
+url = "/email-sending/"
+weight = 20
+[menu.main.params]
+icon = "mail"
+
+[[menu.main]]
+name = "Templates"
+url = "/templates/"
+weight = 30
+[menu.main.params]
+icon = "file-text"
+
+[[menu.main]]
+name = "Security"
+url = "/security/"
+weight = 40
+[menu.main.params]
+icon = "shield"
+
+# One language today. The structure (content/en, a [languages.en] block) is
+# what a second one needs, so adding it is a directory and an i18n file
+# rather than a re-layout.
+[languages.en]
+label = "English"
+weight = 1
+contentDir = "content/en"
+title = "Mailyard"
+
+[languages.en.params]
+description = "Self-hosted email delivery platform for developers"
+
+[markup]
+[markup.goldmark.renderer]
+# The pages carry raw HTML (line breaks inside table cells, the odd
+# details block), which goldmark drops unless it is allowed through.
+unsafe = true
+[markup.tableOfContents]
+startLevel = 2
+endLevel = 4
+ordered = false
+[markup.highlight]
+style = "github-dark"
+lineNos = false
+noClasses = true
+tabWidth = 2
+codeFences = true
+guessSyntax = true
+
+# JSON on the home page is the client-side search index (the theme's
+# layouts/index.json), fetched by the search dialog on first open.
+[outputs]
+home = ["HTML", "JSON"]
+page = ["HTML"]
+section = ["HTML"]

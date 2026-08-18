@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Mailyard. Full mark: a bounded plot with a gate in its top edge,
+    holding a letter. For use above ~20px. Below that use the small
+    variant in web/public/favicon.svg, which solidifies the letter.
+
+    NO prefers-color-scheme HERE, unlike the favicon beside it. The
+    theme renders this file as an <img>, so the SVG is its own document:
+    a media query in it follows the OPERATING SYSTEM while the page
+    around it follows the site's own theme toggle. The two disagree
+    whenever a reader flips that toggle - and with an ink accent a
+    disagreement is not a shade off, it is a mark the same colour as the
+    surface it sits on. The purple hid this, because a purple letter
+    reads on both grounds.
+
+    So both tones sit in the band that clears 3:1 against BOTH grounds,
+    the docs' near-black and white (measured: #6e6e6e is 5.1 and 3.95,
+    #949494 is 3.03 and 6.6). The letter stays a step brighter than the
+    enclosure, which is the relationship it had when it carried the
+    accent colour.
+  -->
+  <style>
+    .plot { stroke: #6e6e6e; }
+    .letter { stroke: #949494; }
+  </style>
+  <g fill="none" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+    <path class="plot" d="M11.5 4.6H7.2a3 3 0 0 0-3 3v17.2a3 3 0 0 0 3 3h17.6a3 3 0 0 0 3-3V7.6a3 3 0 0 0-3-3h-4.3"/>
+    <rect class="letter" x="9" y="14.6" width="14" height="9.6" rx="1.6"/>
+    <path class="letter" d="M9.6 16.4 16 21.1l6.4-4.7"/>
+  </g>
+</svg>

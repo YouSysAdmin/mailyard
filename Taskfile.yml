@@ -1,0 +1,442 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+#
+# Run `task` with no arguments for the list. Install go-task from
+# https://taskfile.dev - every task below is plain sh, so nothing here
+# needs GNU make and the recipes carry no tabs.
+version: '3'
+
+vars:
+  # Overridable from the environment, the same way `VERSION ?=` was.
+  VERSION:
+    sh: 'echo "${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo devel)}"'
+  LDFLAGS: '-s -w -X github.com/yousysadmin/mailyard/pkg.Version={{.VERSION}}'
+
+  # Which EDITION is being built. Empty is the community build, which is
+  # what the public repository contains and compiles by default; the
+  # enterprise one is `enterprise`. Threaded through every go
+  # invocation below, so `task check-ee` is `task check` with one var
+  # rather than a second copy of the recipe.
+  #
+  # Note the shape: -tags "" is accepted by the toolchain, so no recipe
+  # needs to branch on whether the var is set.
+  TAGS: '{{.TAGS | default ""}}'
+
+  # Local dev stack (compose.yaml): Postgres on :5432 with its files in
+  # dev-data/pg, plus a mailyard_test database for the store tests.
+  PG_PORT: '{{.MAILYARD_PG_PORT | default "5432"}}'
+  DEV_DSN: 'postgres://mailyard:mailyard@localhost:{{.PG_PORT}}/mailyard?sslmode=disable'
+  DEV_TEST_DSN: 'postgres://mailyard:mailyard@localhost:{{.PG_PORT}}/mailyard_test?sslmode=disable'
+
+  # The optional streaming replica from compose.yaml (profile "replica").
+  PG_REPLICA_PORT: '{{.MAILYARD_PG_REPLICA_PORT | default "5433"}}'
+  DEV_REPLICA_DSN: 'postgres://mailyard:mailyard@localhost:{{.PG_REPLICA_PORT}}/mailyard?sslmode=disable'
+
+tasks:
+  default:
+    desc: List the tasks
+    silent: true
+    cmds:
+      - task --list
+
+  # Full build: SPA into web/dist and the docs site into docs/dist,
+  # then the binary that embeds both.
+  #
+  # Sequential cmds rather than deps, because deps run in PARALLEL and
+  # the binary embeds what the two before it produce.
+  build:
+    desc: SPA plus docs plus the binary (bin/mailyard)
+    cmds:
+      - task: web
+      - task: docs
+      - task: binary
+
+  # Both of these empty their output directory first, which deletes the
+  # committed .gitkeep. That placeholder is what lets `go build` compile
+  # without a frontend build (go:embed needs a match), so put it back -
+  # otherwise the next clean clone does not build at all.
+  web:
+    desc: Build the console into web/dist
+    dir: web
+    cmds:
+      - npm ci
+      - npm run build
+      - touch dist/.gitkeep
+
+  # Hugo builds straight into docs/dist (publishDir in hugo.toml), which
+  # docs/docsite.go embeds - no copy step, because the Go file lives
+  # beside the site it embeds. Skipping this task is fine: the binary
+  # then has no /docs route.
+  #
+  # --cleanDestinationDir, because Hugo overwrites what it produces and
+  # leaves everything else alone: without it a renamed page keeps
+  # answering out of the previous build forever. It takes .gitkeep with
+  # it, hence the touch.
+  #
+  # The theme is VENDORED at docs/themes/mailyard, so a plain clone
+  # builds. It used to be a submodule, and a clone without it had no
+  # layouts and Hugo built a site of empty pages rather than failing -
+  # which is why this task, the Dockerfile and the goreleaser hook each
+  # had to test for theme.toml first.
+  docs:
+    desc: Build the embedded documentation into docs/dist
+    dir: docs
+    cmds:
+      - hugo --minify --cleanDestinationDir
+      - touch dist/.gitkeep
+
+  # Live editing on :1313. baseURL has to be passed here: the configured
+  # one is the bare path /docs/ (the site is served from inside the
+  # binary), and `hugo server` cannot turn that into something to bind
+  # to - it prints //localhost:1313///docs/ and answers 404 on every
+  # page.
+  docs-dev:
+    desc: Serve the documentation with live reload on :1313/docs/
+    dir: docs
+    cmds:
+      - hugo server --baseURL http://localhost:1313/docs/
+
+  binary:
+    desc: Build bin/mailyard from whatever is in web/dist and docs/dist
+    env:
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -tags "{{.TAGS}}" -ldflags "{{.LDFLAGS}}" -o bin/mailyard{{if .TAGS}}-{{.TAGS}}{{end}} ./cmd/mailyard
+
+  dev-up:
+    desc: Start the dev Postgres and wait until it answers
+    cmds:
+      - docker compose up -d --wait
+
+  # Adds a streaming read replica on :5433, without restarting the
+  # primary. The grant below is the one thing initdb does not set up: its
+  # default pg_hba allows a replication connection from localhost only,
+  # and the entrypoint writes that file during initdb, so an existing
+  # dev-data/pg can only be fixed at runtime. Appending is guarded by the
+  # grep, and a reload is enough - pg_hba does not need a restart.
+  dev-replica:
+    desc: Add a streaming read replica on :5433
+    cmds:
+      - docker compose up -d --wait postgres
+      - >-
+        docker compose exec -T postgres sh -c 'grep -q "host replication all all trust"
+        $PGDATA/pg_hba.conf || echo "host replication all all trust" >> $PGDATA/pg_hba.conf'
+      - docker compose exec -T postgres psql -U mailyard -d mailyard -c 'SELECT pg_reload_conf()' >/dev/null
+      - docker compose --profile replica up -d --wait
+
+  dev-down:
+    desc: Stop the dev stack, keeping the data in dev-data
+    cmds:
+      - docker compose --profile replica down
+
+  test:
+    desc: Go tests - the store tests SKIP without a database, see test-db
+    cmds:
+      - go test -tags "{{.TAGS}}" ./...
+      - task: sdk
+
+  # The store tests skip without a database. This points them at the
+  # separate mailyard_test database the dev stack creates, so they never
+  # touch what you are developing against.
+  test-db:
+    desc: Go tests against the mailyard_test database
+    env:
+      MAILYARD_TEST_DSN: '{{.DEV_TEST_DSN}}'
+    cmds:
+      - go test -tags "{{.TAGS}}" ./...
+      - task: sdk
+
+  # The Go client is a SEPARATE MODULE, so `go test ./...` from the root
+  # does not reach it - it would sit here rotting, compiling against an
+  # API that moved. Its route coverage is pinned by a test in the server
+  # module, but nothing else builds it unless this does.
+  sdk:
+    desc: Build, vet and test all three generated clients
+    cmds:
+      - task: sdk-check
+      - task: sdk-go
+
+  # Its own task because `dir` only works at task level: go-task accepts
+  # `dir` on a single cmd and silently ignores it, which ran all of this
+  # against the server module instead of the client, and passed.
+  sdk-go:
+    internal: true
+    dir: sdk/go
+    cmds:
+      - go build ./...
+      - go vet ./...
+      - go test ./...
+
+  # Compile only, for after a regeneration - the tests come with `sdk`.
+  sdk-go-compile:
+    internal: true
+    dir: sdk/go
+    cmds:
+      - go build ./...
+      - go vet ./...
+
+  # No compiler for these two, so parse them. A missing interpreter says
+  # so rather than skipping quietly.
+  sdk-check:
+    desc: Parse the Python and Ruby clients
+    silent: true
+    cmds:
+      - |
+        if command -v python3 >/dev/null; then
+          for f in sdk/python/mailyard/*.py; do
+            python3 -c "import sys;compile(open(sys.argv[1]).read(),sys.argv[1],'exec')" "$f" || exit 1
+          done
+        else
+          echo "sdk: python3 not found, skipping the Python client"
+        fi
+      - |
+        if command -v ruby >/dev/null; then
+          for f in sdk/ruby/lib/mailyard/*.rb sdk/ruby/lib/*.rb; do
+            ruby -c "$f" >/dev/null || exit 1
+          done
+        else
+          echo "sdk: ruby not found, skipping the Ruby client"
+        fi
+
+  # Rewrite the generated half of every client from the route metadata -
+  # the same metadata the OpenAPI document is built from. Run it after
+  # adding a route or changing a wire type. TestSDKCoversEveryV1Route and
+  # the freshness tests fail the build if you forget.
+  sdk-gen:
+    desc: Regenerate the client surface from the route metadata
+    cmds:
+      - go run ./cmd/sdkgen
+      - task: sdk-go-compile
+      - cmd: |
+          if [ -n "$(gofmt -l sdk/go)" ]; then
+            echo "gofmt: sdk/go"
+            gofmt -l sdk/go
+            exit 1
+          fi
+        silent: true
+      - task: sdk-check
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet -tags "{{.TAGS}}" ./...
+
+  # Lists what is unformatted and does NOT fail on it, which is what the
+  # Makefile did too.
+  fmt:
+    desc: List unformatted Go files
+    cmds:
+      - gofmt -l internal cmd pkg
+
+  # `test` already runs `sdk`, so this does not list it a second time -
+  # make ran it twice through a sub-make.
+  # golangci-lint over the whole tree, at the tag `check` is running
+  # under. Config in .golangci.yml, which carries no blanket exclusions:
+  # a finding is either fixed or marked at its line with a reason.
+  #
+  # It is a hard failure, unlike `fmt` below, because it caught real
+  # things the compiler does not - a dead branch in the SDK generator, a
+  # doc comment attached to the wrong symbol, unchecked writes.
+  lint:
+    desc: golangci-lint
+    cmds:
+      - golangci-lint run --build-tags "{{.TAGS}}" ./...
+
+  check:
+    desc: vet, lint, tests, gofmt, plus the console type-check and format
+    cmds:
+      - task: vet
+      - task: lint
+      - task: test
+      - task: fmt
+      - task: type-check
+      - task: format-check
+
+  # The enterprise half of the three checks above. A var rather than a
+  # copy of the recipe, because two recipes is two places for one of
+  # them to stop matching the other - which is the whole failure this
+  # split is trying not to have.
+  build-ee:
+    desc: Build the enterprise binary (bin/mailyard-enterprise)
+    cmds:
+      - task: binary
+        vars: { TAGS: 'enterprise' }
+
+  test-ee:
+    desc: Go tests, enterprise build
+    cmds:
+      - task: test
+        vars: { TAGS: 'enterprise' }
+
+  check-ee:
+    desc: check, enterprise build
+    cmds:
+      - task: check
+        vars: { TAGS: 'enterprise' }
+
+  # BOTH editions, back to back. The untagged run is the one that
+  # matters most in this repository: it is the continuous proof that the
+  # community tree stands on its own, compiled from a tree that contains
+  # the enterprise source and excludes every line of it.
+  check-both:
+    desc: check untagged and tagged - what CI runs here
+    cmds:
+      - task: check
+      - task: check-ee
+
+  # Every file this tree has and the public one does not must be
+  # enterprise BY CONSTRUCTION - tagged, under internal/ee, or on the
+  # short list of things a build tag cannot reach (Hugo pages, this
+  # repository's own enterprise workflow and release config).
+  #
+  # The failure it exists for is the opposite of the obvious one. A
+  # enterprise file leaking into the public repository is caught there,
+  # by the no-enterprise-source job. What nothing else catches is a
+  # COMMUNITY half that only exists here: the untagged build passes in
+  # this tree, because the file is present, and breaks in the public one
+  # where it is not.
+  #
+  # Needs a remote named oss pointing at the public repository.
+  # THE OVERLAY ONLY ADDS. Nothing shared with the community repository
+  # is modified, with one documented exception below, and this is what
+  # keeps that true.
+  #
+  # It matters more than it looks. The enterprise tree is the community
+  # tree plus a few files, kept in step by merging DOWN from here - and
+  # merges cost nothing only while the overlay adds. The day it edits a
+  # shared file, every later merge has two sides to reconcile, forever.
+  #
+  # So a change to anything that exists upstream belongs, even
+  # when only the enterprise build needs it: that is what the _ce half of
+  # each seam is for.
+  #
+  # In the community repository there is no oss remote and this REFUSES,
+  # naming the remote to add. That is correct rather than a gap: here
+  # there is no overlay to check, and a task that passed by comparing
+  # HEAD against itself would report the same green whether it had
+  # checked anything or not. Nothing in this repository's CI runs it.
+  edition-diff:
+    desc: The overlay only ADDS - nothing shared with the community tree is modified
+    cmds:
+      - |
+        set -e
+        if ! git remote get-url oss >/dev/null 2>&1; then
+          echo "no remote named oss - this task compares against the community"
+          echo "repository, so add it first:"
+          echo "  git remote add oss git@github.com:YouSysAdmin/mailyard.git"
+          exit 1
+        fi
+        git fetch --quiet oss
+        # Captured rather than piped into a variable: a while loop on the
+        # right of a pipe runs in a subshell, so a flag set inside it is
+        # lost. Collecting the complaints on stdout has neither that
+        # problem nor a here-document to indent wrongly.
+        offenders="$(git diff --name-status oss/master HEAD | while read -r status path; do
+          case "$path" in
+            internal/ee/*|*_ee.go|*_ee_test.go) owned=yes ;;
+            .github/workflows/ci-ee.yaml|.goreleaser.ee.yml) owned=yes ;;
+            docs/content/en/smtp-domains/relay-nodes-operations.md) owned=yes ;;
+            docs/content/en/getting-started/scaling-roles.md) owned=yes ;;
+            examples/mailyard-relay.yaml.example) owned=yes ;;
+            # go.mod and go.sum are the one pair that legitimately
+            # DIFFERS rather than being added. The enterprise tree needs
+            # a package the community one does not - bbolt, for the
+            # relay agent's spool - and a module file has to list what
+            # its build actually imports. go mod tidy resolves each tree
+            # correctly on its own, so the two are kept in step by
+            # running it, not by being identical.
+            #
+            # Its own answer rather than owned=yes: this pair is the
+            # one expected to show as MODIFIED, and owned=yes falls
+            # into the added-only check below, which then fails on
+            # exactly the status this exception exists to permit.
+            go.mod|go.sum) owned=differs ;;
+            *) owned=no ;;
+          esac
+          if [ "$owned" = no ]; then
+            echo "  $path exists upstream and this branch changed it ($status) - make that change in the community repository instead"
+          elif [ "$owned" = yes ] && [ "$status" != "A" ]; then
+            echo "  $path is enterprise but shows as $status rather than added, so a copy of it reached the community repository"
+          fi
+        done)"
+        if [ -n "$offenders" ]; then
+          echo "the overlay is no longer purely additive:"
+          echo "$offenders"
+          exit 1
+        fi
+        echo "overlay is purely additive over oss/master"
+
+  type-check:
+    desc: vue-tsc over the console
+    dir: web
+    cmds:
+      - npm run type-check
+
+  # Formatting is CHECKED here rather than applied, the same way gofmt is
+  # - a check tells you what to run, a rewrite in the middle of a test
+  # task changes files you did not ask it to.
+  format-check:
+    desc: prettier over the console (npm run format writes)
+    dir: web
+    cmds:
+      - npm run format-check
+
+  # The only check that presses the button.
+  #
+  # Everything else pins declarations to each other - routes.go to the
+  # OpenAPI document, the console's strings to the catalogue. This stands
+  # up a throwaway instance, mints a credential per permission and asks
+  # the server whether each route is reachable by exactly what it claims.
+  # Nothing touches the dev stack: its own container, its own database,
+  # random ports, torn down either way.
+  audit-perms:
+    desc: Probe every route's authorization against a throwaway instance
+    cmds:
+      - bash scripts/audit-permissions.sh
+
+  docker:
+    desc: Build the container image
+    cmds:
+      - docker build --build-arg VERSION={{.VERSION}} -t mailyard:{{.VERSION}} .
+
+  # Runs against the compose stack with no config file: every setting
+  # comes from the env below. Drop a mailyard.yaml beside the binary, and
+  # it is picked up as well, with these still winning.
+  #
+  # --init because this is one node, and it therefore IS the node that
+  # migrates. In a fleet exactly one carries the flag - see the serve
+  # command - and without it a fresh database gets no schema, which shows
+  # up as `relation "settings" does not exist` on the first boot.
+  #
+  # The dev-only secrets are fixed rather than generated so restarting
+  # the server does not invalidate the session cookie in your browser.
+  # They are worthless outside localhost - never reuse them anywhere
+  # real.
+  #
+  # REPLICA_DSNS is empty unless run-replica passes it, and an empty
+  # MAILYARD_DATABASE_REPLICA_DSNS parses to no replicas rather than to
+  # one blank one - verified, because a replica that will not answer
+  # refuses the boot.
+  run:
+    desc: Run the server against the dev stack (:3000)
+    env:
+      MAILYARD_DATABASE_DSN: '{{.DEV_DSN}}'
+      MAILYARD_DATABASE_REPLICA_DSNS: '{{.REPLICA_DSNS}}'
+      MAILYARD_AUTH_JWT_SECRET: dev-only-jwt-secret-not-for-production
+      MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: dev-only-encryption-key-not-for-production-32b
+      MAILYARD_AUTH_LOCAL_ENABLED: 'true'
+      MAILYARD_AUTH_LOCAL_EMAIL: admin@example.com
+      MAILYARD_STORAGE_BACKEND: fs
+      MAILYARD_STORAGE_FS_PATH: dev-data/blobs
+      MAILYARD_LOGGING_FORMAT: text
+    cmds:
+      - go run ./cmd/mailyard serve --init
+
+  # Same, with the replica configured. Reads still go to the primary
+  # unless a query asked for a follower - see database.Base - so this is
+  # for working on that routing, not a faster dev loop.
+  run-replica:
+    desc: Run the server with the dev read replica configured
+    cmds:
+      - task: run
+        vars:
+          REPLICA_DSNS: '{{.DEV_REPLICA_DSN}}'

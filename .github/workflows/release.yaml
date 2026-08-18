@@ -1,0 +1,55 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+name: Release
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # No submodules and no PAT. The documentation theme was one, in
+      # another repository, and is VENDORED at docs/themes/mailyard now -
+      # a checkout that had not fetched it built a site of blank pages
+      # while Hugo reported success. Leaving the option here would have
+      # a fork fail on a secret it has no reason to hold.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with: { go-version: '1.26' }
+
+      # Node builds the console only. The documentation is Hugo.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.164.0'
+          extended: true
+
+      # QEMU so the arm64 image can be built on an amd64 runner.
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

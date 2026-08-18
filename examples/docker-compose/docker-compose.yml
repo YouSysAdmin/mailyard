@@ -1,0 +1,137 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+#
+# A production-shaped single-node deployment: Mailyard terminating TLS
+# itself on 443, its own SMTP listeners, and one PostgreSQL.
+#
+# Copy this beside a .env holding the secrets (see .env.example next to it), then:
+#
+#   docker compose up -d
+#   docker compose logs mailyard | grep -i password    # read it ONCE
+#
+# The console is at https://mail.example.com/app, and the first thing to
+# do there is Administration -> Certificates, because until you order or
+# upload one the listener is serving a self-signed pair.
+
+name: mailyard
+
+services:
+  mailyard:
+    image: ghcr.io/yousysadmin/mailyard:latest
+    restart: unless-stopped
+    depends_on:
+      mailyard-db:
+        condition: service_healthy
+
+    # --init applies the schema. Exactly ONE node in a fleet carries it,
+    # and a single node always does - without it a fresh database gets no
+    # schema and the boot fails saying so.
+    command: ["serve", "--init"]
+
+    ports:
+      # HTTPS console and API. 443 because this process terminates TLS -
+      # see MAILYARD_SERVER_TLS_ENABLED below.
+      - "443:443"
+      # ACME HTTP-01. Only needed when the CA cannot reach our TLS
+      # handshake, which here it can - so this is commented out. Open it
+      # if you put a TLS-TERMINATING proxy in front, and set
+      # MAILYARD_ACME_CHALLENGE_ADDR=:80 with it.
+      # - "80:80"
+      # SMTP submission, for applications that speak SMTP rather than the
+      # API. Drop this line if none do.
+      - "587:587"
+      # Inbound MX, for bounces and replies. Drop it if you publish no MX
+      # pointing here.
+      - "25:25"
+
+    environment:
+      # --- Required ---
+      MAILYARD_DATABASE_DSN: postgres://mailyard:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@mailyard-db:5432/mailyard?sslmode=disable
+      # Both at least 32 characters: openssl rand -hex 32
+      #
+      # The encryption key seals SMTP passwords, DKIM private keys, TOTP
+      # secrets and certificate private keys. Losing it orphans every one
+      # of those rows - treat it like the database password.
+      MAILYARD_AUTH_JWT_SECRET: ${MAILYARD_AUTH_JWT_SECRET:?set MAILYARD_AUTH_JWT_SECRET}
+      MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: ${MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY:?set MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY}
+
+      # The name this installation calls itself: every invitation link,
+      # reset link, tracking link and hosted unsubscribe page is built
+      # from it, and it decides the Secure flag on the session cookie.
+      #
+      # It must match the scheme and host you actually browse. https here
+      # plus http in the browser means sign-in succeeds and the browser
+      # then discards the cookie, with nothing in the response to say so.
+      # A bare IP address has the same effect in Safari.
+      MAILYARD_SERVER_PUBLIC_URL: https://mail.example.com
+
+      # --- Sign-in ---
+      MAILYARD_AUTH_LOCAL_ENABLED: "true"
+      # Created on first start against an empty users table, with a
+      # generated password printed to stderr ONCE.
+      MAILYARD_AUTH_LOCAL_EMAIL: admin@example.com
+
+      # --- TLS ---
+      # Terminate it here rather than at a proxy. WHICH certificate is
+      # served is not configured in this file: it is assigned in the
+      # console and stored in the database, so replacing one needs no
+      # restart. Until something is assigned a self-signed pair is
+      # generated and served, so the console is reachable immediately.
+      MAILYARD_SERVER_ADDR: ":443"
+      MAILYARD_SERVER_TLS_ENABLED: "true"
+
+      # --- Optional SMTP listeners, both off by default ---
+      MAILYARD_SUBMISSION_ENABLED: "true"
+      MAILYARD_INBOUND_ENABLED: "true"
+
+      # --- Attachments ---
+      # On disk in the volume below rather than base64 in the database,
+      # which is the default. s3 is the other option.
+      MAILYARD_STORAGE_BACKEND: fs
+      MAILYARD_STORAGE_FS_PATH: /data/attachments
+
+      # --- Observability ---
+      MAILYARD_LOGGING_FORMAT: json
+      MAILYARD_METRICS_ENABLED: "true"
+      # Without a token /metrics is open to anything that can reach the
+      # port. It is not published above, so that is the container network.
+      MAILYARD_METRICS_TOKEN: ${MAILYARD_METRICS_TOKEN:-}
+
+    volumes:
+      - mailyard_data:/data
+
+    healthcheck:
+      # /healthz answers "the process is up", /readyz adds "the database
+      # answers". A RESTART probe wants the first: pointing it at readyz
+      # means a brief database blip restarts every node at once, which
+      # turns a recoverable outage into a longer one.
+      #
+      # --no-check-certificate because the listener may still be serving
+      # the self-signed pair, and a health check is not the thing that
+      # should decide whether a certificate is trusted.
+      test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:443/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  mailyard-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mailyard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: mailyard
+    volumes:
+      - mailyard_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Not published. Nothing outside this compose project needs to reach
+    # the database, and publishing 5432 is how one ends up on the
+    # internet.
+
+volumes:
+  mailyard_data:
+  mailyard_db:

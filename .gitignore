@@ -1,0 +1,44 @@
+# The pre-rename name, still on some machines as a local config.
+mailyard.yaml
+
+# Build artifacts
+bin/
+# goreleaser writes here. Root-anchored, so it cannot swallow web/dist,
+# docs/dist or a package called dist somewhere in the tree.
+/dist/
+web/dist/*
+!web/dist/.gitkeep
+web/node_modules/
+docs/dist/*
+!docs/dist/.gitkeep
+# Hugo's asset cache, build lock and stats file. The theme is a submodule
+# under docs/themes and IS tracked (as a pointer), so nothing here may
+# ignore that directory.
+docs/resources/_gen/
+docs/.hugo_build.lock
+docs/hugo_stats.json
+
+# Local dev stack: Postgres files and attachment blobs (see compose.yaml)
+/dev-data/
+/data/
+
+# A filled-in environment file beside examples/docker-compose.yml. It
+# holds the JWT secret and the at-rest encryption key, and the README
+# tells people to create it - so it is one `git add -A` away from being
+# committed. The .example stays tracked.
+.env
+
+# OS and editor noise
+.DS_Store
+*.log
+
+# Python bytecode, if you run the SDK locally
+__pycache__/
+*.pyc
+
+# go-tlsutils defaults ACME CacheDir to a RELATIVE "certs", so a test or
+# a dev run inside a package directory mints an account key THERE. One was
+# committed that way (internal/core/tlsbuild/certs). Production never takes
+# that path - Builder.manager hands autocert a certstore.Cache backed by the
+# database - so any certs/ dir in the tree is a local artifact.
+certs/
