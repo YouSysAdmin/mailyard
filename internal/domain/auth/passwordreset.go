@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -64,7 +65,7 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 	// would let the holder of that mailbox bypass the provider.
 	if u == nil || u.Disabled || !u.ManagesOwnCredentials() {
 		slog.Info("auth: password reset requested for an address with no resettable account",
-			"client_ip", c.IP())
+			"client_ip", clientip.From(c))
 
 		return accepted()
 	}
@@ -76,7 +77,7 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 	}
 
 	if recent >= maxResetsPerHour {
-		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", c.IP())
+		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", clientip.From(c))
 
 		return accepted()
 	}
@@ -92,7 +93,7 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 		TokenHash: hash,
 		ExpiresAt: now.Add(prmodel.TTL),
 		CreatedAt: now,
-		RequestIP: c.IP(),
+		RequestIP: clientip.From(c),
 	}
 	if err := h.Runtime.Store.PasswordReset.Put(c.Context(), tok); err != nil {
 		return response.Internal(c, err)
@@ -106,7 +107,7 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 	// mail was actually dispatched.
 	h.Runtime.SystemMail.SendAsync([]string{u.Email}, subject, htmlBody, textBody)
 
-	slog.Info("auth: password reset requested", "user_id", u.ID, "client_ip", c.IP())
+	slog.Info("auth: password reset requested", "user_id", u.ID, "client_ip", clientip.From(c))
 
 	return accepted()
 }
@@ -131,7 +132,7 @@ func (h *Handler) PasswordResetConfirm(c fiber.Ctx) error {
 	// One message for every failure leg: expired, already spent, and
 	// never existed are indistinguishable to the caller.
 	if tok == nil || !tok.Usable(now) {
-		slog.Warn("auth: password reset token rejected", "client_ip", c.IP())
+		slog.Warn("auth: password reset token rejected", "client_ip", clientip.From(c))
 
 		return response.BadRequest(c, "this reset link is invalid or has expired, request a new one")
 	}
@@ -157,7 +158,7 @@ func (h *Handler) PasswordResetConfirm(c fiber.Ctx) error {
 	}
 
 	if !claimed {
-		slog.Warn("auth: password reset token already spent", "token_id", tok.ID, "client_ip", c.IP())
+		slog.Warn("auth: password reset token already spent", "token_id", tok.ID, "client_ip", clientip.From(c))
 
 		return response.BadRequest(c, "this reset link is invalid or has expired, request a new one")
 	}
@@ -191,7 +192,7 @@ func (h *Handler) PasswordResetConfirm(c fiber.Ctx) error {
 		slog.Warn("auth: invalidating sibling reset tokens failed", "user_id", u.ID, "err", err)
 	}
 
-	slog.Info("auth: password reset completed", "user_id", u.ID, "client_ip", c.IP())
+	slog.Info("auth: password reset completed", "user_id", u.ID, "client_ip", clientip.From(c))
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypePasswordResetOK,
 		ActorID:    u.ID,
@@ -244,7 +245,7 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 	}
 
 	if !authenticator.VerifyPassword(u.PasswordHash, in.CurrentPassword) {
-		slog.Warn("auth: password change refused", "user_id", u.ID, "client_ip", c.IP())
+		slog.Warn("auth: password change refused", "user_id", u.ID, "client_ip", clientip.From(c))
 		h.Runtime.Audit.Security(c, &amodel.Event{
 			Type:       amodel.TypePasswordChanged,
 			ActorID:    u.ID,
@@ -295,7 +296,7 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	slog.Info("auth: password changed", "user_id", u.ID, "client_ip", c.IP())
+	slog.Info("auth: password changed", "user_id", u.ID, "client_ip", clientip.From(c))
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypePasswordChanged,
 		ActorID:    u.ID,

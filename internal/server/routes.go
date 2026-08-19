@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/static"
 	docsite "github.com/yousysadmin/mailyard/docs"
 	coreaudit "github.com/yousysadmin/mailyard/internal/core/audit"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
@@ -307,7 +308,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 			return "s:" + hex.EncodeToString(sum[:8])
 		}
 
-		return "ip:" + c.IP()
+		return "ip:" + clientip.From(c)
 	})
 	// Per-IP budget for REJECTED credentials, spent inside machineAuth.
 	//

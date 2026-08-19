@@ -86,8 +86,23 @@ way of learning the real one, because HTTP and SMTP are not the same problem.
 
 ### HTTP
 
-`server.trusted_proxies` lists the CIDRs of your balancer, and `X-Forwarded-For` is then honored from those hops only.
-Without it, every request behind a proxy shares one bucket.
+`server.trusted_proxies` lists the IPs or CIDRs of your balancer, and `X-Forwarded-For` is then read - but only when the
+connection itself came from one of those hops. Without it, every request behind a proxy shares one bucket.
+
+**List every hop, not just the nearest one.** The header is a list, each hop appends the address it saw, and the entries on
+the left are whatever the caller chose to send. So the address is resolved by reading the list **from the right** and
+stopping at the first entry that is not one of your proxies - a hop you leave out of the list becomes the answer, and a
+caller who sends the header cannot become someone else by doing it:
+
+```
+X-Forwarded-For: 8.8.8.8, 203.0.113.9, 10.0.0.7
+                 ^ sent by the caller
+                              ^ what your edge proxy saw, and the answer
+                                            ^ your internal hop, in trusted_proxies
+```
+
+A chain that cannot be read to the end - an entry that is not an address, which some proxies write as `unknown` - falls
+back to the address that connected, rather than trusting the rest of the list.
 
 ### SMTP
 

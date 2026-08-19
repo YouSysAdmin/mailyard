@@ -15,12 +15,14 @@ package audit
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/safego"
@@ -250,8 +252,18 @@ func (r *Recorder) Close(timeout time.Duration) {
 //
 // Called by Project and Security rather than by their callers, so an
 // event cannot be recorded without it. There were twenty-five copies of
-// `ClientIP: c.IP()` and the next event type to be added would have been
-// the twenty-sixth or, more likely, the first without one.
+// `ClientIP: clientip.From(c)` and the next event type to be added would
+// have been the twenty-sixth or, more likely, the first without one.
+//
+// BOTH FIELDS ARE COPIES, and that is the whole reason this function is
+// worth reading twice. The event is queued here and written on the
+// writer goroutine, long after fasthttp has returned the request to its
+// pool and reused the buffers - so a string that merely POINTS at a
+// header reads as whatever arrived later. Reproduced before fixing:
+// three requests kept their user agent, and the first event read the
+// third request's, while all three read one address. clientip.From
+// already answers with a fresh string, so only the header needs the
+// clone.
 //
 // Neither field identifies anybody. The address is where the request
 // reached us: an iCloud Private Relay user arrives from a Cloudflare,
@@ -264,12 +276,16 @@ func Stamp(e *amodel.Event, c fiber.Ctx) {
 		return
 	}
 
-	e.ClientIP = c.IP()
+	e.ClientIP = clientip.From(c)
 	// Capped, because it is a request header: something has to bound what
 	// a caller can write into a column, and no real agent string is
 	// anywhere near this long. Through safetext rather than a byte cut:
 	// invalid UTF-8 here failed the async INSERT, which meant one bad
 	// byte in a header suppressed the sender's own security trail.
+	//
+	// strings.Clone OUTSIDE the clamp, because Clamp returns the string
+	// it was given when there is nothing to clamp - which is every
+	// ordinary user agent, so the common case is the unsafe one.
 	const maxUserAgent = 400
-	e.UserAgent = safetext.Clamp(c.Get(fiber.HeaderUserAgent), maxUserAgent)
+	e.UserAgent = safetext.Clamp(strings.Clone(c.Get(fiber.HeaderUserAgent)), maxUserAgent)
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -80,7 +81,7 @@ func (h *Handler) VerifyEmailConfirm(c fiber.Ctx) error {
 	// One message for every failure leg, exactly like password reset:
 	// expired, already spent, and never existed are indistinguishable.
 	if tok == nil || !tok.Usable(now) {
-		slog.Warn("auth: signup verification token rejected", "client_ip", c.IP())
+		slog.Warn("auth: signup verification token rejected", "client_ip", clientip.From(c))
 
 		return response.BadRequest(c, "this verification link is invalid or has expired, request a new one from the sign-in page")
 	}
@@ -103,7 +104,7 @@ func (h *Handler) VerifyEmailConfirm(c fiber.Ctx) error {
 	}
 
 	if !claimed {
-		slog.Warn("auth: signup verification token already spent", "token_id", tok.ID, "client_ip", c.IP())
+		slog.Warn("auth: signup verification token already spent", "token_id", tok.ID, "client_ip", clientip.From(c))
 
 		return response.BadRequest(c, "this verification link is invalid or has expired, request a new one from the sign-in page")
 	}
@@ -170,7 +171,7 @@ func (h *Handler) VerifyEmailResend(c fiber.Ctx) error {
 	}
 
 	if u == nil || u.Disabled || u.EmailVerified {
-		slog.Info("auth: verification resend for an address with no unverified account", "client_ip", c.IP())
+		slog.Info("auth: verification resend for an address with no unverified account", "client_ip", clientip.From(c))
 
 		return accepted()
 	}
@@ -182,16 +183,16 @@ func (h *Handler) VerifyEmailResend(c fiber.Ctx) error {
 	}
 
 	if recent >= maxVerifyMailsPerHour {
-		slog.Warn("auth: verification resend throttled", "user_id", u.ID, "client_ip", c.IP())
+		slog.Warn("auth: verification resend throttled", "user_id", u.ID, "client_ip", clientip.From(c))
 
 		return accepted()
 	}
 
-	if err := h.sendVerificationMail(c.Context(), u, c.IP()); err != nil {
+	if err := h.sendVerificationMail(c.Context(), u, clientip.From(c)); err != nil {
 		return response.Internal(c, err)
 	}
 
-	slog.Info("auth: verification link resent", "user_id", u.ID, "client_ip", c.IP())
+	slog.Info("auth: verification link resent", "user_id", u.ID, "client_ip", clientip.From(c))
 
 	return accepted()
 }

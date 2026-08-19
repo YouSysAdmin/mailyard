@@ -28,6 +28,7 @@ require (
 	github.com/samber/slog-fiber v1.22.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	github.com/valyala/fasthttp v1.73.0
 	github.com/vanng822/go-premailer v1.35.0
 	github.com/yousysadmin/go-logger v1.0.0
 	github.com/yousysadmin/go-tlsutils v1.1.2
@@ -107,7 +108,6 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.73.0 // indirect
 	github.com/vanng822/css v1.0.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yousysadmin/logger v0.3.0 // indirect

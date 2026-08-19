@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
@@ -347,7 +348,7 @@ func (h *Handler) linkIdentity(ctx context.Context, prov *opmodel.Provider, u *u
 // trail its
 // sibling auditOIDCDenied was filling.
 func (h *Handler) auditOIDCFailed(c fiber.Ctx, email, reason string) {
-	slog.Warn("auth: oauth login failed", "email", email, "reason", reason, "client_ip", c.IP())
+	slog.Warn("auth: oauth login failed", "email", email, "reason", reason, "client_ip", clientip.From(c))
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCDenied,
 		ActorEmail: email,
@@ -357,7 +358,7 @@ func (h *Handler) auditOIDCFailed(c fiber.Ctx, email, reason string) {
 }
 
 func (h *Handler) auditOIDCDenied(c fiber.Ctx, claims *coreoidc.Claims, reason string) {
-	slog.Warn("auth: oauth denied", "email", claims.Email, "sub", claims.Subject, "reason", reason, "client_ip", c.IP())
+	slog.Warn("auth: oauth denied", "email", claims.Email, "sub", claims.Subject, "reason", reason, "client_ip", clientip.From(c))
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCDenied,
 		ActorEmail: claims.Email,

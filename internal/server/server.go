@@ -13,15 +13,19 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	docsite "github.com/yousysadmin/mailyard/docs"
 
 	"github.com/gofiber/fiber/v3"
 	slogfiber "github.com/samber/slog-fiber"
+	"github.com/valyala/fasthttp"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/domain/eventstream"
 )
 
 // Server is the HTTP listener and the routes mounted on it. New builds
@@ -113,23 +117,63 @@ func New(opts Options) (*Server, error) {
 		// Generous rather than tight on purpose. These are a backstop
 		// against a socket going nowhere, not a latency policy, and a
 		// reverse proxy in front will usually be stricter.
+		//
+		// WriteTimeout is not the whole story for a STREAMED response -
+		// see streamWriteTimeout below, which is why the event feed does
+		// not die every two minutes.
 		ReadTimeout:  2 * time.Minute,
 		WriteTimeout: 2 * time.Minute,
 		IdleTimeout:  75 * time.Second,
+
+		// A request body is read into memory BEFORE the handler chain
+		// runs, so neither auth nor the rate limiter can refuse one
+		// first. This is the only bound on how many of those exist at
+		// once - see env.ServerConfig.MaxConcurrentRequests.
+		Concurrency: concurrencyFor(opts.Runtime.Config),
+
+		// 8 KiB rather than fasthttp's 4 KiB. Our own session cookie is
+		// a 369-byte JWT (measured, on an account with one project),
+		// and it arrives alongside whatever else the browser has for
+		// the origin plus the headers each proxy hop adds. Past the
+		// buffer fasthttp answers 431 before any handler runs, which
+		// reads as the site being broken for one person and fine for
+		// everybody else.
+		ReadBufferSize: 8 * 1024,
+
+		// Every error a handler returns, and Fiber's own 404, answered
+		// in the envelope three generated SDKs expect. Without it the
+		// stock handler writes err.Error() as text/plain, so a store
+		// failure reaching the top of a handler became a 500 carrying
+		// the Postgres message.
+		ErrorHandler: errorHandler,
 	}
 
-	// Fiber treats the TCP peer's address as c.IP() by default.
-	// When operators terminate TLS at a reverse proxy / ALB and only
-	// trusted hosts ever connect to us, we honor X-Forwarded-For but
-	// strictly limit it to the trusted-proxy list so an unproxied
-	// caller cannot spoof their source IP through the header.
+	// TrustProxy governs what Fiber itself will read out of a forwarding
+	// header: c.Scheme() (which the HSTS check in securityHeaders rests
+	// on) and c.Host(). Behind a proxy those come from X-Forwarded-Proto and
+	// X-Forwarded-Host, and only from a peer on this list.
+	//
+	// ProxyHeader is deliberately NOT set, so c.IP() stays the TCP peer
+	// and nothing else. Fiber reads X-Forwarded-For leftmost-first,
+	// which is the half of the header the CALLER writes - the address of
+	// the caller is resolved in internal/core/clientip instead, by
+	// walking the header from the right.
 	if proxies := opts.Runtime.Config.Server.TrustedProxies; len(proxies) > 0 {
 		fiberCfg.TrustProxy = true
 		fiberCfg.TrustProxyConfig = fiber.TrustProxyConfig{Proxies: proxies}
-		fiberCfg.ProxyHeader = fiber.HeaderXForwardedFor
+	}
+
+	// Parsed once, at boot: an unreadable entry is a trust list that is
+	// not what the operator wrote, and finding that out per request
+	// means finding it out never.
+	resolver, err := clientip.New(opts.Runtime.Config.Server.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("server.trusted_proxies: %w", err)
 	}
 
 	app := fiber.New(fiberCfg)
+	app.Server().HeaderReceived = perRequestLimits
+
 	app.Use(safeRecover)
 
 	// script-src is built once, from the hashes of whatever inline scripts
@@ -139,11 +183,71 @@ func New(opts Options) (*Server, error) {
 		slogfiber.NewWithFilters(opts.Runtime.Log, accessLogFilters()...),
 		streamingPaths...,
 	))
-	app.Use(requestContext(opts.Runtime))
+	app.Use(requestContext(opts.Runtime, resolver))
 
 	registerRoutes(app, opts.Runtime, opts.HealthOnly)
 
 	return &Server{app: app, rt: opts.Runtime, tlsCfg: opts.TLS}, nil
+}
+
+// concurrencyFor turns the operator's cap into what fasthttp wants,
+// where 0 means "use the library default" in both places.
+func concurrencyFor(cfg *env.Config) int {
+	if cfg.Server.MaxConcurrentRequests <= 0 {
+		return 0
+	}
+
+	return cfg.Server.MaxConcurrentRequests
+}
+
+// streamWriteTimeout is the write deadline for the endpoints that stream.
+//
+// fasthttp sets the write deadline ONCE, after the handler returns and
+// before it writes the response, and a streamed body is written under
+// that one deadline - so the app-wide WriteTimeout is not a per-write
+// budget for a stream, it is the stream's whole lifetime. Measured: at
+// WriteTimeout 2s a stream writing every 500ms was cut at 2.0s exactly.
+//
+// The feed recycles itself at eventstream.MaxStreamLife, so this only has
+// to sit above that. Derived from it rather than written down, because
+// two numbers that must stay ordered are one number and a margin.
+const streamWriteTimeout = eventstream.MaxStreamLife + 5*time.Minute
+
+// perRequestLimits raises the write deadline for the streaming endpoints
+// and changes nothing else.
+//
+// A zero field in the returned config means "honor the server's own
+// value", so read timeout and body limit are untouched. The URI here is
+// the RAW request target, so the path is normalized the same way the
+// router normalizes it before matching - see normalizePath.
+func perRequestLimits(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
+	uri := string(h.RequestURI())
+	if i := strings.IndexAny(uri, "?#"); i >= 0 {
+		uri = uri[:i]
+	}
+
+	if isStreamingPath(uri) {
+		return fasthttp.RequestConfig{WriteTimeout: streamWriteTimeout}
+	}
+
+	return fasthttp.RequestConfig{}
+}
+
+// errorHandler answers every error that reaches the top of the chain,
+// including Fiber's own for a path that matched no route.
+//
+// A *fiber.Error carries the status the framework chose and a message it
+// wrote, and both are safe to repeat - nothing in this tree constructs
+// one, so the message is never a detail of ours. Anything else is ours and goes
+// through response.Internal, which logs it, softens a malformed uuid to
+// a 404, and tells the caller nothing it should not know.
+func errorHandler(c fiber.Ctx, err error) error {
+	var fe *fiber.Error
+	if errors.As(err, &fe) {
+		return response.Coded(c, fe.Code, strings.ToLower(fe.Message))
+	}
+
+	return response.Internal(c, err)
 }
 
 // Start blocks serving HTTP or HTTPS depending on whether TLS was configured.
@@ -210,7 +314,7 @@ func safeRecover(c fiber.Ctx) (err error) {
 				"reason", fmt.Sprintf("%v", r),
 				"path", c.Path(),
 				"method", c.Method(),
-				"client_ip", c.IP(),
+				"client_ip", clientip.From(c),
 				"stack", string(debug.Stack()),
 			)
 			err = response.Internal(c, nil)
@@ -337,19 +441,55 @@ var streamingPaths = []string{env.ConsolePath + "/api/events/stream"}
 
 // skipPaths runs h for every request except the listed paths, which
 // are passed straight through.
+//
+// The comparison is against the NORMALIZED path, because the router is
+// neither case sensitive nor strict about a trailing slash: a request for
+// /app/api/events/STREAM/ reaches the streaming handler, and a raw string
+// compare did not skip the logger for it - which is a request that hangs
+// with no headers ever sent, holding a connection until the stream
+// recycles itself half an hour later.
 func skipPaths(h fiber.Handler, paths ...string) fiber.Handler {
 	skip := make(map[string]struct{}, len(paths))
 	for _, p := range paths {
-		skip[p] = struct{}{}
+		skip[normalizePath(p)] = struct{}{}
 	}
 
 	return func(c fiber.Ctx) error {
-		if _, ok := skip[c.Path()]; ok {
+		if _, ok := skip[normalizePath(c.Path())]; ok {
 			return c.Next()
 		}
 
 		return h(c)
 	}
+}
+
+// isStreamingPath reports whether a path is one of the endpoints whose
+// response body never ends.
+func isStreamingPath(path string) bool {
+	target := normalizePath(path)
+	for _, p := range streamingPaths {
+		if normalizePath(p) == target {
+			return true
+		}
+	}
+
+	return false
+}
+
+// normalizePath folds a request path the way the router does before it
+// matches: lowercased, since CaseSensitive is off, and without trailing
+// slashes, since StrictRouting is off.
+//
+// Those two are the whole set of variations that reach the same handler -
+// proven rather than assumed in TestTheLoggerSkipsEveryFormOfAStreamingPath,
+// which asks the router which forms arrive and requires this to agree.
+func normalizePath(path string) string {
+	trimmed := strings.TrimRight(path, "/")
+	if trimmed == "" {
+		return "/"
+	}
+
+	return strings.ToLower(trimmed)
 }
 
 func accessLogFilters() []slogfiber.Filter {

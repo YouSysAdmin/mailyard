@@ -32,11 +32,17 @@ type Handler struct {
 // ignored by EventSource.
 const heartbeat = 25 * time.Second
 
-// maxStreamLife caps a single connection. EventSource reconnects
+// MaxStreamLife caps a single connection. EventSource reconnects
 // automatically, so recycling costs the reader nothing and stops a
 // forgotten tab holding a goroutine and a database-free but non-zero
 // slice of memory for weeks.
-const maxStreamLife = 30 * time.Minute
+//
+// Exported because the HTTP edge has to know it: fasthttp applies ONE
+// write deadline to a streamed body, so internal/server raises it above
+// this value for the streaming paths. Left at the app-wide WriteTimeout
+// the stream would be cut at two minutes and the reader would reconnect
+// forever.
+const MaxStreamLife = 30 * time.Minute
 
 // Stream opens the feed for the caller's active project.
 //
@@ -76,7 +82,7 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 	return c.SendStreamWriter(func(w *bufio.Writer) {
 		defer sub.Close()
 
-		deadline := time.NewTimer(maxStreamLife)
+		deadline := time.NewTimer(MaxStreamLife)
 		defer deadline.Stop()
 		ticker := time.NewTicker(heartbeat)
 		defer ticker.Stop()

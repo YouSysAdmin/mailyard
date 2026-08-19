@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -503,7 +504,7 @@ func (h *Handler) PasskeyLoginFinish(c fiber.Ctx) error {
 
 	cred, _, err := svc.FinishLogin(resolve, *sess, c.Body())
 	if err != nil || matched == nil || row == nil {
-		slog.Warn("auth: passkey sign-in failed", "client_ip", c.IP(), "err", err)
+		slog.Warn("auth: passkey sign-in failed", "client_ip", clientip.From(c), "err", err)
 		h.recordLoginFailure(c, matched, emailOf(matched), "passkey assertion rejected")
 
 		return response.Unauthorized(c, "passkey sign-in failed")
@@ -516,7 +517,7 @@ func (h *Handler) PasskeyLoginFinish(c fiber.Ctx) error {
 	// on hardware that counts.
 	if cred.Authenticator.CloneWarning {
 		slog.Warn("auth: passkey clone warning, sign-in refused",
-			"user_id", matched.ID, "client_ip", c.IP())
+			"user_id", matched.ID, "client_ip", clientip.From(c))
 		h.recordLoginFailure(c, matched, matched.Email, "passkey clone warning")
 
 		return response.Unauthorized(c, "passkey sign-in failed")

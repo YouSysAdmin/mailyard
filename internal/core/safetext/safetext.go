@@ -21,6 +21,11 @@ import (
 // replaced away so the result is always storable text. The cut is on a
 // rune boundary - a byte slice would split whatever character straddles
 // the cap and turn a valid string into an unstorable one.
+//
+// IT MAY RETURN s ITSELF, and for valid text under the cap it always
+// does. So a caller holding a value past the end of its request - a
+// header on its way to an asynchronous write - has to clone it: this is
+// not the copy that makes a fasthttp-backed string safe to keep.
 func Clamp(s string, max int) string {
 	// Invalid bytes go FIRST: the []rune conversion below would turn
 	// each of them into U+FFFD rather than away, so cutting first

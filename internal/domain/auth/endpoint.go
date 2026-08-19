@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -181,7 +182,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	})
 
 	if needsVerify {
-		if err := h.sendVerificationMail(c.Context(), u, c.IP()); err != nil {
+		if err := h.sendVerificationMail(c.Context(), u, clientip.From(c)); err != nil {
 			return response.Internal(c, err)
 		}
 

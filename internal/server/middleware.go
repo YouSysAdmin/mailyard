@@ -12,6 +12,7 @@ import (
 	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -30,7 +31,12 @@ import (
 //
 // Registered after slog-fiber: GetRequestID reads the ID that
 // middleware minted at request start.
-func requestContext(rt *env.Runtime) fiber.Handler {
+//
+// It is also where the caller's address is decided, once per request:
+// resolver.Stamp stores it on the request so clientip.From answers the
+// same thing to the rate limiter, the api key allowlist, the audit trail
+// and every log line, without any of them re-reading a header.
+func requestContext(rt *env.Runtime, resolver *clientip.Resolver) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		appURL := rt.Config.Server.PublicURL
 		if appURL == "" {
@@ -42,7 +48,7 @@ func requestContext(rt *env.Runtime) fiber.Handler {
 			AppName:    pkg.AppName,
 			AppURL:     appURL,
 			AppVersion: pkg.Version,
-			ClientIP:   c.IP(),
+			ClientIP:   resolver.Stamp(c),
 			Path:       c.Path(),
 			RequestID:  slogfiber.GetRequestID(c),
 			SSL:        c.Secure() || strings.HasPrefix(strings.ToLower(rt.Config.Server.PublicURL), "https://"),

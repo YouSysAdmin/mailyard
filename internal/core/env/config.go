@@ -545,12 +545,27 @@ type ServerConfig struct {
 	PublicURL string    `mapstructure:"public_url"`
 	TLS       TLSConfig `mapstructure:"tls"`
 
-	// TrustedProxies are the proxy IPs or CIDRs Fiber trusts for
-	// X-Forwarded-For. Empty means c.IP() is the direct peer, which is
-	// right for direct exposure. Behind a proxy, set it or the rate
-	// limiter, the audit log and the access log all record the
-	// proxy.
+	// TrustedProxies are the proxy IPs or CIDRs in front of this node.
+	// Empty means the TCP peer is the caller, which is right for direct
+	// exposure. Behind a proxy, set it or the rate limiter, the audit
+	// log and the access log all record the proxy.
+	//
+	// LIST EVERY HOP, not just the nearest one. The caller's address is
+	// resolved by walking X-Forwarded-For from the right and stopping at
+	// the first entry that is not in this list (internal/core/clientip),
+	// so a hop left out of it becomes the answer.
 	TrustedProxies []string `mapstructure:"trusted_proxies"`
+
+	// MaxConcurrentRequests caps connections being served at once. 0
+	// leaves fasthttp's own default, which is 262144.
+	//
+	// It is a memory bound and not a performance setting. fasthttp reads
+	// a whole request body into memory BEFORE the handler chain runs, so
+	// before any auth or rate limit can refuse it, and the cap on one
+	// body is sending.max_total_attachment_size inflated for base64 -
+	// around 34 MB at the default. The default connection ceiling makes
+	// the product of those two numbers unbounded in practice.
+	MaxConcurrentRequests int `mapstructure:"max_concurrent_requests"`
 }
 
 // DatabaseConfig is the PostgreSQL connection and the key that seals
@@ -733,6 +748,10 @@ func Load(path string) (*Config, error) {
 	bindEnvKeys(v, reflect.TypeFor[Config](), "")
 
 	v.SetDefault("server.addr", ":3000")
+	// Far above what any single node of this shape serves, far below
+	// fasthttp's 262144 - the point is that the worst case is a number
+	// rather than whatever the kernel allows.
+	v.SetDefault("server.max_concurrent_requests", 4096)
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "json")
 	v.SetDefault("logging.output", "stdout")
@@ -989,6 +1008,10 @@ func (c *Config) Validate() error {
 	if c.Database.MaxOpenConns < 0 || c.Database.MaxIdleConns < 0 ||
 		c.Database.ConnMaxLifetime < 0 || c.Database.ConnMaxIdleTime < 0 {
 		return fmt.Errorf("database pool settings (max_open_conns, max_idle_conns, conn_max_lifetime, conn_max_idle_time) cannot be negative - 0 means the driver default")
+	}
+
+	if c.Server.MaxConcurrentRequests < 0 {
+		return fmt.Errorf("server.max_concurrent_requests cannot be negative - 0 means the fasthttp default")
 	}
 
 	if c.Worker.Concurrency < 1 {

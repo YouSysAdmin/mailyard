@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/safetext"
 
@@ -50,7 +51,7 @@ func (h *Handler) startSession(c fiber.Ctx, u *usermodel.User, authProviderID st
 		ID:         ids.New(),
 		UserID:     u.ID,
 		UserAgent:  ua,
-		IP:         c.IP(),
+		IP:         clientip.From(c),
 		CreatedAt:  now,
 		LastSeenAt: now,
 		ExpiresAt:  now.Add(ttl),

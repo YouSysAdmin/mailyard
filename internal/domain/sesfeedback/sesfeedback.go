@@ -24,6 +24,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/sestopics"
@@ -78,7 +79,7 @@ func (h *Handler) Receive(c fiber.Ctx) error {
 
 	msg, err := snsmsg.Parse(body)
 	if err != nil {
-		h.log().Warn("ses: unparseable sns delivery", "err", err, "client_ip", c.IP())
+		h.log().Warn("ses: unparseable sns delivery", "err", err, "client_ip", clientip.From(c))
 
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
@@ -102,14 +103,14 @@ func (h *Handler) Receive(c fiber.Ctx) error {
 		// the log by posting to it. A valid topic with a bad signature
 		// stays a Warn below - that one is genuinely an event.
 		h.log().Debug("ses: notification from an unlisted topic, refusing",
-			"topic", msg.TopicARN, "client_ip", c.IP())
+			"topic", msg.TopicARN, "client_ip", clientip.From(c))
 
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
 	if err := h.verifier.Verify(msg); err != nil {
 		h.log().Warn("ses: notification failed signature verification",
-			"topic", msg.TopicARN, "client_ip", c.IP(), "err", err)
+			"topic", msg.TopicARN, "client_ip", clientip.From(c), "err", err)
 
 		return c.SendStatus(fiber.StatusForbidden)
 	}

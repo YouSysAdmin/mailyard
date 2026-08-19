@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -50,8 +51,8 @@ func stampAPIKey(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	}
 
 	now := time.Now().UTC()
-	if k == nil || !akmodel.HashEquals(raw, k.KeyHash) || !k.IsValid(now) || !k.AllowsIP(c.IP()) {
-		slog.Warn("apikey: rejected", "prefix", akmodel.TokenPrefix(raw), "client_ip", c.IP())
+	if k == nil || !akmodel.HashEquals(raw, k.KeyHash) || !k.IsValid(now) || !k.AllowsIP(clientip.From(c)) {
+		slog.Warn("apikey: rejected", "prefix", akmodel.TokenPrefix(raw), "client_ip", clientip.From(c))
 
 		return false, response.Unauthorized(c, "invalid api key")
 	}
@@ -137,13 +138,13 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 	// status IS the discriminator - there is no error to inspect.
 	charge := func(c fiber.Ctx) {
 		if c.Response().StatusCode() == fiber.StatusUnauthorized {
-			authFailures.Allow(c.IP())
+			authFailures.Allow(clientip.From(c))
 		}
 	}
 
 	return func(c fiber.Ctx) error {
-		if authFailures.Exceeded(c.IP()) {
-			slog.Warn("apikey: authentication budget exhausted", "client_ip", c.IP())
+		if authFailures.Exceeded(clientip.From(c)) {
+			slog.Warn("apikey: authentication budget exhausted", "client_ip", clientip.From(c))
 
 			return response.TooManyRequests(c, "too many failed authentication attempts")
 		}
@@ -219,8 +220,8 @@ func stampAdminKey(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	}
 
 	now := time.Now().UTC()
-	if k == nil || !akmodel.HashEquals(raw, k.KeyHash) || !k.IsValid(now) || !k.AllowsIP(c.IP()) {
-		slog.Warn("apikey: admin key rejected", "prefix", akmodel.TokenPrefix(raw), "client_ip", c.IP())
+	if k == nil || !akmodel.HashEquals(raw, k.KeyHash) || !k.IsValid(now) || !k.AllowsIP(clientip.From(c)) {
+		slog.Warn("apikey: admin key rejected", "prefix", akmodel.TokenPrefix(raw), "client_ip", clientip.From(c))
 
 		return false, response.Unauthorized(c, "invalid api key")
 	}

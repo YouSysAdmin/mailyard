@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/database"
 )
 
@@ -100,6 +101,16 @@ func Unavailable(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": msg})
 }
 
+// Coded answers with an explicit status and message, for the ONE caller
+// that cannot name the status at compile time: the app-wide error handler,
+// which repeats the status Fiber chose for an error it raised itself.
+//
+// Every other refusal has a helper of its own above and should use it - a
+// status passed in as a number is a status nobody can grep for.
+func Coded(c fiber.Ctx, code int, msg string) error {
+	return c.Status(code).JSON(fiber.Map{"error": msg})
+}
+
 // Internal logs the underlying error server-side and returns a generic
 // 500 to the caller. The raw err is intentionally not echoed back - it
 // commonly contains stack-revealing detail (file paths, SQL state,
@@ -127,7 +138,7 @@ func Internal(c fiber.Ctx, err error) error {
 			"err", err,
 			"path", c.Path(),
 			"method", c.Method(),
-			"client_ip", c.IP(),
+			"client_ip", clientip.From(c),
 		)
 
 		return NotFound(c, "not found")
@@ -138,7 +149,7 @@ func Internal(c fiber.Ctx, err error) error {
 			"err", err,
 			"path", c.Path(),
 			"method", c.Method(),
-			"client_ip", c.IP(),
+			"client_ip", clientip.From(c),
 		)
 	}
 

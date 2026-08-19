@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 )
@@ -44,13 +45,13 @@ func TestAFloodOfDistinctTokensIsRefused(t *testing.T) {
 		sum := sha256.Sum256([]byte(token))
 		buckets["k:"+hex.EncodeToString(sum[:8])]++
 
-		if failures.Exceeded(c.IP()) {
+		if failures.Exceeded(clientip.From(c)) {
 			return c.SendStatus(fiber.StatusTooManyRequests)
 		}
 
 		_ = c.SendStatus(fiber.StatusUnauthorized)
 		if c.Response().StatusCode() == fiber.StatusUnauthorized {
-			failures.Allow(c.IP())
+			failures.Allow(clientip.From(c))
 		}
 
 		return nil
@@ -108,7 +109,7 @@ func TestTheGateRefusesAnIPOverItsBudget(t *testing.T) {
 	failures := iplimit.New(1, time.Minute)
 	app := fiber.New()
 	app.Use(func(c fiber.Ctx) error {
-		failures.Allow(c.IP())
+		failures.Allow(clientip.From(c))
 
 		return c.Next()
 	})

@@ -15,6 +15,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/tracking"
@@ -88,7 +89,7 @@ func (h *Handler) Open(c fiber.Ctx) error {
 
 	if !h.signer().VerifyOpen(emailID, c.Query("sig")) {
 		slog.Warn("tracking: open ignored, bad signature",
-			"email_id", emailID, "client_ip", c.IP())
+			"email_id", emailID, "client_ip", clientip.From(c))
 
 		return pixel()
 	}
@@ -150,7 +151,7 @@ func (h *Handler) Open(c fiber.Ctx) error {
 
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
 		EmailID: emailID, CampaignMessageID: campaignMessageID,
-		EventType: cmodel.EventOpen, IP: c.IP(), UserAgent: ua,
+		EventType: cmodel.EventOpen, IP: clientip.From(c), UserAgent: ua,
 	}); err != nil {
 		slog.Error("tracking: record open", "email_id", emailID, "err", err)
 	}
@@ -239,7 +240,7 @@ func (h *Handler) Click(c fiber.Ctx) error {
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
 		EmailID: emailID, CampaignMessageID: campaignMessageID,
 		EventType: cmodel.EventClick, TrackedLinkID: link.ID,
-		IP: c.IP(), UserAgent: ua,
+		IP: clientip.From(c), UserAgent: ua,
 	}); err != nil {
 		slog.Error("tracking: record click", "email_id", emailID, "err", err)
 	}
@@ -346,7 +347,7 @@ func (h *Handler) UnsubscribeConfirm(c fiber.Ctx) error {
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
 		EmailID: m.EmailID, CampaignMessageID: messageID,
 		EventType: cmodel.EventUnsubscribe,
-		IP:        c.IP(), UserAgent: c.Get("User-Agent"),
+		IP:        clientip.From(c), UserAgent: c.Get("User-Agent"),
 	}); err != nil {
 		slog.Error("tracking: record unsubscribe", "message_id", messageID, "err", err)
 	}
