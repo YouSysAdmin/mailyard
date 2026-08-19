@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -69,7 +69,7 @@ func (h *Handler) signer() *tracking.Signer { return h.Runtime.Tracking }
 // recorded invisible from outside, so each one is logged. Chasing an
 // open rate stuck at zero should be a matter of reading the log, not
 // of guessing between four indistinguishable outcomes.
-func (h *Handler) Open(c *fiber.Ctx) error {
+func (h *Handler) Open(c fiber.Ctx) error {
 	emailID := strings.TrimSuffix(c.Params("file"), ".gif")
 	ua := c.Get("User-Agent")
 	pixel := func() error {
@@ -101,7 +101,7 @@ func (h *Handler) Open(c *fiber.Ctx) error {
 	}
 
 	now := time.Now().UTC()
-	ctx := c.UserContext()
+	ctx := c.Context()
 
 	// The id in the URL is an EMAIL id, for campaign and transactional
 	// mail alike - one identifier, so this handler resolves one thing.
@@ -159,7 +159,7 @@ func (h *Handler) Open(c *fiber.Ctx) error {
 }
 
 // Click records the click and redirects to the original URL.
-func (h *Handler) Click(c *fiber.Ctx) error {
+func (h *Handler) Click(c fiber.Ctx) error {
 	emailID := c.Params("id")
 	hash := c.Params("hash")
 	ua := c.Get("User-Agent")
@@ -167,7 +167,7 @@ func (h *Handler) Click(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
 	}
 
-	ctx := c.UserContext()
+	ctx := c.Context()
 	e, err := h.Runtime.Store.Email.GetAny(ctx, emailID)
 	if err != nil || e == nil {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
@@ -204,7 +204,7 @@ func (h *Handler) Click(c *fiber.Ctx) error {
 		slog.Debug("tracking: click not recorded, automated fetch",
 			"email_id", emailID, "matched", reason, "user_agent", ua)
 
-		return c.Redirect(link.OriginalURL, fiber.StatusFound)
+		return c.Redirect().Status(fiber.StatusFound).To(link.OriginalURL)
 	}
 
 	now := time.Now().UTC()
@@ -233,7 +233,7 @@ func (h *Handler) Click(c *fiber.Ctx) error {
 		slog.Debug("tracking: click counted but not recorded, the event ceiling is reached",
 			"email_id", emailID, "clicks", clicks, "ceiling", trackedEventsPerEmail)
 
-		return c.Redirect(link.OriginalURL, fiber.StatusFound)
+		return c.Redirect().Status(fiber.StatusFound).To(link.OriginalURL)
 	}
 
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
@@ -244,12 +244,12 @@ func (h *Handler) Click(c *fiber.Ctx) error {
 		slog.Error("tracking: record click", "email_id", emailID, "err", err)
 	}
 
-	return c.Redirect(link.OriginalURL, fiber.StatusFound)
+	return c.Redirect().Status(fiber.StatusFound).To(link.OriginalURL)
 }
 
 // UnsubscribePage shows the confirmation page (a GET must not mutate:
 // scanners prefetch links).
-func (h *Handler) UnsubscribePage(c *fiber.Ctx) error {
+func (h *Handler) UnsubscribePage(c fiber.Ctx) error {
 	token := c.Params("token")
 
 	// Two token kinds land here: a campaign message (unsubscribes the
@@ -257,7 +257,7 @@ func (h *Handler) UnsubscribePage(c *fiber.Ctx) error {
 	// opt-out scope (suppresses the address for that list only).
 	scope := "this list"
 	if listID, _, err := h.signer().VerifyListUnsubscribeToken(token); err == nil {
-		if l, lerr := h.Runtime.Store.UnsubscribeList.GetAny(c.UserContext(), listID); lerr == nil && l != nil {
+		if l, lerr := h.Runtime.Store.UnsubscribeList.GetAny(c.Context(), listID); lerr == nil && l != nil {
 			scope = l.Display()
 		}
 	} else if _, err := h.signer().VerifyUnsubscribeToken(token); err != nil {
@@ -275,8 +275,8 @@ func (h *Handler) UnsubscribePage(c *fiber.Ctx) error {
 // listUnsubscribe handles the transactional opt-out kind: write a
 // suppression scoped to the list, leaving every other kind of mail to
 // that address alone.
-func (h *Handler) listUnsubscribe(c *fiber.Ctx, listID, email string) error {
-	ctx := c.UserContext()
+func (h *Handler) listUnsubscribe(c fiber.Ctx, listID, email string) error {
+	ctx := c.Context()
 	l, err := h.Runtime.Store.UnsubscribeList.GetAny(ctx, listID)
 	if err != nil || l == nil {
 		return pageResponse(c, fiber.StatusNotFound, "Link invalid",
@@ -306,7 +306,7 @@ func (h *Handler) listUnsubscribe(c *fiber.Ctx, listID, email string) error {
 
 // UnsubscribeConfirm performs the opt-out. RFC 8058 one-click POSTs
 // land here directly.
-func (h *Handler) UnsubscribeConfirm(c *fiber.Ctx) error {
+func (h *Handler) UnsubscribeConfirm(c fiber.Ctx) error {
 	token := c.Params("token")
 	if listID, email, lerr := h.signer().VerifyListUnsubscribeToken(token); lerr == nil {
 		return h.listUnsubscribe(c, listID, email)
@@ -318,7 +318,7 @@ func (h *Handler) UnsubscribeConfirm(c *fiber.Ctx) error {
 			"This unsubscribe link is invalid or incomplete.")
 	}
 
-	ctx := c.UserContext()
+	ctx := c.Context()
 	m, err := h.Runtime.Store.Campaign.GetMessageAny(ctx, messageID)
 	if err != nil || m == nil {
 		return pageResponse(c, fiber.StatusNotFound, "Link invalid",
@@ -378,7 +378,7 @@ const webViewCSP = "sandbox; default-src 'none'; img-src data: http: https:; " +
 	"style-src 'unsafe-inline'; font-src data:; form-action 'none'"
 
 // WebView serves the hosted copy of a sent email.
-func (h *Handler) WebView(c *fiber.Ctx) error {
+func (h *Handler) WebView(c fiber.Ctx) error {
 	emailID, err := h.signer().VerifyWebViewToken(c.Params("token"))
 	if err != nil {
 		status := fiber.StatusNotFound
@@ -391,7 +391,7 @@ func (h *Handler) WebView(c *fiber.Ctx) error {
 		return pageResponse(c, status, "Message unavailable", msg)
 	}
 
-	e, err := h.Runtime.Store.Email.GetAny(c.UserContext(), emailID)
+	e, err := h.Runtime.Store.Email.GetAny(c.Context(), emailID)
 	if err != nil || e == nil {
 		return pageResponse(c, fiber.StatusNotFound, "Message unavailable",
 			"This message is no longer available online.")
@@ -407,7 +407,7 @@ func (h *Handler) WebView(c *fiber.Ctx) error {
 }
 
 // pageResponse renders the minimal hosted page shell.
-func pageResponse(c *fiber.Ctx, status int, title, body string) error {
+func pageResponse(c fiber.Ctx, status int, title, body string) error {
 	c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 
 	return c.Status(status).SendString(fmt.Sprintf(`<!DOCTYPE html>

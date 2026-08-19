@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -28,7 +28,7 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/subscribers.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	status := c.Query("status")
 	if status != "" {
@@ -39,7 +39,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 
 	pg := paging.From(c)
 	search := paging.Search(c, "q")
-	subs, err := h.Runtime.Store.Subscriber.List(c.UserContext(), rc.Project.ID,
+	subs, err := h.Runtime.Store.Subscriber.List(c.Context(), rc.Project.ID,
 		status, search, pg.Limit, pg.Offset)
 	if err != nil {
 		return response.Internal(c, err)
@@ -52,7 +52,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	// The total of what this page is a page OF. Plain Count ignores both
 	// filters, so a search matching one row out of five thousand reported
 	// total 5000 and the pager offered fifty pages, forty-nine empty.
-	total, err := h.Runtime.Store.Subscriber.CountMatching(c.UserContext(), rc.Project.ID, status, search)
+	total, err := h.Runtime.Store.Subscriber.CountMatching(c.Context(), rc.Project.ID, status, search)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -61,9 +61,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/subscribers/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sub, err := h.Runtime.Store.Subscriber.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	sub, err := h.Runtime.Store.Subscriber.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -76,14 +76,14 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/subscribers.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.UserContext(), h.Runtime.Store, rc.Project.ID, quota.ResSubscribers, 1); err != nil {
+	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResSubscribers, 1); err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
@@ -91,7 +91,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	existing, err := h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), rc.Project.ID, in.Email)
+	existing, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -101,7 +101,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	}
 
 	sub := in.toModel(rc.Project.ID)
-	if err := h.Runtime.Store.Subscriber.Put(c.UserContext(), sub); err != nil {
+	if err := h.Runtime.Store.Subscriber.Put(c.Context(), sub); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -109,9 +109,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/subscribers/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sub, err := h.Runtime.Store.Subscriber.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	sub, err := h.Runtime.Store.Subscriber.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -126,7 +126,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	if in.Email != sub.Email {
-		other, err := h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), rc.Project.ID, in.Email)
+		other, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -153,7 +153,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	sub.Timezone = in.Timezone
 	sub.Language = in.Language
 	sub.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Subscriber.Put(c.UserContext(), sub); err != nil {
+	if err := h.Runtime.Store.Subscriber.Put(c.Context(), sub); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -161,9 +161,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/subscribers/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sub, err := h.Runtime.Store.Subscriber.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	sub, err := h.Runtime.Store.Subscriber.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -172,7 +172,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "subscriber not found")
 	}
 
-	if err := h.Runtime.Store.Subscriber.Delete(c.UserContext(), rc.Project.ID, sub.ID); err != nil {
+	if err := h.Runtime.Store.Subscriber.Delete(c.Context(), rc.Project.ID, sub.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -181,7 +181,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 
 // Import bulk-upserts subscribers from JSON. Existing emails are
 // updated, invalid rows are reported and skipped.
-func (h *Handler) Import(c *fiber.Ctx) error {
+func (h *Handler) Import(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[importInput](c)
 	if !ok {
@@ -194,7 +194,7 @@ func (h *Handler) Import(c *fiber.Ctx) error {
 // ImportCSV bulk-upserts from a CSV body. The header row names the
 // columns: email (required), name, status, timezone, language - any
 // other column lands in custom_fields.
-func (h *Handler) ImportCSV(c *fiber.Ctx) error {
+func (h *Handler) ImportCSV(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	reader := csv.NewReader(strings.NewReader(string(c.Body())))
 	reader.TrimLeadingSpace = true
@@ -269,8 +269,8 @@ func (h *Handler) ImportCSV(c *fiber.Ctx) error {
 }
 
 // runImport applies the upserts, tolerating per-row failures.
-func (h *Handler) runImport(c *fiber.Ctx, projID string, items []upsertInput) error {
-	if err := quota.CheckResource(c.UserContext(), h.Runtime.Store, projID, quota.ResSubscribers, len(items)); err != nil {
+func (h *Handler) runImport(c fiber.Ctx, projID string, items []upsertInput) error {
+	if err := quota.CheckResource(c.Context(), h.Runtime.Store, projID, quota.ResSubscribers, len(items)); err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
@@ -293,7 +293,7 @@ func (h *Handler) runImport(c *fiber.Ctx, projID string, items []upsertInput) er
 			}
 		}
 
-		existing, err := h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), projID, item.Email)
+		existing, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), projID, item.Email)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -313,7 +313,7 @@ func (h *Handler) runImport(c *fiber.Ctx, projID string, items []upsertInput) er
 			created++
 		}
 
-		if err := h.Runtime.Store.Subscriber.Put(c.UserContext(), sub); err != nil {
+		if err := h.Runtime.Store.Subscriber.Put(c.Context(), sub); err != nil {
 			return response.Internal(c, err)
 		}
 	}

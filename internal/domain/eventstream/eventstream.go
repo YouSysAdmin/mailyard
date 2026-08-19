@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/eventbus"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -47,7 +47,7 @@ const maxStreamLife = 30 * time.Minute
 // JWT in a URL would write it into access logs, proxy logs, and
 // Referer headers for no benefit, so this endpoint does not accept
 // one.
-func (h *Handler) Stream(c *fiber.Ctx) error {
+func (h *Handler) Stream(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.Project == nil {
 		return response.Forbidden(c, "project not resolved")
@@ -73,7 +73,7 @@ func (h *Handler) Stream(c *fiber.Ctx) error {
 	// Fiber hands the connection to fasthttp's stream writer, which
 	// runs after the handler returns. Everything the loop needs is
 	// captured here.
-	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+	return c.SendStreamWriter(func(w *bufio.Writer) {
 		defer sub.Close()
 
 		deadline := time.NewTimer(maxStreamLife)
@@ -116,8 +116,6 @@ func (h *Handler) Stream(c *fiber.Ctx) error {
 			}
 		}
 	})
-
-	return nil
 }
 
 // writeEvent emits one SSE frame. Returns false when the connection
@@ -137,7 +135,7 @@ func writeEvent(w *bufio.Writer, event string, payload any) bool {
 }
 
 // Stats reports live subscriber counts, for the admin view.
-func (h *Handler) Stats(c *fiber.Ctx) error {
+func (h *Handler) Stats(c fiber.Ctx) error {
 	subs, projects, dropped := h.Runtime.Events.Stats()
 
 	return response.Success(c, StatsResponse{

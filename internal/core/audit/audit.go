@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
@@ -194,7 +194,7 @@ func (r *Recorder) Record(e *amodel.Event) {
 // Stamp. Every caller had that line of its own, twenty-five of them, and
 // a new event type that forgot it would have recorded who and what with
 // no trace of from where.
-func (r *Recorder) Project(c *fiber.Ctx, e *amodel.Event) {
+func (r *Recorder) Project(c fiber.Ctx, e *amodel.Event) {
 	if e == nil {
 		return
 	}
@@ -205,7 +205,7 @@ func (r *Recorder) Project(c *fiber.Ctx, e *amodel.Event) {
 }
 
 // Security records an account event.
-func (r *Recorder) Security(c *fiber.Ctx, e *amodel.Event) {
+func (r *Recorder) Security(c fiber.Ctx, e *amodel.Event) {
 	if e == nil {
 		return
 	}
@@ -259,7 +259,7 @@ func (r *Recorder) Close(timeout time.Duration) {
 // their own, because the egress proxy is never told it. The user agent
 // is forgeable. Together they are the best a request offers, and the
 // trail says as much where a person reads it.
-func Stamp(e *amodel.Event, c *fiber.Ctx) {
+func Stamp(e *amodel.Event, c fiber.Ctx) {
 	if e == nil || c == nil {
 		return
 	}

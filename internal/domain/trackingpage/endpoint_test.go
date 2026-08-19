@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // The hosted "view in browser" page is the only response that returns
@@ -60,12 +60,12 @@ func TestWebViewCSPOverridesTheSitePolicy(t *testing.T) {
 
 	// Stand in for internal/server.securityHeaders, which runs first
 	// and sets the permissive console policy.
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		c.Set(fiber.HeaderContentSecurityPolicy, "default-src 'self'; script-src 'self' 'unsafe-inline'")
 
 		return c.Next()
 	})
-	app.Get("/view", func(c *fiber.Ctx) error {
+	app.Get("/view", func(c fiber.Ctx) error {
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 		c.Set(fiber.HeaderContentSecurityPolicy, webViewCSP)
 

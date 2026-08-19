@@ -5,7 +5,7 @@ package notification
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -26,18 +26,18 @@ const (
 )
 
 // List serves GET /api/v1/notifications.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	pg := paging.FromWith(c, defaultLimit, maxLimit)
 	limit, offset := pg.Limit, pg.Offset
-	unreadOnly := c.QueryBool("unread", false)
+	unreadOnly := fiber.Query[bool](c, "unread", false)
 
-	items, err := h.Runtime.Store.Notification.List(c.UserContext(), rc.Project.ID, unreadOnly, limit, offset)
+	items, err := h.Runtime.Store.Notification.List(c.Context(), rc.Project.ID, unreadOnly, limit, offset)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	unread, err := h.Runtime.Store.Notification.CountUnread(c.UserContext(), rc.Project.ID)
+	unread, err := h.Runtime.Store.Notification.CountUnread(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -53,9 +53,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 // Unread is the badge endpoint. Split from List because the console
 // polls it far more often than it opens the list, and it is one
 // indexed count rather than a page of rows.
-func (h *Handler) Unread(c *fiber.Ctx) error {
+func (h *Handler) Unread(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	n, err := h.Runtime.Store.Notification.CountUnread(c.UserContext(), rc.Project.ID)
+	n, err := h.Runtime.Store.Notification.CountUnread(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -64,9 +64,9 @@ func (h *Handler) Unread(c *fiber.Ctx) error {
 }
 
 // MarkRead serves POST /api/v1/notifications/:id/read.
-func (h *Handler) MarkRead(c *fiber.Ctx) error {
+func (h *Handler) MarkRead(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	n, err := h.Runtime.Store.Notification.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	n, err := h.Runtime.Store.Notification.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -75,7 +75,7 @@ func (h *Handler) MarkRead(c *fiber.Ctx) error {
 		return response.NotFound(c, "notification not found")
 	}
 
-	if err := h.Runtime.Store.Notification.MarkRead(c.UserContext(), rc.Project.ID, n.ID, time.Now().UTC()); err != nil {
+	if err := h.Runtime.Store.Notification.MarkRead(c.Context(), rc.Project.ID, n.ID, time.Now().UTC()); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -83,9 +83,9 @@ func (h *Handler) MarkRead(c *fiber.Ctx) error {
 }
 
 // MarkAllRead serves POST /api/v1/notifications/read-all.
-func (h *Handler) MarkAllRead(c *fiber.Ctx) error {
+func (h *Handler) MarkAllRead(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	n, err := h.Runtime.Store.Notification.MarkAllRead(c.UserContext(), rc.Project.ID, time.Now().UTC())
+	n, err := h.Runtime.Store.Notification.MarkAllRead(c.Context(), rc.Project.ID, time.Now().UTC())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -94,9 +94,9 @@ func (h *Handler) MarkAllRead(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/notifications/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	n, err := h.Runtime.Store.Notification.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	n, err := h.Runtime.Store.Notification.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -105,7 +105,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "notification not found")
 	}
 
-	if err := h.Runtime.Store.Notification.Delete(c.UserContext(), rc.Project.ID, n.ID); err != nil {
+	if err := h.Runtime.Store.Notification.Delete(c.Context(), rc.Project.ID, n.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

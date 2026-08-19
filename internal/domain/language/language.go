@@ -12,7 +12,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -148,9 +148,9 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/languages.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	langs, err := h.Runtime.Store.Language.List(c.UserContext(), rc.Project.ID)
+	langs, err := h.Runtime.Store.Language.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -163,14 +163,14 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/languages.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
 		return resp
 	}
 
-	existing, err := h.Runtime.Store.Language.GetByCode(c.UserContext(), rc.Project.ID, in.Code)
+	existing, err := h.Runtime.Store.Language.GetByCode(c.Context(), rc.Project.ID, in.Code)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -186,7 +186,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		Name:      in.Name,
 		IsDefault: in.IsDefault,
 	}
-	if err := h.Runtime.Store.Language.Put(c.UserContext(), l); err != nil {
+	if err := h.Runtime.Store.Language.Put(c.Context(), l); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -194,9 +194,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PUT /api/v1/languages/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.Language.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.Language.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -211,7 +211,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	if in.Code != l.Code {
-		other, err := h.Runtime.Store.Language.GetByCode(c.UserContext(), rc.Project.ID, in.Code)
+		other, err := h.Runtime.Store.Language.GetByCode(c.Context(), rc.Project.ID, in.Code)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -224,7 +224,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	l.Code = in.Code
 	l.Name = in.Name
 	l.IsDefault = in.IsDefault
-	if err := h.Runtime.Store.Language.Put(c.UserContext(), l); err != nil {
+	if err := h.Runtime.Store.Language.Put(c.Context(), l); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -232,9 +232,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/languages/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.Language.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.Language.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -243,7 +243,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "language not found")
 	}
 
-	if err := h.Runtime.Store.Language.Delete(c.UserContext(), rc.Project.ID, l.ID); err != nil {
+	if err := h.Runtime.Store.Language.Delete(c.Context(), rc.Project.ID, l.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

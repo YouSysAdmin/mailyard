@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
@@ -68,7 +68,7 @@ const maxBody = 1 << 20
 // line, not a status code. The one exception is a body we could not
 // authenticate, which is answered 403 so a misconfigured topic is
 // visible in the SNS delivery status rather than silently succeeding.
-func (h *Handler) Receive(c *fiber.Ctx) error {
+func (h *Handler) Receive(c fiber.Ctx) error {
 	body := c.Body()
 	if len(body) > maxBody {
 		h.log().Warn("ses: notification too large, ignoring", "bytes", len(body))
@@ -86,7 +86,7 @@ func (h *Handler) Receive(c *fiber.Ctx) error {
 	// The allowlist, not the signature, is what makes this ours. A
 	// valid signature only proves SOME AWS account sent it, and anyone
 	// can make an account and point a topic here.
-	allowed, aerr := h.Allowlist.Allowed(c.UserContext(), msg.TopicARN)
+	allowed, aerr := h.Allowlist.Allowed(c.Context(), msg.TopicARN)
 	if aerr != nil {
 		// Could not answer the authorization question. Refusing is the
 		// only honest response - and 503 rather than 403, because SNS
@@ -125,7 +125,7 @@ func (h *Handler) Receive(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	}
 
-	h.record(c.UserContext(), msg.TopicARN, msg.Message)
+	h.record(c.Context(), msg.TopicARN, msg.Message)
 
 	return c.SendStatus(fiber.StatusOK)
 }

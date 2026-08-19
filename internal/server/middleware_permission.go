@@ -5,7 +5,7 @@ package server
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
@@ -87,7 +87,7 @@ func permOnSending() fiber.Handler {
 // resource for the route-level action check and refuses a caller who
 // may do nothing with it.
 func permOnResolved(resolve func(*domain.RequestContext) permission.Resource) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		rc := domain.GetRequestContext(c)
 		if rc == nil {
 			return response.Internal(c, errors.New("request context middleware not installed"))
@@ -130,7 +130,7 @@ func permOnResolved(resolve func(*domain.RequestContext) permission.Resource) fi
 // real mail, and a credential whose entire purpose is that its mail is
 // not real has no business there. Saying so beats a bare 403 on a
 // permission the holder was never meant to be given.
-func refuseSandboxCredential(c *fiber.Ctx) error {
+func refuseSandboxCredential(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc != nil && rc.IsSandboxCredential() {
 		return response.Forbidden(c,
@@ -154,11 +154,11 @@ func refuseSandboxCredential(c *fiber.Ctx) error {
 // The mapping is mechanical: a DELETE method takes permDelete. A POST
 // that erases has to say so itself, the same way /templates/preview has
 // to say permRead.
-func permRead(c *fiber.Ctx) error   { return checkPermission(c, permission.ActionRead) }
-func permWrite(c *fiber.Ctx) error  { return checkPermission(c, permission.ActionWrite) }
-func permDelete(c *fiber.Ctx) error { return checkPermission(c, permission.ActionDelete) }
+func permRead(c fiber.Ctx) error   { return checkPermission(c, permission.ActionRead) }
+func permWrite(c fiber.Ctx) error  { return checkPermission(c, permission.ActionWrite) }
+func permDelete(c fiber.Ctx) error { return checkPermission(c, permission.ActionDelete) }
 
-func checkPermission(c *fiber.Ctx, a permission.Action) error {
+func checkPermission(c fiber.Ctx, a permission.Action) error {
 	r, ok := c.Locals(permLocalKey{}).(permission.Resource)
 	if !ok {
 		// The route declared an action but its group declared no
@@ -189,7 +189,7 @@ func checkPermission(c *fiber.Ctx, a permission.Action) error {
 // thing that becomes a support ticket. A non-member never reaches
 // here - requireProject refuses them first, with a message that does
 // not distinguish an existing project from one they cannot see.
-func refusePermission(c *fiber.Ctx, r permission.Resource, a permission.Action) error {
+func refusePermission(c fiber.Ctx, r permission.Resource, a permission.Action) error {
 	if a == "" {
 		return response.Forbidden(c, "no access to "+string(r)+" in this project")
 	}

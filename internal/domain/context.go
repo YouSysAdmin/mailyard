@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 	"github.com/yousysadmin/mailyard/internal/models/permission"
@@ -26,11 +26,11 @@ const ContextKey = "AppReqContext"
 // has resolved it (nil before auth / on open endpoints / when auth is
 // disabled).
 //
-// It embeds *fiber.Ctx so handlers holding the RequestContext keep
+// It embeds fiber.Ctx so handlers holding the RequestContext keep
 // the full Fiber surface. The Path field shadows the embedded Path()
 // method - use rc.Ctx.Path() if you need the live value.
 type RequestContext struct {
-	*fiber.Ctx
+	fiber.Ctx
 	AppName    string          `json:"app_name"`
 	AppURL     string          `json:"app_url"`
 	AppVersion string          `json:"app_version"`
@@ -161,7 +161,7 @@ func (ctx *RequestContext) GetAppURL(endpoint string) string {
 // GetRequestContext returns the RequestContext the server middleware
 // stored on this request, or nil when the middleware isn't installed
 // (e.g. a bare unit-test app).
-func GetRequestContext(c *fiber.Ctx) *RequestContext {
+func GetRequestContext(c fiber.Ctx) *RequestContext {
 	rc, _ := c.Locals(ContextKey).(*RequestContext)
 
 	return rc

@@ -5,9 +5,10 @@ package email
 import (
 	"errors"
 	"regexp"
+	"strconv"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -26,7 +27,7 @@ type Handler struct {
 
 // Send accepts an email for asynchronous delivery (202-style: the
 // response carries the queued row, delivery status is polled).
-func (h *Handler) Send(c *fiber.Ctx) error {
+func (h *Handler) Send(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[sendInput](c)
 	if !ok {
@@ -68,7 +69,7 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 	svc := NewService(h.Runtime)
 	// Resolved before validation so an unknown group is a 400 naming
 	// the group, not a confusing "no smtp server accepts this sender".
-	if req.Route, err = svc.ResolveRoute(c.UserContext(), rc.Project.ID, in.SMTPServerID, in.SMTPGroup); err != nil {
+	if req.Route, err = svc.ResolveRoute(c.Context(), rc.Project.ID, in.SMTPServerID, in.SMTPGroup); err != nil {
 		return sendFailure(c, err)
 	}
 
@@ -77,7 +78,7 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 	}
 
 	if in.DryRun {
-		if err := svc.Validate(c.UserContext(), rc.Project.ID, req); err != nil {
+		if err := svc.Validate(c.Context(), rc.Project.ID, req); err != nil {
 			return sendFailure(c, err)
 		}
 
@@ -88,7 +89,7 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 		// having opted out of that list. A dry run that disagrees with
 		// to send is worse than no dry run.
 		_, blocked, err := h.Runtime.Store.Suppression.FilterSuppressedForList(
-			c.UserContext(), rc.Project.ID, req.UnsubscribeListID, req.To)
+			c.Context(), rc.Project.ID, req.UnsubscribeListID, req.To)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -99,7 +100,7 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 		})
 	}
 
-	e, blocked, err := svc.Send(c.UserContext(), rc.Project.ID, callerID(rc), apiKeyID(rc), req)
+	e, blocked, err := svc.Send(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), req)
 	if err != nil {
 		return sendFailure(c, err)
 	}
@@ -114,7 +115,7 @@ const maxAttachmentsPerEmail = 10
 // Limits reports what send will accept, so a client can reject an
 // oversized file before spending the upload. Hardcoding these in the
 // console would be a second copy of a number an operator can change.
-func (h *Handler) Limits(c *fiber.Ctx) error {
+func (h *Handler) Limits(c fiber.Ctx) error {
 	s := h.Runtime.Config.Sending
 
 	return response.Success(c, LimitsResponse{Limits: SendingLimits{
@@ -135,7 +136,7 @@ func emptyIfNil(in []string) []string {
 }
 
 // List serves GET /api/v1/emails.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	f := Filter{
 		Status: c.Query("status"),
@@ -156,7 +157,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		f.BeforeID = c.Query("before_id")
 	}
 
-	emails, err := h.Runtime.Store.Email.List(c.UserContext(), rc.Project.ID, f)
+	emails, err := h.Runtime.Store.Email.List(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -169,9 +170,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Stats returns per-status counts for the project.
-func (h *Handler) Stats(c *fiber.Ctx) error {
+func (h *Handler) Stats(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	counts, err := h.Runtime.Store.Email.CountByStatus(c.UserContext(), rc.Project.ID)
+	counts, err := h.Runtime.Store.Email.CountByStatus(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -180,9 +181,9 @@ func (h *Handler) Stats(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/emails/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Email.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Email.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -210,9 +211,9 @@ var clickHashRE = regexp.MustCompile(`/tracking/click/[^/"'?]+/([0-9a-f]{16})`)
 // rather than a field on Get, because the detail page polls Get every
 // three seconds while a message is in flight and this mapping never
 // changes after send.
-func (h *Handler) TrackedLinks(c *fiber.Ctx) error {
+func (h *Handler) TrackedLinks(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Email.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Email.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -230,7 +231,7 @@ func (h *Handler) TrackedLinks(c *fiber.Ctx) error {
 		}
 	}
 
-	links, err := h.Runtime.Store.Campaign.TrackedLinkURLs(c.UserContext(), rc.Project.ID, hashes)
+	links, err := h.Runtime.Store.Campaign.TrackedLinkURLs(c.Context(), rc.Project.ID, hashes)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -240,9 +241,9 @@ func (h *Handler) TrackedLinks(c *fiber.Ctx) error {
 
 // Attachment streams one attachment's decoded bytes, reading inline
 // content or the blob store as appropriate.
-func (h *Handler) Attachment(c *fiber.Ctx) error {
+func (h *Handler) Attachment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Email.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Email.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -251,13 +252,13 @@ func (h *Handler) Attachment(c *fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	idx, err := c.ParamsInt("idx")
+	idx, err := strconv.Atoi(c.Params("idx"))
 	if err != nil || idx < 0 || idx >= len(e.Attachments) {
 		return response.NotFound(c, "attachment not found")
 	}
 
 	a := e.Attachments[idx]
-	raw, err := LoadAttachment(c.UserContext(), h.Runtime.Blob, &a)
+	raw, err := LoadAttachment(c.Context(), h.Runtime.Blob, &a)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -266,9 +267,9 @@ func (h *Handler) Attachment(c *fiber.Ctx) error {
 }
 
 // Status is the cheap polling endpoint: just the delivery state.
-func (h *Handler) Status(c *fiber.Ctx) error {
+func (h *Handler) Status(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Email.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Email.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -287,10 +288,10 @@ func (h *Handler) Status(c *fiber.Ctx) error {
 }
 
 // Retry serves POST /api/v1/emails/:id/retry.
-func (h *Handler) Retry(c *fiber.Ctx) error {
+func (h *Handler) Retry(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	svc := NewService(h.Runtime)
-	e, err := svc.Retry(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := svc.Retry(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return sendFailure(c, err)
 	}
@@ -332,7 +333,7 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 }
 
 // sendFailure maps service errors: caller mistakes to 400, the rest to 500.
-func sendFailure(c *fiber.Ctx, err error) error {
+func sendFailure(c fiber.Ctx, err error) error {
 	if re, ok := errors.AsType[*RequestError](err); ok {
 		return response.BadRequest(c, re.Error())
 	}

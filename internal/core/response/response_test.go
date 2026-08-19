@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -51,7 +51,7 @@ func TestAnIDThatCannotBeAUUIDIsNotFound(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			app := fiber.New()
-			app.Get("/x", func(c *fiber.Ctx) error { return Internal(c, tc.err) })
+			app.Get("/x", func(c fiber.Ctx) error { return Internal(c, tc.err) })
 			res, err := app.Test(httptest.NewRequest("GET", "/x", nil))
 			if err != nil {
 				t.Fatal(err)

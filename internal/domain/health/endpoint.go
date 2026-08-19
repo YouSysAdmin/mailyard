@@ -14,7 +14,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -34,7 +34,7 @@ type Handler struct {
 // HTTP server can answer at all, the process is alive. Adding a
 // dependency check here would turn a database outage into a restart
 // loop, which is the one thing that cannot help.
-func (h *Handler) Status(c *fiber.Ctx) error {
+func (h *Handler) Status(c fiber.Ctx) error {
 	return response.Success(c, StatusResponse{Status: "ok"})
 }
 
@@ -48,7 +48,7 @@ const readyTimeout = 2 * time.Second
 // It reports 503 with the failing check named when a dependency is
 // unreachable, so the instance leaves the load balancer's rotation
 // without being killed.
-func (h *Handler) Ready(c *fiber.Ctx) error {
+func (h *Handler) Ready(c fiber.Ctx) error {
 	ctx, cancel := contextWithTimeout(c, readyTimeout)
 	defer cancel()
 
@@ -89,6 +89,6 @@ func (h *Handler) Ready(c *fiber.Ctx) error {
 
 // contextWithTimeout derives from the request context so a client
 // disconnect cancels the ping too.
-func contextWithTimeout(c *fiber.Ctx, d time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(c.UserContext(), d)
+func contextWithTimeout(c fiber.Ctx, d time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(c.Context(), d)
 }

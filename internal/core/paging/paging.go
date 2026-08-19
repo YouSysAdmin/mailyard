@@ -15,7 +15,7 @@ package paging
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/safetext"
 )
@@ -38,7 +38,7 @@ type Page struct {
 
 // From reads limit and offset from the query string using the
 // package defaults.
-func From(c *fiber.Ctx) Page {
+func From(c fiber.Ctx) Page {
 	return FromWith(c, DefaultLimit, MaxLimit)
 }
 
@@ -49,7 +49,7 @@ func From(c *fiber.Ctx) Page {
 // A caller asking for more than max gets max rather than an error:
 // paging parameters are a hint about how much to send, and failing a
 // list request over one is unhelpful.
-func FromWith(c *fiber.Ctx, def, max int) Page {
+func FromWith(c fiber.Ctx, def, max int) Page {
 	if def <= 0 {
 		def = DefaultLimit
 	}
@@ -62,7 +62,7 @@ func FromWith(c *fiber.Ctx, def, max int) Page {
 		def = max
 	}
 
-	limit := c.QueryInt("limit", def)
+	limit := fiber.Query[int](c, "limit", def)
 	if limit < 1 {
 		limit = def
 	}
@@ -71,12 +71,12 @@ func FromWith(c *fiber.Ctx, def, max int) Page {
 		limit = max
 	}
 
-	offset := c.QueryInt("offset", 0)
+	offset := fiber.Query[int](c, "offset", 0)
 	// The original API paged by zero-based page number. Honor it when
 	// offset was not given, so a client written against those docs
 	// keeps working.
 	if offset == 0 {
-		if p := c.QueryInt("page", 0); p > 0 {
+		if p := fiber.Query[int](c, "page", 0); p > 0 {
 			offset = p * limit
 		}
 	}
@@ -111,6 +111,6 @@ const MaxSearchTerm = 200
 // response.Internal softens into a 404, so the search box answers 500.
 // The same hazard was then found on every other header reaching a TEXT
 // column, which is why the mechanics live in safetext rather than here.
-func Search(c *fiber.Ctx, param string) string {
+func Search(c fiber.Ctx, param string) string {
 	return safetext.Clamp(strings.TrimSpace(c.Query(param)), MaxSearchTerm)
 }

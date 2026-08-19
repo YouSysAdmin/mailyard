@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
@@ -30,9 +30,9 @@ import (
 // caller should not be able to enumerate which providers exist. Hidden
 // is not checked here - hidden only keeps a provider off the login
 // page, it stays reachable by direct URL on purpose.
-func (h *Handler) resolveProvider(c *fiber.Ctx) (*opmodel.Provider, *coreoidc.Provider, error) {
+func (h *Handler) resolveProvider(c fiber.Ctx) (*opmodel.Provider, *coreoidc.Provider, error) {
 	slug := c.Params("slug")
-	row, err := h.Runtime.Store.OAuthProvider.GetBySlug(c.UserContext(), slug)
+	row, err := h.Runtime.Store.OAuthProvider.GetBySlug(c.Context(), slug)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -41,7 +41,7 @@ func (h *Handler) resolveProvider(c *fiber.Ctx) (*opmodel.Provider, *coreoidc.Pr
 		return nil, nil, errNoProvider
 	}
 
-	flow, err := h.Runtime.OAuth.For(c.UserContext(), row)
+	flow, err := h.Runtime.OAuth.For(c.Context(), row)
 	if err != nil {
 		return row, nil, err
 	}
@@ -55,7 +55,7 @@ var errNoProvider = errors.New("provider not found")
 // OAuthStart kicks off the SSO redirect for one provider: mints
 // state/nonce/PKCE, sets the short-lived signed cookie, and 302s the
 // browser at the IdP's authorization endpoint.
-func (h *Handler) OAuthStart(c *fiber.Ctx) error {
+func (h *Handler) OAuthStart(c fiber.Ctx) error {
 	row, flow, err := h.resolveProvider(c)
 	if errors.Is(err, errNoProvider) {
 		return redirectLogin(c, "sso_unknown_provider")
@@ -75,7 +75,7 @@ func (h *Handler) OAuthStart(c *fiber.Ctx) error {
 	// round-trip started with.
 	c.Cookie(buildOIDCStateCookie(h.Runtime, row.Slug+"|"+cookieValue, coreoidc.StateCookieTTL))
 
-	return c.Redirect(redirect, fiber.StatusFound)
+	return c.Redirect().Status(fiber.StatusFound).To(redirect)
 }
 
 // OAuthCallback completes the SSO round-trip: verifies the state
@@ -84,7 +84,7 @@ func (h *Handler) OAuthStart(c *fiber.Ctx) error {
 // then redirects to the console. Allowlist denials show a generic
 // "access denied" so the failure mode does not leak which leg of the
 // allowlist refused.
-func (h *Handler) OAuthCallback(c *fiber.Ctx) error {
+func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	row, flow, err := h.resolveProvider(c)
 	if errors.Is(err, errNoProvider) {
 		return redirectLogin(c, "sso_unknown_provider")
@@ -131,7 +131,7 @@ func (h *Handler) OAuthCallback(c *fiber.Ctx) error {
 	}
 
 	jwtSecret := []byte(crypto.DeriveKey(h.Runtime.Config.Auth.JWTSecret, crypto.KeyOIDCState))
-	claims, invite, err := flow.Exchange(c.UserContext(), jwtSecret, state, code, cookieValue)
+	claims, invite, err := flow.Exchange(c.Context(), jwtSecret, state, code, cookieValue)
 	c.Cookie(buildOIDCStateCookie(h.Runtime, "", -time.Hour))
 	if err != nil {
 		h.auditOIDCFailed(c, "", "exchange/verify: "+err.Error())
@@ -164,7 +164,7 @@ func (h *Handler) OAuthCallback(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	if err := h.Runtime.Store.User.TouchLastLogin(c.UserContext(), u.Email); err != nil {
+	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
 		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
 	}
 
@@ -197,10 +197,10 @@ func (h *Handler) OAuthCallback(c *fiber.Ctx) error {
 	// click again - which, since a project is reached only by invitation,
 	// is the whole first-run experience.
 	if invite != "" {
-		return c.Redirect(env.ConsolePath+"/invitations?token="+invite, fiber.StatusFound)
+		return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/invitations?token=" + invite)
 	}
 
-	return c.Redirect(env.ConsolePath+"/", fiber.StatusFound)
+	return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/")
 }
 
 // inviteToken keeps only what an invitation token can be: 64 hex
@@ -235,8 +235,8 @@ func inviteToken(raw string) string {
 // the most stable key and survives an email change at the IdP -> the
 // email address, which links a pre-existing local account to this IdP
 // on first sign-in -> create, when the provider allows it.
-func (h *Handler) findOrCreateOAuthUser(c *fiber.Ctx, prov *opmodel.Provider, claims *coreoidc.Claims) (*usermodel.User, error) {
-	ctx := c.UserContext()
+func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, claims *coreoidc.Claims) (*usermodel.User, error) {
+	ctx := c.Context()
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
 
 	ident, err := h.Runtime.Store.OAuthIdentity.GetBySubject(ctx, prov.ID, claims.Subject)
@@ -346,7 +346,7 @@ func (h *Handler) linkIdentity(ctx context.Context, prov *opmodel.Provider, u *u
 // replay attempt or a misconfigured IdP looks like, so it belongs in the
 // trail its
 // sibling auditOIDCDenied was filling.
-func (h *Handler) auditOIDCFailed(c *fiber.Ctx, email, reason string) {
+func (h *Handler) auditOIDCFailed(c fiber.Ctx, email, reason string) {
 	slog.Warn("auth: oauth login failed", "email", email, "reason", reason, "client_ip", c.IP())
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCDenied,
@@ -356,7 +356,7 @@ func (h *Handler) auditOIDCFailed(c *fiber.Ctx, email, reason string) {
 	})
 }
 
-func (h *Handler) auditOIDCDenied(c *fiber.Ctx, claims *coreoidc.Claims, reason string) {
+func (h *Handler) auditOIDCDenied(c fiber.Ctx, claims *coreoidc.Claims, reason string) {
 	slog.Warn("auth: oauth denied", "email", claims.Email, "sub", claims.Subject, "reason", reason, "client_ip", c.IP())
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCDenied,
@@ -369,8 +369,8 @@ func (h *Handler) auditOIDCDenied(c *fiber.Ctx, claims *coreoidc.Claims, reason 
 // redirectLogin sends the browser back to /login with an error code
 // the SPA can render as a banner. Generic codes - never include the
 // raw failure reason in the URL.
-func redirectLogin(c *fiber.Ctx, code string) error {
-	return c.Redirect(env.ConsolePath+"/login?err="+code, fiber.StatusFound)
+func redirectLogin(c fiber.Ctx, code string) error {
+	return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/login?err=" + code)
 }
 
 func buildOIDCStateCookie(rt *env.Runtime, value string, ttl time.Duration) *fiber.Cookie {

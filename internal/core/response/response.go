@@ -9,30 +9,30 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/database"
 )
 
 // Success writes 200 with data as the body.
-func Success(c *fiber.Ctx, data any) error {
+func Success(c fiber.Ctx, data any) error {
 	return c.Status(fiber.StatusOK).JSON(data)
 }
 
 // Created writes 201 with data as the body.
-func Created(c *fiber.Ctx, data any) error {
+func Created(c fiber.Ctx, data any) error {
 	return c.Status(fiber.StatusCreated).JSON(data)
 }
 
 // NoContent writes 204 and no body.
-func NoContent(c *fiber.Ctx) error {
+func NoContent(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // BadRequest writes 400 with msg. For a field-level refusal use the
 // validation package, which lists which fields were refused.
-func BadRequest(c *fiber.Ctx, msg string) error {
+func BadRequest(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": msg})
 }
 
@@ -46,7 +46,7 @@ func BadRequest(c *fiber.Ctx, msg string) error {
 // validation.Humanize + validation.Summary are the canonical
 // producers, but any handler that wants to surface multiple field
 // errors (e.g. cross-field business rules) can build them directly.
-func BadRequestFields(c *fiber.Ctx, summary string, fields any) error {
+func BadRequestFields(c fiber.Ctx, summary string, fields any) error {
 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 		"error":  summary,
 		"fields": fields,
@@ -55,25 +55,25 @@ func BadRequestFields(c *fiber.Ctx, summary string, fields any) error {
 
 // TooManyRequests is the quota rejection: the caller can retry after
 // the window rolls or the operator raises the plan.
-func TooManyRequests(c *fiber.Ctx, msg string) error {
+func TooManyRequests(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": msg})
 }
 
 // Unauthorized writes 401 with msg, meaning the caller is not
 // identified.
-func Unauthorized(c *fiber.Ctx, msg string) error {
+func Unauthorized(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": msg})
 }
 
 // Forbidden writes 403 with msg, meaning the caller is identified and
 // still may not.
-func Forbidden(c *fiber.Ctx, msg string) error {
+func Forbidden(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": msg})
 }
 
 // NotFound writes 404 with msg. Cross-project access answers this too,
 // so a caller cannot tell a foreign row from a missing one.
-func NotFound(c *fiber.Ctx, msg string) error {
+func NotFound(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": msg})
 }
 
@@ -81,14 +81,14 @@ func NotFound(c *fiber.Ctx, msg string) error {
 // themselves (FK constraint violations on delete, unique-key
 // collisions, etc.) - distinct from BadRequest (which connotes
 // "your input is wrong") and Internal (which connotes "server bug").
-func Conflict(c *fiber.Ctx, msg string) error {
+func Conflict(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": msg})
 }
 
 // Gone is for single-use resources that have already been consumed
 // (or never existed) - the caller has no viable retry, unlike
 // Conflict where the operator can resolve the state and try again.
-func Gone(c *fiber.Ctx, msg string) error {
+func Gone(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": msg})
 }
 
@@ -96,7 +96,7 @@ func Gone(c *fiber.Ctx, msg string) error {
 // should come back, and nothing about the request needs changing.
 // Distinct from Conflict, where somebody has to fix state, and from
 // Forbidden, which a machine client is right to treat as permanent.
-func Unavailable(c *fiber.Ctx, msg string) error {
+func Unavailable(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": msg})
 }
 
@@ -110,7 +110,7 @@ func Unavailable(c *fiber.Ctx, msg string) error {
 //
 // Pass nil err when the caller has already done its own logging or
 // when invoked from the panic-recovery path.
-func Internal(c *fiber.Ctx, err error) error {
+func Internal(c fiber.Ctx, err error) error {
 	// An id that is not a uuid names nothing, and that is a 404.
 	//
 	// This is the one place every store error becomes a response, which
@@ -157,7 +157,7 @@ func Internal(c *fiber.Ctx, err error) error {
 //
 // Callers pass the raw filename: sanitizing it is this function's
 // job, not something three endpoints should each remember.
-func Attachment(c *fiber.Ctx, filename, contentType string, raw []byte) error {
+func Attachment(c fiber.Ctx, filename, contentType string, raw []byte) error {
 	if contentType == "" {
 		contentType = fiber.MIMEOctetStream
 	}

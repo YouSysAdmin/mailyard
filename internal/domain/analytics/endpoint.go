@@ -5,7 +5,7 @@ package analytics
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -25,9 +25,9 @@ type Handler struct {
 const maxRange = 366 * 24 * time.Hour
 
 // DashboardStats returns the project summary.
-func (h *Handler) DashboardStats(c *fiber.Ctx) error {
+func (h *Handler) DashboardStats(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sum, err := h.Runtime.Store.Analytics.Summary(c.UserContext(), rc.Project.ID)
+	sum, err := h.Runtime.Store.Analytics.Summary(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -36,7 +36,7 @@ func (h *Handler) DashboardStats(c *fiber.Ctx) error {
 }
 
 // Analytics returns the delivery trend over a date range.
-func (h *Handler) Analytics(c *fiber.Ctx) error {
+func (h *Handler) Analytics(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 
 	from, to, err := parseRange(c)
@@ -49,12 +49,12 @@ func (h *Handler) Analytics(c *fiber.Ctx) error {
 		return response.BadRequest(c, "unknown status "+status)
 	}
 
-	daily, err := h.Runtime.Store.Analytics.DailyCounts(c.UserContext(), rc.Project.ID, from, to, status)
+	daily, err := h.Runtime.Store.Analytics.DailyCounts(c.Context(), rc.Project.ID, from, to, status)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	breakdown, err := h.Runtime.Store.Analytics.StatusBreakdown(c.UserContext(), rc.Project.ID, from, to)
+	breakdown, err := h.Runtime.Store.Analytics.StatusBreakdown(c.Context(), rc.Project.ID, from, to)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -75,7 +75,7 @@ func (h *Handler) Analytics(c *fiber.Ctx) error {
 // 30 days. The returned window is half-open [from, to) with `to`
 // advanced to the end of its day, so a range of one day includes that
 // whole day rather than only its first instant.
-func parseRange(c *fiber.Ctx) (from, to time.Time, err error) {
+func parseRange(c fiber.Ctx) (from, to time.Time, err error) {
 	const layout = "2006-01-02"
 	now := time.Now().UTC()
 

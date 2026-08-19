@@ -28,7 +28,7 @@
 //	    Password string `json:"password" validate:"required,min=1"  normalize:"trim"`
 //	}
 //
-//	func (h Handler) Login(c *fiber.Ctx) error {
+//	func (h Handler) Login(c fiber.Ctx) error {
 //	    in, err := validation.BindAndValidate[loginRequest](c)
 //	    if err != nil {
 //	        return response.BadRequestFields(c, validation.Humanize(err))
@@ -45,7 +45,7 @@ import (
 	"sync"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 var (
@@ -102,9 +102,9 @@ type Normalizer interface {
 	Normalize()
 }
 
-// fiberCtx is the slice of Fiber's *fiber.Ctx that BindAndValidate
+// fiberCtx is the slice of Fiber's fiber.Ctx that BindAndValidate
 // needs. Declared as an interface so unit tests can stub it - in
-// practice the only caller passes a real *fiber.Ctx.
+// practice the only caller passes a real fiber.Ctx.
 type fiberCtx interface {
 	Body() []byte
 }
@@ -212,7 +212,7 @@ func applyStringOps(s string, tag string) string {
 	return s
 }
 
-// Compile-time guard: *fiber.Ctx satisfies our minimal interface. If
+// Compile-time guard: fiber.Ctx satisfies our minimal interface. If
 // Fiber ever renames Body() the build breaks here, which is the
 // right place to find out.
-var _ fiberCtx = (*fiber.Ctx)(nil)
+var _ fiberCtx = (fiber.Ctx)(nil)

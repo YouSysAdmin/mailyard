@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/cron"
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -69,8 +69,8 @@ func (v flexValue) String() string { return string(v) }
 
 // List returns every known setting: its definition, the effective
 // value, and whether that value is an override or the default.
-func (h *Handler) List(c *fiber.Ctx) error {
-	stored, err := h.Runtime.Store.Setting.All(c.UserContext())
+func (h *Handler) List(c fiber.Ctx) error {
+	stored, err := h.Runtime.Store.Setting.All(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -118,7 +118,7 @@ var tlsCertificateSettings = map[string]bool{
 // Update writes overrides. Setting a key back to its registry default
 // deletes the row rather than storing a redundant copy, so "has an
 // operator changed this?" stays answerable.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[updateInput](c)
 	if !ok {
 		return resp
@@ -161,7 +161,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 		// pointed at a certificate authority refuses every client,
 		// which is strictly worse than pointing it at nothing.
 		if tlsCertificateSettings[s.Key] {
-			if cerr := certificate.ValidateAssignment(c.UserContext(),
+			if cerr := certificate.ValidateAssignment(c.Context(),
 				h.Runtime.Store.Certificate, normalized); cerr != nil {
 				return response.BadRequest(c, cerr.Error())
 			}
@@ -180,7 +180,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 
 	for _, ch := range changes {
 		if ch.value == ch.def.Default {
-			if err := h.Runtime.Store.Setting.Delete(c.UserContext(), ch.def.Key); err != nil {
+			if err := h.Runtime.Store.Setting.Delete(c.Context(), ch.def.Key); err != nil {
 				return response.Internal(c, err)
 			}
 
@@ -194,14 +194,14 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 			UpdatedAt: now,
 			UpdatedBy: updatedBy,
 		}
-		if err := h.Runtime.Store.Setting.Put(c.UserContext(), row); err != nil {
+		if err := h.Runtime.Store.Setting.Put(c.Context(), row); err != nil {
 			return response.Internal(c, err)
 		}
 	}
 
 	// Refresh this node immediately. Other nodes converge on their
 	// own refresh tick.
-	if err := h.Runtime.Settings.Reload(c.UserContext()); err != nil {
+	if err := h.Runtime.Settings.Reload(c.Context()); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -209,7 +209,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Jobs reports the scheduled maintenance jobs.
-func (h *Handler) Jobs(c *fiber.Ctx) error {
+func (h *Handler) Jobs(c fiber.Ctx) error {
 	if h.Runtime.Cron == nil {
 		return response.Success(c, JobsResponse{Jobs: []cron.Status{}})
 	}
@@ -218,12 +218,12 @@ func (h *Handler) Jobs(c *fiber.Ctx) error {
 }
 
 // RunJob triggers one job out of band.
-func (h *Handler) RunJob(c *fiber.Ctx) error {
+func (h *Handler) RunJob(c fiber.Ctx) error {
 	if h.Runtime.Cron == nil {
 		return response.BadRequest(c, "the scheduler is not running")
 	}
 
-	if err := h.Runtime.Cron.RunNow(c.UserContext(), c.Params("name")); err != nil {
+	if err := h.Runtime.Cron.RunNow(c.Context(), c.Params("name")); err != nil {
 		return response.BadRequest(c, err.Error())
 	}
 

@@ -3,7 +3,7 @@
 package email
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/emailverify"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -17,7 +17,7 @@ import (
 // The two per-project facts - suppressed, previously bounced - are
 // re-read on every call and layered on top, so a cached verdict can
 // never claim an address is fine seconds after you suppressed it.
-func (h *Handler) Verify(c *fiber.Ctx) error {
+func (h *Handler) Verify(c fiber.Ctx) error {
 	if h.Runtime.Verifier == nil {
 		return response.BadRequest(c,
 			"email verification is disabled on this install (set email_verify.enabled)")
@@ -29,14 +29,14 @@ func (h *Handler) Verify(c *fiber.Ctx) error {
 		return resp
 	}
 
-	res := h.Runtime.Verifier.Check(c.UserContext(), in.Email, c.QueryBool("fresh", false))
+	res := h.Runtime.Verifier.Check(c.Context(), in.Email, fiber.Query[bool](c, "fresh", false))
 
-	suppressed, err := h.Runtime.Store.Suppression.IsSuppressed(c.UserContext(), rc.Project.ID, res.Email)
+	suppressed, err := h.Runtime.Store.Suppression.IsSuppressed(c.Context(), rc.Project.ID, res.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	bounced, err := h.Runtime.Store.Bounce.HasHardBounce(c.UserContext(), rc.Project.ID, res.Email)
+	bounced, err := h.Runtime.Store.Bounce.HasHardBounce(c.Context(), rc.Project.ID, res.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}

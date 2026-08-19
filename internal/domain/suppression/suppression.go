@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -292,7 +292,7 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/suppressions.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	kind := c.Query("kind")
 	if kind != "" {
@@ -302,7 +302,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	}
 
 	w := paging.WindowFrom(c)
-	rows, err := h.Runtime.Store.Suppression.List(c.UserContext(), rc.Project.ID, store.SuppressionFilter{
+	rows, err := h.Runtime.Store.Suppression.List(c.Context(), rc.Project.ID, store.SuppressionFilter{
 		Kind:   kind,
 		Search: paging.Search(c, "search"),
 		Limit:  w.Fetch(),
@@ -327,7 +327,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/suppressions.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
@@ -344,7 +344,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		sup.Kind = supmodel.KindManual
 	}
 
-	if err := h.Runtime.Store.Suppression.Upsert(c.UserContext(), sup); err != nil {
+	if err := h.Runtime.Store.Suppression.Upsert(c.Context(), sup); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -358,7 +358,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 // exactly that list's opt-out. One call cannot do both, because they are
 // not one fact: a project unblocking a mailbox that bounced is saying
 // nothing about the lists that mailbox chose to leave.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	email := c.Query("email")
 	if email == "" {
@@ -372,7 +372,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		}
 	}
 
-	ok, err := del(c.UserContext(), rc.Project.ID, email)
+	ok, err := del(c.Context(), rc.Project.ID, email)
 	if err != nil {
 		return response.Internal(c, err)
 	}

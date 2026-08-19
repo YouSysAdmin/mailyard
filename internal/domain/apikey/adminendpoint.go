@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -23,8 +23,8 @@ type AdminHandler struct {
 }
 
 // List serves GET /api/v1/admin/api-keys.
-func (h *AdminHandler) List(c *fiber.Ctx) error {
-	keys, err := h.Runtime.Store.AdminAPIKey.List(c.UserContext())
+func (h *AdminHandler) List(c fiber.Ctx) error {
+	keys, err := h.Runtime.Store.AdminAPIKey.List(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -42,7 +42,7 @@ func (h *AdminHandler) List(c *fiber.Ctx) error {
 // exist. That is why minting one is deliberately a platform-admin act
 // and why the console asks for confirmation - the credential it hands
 // back can create users and rewrite the installation's settings.
-func (h *AdminHandler) Create(c *fiber.Ctx) error {
+func (h *AdminHandler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[adminCreateInput](c)
 	if !ok {
@@ -75,7 +75,7 @@ func (h *AdminHandler) Create(c *fiber.Ctx) error {
 			return response.Internal(c, err)
 		}
 
-		existing, gerr := h.Runtime.Store.AdminAPIKey.GetByPrefix(c.UserContext(), prefix)
+		existing, gerr := h.Runtime.Store.AdminAPIKey.GetByPrefix(c.Context(), prefix)
 		if gerr != nil {
 			return response.Internal(c, gerr)
 		}
@@ -107,7 +107,7 @@ func (h *AdminHandler) Create(c *fiber.Ctx) error {
 		k.AllowedIPs = []string{}
 	}
 
-	if err := h.Runtime.Store.AdminAPIKey.Put(c.UserContext(), k); err != nil {
+	if err := h.Runtime.Store.AdminAPIKey.Put(c.Context(), k); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -115,8 +115,8 @@ func (h *AdminHandler) Create(c *fiber.Ctx) error {
 }
 
 // Revoke serves POST /api/v1/admin/api-keys/:id/revoke.
-func (h *AdminHandler) Revoke(c *fiber.Ctx) error {
-	k, err := h.Runtime.Store.AdminAPIKey.Get(c.UserContext(), c.Params("id"))
+func (h *AdminHandler) Revoke(c fiber.Ctx) error {
+	k, err := h.Runtime.Store.AdminAPIKey.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -125,7 +125,7 @@ func (h *AdminHandler) Revoke(c *fiber.Ctx) error {
 		return response.NotFound(c, "api key not found")
 	}
 
-	if err := h.Runtime.Store.AdminAPIKey.Revoke(c.UserContext(), k.ID); err != nil {
+	if err := h.Runtime.Store.AdminAPIKey.Revoke(c.Context(), k.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -135,8 +135,8 @@ func (h *AdminHandler) Revoke(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/admin/api-keys/:id.
-func (h *AdminHandler) Delete(c *fiber.Ctx) error {
-	k, err := h.Runtime.Store.AdminAPIKey.Get(c.UserContext(), c.Params("id"))
+func (h *AdminHandler) Delete(c fiber.Ctx) error {
+	k, err := h.Runtime.Store.AdminAPIKey.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -145,7 +145,7 @@ func (h *AdminHandler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "api key not found")
 	}
 
-	if err := h.Runtime.Store.AdminAPIKey.Delete(c.UserContext(), k.ID); err != nil {
+	if err := h.Runtime.Store.AdminAPIKey.Delete(c.Context(), k.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

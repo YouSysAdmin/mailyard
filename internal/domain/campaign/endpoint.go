@@ -5,7 +5,7 @@ package campaign
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -36,8 +36,8 @@ type Handler struct {
 //
 // Same trap as verifySession, passkeySelf, enrolmentScope and
 // refuseCAOverAnAssignedName.
-func (h *Handler) validateCampaignRefs(c *fiber.Ctx, projID string, in *upsertInput) (bool, error) {
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), projID, in.TemplateID)
+func (h *Handler) validateCampaignRefs(c fiber.Ctx, projID string, in *upsertInput) (bool, error) {
+	t, err := h.Runtime.Store.Template.Get(c.Context(), projID, in.TemplateID)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -51,7 +51,7 @@ func (h *Handler) validateCampaignRefs(c *fiber.Ctx, projID string, in *upsertIn
 	}
 
 	if in.SMTPGroup != "" {
-		g, err := h.Runtime.Store.SMTPGroup.GetBySlug(c.UserContext(), projID, in.SMTPGroup)
+		g, err := h.Runtime.Store.SMTPGroup.GetBySlug(c.Context(), projID, in.SMTPGroup)
 		if err != nil {
 			return false, response.Internal(c, err)
 		}
@@ -64,7 +64,7 @@ func (h *Handler) validateCampaignRefs(c *fiber.Ctx, projID string, in *upsertIn
 		in.smtpGroupID = g.ID
 	}
 
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), projID, in.ListID)
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), projID, in.ListID)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -88,7 +88,7 @@ func (h *Handler) validateCampaignRefs(c *fiber.Ctx, projID string, in *upsertIn
 			seen[v.Name] = true
 			sum += v.SplitPercentage
 			if v.TemplateID != "" {
-				vt, err := h.Runtime.Store.Template.Get(c.UserContext(), projID, v.TemplateID)
+				vt, err := h.Runtime.Store.Template.Get(c.Context(), projID, v.TemplateID)
 				if err != nil {
 					return false, response.Internal(c, err)
 				}
@@ -108,9 +108,9 @@ func (h *Handler) validateCampaignRefs(c *fiber.Ctx, projID string, in *upsertIn
 }
 
 // List serves GET /api/v1/campaigns.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	campaigns, err := h.Runtime.Store.Campaign.List(c.UserContext(), rc.Project.ID)
+	campaigns, err := h.Runtime.Store.Campaign.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -123,9 +123,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/campaigns/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -134,12 +134,12 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 		return response.NotFound(c, "campaign not found")
 	}
 
-	totals, byVariant, err := h.Runtime.Store.Campaign.MessageStats(c.UserContext(), cam.ID)
+	totals, byVariant, err := h.Runtime.Store.Campaign.MessageStats(c.Context(), cam.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	opened, clicked, err := h.Runtime.Store.Campaign.EngagementStats(c.UserContext(), cam.ID)
+	opened, clicked, err := h.Runtime.Store.Campaign.EngagementStats(c.Context(), cam.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -155,9 +155,9 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 // The headline counts stay on Get - this endpoint adds what a chart
 // needs. Series only reach back as far as tracking-event retention,
 // while the counters on Get are aggregated and survive the sweep.
-func (h *Handler) Analytics(c *fiber.Ctx) error {
+func (h *Handler) Analytics(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -166,7 +166,7 @@ func (h *Handler) Analytics(c *fiber.Ctx) error {
 		return response.NotFound(c, "campaign not found")
 	}
 
-	links, err := h.Runtime.Store.Campaign.ListTrackedLinks(c.UserContext(), cam.ID)
+	links, err := h.Runtime.Store.Campaign.ListTrackedLinks(c.Context(), cam.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -175,12 +175,12 @@ func (h *Handler) Analytics(c *fiber.Ctx) error {
 		links = []*cmodel.TrackedLink{}
 	}
 
-	openSeries, err := h.Runtime.Store.Campaign.EventSeries(c.UserContext(), cam.ID, cmodel.EventOpen)
+	openSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventOpen)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	clickSeries, err := h.Runtime.Store.Campaign.EventSeries(c.UserContext(), cam.ID, cmodel.EventClick)
+	clickSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventClick)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -201,7 +201,7 @@ func (h *Handler) Analytics(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/campaigns.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
@@ -219,7 +219,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		cam.CreatedBy = rc.User.ID
 	}
 
-	if err := h.Runtime.Store.Campaign.Put(c.UserContext(), cam); err != nil {
+	if err := h.Runtime.Store.Campaign.Put(c.Context(), cam); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -229,9 +229,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 // Update replaces the definition. Only draft campaigns are editable
 // (a scheduled campaign must be cancelled back to draft first, sends
 // in flight are immutable).
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -259,7 +259,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	updated.CreatedBy = cam.CreatedBy
 	updated.CreatedAt = cam.CreatedAt
 	updated.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Campaign.Put(c.UserContext(), updated); err != nil {
+	if err := h.Runtime.Store.Campaign.Put(c.Context(), updated); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -267,9 +267,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete removes a campaign that never ran (draft or cancelled).
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -282,7 +282,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.Conflict(c, "only draft or cancelled campaigns can be deleted")
 	}
 
-	if err := h.Runtime.Store.Campaign.Delete(c.UserContext(), rc.Project.ID, cam.ID); err != nil {
+	if err := h.Runtime.Store.Campaign.Delete(c.Context(), rc.Project.ID, cam.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -291,9 +291,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 
 // Send launches the campaign now, or schedules it when scheduled_at
 // is set.
-func (h *Handler) Send(c *fiber.Ctx) error {
+func (h *Handler) Send(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -327,7 +327,7 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 	// of once per recipient. Without it a campaign to a hundred
 	// thousand subscribers would queue, run, and fail every single
 	// message for a reason that was knowable before the first one.
-	if err := email.RequireVerifiedSender(c.UserContext(), h.Runtime.Store, rc.Project.ID, cam.FromEmail); err != nil {
+	if err := email.RequireVerifiedSender(c.Context(), h.Runtime.Store, rc.Project.ID, cam.FromEmail); err != nil {
 		return response.BadRequest(c, err.Error())
 	}
 
@@ -361,7 +361,7 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 	// snapshot, and a Cancel can land between it and the write - Put
 	// wrote the stale status back and resurrected the cancelled
 	// campaign. Launch re-checks draft/scheduled inside the UPDATE.
-	moved, err := h.Runtime.Store.Campaign.Launch(c.UserContext(), rc.Project.ID, cam.ID,
+	moved, err := h.Runtime.Store.Campaign.Launch(c.Context(), rc.Project.ID, cam.ID,
 		cam.Status, cam.ScheduledAt, cam.StartedAt, cam.NextBatchAt)
 	if err != nil {
 		return response.Internal(c, err)
@@ -379,15 +379,15 @@ func (h *Handler) Send(c *fiber.Ctx) error {
 }
 
 // Pause serves POST /api/v1/campaigns/:id/pause.
-func (h *Handler) Pause(c *fiber.Ctx) error {
+func (h *Handler) Pause(c fiber.Ctx) error {
 	return h.transition(c, cmodel.StatusPaused, "campaign is not sending",
 		cmodel.StatusSending)
 }
 
 // Resume serves POST /api/v1/campaigns/:id/resume.
-func (h *Handler) Resume(c *fiber.Ctx) error {
+func (h *Handler) Resume(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.UserContext(),
+	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.Context(),
 		rc.Project.ID, c.Params("id"), cmodel.StatusSending, cmodel.StatusPaused)
 	if err != nil {
 		return response.Internal(c, err)
@@ -402,7 +402,7 @@ func (h *Handler) Resume(c *fiber.Ctx) error {
 	// concurrent cancel between the two statements wins rather than
 	// being overwritten here.
 	now := time.Now().UTC()
-	if _, err := h.Runtime.Store.Campaign.SetRunState(c.UserContext(),
+	if _, err := h.Runtime.Store.Campaign.SetRunState(c.Context(),
 		c.Params("id"), cmodel.StatusSending, nil, nil, &now, cmodel.StatusSending); err != nil {
 		return response.Internal(c, err)
 	}
@@ -415,9 +415,9 @@ func (h *Handler) Resume(c *fiber.Ctx) error {
 }
 
 // Cancel stops a campaign for good and skips the unsent remainder.
-func (h *Handler) Cancel(c *fiber.Ctx) error {
+func (h *Handler) Cancel(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.UserContext(),
+	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.Context(),
 		rc.Project.ID, c.Params("id"), cmodel.StatusCancelled,
 		cmodel.StatusScheduled, cmodel.StatusSending, cmodel.StatusPaused)
 	if err != nil {
@@ -428,7 +428,7 @@ func (h *Handler) Cancel(c *fiber.Ctx) error {
 		return response.Conflict(c, "campaign cannot be cancelled from its current state")
 	}
 
-	if _, err := h.Runtime.Store.Campaign.SkipPending(c.UserContext(),
+	if _, err := h.Runtime.Store.Campaign.SkipPending(c.Context(),
 		c.Params("id"), "campaign cancelled"); err != nil {
 		return response.Internal(c, err)
 	}
@@ -437,9 +437,9 @@ func (h *Handler) Cancel(c *fiber.Ctx) error {
 }
 
 // Duplicate copies the definition into a fresh draft.
-func (h *Handler) Duplicate(c *fiber.Ctx) error {
+func (h *Handler) Duplicate(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -462,7 +462,7 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 		dup.CreatedBy = rc.User.ID
 	}
 
-	if err := h.Runtime.Store.Campaign.Put(c.UserContext(), &dup); err != nil {
+	if err := h.Runtime.Store.Campaign.Put(c.Context(), &dup); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -470,9 +470,9 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 }
 
 // Messages serves GET /api/v1/campaigns/:id/messages.
-func (h *Handler) Messages(c *fiber.Ctx) error {
+func (h *Handler) Messages(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -482,7 +482,7 @@ func (h *Handler) Messages(c *fiber.Ctx) error {
 	}
 
 	pg := paging.From(c)
-	msgs, err := h.Runtime.Store.Campaign.ListMessages(c.UserContext(),
+	msgs, err := h.Runtime.Store.Campaign.ListMessages(c.Context(),
 		rc.Project.ID, cam.ID, pg.Limit, pg.Offset)
 	if err != nil {
 		return response.Internal(c, err)
@@ -495,9 +495,9 @@ func (h *Handler) Messages(c *fiber.Ctx) error {
 	return response.Success(c, MessageListResponse{Messages: msgs})
 }
 
-func (h *Handler) transition(c *fiber.Ctx, to, conflictMsg string, from ...string) error {
+func (h *Handler) transition(c fiber.Ctx, to, conflictMsg string, from ...string) error {
 	rc := domain.GetRequestContext(c)
-	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.UserContext(),
+	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.Context(),
 		rc.Project.ID, c.Params("id"), to, from...)
 	if err != nil {
 		return response.Internal(c, err)
@@ -510,9 +510,9 @@ func (h *Handler) transition(c *fiber.Ctx, to, conflictMsg string, from ...strin
 	return h.respondWith(c, c.Params("id"))
 }
 
-func (h *Handler) respondWith(c *fiber.Ctx, id string) error {
+func (h *Handler) respondWith(c fiber.Ctx, id string) error {
 	rc := domain.GetRequestContext(c)
-	cam, err := h.Runtime.Store.Campaign.Get(c.UserContext(), rc.Project.ID, id)
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, id)
 	if err != nil {
 		return response.Internal(c, err)
 	}

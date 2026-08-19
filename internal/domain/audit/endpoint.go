@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -28,11 +28,11 @@ const (
 // ProjectLog returns configuration activity for the active
 // project. Mounted behind requireProjectRole(admin) - the trail
 // names who changed what, which is not something every viewer should read.
-func (h *Handler) ProjectLog(c *fiber.Ctx) error {
+func (h *Handler) ProjectLog(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
 	limit, offset := pg.Limit, pg.Offset
-	events, err := h.Runtime.Store.Audit.ListProject(c.UserContext(), rc.Project.ID, limit, offset)
+	events, err := h.Runtime.Store.Audit.ListProject(c.Context(), rc.Project.ID, limit, offset)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -42,9 +42,9 @@ func (h *Handler) ProjectLog(c *fiber.Ctx) error {
 
 // ProjectEvent returns one project event by id, same gate as the
 // list. Cross-project (or security-trail) ids look like a missing row.
-func (h *Handler) ProjectEvent(c *fiber.Ctx) error {
+func (h *Handler) ProjectEvent(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Audit.GetProject(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Audit.GetProject(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -59,7 +59,7 @@ func (h *Handler) ProjectEvent(c *fiber.Ctx) error {
 // SecurityLog returns account activity. A platform admin sees every
 // account, everyone else sees only their own - a non-admin reading
 // other people's sign-in times and IPs would be a new disclosure.
-func (h *Handler) SecurityLog(c *fiber.Ctx) error {
+func (h *Handler) SecurityLog(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
 	limit, offset := pg.Limit, pg.Offset
@@ -69,14 +69,14 @@ func (h *Handler) SecurityLog(c *fiber.Ctx) error {
 		err    error
 	)
 	if rc != nil && rc.User != nil && rc.User.IsAdmin() && c.Query("all") == "true" {
-		events, err = h.Runtime.Store.Audit.ListSecurity(c.UserContext(), limit, offset)
+		events, err = h.Runtime.Store.Audit.ListSecurity(c.Context(), limit, offset)
 	} else {
 		actorID := ""
 		if rc != nil && rc.User != nil {
 			actorID = rc.User.ID
 		}
 
-		events, err = h.Runtime.Store.Audit.ListForActor(c.UserContext(), actorID, limit, offset)
+		events, err = h.Runtime.Store.Audit.ListForActor(c.Context(), actorID, limit, offset)
 	}
 
 	if err != nil {
@@ -105,14 +105,14 @@ const exportCap = 50000
 // screen and answers with a page, this is a file and answers with a
 // window. One route trying to be both would need the caller to know
 // that a limit above some number changes what the endpoint IS.
-func (h *Handler) ProjectLogExport(c *fiber.Ctx) error {
+func (h *Handler) ProjectLogExport(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	from, to, resp, ok := exportWindow(c)
 	if !ok {
 		return resp
 	}
 
-	events, err := h.Runtime.Store.Audit.ExportProject(c.UserContext(), rc.Project.ID, from, to, exportCap+1)
+	events, err := h.Runtime.Store.Audit.ExportProject(c.Context(), rc.Project.ID, from, to, exportCap+1)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -123,7 +123,7 @@ func (h *Handler) ProjectLogExport(c *fiber.Ctx) error {
 // SecurityLogExport is the same for account activity, with the same
 // audience rule as SecurityLog: your own unless you administer the
 // installation and ask for every account.
-func (h *Handler) SecurityLogExport(c *fiber.Ctx) error {
+func (h *Handler) SecurityLogExport(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	from, to, resp, ok := exportWindow(c)
 	if !ok {
@@ -135,14 +135,14 @@ func (h *Handler) SecurityLogExport(c *fiber.Ctx) error {
 		err    error
 	)
 	if rc != nil && rc.User != nil && rc.User.IsAdmin() && c.Query("all") == "true" {
-		events, err = h.Runtime.Store.Audit.ExportSecurity(c.UserContext(), from, to, exportCap+1)
+		events, err = h.Runtime.Store.Audit.ExportSecurity(c.Context(), from, to, exportCap+1)
 	} else {
 		actorID := ""
 		if rc != nil && rc.User != nil {
 			actorID = rc.User.ID
 		}
 
-		events, err = h.Runtime.Store.Audit.ExportForActor(c.UserContext(), actorID, from, to, exportCap+1)
+		events, err = h.Runtime.Store.Audit.ExportForActor(c.Context(), actorID, from, to, exportCap+1)
 	}
 
 	if err != nil {
@@ -157,7 +157,7 @@ func (h *Handler) SecurityLogExport(c *fiber.Ctx) error {
 // The store is asked for cap+1 rows, which is how "there was more" is
 // known without a COUNT over a table that grows per request - the same
 // trick keyset paging uses to answer "is there another page".
-func exported(c *fiber.Ctx, events []*amodel.Event, from, to time.Time) error {
+func exported(c fiber.Ctx, events []*amodel.Event, from, to time.Time) error {
 	truncated := len(events) > exportCap
 	if truncated {
 		events = events[:exportCap]
@@ -185,7 +185,7 @@ func exported(c *fiber.Ctx, events []*amodel.Event, from, to time.Time) error {
 // Returns (from, to, resp, ok) rather than an error, for the reason
 // verifySession does: response.* writes the status and returns nil, so
 // a lone error would be nil on a refusal and the caller would carry on.
-func exportWindow(c *fiber.Ctx) (time.Time, time.Time, error, bool) {
+func exportWindow(c fiber.Ctx) (time.Time, time.Time, error, bool) {
 	// Not time.Time{}: a Go zero time is year 1 and Postgres accepts it,
 	// but it also serializes into the response as 0001-01-01, which reads
 	// like a bug in the export rather than "from the beginning".

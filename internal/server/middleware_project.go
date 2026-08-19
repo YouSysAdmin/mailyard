@@ -6,7 +6,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -42,7 +42,7 @@ const ProjectHeader = "X-Mailyard-Project-Id"
 // configuration and the whole data export. A group that declares no
 // resource is now refused outright.
 func requireProject(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if ok, resp := stampProject(c, rt); !ok {
 			return resp
 		}
@@ -57,7 +57,7 @@ func requireProject(rt *env.Runtime) fiber.Handler {
 // Split out of requireProject so machineAuth can run it as one branch
 // of a decision, rather than the machine surface growing its own
 // tenancy resolution.
-func stampProject(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
+func stampProject(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	rc := domain.GetRequestContext(c)
 	if rc == nil {
 		return false, response.Internal(c, errors.New("request context middleware not installed"))
@@ -90,7 +90,7 @@ func stampProject(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 	// projectAccessOf. It has no membership row to read, so this
 	// branch is where that is decided rather than there.
 	if rc.User == nil && rc.AdminAPIKey != nil {
-		proj, err := rt.Store.Project.Get(c.UserContext(), projID)
+		proj, err := rt.Store.Project.Get(c.Context(), projID)
 		if err != nil {
 			return false, response.Internal(c, err)
 		}
@@ -113,7 +113,7 @@ func stampProject(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 	}
 
 	if projID == "" {
-		proj, err := project.ResolveDefault(c.UserContext(), rt, rc.User.ID)
+		proj, err := project.ResolveDefault(c.Context(), rt, rc.User.ID)
 		if err != nil {
 			return false, response.Internal(c, err)
 		}
@@ -165,7 +165,7 @@ func stampProject(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 	//
 	// Collapsing "no such project" into "not a member" is also the
 	// tenancy rule - a distinct 403 tells a stranger the project exists.
-	proj, err := rt.Store.Project.Get(c.UserContext(), projID)
+	proj, err := rt.Store.Project.Get(c.Context(), projID)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -195,7 +195,7 @@ func stampProject(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 // One message. Naming a required role would only make sense if a single
 // rank were the answer, and a caller is turned away by permOn or
 // permRead, which name the permission.
-func refuseProjectRole(c *fiber.Ctx) error {
+func refuseProjectRole(c fiber.Ctx) error {
 	return response.Forbidden(c, "not a project member")
 }
 
@@ -209,12 +209,12 @@ func refuseProjectRole(c *fiber.Ctx) error {
 // resolveOpenProject picks the project for the auth-disabled
 // mode: the explicitly addressed one, else the shared default
 // (created on demand).
-func resolveOpenProject(c *fiber.Ctx, rt *env.Runtime, projID string) (*projmodel.Project, error) {
+func resolveOpenProject(c fiber.Ctx, rt *env.Runtime, projID string) (*projmodel.Project, error) {
 	if projID != "" {
-		return rt.Store.Project.Get(c.UserContext(), projID)
+		return rt.Store.Project.Get(c.Context(), projID)
 	}
 
-	return rt.Store.Project.EnsureDefault(c.UserContext())
+	return rt.Store.Project.EnsureDefault(c.Context())
 }
 
 // projectAccess is what one caller may do in one project: whether
@@ -237,13 +237,13 @@ type projectAccess struct {
 //
 // Platform admins are owner-equivalent. Non-members get the zero
 // value, which every gate refuses.
-func projectAccessOf(c *fiber.Ctx, rt *env.Runtime, projID string) (projectAccess, error) {
+func projectAccessOf(c fiber.Ctx, rt *env.Runtime, projID string) (projectAccess, error) {
 	rc := domain.GetRequestContext(c)
 	if rc.IsPlatformAdmin() {
 		return projectAccess{member: true, owner: true, perms: permission.NewSet(permission.All)}, nil
 	}
 
-	m, err := rt.Store.Project.GetMember(c.UserContext(), projID, rc.User.ID)
+	m, err := rt.Store.Project.GetMember(c.Context(), projID, rc.User.ID)
 	if err != nil {
 		return projectAccess{}, err
 	}

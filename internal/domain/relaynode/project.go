@@ -5,7 +5,7 @@ package relaynode
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/edition"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -33,10 +33,10 @@ import (
 // their own return path with no new code at all.
 
 // ListMine returns the calling project's nodes.
-func (h *Handler) ListMine(c *fiber.Ctx) error {
+func (h *Handler) ListMine(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 
-	nodes, err := h.Runtime.Store.RelayNode.List(c.UserContext(), rc.Project.ID)
+	nodes, err := h.Runtime.Store.RelayNode.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -50,7 +50,7 @@ func (h *Handler) ListMine(c *fiber.Ctx) error {
 	}
 	for _, n := range nodes {
 		v := nodeView{Node: n, Alive: n.Fresh(nodemodel.StaleAfter, now)}
-		srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), rc.Project.ID, n.ServerID)
+		srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, n.ServerID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -75,13 +75,13 @@ func (h *Handler) ListMine(c *fiber.Ctx) error {
 }
 
 // ApproveMine lets one of the project's nodes start carrying its mail.
-func (h *Handler) ApproveMine(c *fiber.Ctx) error {
+func (h *Handler) ApproveMine(c fiber.Ctx) error {
 	node, srv, resp := h.projectNode(c)
 	if resp != nil {
 		return resp
 	}
 
-	if err := h.Runtime.Store.SMTPServer.SetStatus(c.UserContext(),
+	if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 		node.ProjectID, srv.ID, ssmodel.StatusEnabled, "", nil); err != nil {
 		return response.Internal(c, err)
 	}
@@ -95,13 +95,13 @@ func (h *Handler) ApproveMine(c *fiber.Ctx) error {
 // SuspendMine takes a node out of rotation without forgetting it. The
 // node keeps its certificate and keeps reporting, so putting it back
 // is one click rather than a re-enrolment.
-func (h *Handler) SuspendMine(c *fiber.Ctx) error {
+func (h *Handler) SuspendMine(c fiber.Ctx) error {
 	node, srv, resp := h.projectNode(c)
 	if resp != nil {
 		return resp
 	}
 
-	if err := h.Runtime.Store.SMTPServer.SetStatus(c.UserContext(),
+	if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 		node.ProjectID, srv.ID, ssmodel.StatusDisabled,
 		"suspended by a project administrator", nil); err != nil {
 		return response.Internal(c, err)
@@ -116,18 +116,18 @@ func (h *Handler) SuspendMine(c *fiber.Ctx) error {
 // project's group with nothing behind it - and since the freshness
 // rule only applies to rows a node still claims, that orphan would
 // look like an ordinary server and be handed mail forever.
-func (h *Handler) DeleteMine(c *fiber.Ctx) error {
+func (h *Handler) DeleteMine(c fiber.Ctx) error {
 	node, srv, resp := h.projectNode(c)
 	if resp != nil {
 		return resp
 	}
 
-	if err := h.Runtime.Store.RelayNode.Delete(c.UserContext(), node.ID); err != nil {
+	if err := h.Runtime.Store.RelayNode.Delete(c.Context(), node.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
 	h.forgetIssued(c, node.ID)
-	if err := h.Runtime.Store.SMTPServer.Delete(c.UserContext(), node.ProjectID, srv.ID); err != nil {
+	if err := h.Runtime.Store.SMTPServer.Delete(c.Context(), node.ProjectID, srv.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -150,10 +150,10 @@ func (h *Handler) DeleteMine(c *fiber.Ctx) error {
 //
 // The RESPONSE is what a caller tests - see adminNode, which carries
 // the same contract for the platform-admin side.
-func (h *Handler) projectNode(c *fiber.Ctx) (*nodemodel.Node, *ssmodel.Server, error) {
+func (h *Handler) projectNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Server, error) {
 	rc := domain.GetRequestContext(c)
 
-	node, err := h.Runtime.Store.RelayNode.Get(c.UserContext(), c.Params("id"))
+	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return nil, nil, response.Internal(c, err)
 	}
@@ -162,7 +162,7 @@ func (h *Handler) projectNode(c *fiber.Ctx) (*nodemodel.Node, *ssmodel.Server, e
 		return nil, nil, response.NotFound(c, "relay node not found")
 	}
 
-	srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), node.ProjectID, node.ServerID)
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), node.ProjectID, node.ServerID)
 	if err != nil {
 		return nil, nil, response.Internal(c, err)
 	}

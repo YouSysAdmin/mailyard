@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // hugoFS is the built documentation stripped to its shape: a page is a
@@ -41,7 +41,7 @@ func TestADocumentationPageAnswersWithAndWithoutATrailingSlash(t *testing.T) {
 	app := fiber.New()
 	// No gate: what is being asked here is what the filesystem answers.
 	// requirePageAuth needs a runtime, and is exercised where it lives.
-	mountDocs(app, hugoFS(), func(c *fiber.Ctx) error { return c.Next() })
+	mountDocs(app, hugoFS(), func(c fiber.Ctx) error { return c.Next() })
 
 	for _, tc := range []struct {
 		path   string

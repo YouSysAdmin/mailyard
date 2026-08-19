@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
@@ -39,7 +39,7 @@ func TestAFloodOfDistinctTokensIsRefused(t *testing.T) {
 	// unknown key. The keyed limiter is modelled too, to show it is not
 	// the thing doing the work.
 	buckets := map[string]int{}
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		token := c.Get("Authorization")
 		sum := sha256.Sum256([]byte(token))
 		buckets["k:"+hex.EncodeToString(sum[:8])]++
@@ -107,13 +107,13 @@ func TestAFloodOfDistinctTokensIsRefused(t *testing.T) {
 func TestTheGateRefusesAnIPOverItsBudget(t *testing.T) {
 	failures := iplimit.New(1, time.Minute)
 	app := fiber.New()
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		failures.Allow(c.IP())
 
 		return c.Next()
 	})
 	app.Use(machineAuth(&env.Runtime{}, failures))
-	app.Get("/api/v1/emails", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+	app.Get("/api/v1/emails", func(c fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
 
 	res, err := app.Test(httptest.NewRequest("GET", "/api/v1/emails", nil))
 	if err != nil {

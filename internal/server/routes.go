@@ -8,15 +8,14 @@ import (
 	"encoding/hex"
 	"io/fs"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gofiber/adaptor/v2"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
+	"github.com/gofiber/fiber/v3/middleware/static"
 	docsite "github.com/yousysadmin/mailyard/docs"
 	coreaudit "github.com/yousysadmin/mailyard/internal/core/audit"
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -81,10 +80,10 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// request that carries no credentials by definition.
 	if rt.Config.CORS.Enabled {
 		app.Use(cors.New(cors.Config{
-			AllowOrigins:     strings.Join(rt.Config.CORS.AllowedOrigins, ","),
-			AllowMethods:     strings.Join(rt.Config.CORS.AllowedMethods, ","),
-			AllowHeaders:     strings.Join(rt.Config.CORS.AllowedHeaders, ","),
-			ExposeHeaders:    strings.Join(rt.Config.CORS.ExposeHeaders, ","),
+			AllowOrigins:     rt.Config.CORS.AllowedOrigins,
+			AllowMethods:     rt.Config.CORS.AllowedMethods,
+			AllowHeaders:     rt.Config.CORS.AllowedHeaders,
+			ExposeHeaders:    rt.Config.CORS.ExposeHeaders,
 			AllowCredentials: rt.Config.CORS.AllowCredentials,
 			MaxAge:           rt.Config.CORS.MaxAge,
 		}))
@@ -95,7 +94,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// them separate means a database outage drains the instance
 	// instead of restarting it.
 	hh := &health.Handler{Runtime: rt}
-	app.Get("/healthz", func(c *fiber.Ctx) error {
+	app.Get("/healthz", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 	app.Get("/readyz", hh.Ready)
@@ -105,7 +104,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// worker role wants metrics more than any other node does.
 	if rt.Config.Metrics.Enabled {
 		mh := adaptor.HTTPHandler(metrics.HTTPHandler())
-		app.Get("/metrics", func(c *fiber.Ctx) error {
+		app.Get("/metrics", func(c fiber.Ctx) error {
 			if tok := rt.Config.Metrics.Token; tok != "" {
 				// Constant time, like every other credential check in
 				// this codebase (api keys, relay passwords). A plain !=
@@ -130,8 +129,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	}
 
 	// The console lives at env.ConsolePath - send the bare root there.
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.Redirect(env.ConsolePath+"/", fiber.StatusFound)
+	app.Get("/", func(c fiber.Ctx) error {
+		return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/")
 	})
 
 	// Public tracking surface - open pixel, click redirects, hosted
@@ -295,7 +294,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	//
 	// The session cookie gets its own bucket, or every operator behind
 	// one office NAT would share a budget.
-	v1Limiter := perMinute(rt, rt.Config.RateLimit.APIPerMinute, func(c *fiber.Ctx) string {
+	v1Limiter := perMinute(rt, rt.Config.RateLimit.APIPerMinute, func(c fiber.Ctx) string {
 		if token := bearerToken(c); token != "" {
 			sum := sha256.Sum256([]byte(token))
 
@@ -911,7 +910,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 		// than 404ing: the alternative is someone concluding the
 		// console is broken when it was simply never compiled in.
 		slog.Warn("console not embedded in this binary, " + env.ConsolePath + " will not serve - run `task build`")
-		app.Use(env.ConsolePath, func(c *fiber.Ctx) error {
+		app.Use(env.ConsolePath, func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusServiceUnavailable).
 				SendString("console not built into this binary - run `task build`")
 		})
@@ -932,22 +931,30 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 // TestADocumentationPageAnswersWithAndWithoutATrailingSlash pins it.
 func mountDocs(app *fiber.App, site fs.FS, gate fiber.Handler) {
 	docs := app.Group("/docs", gate)
-	docs.Use("/", filesystem.New(filesystem.Config{
-		Root:  http.FS(site),
-		Index: "index.html",
+	docs.Use("/", static.New("", static.Config{
+		FS:         site,
+		IndexNames: []string{"index.html"},
+
+		// A bare /docs is handed straight past. v3's static resolves a
+		// directory request to its index itself, where v2's filesystem
+		// middleware did not match this path at all - so without this
+		// the site root would answer at BOTH /docs and /docs/, and the
+		// redirect below, which exists to keep one canonical URL for
+		// it, would never run.
+		Next: func(c fiber.Ctx) bool { return c.Path() == "/docs" },
 	}))
-	// NotFoundFile is not used on purpose: it serves the 404 page with a
-	// 200 status, which lies to anything that checks. The middleware
-	// falls through on a miss, so serve the page here with the status it
-	// deserves.
-	docs.Use("/", func(c *fiber.Ctx) error {
-		// A bare /docs, which is what a person types - the middleware
-		// above serves the index for /docs/ and does not match this. It
-		// is answered here rather than by a route of its own, because a
-		// route on /docs would match /docs/ too (routing is not strict)
-		// and redirect the index to itself forever.
+	// static.Config.NotFoundHandler is not set on purpose - the 404 page
+	// has to carry a 404 status, and a handler set there would be inside
+	// the middleware that already wrote one meaning. static falls through
+	// on a miss, so the page is served here, with the status it deserves.
+	docs.Use("/", func(c fiber.Ctx) error {
+		// A bare /docs, which is what a person types - static is handed
+		// past that one path above, so it arrives here. It is answered
+		// here rather than by a route of its own, because a route on
+		// /docs would match /docs/ too (routing is not strict) and
+		// redirect the index to itself forever.
 		if c.Path() == "/docs" {
-			return c.Redirect("/docs/", fiber.StatusFound)
+			return c.Redirect().Status(fiber.StatusFound).To("/docs/")
 		}
 
 		page, err := fs.ReadFile(site, "404.html")
@@ -972,7 +979,7 @@ func mountDocs(app *fiber.App, site fs.FS, gate fiber.Handler) {
 // the API Keys page should have been. Found by fetching every console
 // path in a browser and reading the status codes.
 func apiNotFound(prefix string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		path := c.Path()
 		if len(path) > len(prefix) && path[len(prefix)] != '/' {
 			return c.Next()
@@ -993,7 +1000,7 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 	// index.html shell must always revalidate - a browser holding a
 	// stale shell after a binary upgrade would request chunk files
 	// that no longer exist and every lazy-loaded page would break.
-	app.Use(env.ConsolePath, func(c *fiber.Ctx) error {
+	app.Use(env.ConsolePath, func(c fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), env.ConsolePath+"/assets/") {
 			c.Set(fiber.HeaderCacheControl, "public, max-age=31536000, immutable")
 		} else {
@@ -1011,7 +1018,7 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 	// neither the file nor the reason. It is what a tab left open
 	// across an upgrade asks for, and it took a packet capture to see
 	// that the server had answered 200.
-	app.Use(env.ConsolePath+"/assets", func(c *fiber.Ctx) error {
+	app.Use(env.ConsolePath+"/assets", func(c fiber.Ctx) error {
 		name := strings.TrimPrefix(c.Path(), env.ConsolePath+"/")
 		f, err := sub.Open(name)
 		if err != nil {
@@ -1025,10 +1032,23 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 		return c.Next()
 	})
 
-	app.Use(env.ConsolePath, filesystem.New(filesystem.Config{
-		Root:         http.FS(sub),
-		Index:        "index.html",
-		NotFoundFile: "index.html",
+	app.Use(env.ConsolePath, static.New("", static.Config{
+		FS:         sub,
+		IndexNames: []string{"index.html"},
+
+		// The history fallback, which v2 spelled NotFoundFile. Status
+		// 200 and not the 404 static already wrote: this answers a deep
+		// link into the SPA, where the shell IS the right response.
+		NotFoundHandler: func(c fiber.Ctx) error {
+			page, err := fs.ReadFile(sub, "index.html")
+			if err != nil {
+				return c.SendStatus(fiber.StatusNotFound)
+			}
+
+			c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
+
+			return c.Status(fiber.StatusOK).Send(page)
+		},
 	}))
 }
 
@@ -1041,7 +1061,7 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 //
 // Set before c.Next() so a specific handler can still override if it
 // ever has reason to.
-func noStoreCache(c *fiber.Ctx) error {
+func noStoreCache(c fiber.Ctx) error {
 	c.Set(fiber.HeaderCacheControl, "no-store")
 
 	return c.Next()
@@ -1055,9 +1075,9 @@ func noStoreCache(c *fiber.Ctx) error {
 // The window state is per process. On a multi-node deployment the
 // effective ceiling is max times the node count - see the note on
 // env.RateLimitConfig.
-func perMinute(rt *env.Runtime, max int, keyFn func(*fiber.Ctx) string) fiber.Handler {
+func perMinute(rt *env.Runtime, max int, keyFn func(fiber.Ctx) string) fiber.Handler {
 	if !rt.Config.RateLimit.Enabled || max <= 0 {
-		return func(c *fiber.Ctx) error { return c.Next() }
+		return func(c fiber.Ctx) error { return c.Next() }
 	}
 
 	cfg := limiter.Config{Max: max, Expiration: time.Minute}
@@ -1077,7 +1097,7 @@ func perMinute(rt *env.Runtime, max int, keyFn func(*fiber.Ctx) string) fiber.Ha
 // diagnose. Platform admins are exempt entirely - somebody has to be
 // able to turn it back off.
 func maintenanceMode(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		switch c.Method() {
 		case fiber.MethodGet, fiber.MethodHead, fiber.MethodOptions:
 			return c.Next()
@@ -1109,7 +1129,7 @@ func maintenanceMode(rt *env.Runtime) fiber.Handler {
 // looking for. Failed sign-ins are the exception, recorded explicitly by
 // the auth handler, because there the failure is the event.
 func auditWrites(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		err := c.Next()
 
 		switch c.Method() {

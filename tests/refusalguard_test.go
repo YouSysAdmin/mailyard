@@ -55,7 +55,7 @@ import (
 // function that returns a lone error and answers with `response.*` may
 // only be called as `return f(...)`.
 //
-// Fiber handlers are exempt by construction: `func(c *fiber.Ctx) error`
+// Fiber handlers are exempt by construction: `func(c fiber.Ctx) error`
 // returns the refusal AS the response, which is the whole convention.
 //
 // Package scoped, and that is load-bearing rather than tidy:
@@ -172,12 +172,11 @@ func isFiberHandler(fn *ast.FuncDecl) bool {
 		return false
 	}
 
-	star, ok := params.List[0].Type.(*ast.StarExpr)
-	if !ok {
-		return false
-	}
-
-	sel, ok := star.X.(*ast.SelectorExpr)
+	// Not a StarExpr: Fiber v3's Ctx is an INTERFACE, so a handler takes
+	// it by value. Left matching on the pointer, this predicate answered
+	// false for every handler in the tree and the exemption below it was
+	// dead - each one would have been collected as a refusal helper.
+	sel, ok := params.List[0].Type.(*ast.SelectorExpr)
 
 	return ok && sel.Sel.Name == "Ctx"
 }

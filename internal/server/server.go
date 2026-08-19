@@ -17,7 +17,7 @@ import (
 
 	docsite "github.com/yousysadmin/mailyard/docs"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -64,8 +64,10 @@ const baseBodyLimit = 1 * 1024 * 1024
 // limit is a number nothing enforces.
 //
 // The trade is deliberate: this raises the ceiling for every endpoint,
-// not just the send routes, because Fiber v2 has no per-route body
-// limit. Operators who do not send large attachments should lower
+// not just the send routes, because the limit is a property of the
+// fasthttp server and Fiber has no per-route override - checked again
+// on v3, where BodyLimit still reaches only app.server. Operators who
+// do not send large attachments should lower
 // sending.max_total_attachment_size, which lowers this with it.
 func bodyLimitFor(cfg *env.Config) int {
 	total := cfg.Sending.MaxTotalAttachmentSize
@@ -106,8 +108,7 @@ func bodyLimitFor(cfg *env.Config) int {
 // boot, and so every listener in the process can share one.
 func New(opts Options) (*Server, error) {
 	fiberCfg := fiber.Config{
-		DisableStartupMessage: true,
-		BodyLimit:             bodyLimitFor(opts.Runtime.Config),
+		BodyLimit: bodyLimitFor(opts.Runtime.Config),
 
 		// Generous rather than tight on purpose. These are a backstop
 		// against a socket going nowhere, not a latency policy, and a
@@ -123,8 +124,8 @@ func New(opts Options) (*Server, error) {
 	// strictly limit it to the trusted-proxy list so an unproxied
 	// caller cannot spoof their source IP through the header.
 	if proxies := opts.Runtime.Config.Server.TrustedProxies; len(proxies) > 0 {
-		fiberCfg.EnableTrustedProxyCheck = true
-		fiberCfg.TrustedProxies = proxies
+		fiberCfg.TrustProxy = true
+		fiberCfg.TrustProxyConfig = fiber.TrustProxyConfig{Proxies: proxies}
 		fiberCfg.ProxyHeader = fiber.HeaderXForwardedFor
 	}
 
@@ -150,6 +151,11 @@ func New(opts Options) (*Server, error) {
 // errCh path keeps working unchanged.
 func (s *Server) Start() error {
 	addr := s.rt.Config.Server.Addr
+	// v3 asks about listening at Listen time rather than at New time.
+	// One value for both paths below: the startup banner is noise in a
+	// service that logs its own start line.
+	listenCfg := fiber.ListenConfig{DisableStartupMessage: true}
+
 	if s.tlsCfg != nil {
 		ln, err := tls.Listen("tcp", addr, s.tlsCfg)
 		if err != nil {
@@ -162,12 +168,12 @@ func (s *Server) Start() error {
 		// stops being true the moment an admin assigns one.
 		slog.Info("server start", "addr", addr, "tls", true)
 
-		return s.app.Listener(ln)
+		return s.app.Listener(ln, listenCfg)
 	}
 
 	slog.Info("server start", "addr", addr, "tls", false)
 
-	return s.app.Listen(addr)
+	return s.app.Listen(addr, listenCfg)
 }
 
 // Shutdown stops accepting connections and waits for in-flight
@@ -197,7 +203,7 @@ func (s *Server) Shutdown(timeout time.Duration) error {
 // caller. Fiber's stock recover.New writes the panic value into the
 // response body, which leaks internal state (paths, types, sometimes
 // secrets in *fmt.wrapError values) to whoever triggered the panic.
-func safeRecover(c *fiber.Ctx) (err error) {
+func safeRecover(c fiber.Ctx) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("panic recovered",
@@ -236,7 +242,7 @@ func safeRecover(c *fiber.Ctx) (err error) {
 // Fonts are bundled and served from this origin. 'unsafe-eval' is off,
 // so bundling that needs it has to opt in deliberately.
 func securityHeaders(scriptSrc string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// HSTS, but only on a connection that really arrived over TLS.
 		// Without it a browser has nothing telling it to refuse the
 		// plain-HTTP version of the site, and the first request of a
@@ -244,16 +250,21 @@ func securityHeaders(scriptSrc string) fiber.Handler {
 		// Secure flag is no help there, because the attacker is the one
 		// answering.
 		//
-		// We check c.Protocol(), which honours the trusted-proxy list, so
+		// We check c.Scheme(), which honours the trusted-proxy list, so
 		// the usual deployment (TLS at a proxy, plain HTTP upstream) sets
 		// the header and a local dev instance does not. Browsers ignore
 		// HSTS over HTTP anyway, so setting it always would be harmless
 		// but misleading to read.
 		//
+		// NOT c.Protocol(), which is what this read was called in Fiber
+		// v2. In v3 that name answers the HTTP version - "HTTP/1.1" -
+		// and compares equal to nothing here, so the header would simply
+		// never be sent and no build or test would say so.
+		//
 		// No preload and no includeSubDomains. Both are promises about
 		// hostnames this process does not own, and preload is hard to
 		// undo.
-		if c.Protocol() == "https" {
+		if c.Scheme() == "https" {
 			c.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 
@@ -332,7 +343,7 @@ func skipPaths(h fiber.Handler, paths ...string) fiber.Handler {
 		skip[p] = struct{}{}
 	}
 
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if _, ok := skip[c.Path()]; ok {
 			return c.Next()
 		}
@@ -343,7 +354,7 @@ func skipPaths(h fiber.Handler, paths ...string) fiber.Handler {
 
 func accessLogFilters() []slogfiber.Filter {
 	return []slogfiber.Filter{
-		func(c *fiber.Ctx) bool {
+		func(c fiber.Ctx) bool {
 			return c.Path() != env.ConsolePath+"/api/auth/me" ||
 				c.Response().StatusCode() != http.StatusUnauthorized
 		},

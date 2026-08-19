@@ -13,7 +13,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -196,8 +196,8 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/admin/plans.
-func (h *Handler) List(c *fiber.Ctx) error {
-	plans, err := h.Runtime.Store.Plan.List(c.UserContext())
+func (h *Handler) List(c fiber.Ctx) error {
+	plans, err := h.Runtime.Store.Plan.List(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -210,7 +210,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/admin/plans.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
 		return resp
@@ -218,7 +218,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 
 	p := &pmodel.Plan{ID: ids.New()}
 	apply(p, in)
-	if err := h.Runtime.Store.Plan.Put(c.UserContext(), p); err != nil {
+	if err := h.Runtime.Store.Plan.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -226,8 +226,8 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/admin/plans/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
-	p, err := h.Runtime.Store.Plan.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Update(c fiber.Ctx) error {
+	p, err := h.Runtime.Store.Plan.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -244,7 +244,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	apply(p, in)
 	now := time.Now().UTC()
 	p.UpdatedAt = &now
-	if err := h.Runtime.Store.Plan.Put(c.UserContext(), p); err != nil {
+	if err := h.Runtime.Store.Plan.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -252,8 +252,8 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/admin/plans/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
-	p, err := h.Runtime.Store.Plan.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Delete(c fiber.Ctx) error {
+	p, err := h.Runtime.Store.Plan.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -262,7 +262,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "plan not found")
 	}
 
-	if err := h.Runtime.Store.Plan.Delete(c.UserContext(), p.ID); err != nil {
+	if err := h.Runtime.Store.Plan.Delete(c.Context(), p.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -270,8 +270,8 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 }
 
 // Assign sets or clears a project's plan. Platform admin only.
-func (h *Handler) Assign(c *fiber.Ctx) error {
-	w, err := h.Runtime.Store.Project.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Assign(c fiber.Ctx) error {
+	w, err := h.Runtime.Store.Project.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -286,7 +286,7 @@ func (h *Handler) Assign(c *fiber.Ctx) error {
 	}
 
 	if in.PlanID != "" {
-		p, err := h.Runtime.Store.Plan.Get(c.UserContext(), in.PlanID)
+		p, err := h.Runtime.Store.Plan.Get(c.Context(), in.PlanID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -299,7 +299,7 @@ func (h *Handler) Assign(c *fiber.Ctx) error {
 	w.PlanID = in.PlanID
 	now := time.Now().UTC()
 	w.UpdatedAt = &now
-	if err := h.Runtime.Store.Project.Put(c.UserContext(), w); err != nil {
+	if err := h.Runtime.Store.Project.Put(c.Context(), w); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -308,9 +308,9 @@ func (h *Handler) Assign(c *fiber.Ctx) error {
 
 // Usage reports the active project's effective plan and current
 // consumption so the UI can render limits. Any member may read it.
-func (h *Handler) Usage(c *fiber.Ctx) error {
+func (h *Handler) Usage(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	counts, p, err := quota.Usage(c.UserContext(), h.Runtime.Store, rc.Project.ID)
+	counts, p, err := quota.Usage(c.Context(), h.Runtime.Store, rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}

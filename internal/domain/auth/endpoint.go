@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -37,7 +37,7 @@ type Handler struct {
 // session cookie, and returns the public user record.
 // Uniform error for missing user / wrong password / disabled account so the
 // response never leaks which leg failed.
-func (h *Handler) Login(c *fiber.Ctx) error {
+func (h *Handler) Login(c fiber.Ctx) error {
 	if !h.Runtime.Config.Auth.Local.Enabled {
 		return response.BadRequest(c, "local login is disabled")
 	}
@@ -47,7 +47,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return resp
 	}
 
-	u, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+	u, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -93,7 +93,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 			})
 		}
 
-		if !h.consumeTOTP(c.UserContext(), u.ID, u.TOTPSecret, in.TOTPCode) {
+		if !h.consumeTOTP(c.Context(), u.ID, u.TOTPSecret, in.TOTPCode) {
 			h.recordLoginFailure(c, u, in.Email, "wrong two-factor code")
 
 			return response.Unauthorized(c, "invalid credentials")
@@ -104,7 +104,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	if err := h.Runtime.Store.User.TouchLastLogin(c.UserContext(), u.Email); err != nil {
+	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
 		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
 	}
 
@@ -133,13 +133,13 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 // unlike password reset, a signup form that silently succeeds against
 // an existing address strands the person on a login they cannot pass.
 // The login-tier rate limit on the route is what keeps the oracle slow.
-func (h *Handler) Register(c *fiber.Ctx) error {
+func (h *Handler) Register(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[registerInput](c)
 	if !ok {
 		return resp
 	}
 
-	existing, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+	existing, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -165,7 +165,7 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 		PasswordHash:  hash,
 		EmailVerified: !needsVerify,
 	}
-	if err := h.Runtime.Store.User.Put(c.UserContext(), u); err != nil {
+	if err := h.Runtime.Store.User.Put(c.Context(), u); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -181,7 +181,7 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 	})
 
 	if needsVerify {
-		if err := h.sendVerificationMail(c.UserContext(), u, c.IP()); err != nil {
+		if err := h.sendVerificationMail(c.Context(), u, c.IP()); err != nil {
 			return response.Internal(c, err)
 		}
 
@@ -199,7 +199,7 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	if err := h.Runtime.Store.User.TouchLastLogin(c.UserContext(), u.Email); err != nil {
+	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
 		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
 	}
 
@@ -213,14 +213,14 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 // stays signed and unexpired - revoking the row named by its jti is
 // what actually ends the session, and rt.Sessions.Invalidate makes
 // this node agree immediately instead of within the cache TTL.
-func (h *Handler) Logout(c *fiber.Ctx) error {
+func (h *Handler) Logout(c fiber.Ctx) error {
 	// Deliberately not behind requireAuth: signing out must succeed
 	// even when the session has already expired or been revoked
 	// elsewhere, otherwise the console can get stuck holding a dead
 	// cookie it cannot clear. So the handler resolves the session
 	// itself instead of reading it from the request context.
 	if sess, email := h.currentSession(c); sess != nil {
-		if _, err := h.Runtime.Store.Session.Revoke(c.UserContext(), sess.UserID, sess.ID); err != nil {
+		if _, err := h.Runtime.Store.Session.Revoke(c.Context(), sess.UserID, sess.ID); err != nil {
 			slog.Warn("auth: revoking session on logout failed", "session_id", sess.ID, "err", err)
 		}
 
@@ -241,7 +241,7 @@ func (h *Handler) Logout(c *fiber.Ctx) error {
 // currentSession resolves the session behind the request's own
 // cookie or bearer token. Returns nil for anything unusable - a
 // logout with no valid token still clears the cookie and succeeds.
-func (h *Handler) currentSession(c *fiber.Ctx) (*sessmodel.Session, string) {
+func (h *Handler) currentSession(c fiber.Ctx) (*sessmodel.Session, string) {
 	raw := c.Cookies(SessionCookie)
 	if raw == "" {
 		raw, _ = strings.CutPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")
@@ -256,7 +256,7 @@ func (h *Handler) currentSession(c *fiber.Ctx) (*sessmodel.Session, string) {
 		return nil, ""
 	}
 
-	sess, err := h.Runtime.Store.Session.Get(c.UserContext(), claims.SessionID)
+	sess, err := h.Runtime.Store.Session.Get(c.Context(), claims.SessionID)
 	if err != nil || sess == nil {
 		return nil, ""
 	}
@@ -269,7 +269,7 @@ func (h *Handler) currentSession(c *fiber.Ctx) (*sessmodel.Session, string) {
 // failure IS the event an operator needs to see. The address is
 // recorded even when no account matches - a burst against unknown
 // addresses is exactly the pattern worth spotting.
-func (h *Handler) recordLoginFailure(c *fiber.Ctx, u *usermodel.User, attempted, reason string) {
+func (h *Handler) recordLoginFailure(c fiber.Ctx, u *usermodel.User, attempted, reason string) {
 	ev := &amodel.Event{
 		Type:       amodel.TypeLoginFailed,
 		ActorEmail: attempted,
@@ -288,7 +288,7 @@ func (h *Handler) recordLoginFailure(c *fiber.Ctx, u *usermodel.User, attempted,
 //   - 200 {"user": {...}}          authenticated
 //   - 200 {"auth_disabled": true}  auth.disabled=true - no user concept
 //   - 401 {"error": "..."}         auth is on but caller has no session
-func (h *Handler) Me(c *fiber.Ctx) error {
+func (h *Handler) Me(c fiber.Ctx) error {
 	if h.Runtime.Config.Auth.Disabled {
 		return response.Success(c, AuthDisabledResponse{AuthDisabled: true})
 	}
@@ -304,7 +304,7 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 // Info returns the auth posture for the unauthenticated login page so
 // it can render the right control (local form vs OIDC button vs
 // nothing when auth.disabled). Open endpoint - not gated.
-func (h *Handler) Info(c *fiber.Ctx) error {
+func (h *Handler) Info(c fiber.Ctx) error {
 	cfg := h.Runtime.Config.Auth
 	if cfg.Disabled {
 		// The edition travels on this branch too - it is the same
@@ -321,7 +321,7 @@ func (h *Handler) Info(c *fiber.Ctx) error {
 	// Only name, slug, and type are exposed. The list is public by
 	// necessity - the login page needs it before anyone has signed in -
 	// so it must not carry client ids, issuers, or allowlists.
-	provs, err := h.Runtime.Store.OAuthProvider.ListLoginable(c.UserContext())
+	provs, err := h.Runtime.Store.OAuthProvider.ListLoginable(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}

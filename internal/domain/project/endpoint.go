@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -37,7 +37,7 @@ type Handler struct {
 
 // List returns the caller's projects (every project for platform
 // admins so the console can administer all tenants).
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	var (
 		out []*projmodel.Project
 		err error
@@ -45,11 +45,11 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	switch {
 	case h.Runtime.Config.Auth.Disabled:
-		out, err = h.Runtime.Store.Project.List(c.UserContext())
+		out, err = h.Runtime.Store.Project.List(c.Context())
 	case rc != nil && rc.User != nil && rc.User.IsAdmin():
-		out, err = h.Runtime.Store.Project.List(c.UserContext())
+		out, err = h.Runtime.Store.Project.List(c.Context())
 	case rc != nil && rc.User != nil:
-		out, err = h.Runtime.Store.Project.ListForUser(c.UserContext(), rc.User.ID)
+		out, err = h.Runtime.Store.Project.ListForUser(c.Context(), rc.User.ID)
 	default:
 		return response.Unauthorized(c, "not authenticated")
 	}
@@ -90,7 +90,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 // every project rather than their own - so deriving this from
 // memberships alone would hand them an empty set for projects they can
 // administer.
-func (h *Handler) accessForList(c *fiber.Ctx, projects []*projmodel.Project) (map[string]ProjectAccess, error) {
+func (h *Handler) accessForList(c fiber.Ctx, projects []*projmodel.Project) (map[string]ProjectAccess, error) {
 	out := make(map[string]ProjectAccess, len(projects))
 	rc := domain.GetRequestContext(c)
 	everything := ProjectAccess{Owner: true, Permissions: perm.NewSet(perm.All).List()}
@@ -106,7 +106,7 @@ func (h *Handler) accessForList(c *fiber.Ctx, projects []*projmodel.Project) (ma
 		return out, nil
 	}
 
-	members, err := h.Runtime.Store.Project.MembershipsForUser(c.UserContext(), rc.User.ID)
+	members, err := h.Runtime.Store.Project.MembershipsForUser(c.Context(), rc.User.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (h *Handler) accessForList(c *fiber.Ctx, projects []*projmodel.Project) (ma
 }
 
 // Create adds a project with the caller as owner.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Forbidden(c, "project creation requires an authenticated user")
@@ -155,7 +155,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		return response.BadRequest(c, "slug could not be derived from the name, set one explicitly")
 	}
 
-	existing, err := h.Runtime.Store.Project.GetBySlug(c.UserContext(), slug)
+	existing, err := h.Runtime.Store.Project.GetBySlug(c.Context(), slug)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -176,7 +176,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		w.DefaultLanguage = "en"
 	}
 
-	if err := h.Runtime.Store.Project.CreateWithOwner(c.UserContext(), w, rc.User.ID); err != nil {
+	if err := h.Runtime.Store.Project.CreateWithOwner(c.Context(), w, rc.User.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -188,7 +188,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 // name and the caller own role from here before it can render
 // anything at all, including for a role that may see only the
 // sandbox.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.member {
 		return h.accessFailure(c, w, acc, err)
@@ -216,7 +216,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 
 // Update patches name, description, or default language. Project
 // admin tier.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceSettings, perm.ActionWrite) {
 		return h.accessFailure(c, w, acc, err)
@@ -282,7 +282,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 		// than a 400 that makes them guess what it is. The response
 		// carries what was actually stored, so the console shows the
 		// clamp rather than pretending.
-		if _, ceiling, qerr := quota.Sandbox(c.UserContext(), h.Runtime.Store, w.ID); qerr == nil {
+		if _, ceiling, qerr := quota.Sandbox(c.Context(), h.Runtime.Store, w.ID); qerr == nil {
 			if ceiling > 0 && (days <= 0 || days > ceiling) {
 				days = ceiling
 			}
@@ -292,7 +292,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	w.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Project.Put(c.UserContext(), w); err != nil {
+	if err := h.Runtime.Store.Project.Put(c.Context(), w); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -304,7 +304,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 // There is no undeletable project. Refusing on the premise that every
 // account must keep somewhere to stand stopped making sense once
 // belonging to no project became an ordinary state.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.owner {
 		return h.accessFailure(c, w, acc, err)
@@ -325,7 +325,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 	// A failed drop refuses the deletion instead of continuing. The
 	// project is still there, so the keys are still findable and a
 	// retry works - which is not true the other way round.
-	ctx := c.UserContext()
+	ctx := c.Context()
 	var keys []string
 	for _, collect := range []func(context.Context, string) ([]string, error){
 		h.Runtime.Store.Email.StorageKeysForProject,
@@ -356,13 +356,13 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 }
 
 // ListMembers returns the membership roster. Any member may see it.
-func (h *Handler) ListMembers(c *fiber.Ctx) error {
+func (h *Handler) ListMembers(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceMembers, perm.ActionRead) {
 		return h.accessFailure(c, w, acc, err)
 	}
 
-	members, err := h.Runtime.Store.Project.ListMembers(c.UserContext(), w.ID)
+	members, err := h.Runtime.Store.Project.ListMembers(c.Context(), w.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -382,7 +382,7 @@ func (h *Handler) ListMembers(c *fiber.Ctx) error {
 // sign-in clearing somebody's role), then SetMemberRole assigns. So
 // adding a member who is already there and naming a role reassigns
 // them, which is the only reading of that request that makes sense.
-func (h *Handler) AddMember(c *fiber.Ctx) error {
+func (h *Handler) AddMember(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, acc, err)
@@ -393,7 +393,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 		return resp
 	}
 
-	u, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+	u, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -415,7 +415,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 	// so COALESCE(m.role_id, p.default_role_id) keeps the dead id over
 	// the default and the permission set comes back empty.
 	if in.RoleID != "" {
-		role, err := h.Runtime.Store.Project.GetRole(c.UserContext(), w.ID, in.RoleID)
+		role, err := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, in.RoleID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -429,7 +429,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 		}
 	}
 
-	if err := h.Runtime.Store.Project.PutMember(c.UserContext(), &projmodel.Member{
+	if err := h.Runtime.Store.Project.PutMember(c.Context(), &projmodel.Member{
 		ProjectID: w.ID,
 		UserID:    u.ID,
 		RoleID:    in.RoleID,
@@ -438,7 +438,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 	}
 
 	if in.RoleID != "" {
-		assigned, err := h.Runtime.Store.Project.SetMemberRole(c.UserContext(), w.ID, u.ID, in.RoleID)
+		assigned, err := h.Runtime.Store.Project.SetMemberRole(c.Context(), w.ID, u.ID, in.RoleID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -450,7 +450,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 
 	// Re-read so the response carries the resolved role name and
 	// whether it came from the project default.
-	m, err := h.Runtime.Store.Project.GetMember(c.UserContext(), w.ID, u.ID)
+	m, err := h.Runtime.Store.Project.GetMember(c.Context(), w.ID, u.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -465,7 +465,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 // ownership hands over deleting the project. Only an owner may do
 // that. The last owner cannot be demoted - the store refuses inside
 // the statement, so two simultaneous resignations cannot both win.
-func (h *Handler) UpdateMember(c *fiber.Ctx) error {
+func (h *Handler) UpdateMember(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, acc, err)
@@ -485,7 +485,7 @@ func (h *Handler) UpdateMember(c *fiber.Ctx) error {
 		return response.Forbidden(c, "only a project owner may grant or revoke ownership")
 	}
 
-	m, err := h.Runtime.Store.Project.GetMember(c.UserContext(), w.ID, userID)
+	m, err := h.Runtime.Store.Project.GetMember(c.Context(), w.ID, userID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -497,7 +497,7 @@ func (h *Handler) UpdateMember(c *fiber.Ctx) error {
 	if in.RoleID != nil && *in.RoleID != "" {
 		// Read the role before assigning it, so what it grants can be
 		// checked against what the caller holds. See refuseDelegating.
-		role, rerr := h.Runtime.Store.Project.GetRole(c.UserContext(), w.ID, *in.RoleID)
+		role, rerr := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, *in.RoleID)
 		if rerr != nil {
 			return response.Internal(c, rerr)
 		}
@@ -514,7 +514,7 @@ func (h *Handler) UpdateMember(c *fiber.Ctx) error {
 	}
 
 	if in.RoleID != nil {
-		assigned, err := h.Runtime.Store.Project.SetMemberRole(c.UserContext(), w.ID, userID, *in.RoleID)
+		assigned, err := h.Runtime.Store.Project.SetMemberRole(c.Context(), w.ID, userID, *in.RoleID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -525,7 +525,7 @@ func (h *Handler) UpdateMember(c *fiber.Ctx) error {
 	}
 
 	if in.Owner != nil && *in.Owner != m.Owner {
-		changed, err := h.Runtime.Store.Project.SetMemberOwner(c.UserContext(), w.ID, userID, *in.Owner)
+		changed, err := h.Runtime.Store.Project.SetMemberOwner(c.Context(), w.ID, userID, *in.Owner)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -538,7 +538,7 @@ func (h *Handler) UpdateMember(c *fiber.Ctx) error {
 
 	// Re-read so the response carries the resolved role name and
 	// ownership together, whatever combination just changed.
-	m, err = h.Runtime.Store.Project.GetMember(c.UserContext(), w.ID, userID)
+	m, err = h.Runtime.Store.Project.GetMember(c.Context(), w.ID, userID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -554,7 +554,7 @@ func (h *Handler) UpdateMember(c *fiber.Ctx) error {
 // store refuses inside the DELETE. A project with no owner could never
 // be deleted or handed on, and nothing in the product can put an owner
 // back.
-func (h *Handler) RemoveMember(c *fiber.Ctx) error {
+func (h *Handler) RemoveMember(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.member {
 		return h.accessFailure(c, w, acc, err)
@@ -567,7 +567,7 @@ func (h *Handler) RemoveMember(c *fiber.Ctx) error {
 		return response.Forbidden(c, "the members:delete permission is required")
 	}
 
-	m, err := h.Runtime.Store.Project.GetMember(c.UserContext(), w.ID, userID)
+	m, err := h.Runtime.Store.Project.GetMember(c.Context(), w.ID, userID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -591,7 +591,7 @@ func (h *Handler) RemoveMember(c *fiber.Ctx) error {
 		return response.Forbidden(c, "only a project owner may remove another owner")
 	}
 
-	removed, err := h.Runtime.Store.Project.RemoveMember(c.UserContext(), w.ID, userID)
+	removed, err := h.Runtime.Store.Project.RemoveMember(c.Context(), w.ID, userID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -606,13 +606,13 @@ func (h *Handler) RemoveMember(c *fiber.Ctx) error {
 
 // ListInvitations returns pending and past invitations. Admin tier --
 // they carry outside email addresses.
-func (h *Handler) ListInvitations(c *fiber.Ctx) error {
+func (h *Handler) ListInvitations(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, acc, err)
 	}
 
-	invs, err := h.Runtime.Store.Project.ListInvitations(c.UserContext(), w.ID)
+	invs, err := h.Runtime.Store.Project.ListInvitations(c.Context(), w.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -630,7 +630,7 @@ func (h *Handler) ListInvitations(c *fiber.Ctx) error {
 // the response either way: an install without system mail has to be
 // able to pass the link along out of band, and a mail server that is
 // briefly down must not fail the invite.
-func (h *Handler) CreateInvitation(c *fiber.Ctx) error {
+func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, acc, err)
@@ -648,7 +648,7 @@ func (h *Handler) CreateInvitation(c *fiber.Ctx) error {
 	// an id from another project offered at invite time became a member
 	// with an unresolvable role and no permissions at all.
 	if in.RoleID != "" {
-		role, err := h.Runtime.Store.Project.GetRole(c.UserContext(), w.ID, in.RoleID)
+		role, err := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, in.RoleID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -679,7 +679,7 @@ func (h *Handler) CreateInvitation(c *fiber.Ctx) error {
 		InvitedBy: invitedBy,
 		ExpiresAt: time.Now().UTC().Add(invitationTTL),
 	}
-	if err := h.Runtime.Store.Project.PutInvitation(c.UserContext(), inv); err != nil {
+	if err := h.Runtime.Store.Project.PutInvitation(c.Context(), inv); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -708,13 +708,13 @@ func (h *Handler) CreateInvitation(c *fiber.Ctx) error {
 }
 
 // DeleteInvitation revokes an invitation.
-func (h *Handler) DeleteInvitation(c *fiber.Ctx) error {
+func (h *Handler) DeleteInvitation(c fiber.Ctx) error {
 	w, acc, err := h.loadWithMember(c)
 	if err != nil || w == nil || !acc.perms.Has(perm.ResourceMembers, perm.ActionDelete) {
 		return h.accessFailure(c, w, acc, err)
 	}
 
-	if err := h.Runtime.Store.Project.DeleteInvitation(c.UserContext(), w.ID, c.Params("invId")); err != nil {
+	if err := h.Runtime.Store.Project.DeleteInvitation(c.Context(), w.ID, c.Params("invId")); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -724,13 +724,13 @@ func (h *Handler) DeleteInvitation(c *fiber.Ctx) error {
 // AcceptInvitation redeems a token for a membership. The caller's
 // account email must match the invited address so a leaked token
 // alone is not enough to join.
-func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
+func (h *Handler) AcceptInvitation(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
 	}
 
-	inv, err := h.Runtime.Store.Project.GetInvitationByToken(c.UserContext(), c.Params("token"))
+	inv, err := h.Runtime.Store.Project.GetInvitationByToken(c.Context(), c.Params("token"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -760,7 +760,7 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 	// so. Clearing it here is what makes the fallback real.
 	roleID := inv.RoleID
 	if roleID != "" {
-		role, rerr := h.Runtime.Store.Project.GetRole(c.UserContext(), inv.ProjectID, roleID)
+		role, rerr := h.Runtime.Store.Project.GetRole(c.Context(), inv.ProjectID, roleID)
 		if rerr != nil {
 			return response.Internal(c, rerr)
 		}
@@ -777,7 +777,7 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 		UserID:    rc.User.ID,
 		RoleID:    roleID,
 	}
-	if err := h.Runtime.Store.Project.PutMember(c.UserContext(), m); err != nil {
+	if err := h.Runtime.Store.Project.PutMember(c.Context(), m); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -786,11 +786,11 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 	// answer: an invitation is an offer to JOIN, and redeeming one is
 	// not the moment to overwrite a role an owner set deliberately.
 	inv.Status = projmodel.InvitationAccepted
-	if err := h.Runtime.Store.Project.PutInvitation(c.UserContext(), inv); err != nil {
+	if err := h.Runtime.Store.Project.PutInvitation(c.Context(), inv); err != nil {
 		return response.Internal(c, err)
 	}
 
-	w, err := h.Runtime.Store.Project.Get(c.UserContext(), inv.ProjectID)
+	w, err := h.Runtime.Store.Project.Get(c.Context(), inv.ProjectID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -802,13 +802,13 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 // the inviter sees "declined" instead of an invitation that sits
 // pending until it expires. Same guards as accept: only the invited
 // address may answer, in either direction.
-func (h *Handler) DeclineInvitation(c *fiber.Ctx) error {
+func (h *Handler) DeclineInvitation(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
 	}
 
-	inv, err := h.Runtime.Store.Project.GetInvitationByToken(c.UserContext(), c.Params("token"))
+	inv, err := h.Runtime.Store.Project.GetInvitationByToken(c.Context(), c.Params("token"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -826,7 +826,7 @@ func (h *Handler) DeclineInvitation(c *fiber.Ctx) error {
 	}
 
 	inv.Status = projmodel.InvitationDeclined
-	if err := h.Runtime.Store.Project.PutInvitation(c.UserContext(), inv); err != nil {
+	if err := h.Runtime.Store.Project.PutInvitation(c.Context(), inv); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -837,13 +837,13 @@ func (h *Handler) DeclineInvitation(c *fiber.Ctx) error {
 // project projID. Covering, so a subdomain of a verified domain
 // counts - which is the point, since a bounce domain wants its own MX
 // and SPF and so is never the apex.
-func (h *Handler) ownsVerifiedDomain(c *fiber.Ctx, projID, addr string) (bool, error) {
+func (h *Handler) ownsVerifiedDomain(c fiber.Ctx, projID, addr string) (bool, error) {
 	at := strings.LastIndex(addr, "@")
 	if at < 0 {
 		return false, nil
 	}
 
-	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.UserContext(), addr[at+1:])
+	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), addr[at+1:])
 	if err != nil {
 		return false, err
 	}
@@ -880,8 +880,8 @@ type access struct {
 // invitation, SSO and role change into the SECURITY trail with an
 // empty project id - invisible to the project audit log, which is
 // exactly where a permission-policy change belongs.
-func (h *Handler) loadWithMember(c *fiber.Ctx) (*projmodel.Project, access, error) {
-	w, err := h.Runtime.Store.Project.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) loadWithMember(c fiber.Ctx) (*projmodel.Project, access, error) {
+	w, err := h.Runtime.Store.Project.Get(c.Context(), c.Params("id"))
 	if err != nil || w == nil {
 		return nil, access{}, err
 	}
@@ -902,7 +902,7 @@ func (h *Handler) loadWithMember(c *fiber.Ctx) (*projmodel.Project, access, erro
 // callerAccess resolves the caller's access to projID. Platform admins
 // and the auth-disabled mode are owner-equivalent. Non-members get the
 // zero value, which every gate refuses.
-func (h *Handler) callerAccess(c *fiber.Ctx, projID string) (access, error) {
+func (h *Handler) callerAccess(c fiber.Ctx, projID string) (access, error) {
 	everything := access{member: true, owner: true, perms: perm.NewSet(perm.All)}
 	if h.Runtime.Config.Auth.Disabled {
 		return everything, nil
@@ -917,7 +917,7 @@ func (h *Handler) callerAccess(c *fiber.Ctx, projID string) (access, error) {
 		return everything, nil
 	}
 
-	m, err := h.Runtime.Store.Project.GetMember(c.UserContext(), projID, rc.User.ID)
+	m, err := h.Runtime.Store.Project.GetMember(c.Context(), projID, rc.User.ID)
 	if err != nil {
 		return access{}, err
 	}
@@ -941,7 +941,7 @@ func (h *Handler) callerAccess(c *fiber.Ctx, projID string) (access, error) {
 // accessFailure translates the loadWithMember outcome into the right
 // error response: 500 on store error, 404 on missing project, 403 on
 // not being a member or not holding the permission.
-func (h *Handler) accessFailure(c *fiber.Ctx, w *projmodel.Project, acc access, err error) error {
+func (h *Handler) accessFailure(c fiber.Ctx, w *projmodel.Project, acc access, err error) error {
 	if err != nil {
 		return response.Internal(c, err)
 	}

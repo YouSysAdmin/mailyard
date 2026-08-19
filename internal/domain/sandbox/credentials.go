@@ -5,7 +5,7 @@ package sandbox
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -32,9 +32,9 @@ import (
 // may not create one, may not revoke one, and showing them the name
 // of the production integration tells them something about the
 // project they were deliberately not given.
-func (h *Handler) ListCredentials(c *fiber.Ctx) error {
+func (h *Handler) ListCredentials(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	creds, err := h.Runtime.Store.SMTPCredential.List(c.UserContext(), rc.Project.ID)
+	creds, err := h.Runtime.Store.SMTPCredential.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -54,7 +54,7 @@ func (h *Handler) ListCredentials(c *fiber.Ctx) error {
 
 // CreateCredential mints a sandbox credential and returns the
 // password EXACTLY ONCE.
-func (h *Handler) CreateCredential(c *fiber.Ctx) error {
+func (h *Handler) CreateCredential(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[credentialInput](c)
 	if !ok {
@@ -72,7 +72,7 @@ func (h *Handler) CreateCredential(c *fiber.Ctx) error {
 			return response.Internal(c, err)
 		}
 
-		existing, gerr := h.Runtime.Store.SMTPCredential.GetByUsername(c.UserContext(), username)
+		existing, gerr := h.Runtime.Store.SMTPCredential.GetByUsername(c.Context(), username)
 		if gerr != nil {
 			return response.Internal(c, gerr)
 		}
@@ -104,7 +104,7 @@ func (h *Handler) CreateCredential(c *fiber.Ctx) error {
 		// endpoint mints one kind of credential.
 		Sandbox: true,
 	}
-	if err := h.Runtime.Store.SMTPCredential.Put(c.UserContext(), cred); err != nil {
+	if err := h.Runtime.Store.SMTPCredential.Put(c.Context(), cred); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -120,9 +120,9 @@ func (h *Handler) CreateCredential(c *fiber.Ctx) error {
 // The sandbox check is re-read from the row rather than trusted from
 // the list: a caller passing the id of the project's live production
 // credential must not be able to switch off its mail from here.
-func (h *Handler) RevokeCredential(c *fiber.Ctx) error {
+func (h *Handler) RevokeCredential(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cred, err := h.Runtime.Store.SMTPCredential.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -134,7 +134,7 @@ func (h *Handler) RevokeCredential(c *fiber.Ctx) error {
 		return response.NotFound(c, "sandbox credential not found")
 	}
 
-	if err := h.Runtime.Store.SMTPCredential.Revoke(c.UserContext(), rc.Project.ID, cred.ID); err != nil {
+	if err := h.Runtime.Store.SMTPCredential.Revoke(c.Context(), rc.Project.ID, cred.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
@@ -27,18 +27,18 @@ func everyPermission() []string {
 }
 
 // inRequest runs fn inside a real request, so the refusal helpers have a
-// live *fiber.Ctx to write to.
+// live fiber.Ctx to write to.
 //
 // A real one, not a hand-built context: these helpers write a response
 // and return nil, and the bool beside it is the load-bearing half - the
 // exact shape TestARefusalHelperIsReturnedAndNotTested exists for. A ctx
 // captured out of a handler is released when the request ends, and using
 // it afterwards panics inside response.Forbidden. Which it did.
-func inRequest(t *testing.T, fn func(c *fiber.Ctx)) {
+func inRequest(t *testing.T, fn func(c fiber.Ctx)) {
 	t.Helper()
 
 	app := fiber.New()
-	app.Get("/", func(c *fiber.Ctx) error {
+	app.Get("/", func(c fiber.Ctx) error {
 		fn(c)
 
 		return nil
@@ -83,14 +83,14 @@ func TestAMembersWriterCannotGrantWhatItDoesNotHold(t *testing.T) {
 
 	mine := []string{string(perm.Of(perm.ResourceMembers, perm.ActionWrite))}
 
-	inRequest(t, func(c *fiber.Ctx) {
+	inRequest(t, func(c fiber.Ctx) {
 		// WRITING a role that grants more than the caller holds.
 		if _, refused := refuseGranting(c, manager, all); !refused {
 			t.Error("a members:write holder was allowed to write a role granting the whole catalogue")
 		}
 	})
 
-	inRequest(t, func(c *fiber.Ctx) {
+	inRequest(t, func(c fiber.Ctx) {
 		// ASSIGNING a role that grants more than the caller holds - the
 		// same escalation with the role already there.
 		if _, refused := refuseDelegating(c, manager,
@@ -101,7 +101,7 @@ func TestAMembersWriterCannotGrantWhatItDoesNotHold(t *testing.T) {
 
 	// What they do hold is still theirs to delegate, or the rule would
 	// have replaced an escalation with a member nobody can manage.
-	inRequest(t, func(c *fiber.Ctx) {
+	inRequest(t, func(c fiber.Ctx) {
 		if _, refused := refuseGranting(c, manager, mine); refused {
 			t.Error("a members:write holder cannot delegate members:write, which is what they hold")
 		}

@@ -14,7 +14,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
@@ -237,9 +237,9 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/webhooks.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	hooks, err := h.Runtime.Store.Webhook.List(c.UserContext(), rc.Project.ID)
+	hooks, err := h.Runtime.Store.Webhook.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -253,7 +253,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 
 // Create registers a webhook. The signing secret is generated
 // server-side and returned EXACTLY ONCE.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
@@ -277,7 +277,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 			return response.BadRequest(c, "url is not a valid absolute http(s) url")
 		}
 
-		if !safedial.HostAllowed(c.UserContext(), u.Hostname()) {
+		if !safedial.HostAllowed(c.Context(), u.Hostname()) {
 			return response.BadRequest(c,
 				"webhook targets a private or reserved address, which is refused (set webhook.allow_private_targets to permit it)")
 		}
@@ -307,7 +307,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		hook.Filters = []string{}
 	}
 
-	if err := h.Runtime.Store.Webhook.Put(c.UserContext(), hook); err != nil {
+	if err := h.Runtime.Store.Webhook.Put(c.Context(), hook); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -315,9 +315,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/webhooks/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	hook, err := h.Runtime.Store.Webhook.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -326,7 +326,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "webhook not found")
 	}
 
-	if err := h.Runtime.Store.Webhook.Delete(c.UserContext(), rc.Project.ID, hook.ID); err != nil {
+	if err := h.Runtime.Store.Webhook.Delete(c.Context(), rc.Project.ID, hook.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -334,9 +334,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 }
 
 // Deliveries serves GET /api/v1/webhooks/:id/deliveries.
-func (h *Handler) Deliveries(c *fiber.Ctx) error {
+func (h *Handler) Deliveries(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	hook, err := h.Runtime.Store.Webhook.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -346,7 +346,7 @@ func (h *Handler) Deliveries(c *fiber.Ctx) error {
 	}
 
 	w := paging.WindowFrom(c)
-	dels, err := h.Runtime.Store.Webhook.ListDeliveries(c.UserContext(), rc.Project.ID, hook.ID, w.Fetch(), w.Cursor)
+	dels, err := h.Runtime.Store.Webhook.ListDeliveries(c.Context(), rc.Project.ID, hook.ID, w.Fetch(), w.Cursor)
 	if err != nil {
 		return response.Internal(c, err)
 	}

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 
@@ -37,13 +37,13 @@ import (
 //
 // Disabling is gated by a CODE, which proves possession, and that is the
 // half where proof matters.
-func (h *Handler) TOTPSetup(c *fiber.Ctx) error {
+func (h *Handler) TOTPSetup(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), rc.User.ID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), rc.User.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -84,7 +84,7 @@ func (h *Handler) TOTPSetup(c *fiber.Ctx) error {
 	// SetTOTP, not Put: Put writes the whole row from a read taken before
 	// this request, so enrolling a second factor also rewrote `admin`,
 	// `disabled` and `email_verified` as they stood then.
-	if err := h.Runtime.Store.User.SetTOTP(c.UserContext(), u.ID, u.TOTPSecret, u.TOTPEnabled); err != nil {
+	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, u.TOTPSecret, u.TOTPEnabled); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -96,7 +96,7 @@ func (h *Handler) TOTPSetup(c *fiber.Ctx) error {
 
 // TOTPEnable turns 2FA on after the user proves the authenticator
 // works with a valid code for the pending secret.
-func (h *Handler) TOTPEnable(c *fiber.Ctx) error {
+func (h *Handler) TOTPEnable(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
@@ -107,7 +107,7 @@ func (h *Handler) TOTPEnable(c *fiber.Ctx) error {
 		return resp
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), rc.User.ID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), rc.User.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -124,12 +124,12 @@ func (h *Handler) TOTPEnable(c *fiber.Ctx) error {
 		return response.BadRequest(c, "run 2fa setup first")
 	}
 
-	if !h.consumeTOTP(c.UserContext(), u.ID, u.TOTPSecret, in.Code) {
+	if !h.consumeTOTP(c.Context(), u.ID, u.TOTPSecret, in.Code) {
 		return response.BadRequest(c, "invalid code")
 	}
 
 	u.TOTPEnabled = true
-	if err := h.Runtime.Store.User.SetTOTP(c.UserContext(), u.ID, u.TOTPSecret, true); err != nil {
+	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, u.TOTPSecret, true); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -151,7 +151,7 @@ func (h *Handler) TOTPEnable(c *fiber.Ctx) error {
 
 // TOTPDisable turns 2FA off, gated on a currently valid code so a
 // hijacked session cannot silently weaken the account.
-func (h *Handler) TOTPDisable(c *fiber.Ctx) error {
+func (h *Handler) TOTPDisable(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
@@ -162,7 +162,7 @@ func (h *Handler) TOTPDisable(c *fiber.Ctx) error {
 		return resp
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), rc.User.ID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), rc.User.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -179,13 +179,13 @@ func (h *Handler) TOTPDisable(c *fiber.Ctx) error {
 		return response.BadRequest(c, "two-factor auth is not enabled")
 	}
 
-	if !h.consumeTOTP(c.UserContext(), u.ID, u.TOTPSecret, in.Code) {
+	if !h.consumeTOTP(c.Context(), u.ID, u.TOTPSecret, in.Code) {
 		return response.BadRequest(c, "invalid code")
 	}
 
 	u.TOTPEnabled = false
 	u.TOTPSecret = ""
-	if err := h.Runtime.Store.User.SetTOTP(c.UserContext(), u.ID, "", false); err != nil {
+	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, "", false); err != nil {
 		return response.Internal(c, err)
 	}
 

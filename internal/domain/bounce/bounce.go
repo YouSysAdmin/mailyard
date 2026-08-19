@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -140,10 +140,10 @@ type Handler struct {
 // is a full index scan per page load, to render a number nobody acts
 // on. next_cursor being present is the honest answer to "is there
 // more", and it costs one extra row.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	w := paging.WindowFrom(c)
-	rows, err := h.Runtime.Store.Bounce.List(c.UserContext(), rc.Project.ID, store.BounceFilter{
+	rows, err := h.Runtime.Store.Bounce.List(c.Context(), rc.Project.ID, store.BounceFilter{
 		Type:   c.Query("type"),
 		Search: paging.Search(c, "search"),
 		Limit:  w.Fetch(),
@@ -177,14 +177,14 @@ func (h *Handler) List(c *fiber.Ctx) error {
 //
 // By address and not row id, like DELETE /suppressions: the question
 // is about a person, not about one report.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	email := c.Query("email")
 	if email == "" {
 		return response.BadRequest(c, "email query parameter is required")
 	}
 
-	n, err := h.Runtime.Store.Bounce.DeleteByEmail(c.UserContext(), rc.Project.ID, email)
+	n, err := h.Runtime.Store.Bounce.DeleteByEmail(c.Context(), rc.Project.ID, email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -198,7 +198,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 
 // Ingest records a reported bounce. Hard bounces and complaints
 // auto-suppress the recipient (soft ones do not).
-func (h *Handler) Ingest(c *fiber.Ctx) error {
+func (h *Handler) Ingest(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[ingestInput](c)
 	if !ok {
@@ -216,7 +216,7 @@ func (h *Handler) Ingest(c *fiber.Ctx) error {
 		b.Type = bmodel.TypeHard
 	}
 
-	if err := h.Runtime.Store.Bounce.Put(c.UserContext(), b); err != nil {
+	if err := h.Runtime.Store.Bounce.Put(c.Context(), b); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -227,7 +227,7 @@ func (h *Handler) Ingest(c *fiber.Ctx) error {
 			kind = supmodel.KindComplaint
 		}
 
-		if err := h.Runtime.Store.Suppression.Upsert(c.UserContext(), &supmodel.Suppression{
+		if err := h.Runtime.Store.Suppression.Upsert(c.Context(), &supmodel.Suppression{
 			ProjectID: rc.Project.ID,
 			Email:     in.Recipient,
 			Kind:      kind,

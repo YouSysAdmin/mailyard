@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -28,9 +28,9 @@ type Handler struct {
 }
 
 // List returns the project's servers. Passwords never serialize.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	servers, err := h.Runtime.Store.SMTPServer.List(c.UserContext(), rc.Project.ID)
+	servers, err := h.Runtime.Store.SMTPServer.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -43,9 +43,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/smtp-servers/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -58,14 +58,14 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/smtp-servers.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.UserContext(), h.Runtime.Store, rc.Project.ID, quota.ResSMTPServers, 1); err != nil {
+	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResSMTPServers, 1); err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
@@ -112,7 +112,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		srv.AllowedEmails = []string{}
 	}
 
-	if err := h.Runtime.Store.SMTPServer.Put(c.UserContext(), srv); err != nil {
+	if err := h.Runtime.Store.SMTPServer.Put(c.Context(), srv); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -122,9 +122,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/smtp-servers/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -205,7 +205,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 		srv.ValidatedAt = nil
 	}
 
-	if err := h.Runtime.Store.SMTPServer.Put(c.UserContext(), srv); err != nil {
+	if err := h.Runtime.Store.SMTPServer.Put(c.Context(), srv); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -215,9 +215,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/smtp-servers/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -226,7 +226,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "smtp server not found")
 	}
 
-	if err := h.Runtime.Store.SMTPServer.Delete(c.UserContext(), rc.Project.ID, srv.ID); err != nil {
+	if err := h.Runtime.Store.SMTPServer.Delete(c.Context(), rc.Project.ID, srv.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -238,9 +238,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 // Test dials the server (auth included when credentials are set) and
 // records the verdict on the row: success re-enables an invalid
 // server, failure marks it invalid so the delivery worker skips it.
-func (h *Handler) Test(c *fiber.Ctx) error {
+func (h *Handler) Test(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -253,9 +253,9 @@ func (h *Handler) Test(c *fiber.Ctx) error {
 	// Through the provider, so "test" means whatever proving reachability
 	// means for it: a dial and an AUTH for SMTP, an account read for an
 	// API. Neither sends anything.
-	testErr := testTransport(c.UserContext(), srv)
+	testErr := testTransport(c.Context(), srv)
 	if testErr != nil {
-		if err := h.Runtime.Store.SMTPServer.SetStatus(c.UserContext(),
+		if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 			rc.Project.ID, srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {
 			return response.Internal(c, err)
 		}
@@ -268,7 +268,7 @@ func (h *Handler) Test(c *fiber.Ctx) error {
 		status = ssmodel.StatusEnabled
 	}
 
-	if err := h.Runtime.Store.SMTPServer.SetStatus(c.UserContext(),
+	if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 		rc.Project.ID, srv.ID, status, "", now); err != nil {
 		return response.Internal(c, err)
 	}
@@ -278,18 +278,18 @@ func (h *Handler) Test(c *fiber.Ctx) error {
 
 // Enable flips the server to enabled (also clearing an invalid
 // verdict - the operator overrides the last test).
-func (h *Handler) Enable(c *fiber.Ctx) error {
+func (h *Handler) Enable(c fiber.Ctx) error {
 	return h.setStatus(c, ssmodel.StatusEnabled)
 }
 
 // Disable takes the server out of the delivery rotation.
-func (h *Handler) Disable(c *fiber.Ctx) error {
+func (h *Handler) Disable(c fiber.Ctx) error {
 	return h.setStatus(c, ssmodel.StatusDisabled)
 }
 
-func (h *Handler) setStatus(c *fiber.Ctx, status string) error {
+func (h *Handler) setStatus(c fiber.Ctx, status string) error {
 	rc := domain.GetRequestContext(c)
-	srv, err := h.Runtime.Store.SMTPServer.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -298,7 +298,7 @@ func (h *Handler) setStatus(c *fiber.Ctx, status string) error {
 		return response.NotFound(c, "smtp server not found")
 	}
 
-	if err := h.Runtime.Store.SMTPServer.SetStatus(c.UserContext(),
+	if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 		rc.Project.ID, srv.ID, status, "", srv.ValidatedAt); err != nil {
 		return response.Internal(c, err)
 	}
@@ -315,9 +315,9 @@ func (h *Handler) setStatus(c *fiber.Ctx, status string) error {
 // project's default. A server must always land in exactly one group -
 // one that belongs to no group is invisible to every resolution path,
 // so it would silently stop being used with nothing to show why.
-func (h *Handler) resolveGroup(c *fiber.Ctx, projID, groupID string) (string, error, bool) {
+func (h *Handler) resolveGroup(c fiber.Ctx, projID, groupID string) (string, error, bool) {
 	if groupID != "" {
-		g, err := h.Runtime.Store.SMTPGroup.Get(c.UserContext(), projID, groupID)
+		g, err := h.Runtime.Store.SMTPGroup.Get(c.Context(), projID, groupID)
 		if err != nil {
 			return "", response.Internal(c, err), false
 		}
@@ -329,7 +329,7 @@ func (h *Handler) resolveGroup(c *fiber.Ctx, projID, groupID string) (string, er
 		return g.ID, nil, true
 	}
 
-	def, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.UserContext(), projID)
+	def, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.Context(), projID)
 	if err != nil {
 		return "", response.Internal(c, err), false
 	}

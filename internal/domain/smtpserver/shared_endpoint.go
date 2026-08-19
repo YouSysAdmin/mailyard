@@ -5,7 +5,7 @@ package smtpserver
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -28,8 +28,8 @@ type SharedHandler struct {
 }
 
 // List serves GET /api/v1/admin/shared-smtp-servers.
-func (h *SharedHandler) List(c *fiber.Ctx) error {
-	servers, err := h.Runtime.Store.SharedSMTP.List(c.UserContext())
+func (h *SharedHandler) List(c fiber.Ctx) error {
+	servers, err := h.Runtime.Store.SharedSMTP.List(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -45,8 +45,8 @@ func (h *SharedHandler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/admin/shared-smtp-servers/:id.
-func (h *SharedHandler) Get(c *fiber.Ctx) error {
-	srv, err := h.Runtime.Store.SharedSMTP.Get(c.UserContext(), c.Params("id"))
+func (h *SharedHandler) Get(c fiber.Ctx) error {
+	srv, err := h.Runtime.Store.SharedSMTP.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -59,7 +59,7 @@ func (h *SharedHandler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/admin/shared-smtp-servers.
-func (h *SharedHandler) Create(c *fiber.Ctx) error {
+func (h *SharedHandler) Create(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[sharedCreateInput](c)
 	if !ok {
 		return resp
@@ -95,7 +95,7 @@ func (h *SharedHandler) Create(c *fiber.Ctx) error {
 		PlatformOnly:   in.PlatformOnly,
 	}
 	normalizeShared(srv)
-	if err := h.Runtime.Store.SharedSMTP.Put(c.UserContext(), srv); err != nil {
+	if err := h.Runtime.Store.SharedSMTP.Put(c.Context(), srv); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -107,8 +107,8 @@ func (h *SharedHandler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/admin/shared-smtp-servers/:id.
-func (h *SharedHandler) Update(c *fiber.Ctx) error {
-	srv, err := h.Runtime.Store.SharedSMTP.Get(c.UserContext(), c.Params("id"))
+func (h *SharedHandler) Update(c fiber.Ctx) error {
+	srv, err := h.Runtime.Store.SharedSMTP.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -191,7 +191,7 @@ func (h *SharedHandler) Update(c *fiber.Ctx) error {
 	}
 
 	normalizeShared(srv)
-	if err := h.Runtime.Store.SharedSMTP.Put(c.UserContext(), srv); err != nil {
+	if err := h.Runtime.Store.SharedSMTP.Put(c.Context(), srv); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -201,8 +201,8 @@ func (h *SharedHandler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/admin/shared-smtp-servers/:id.
-func (h *SharedHandler) Delete(c *fiber.Ctx) error {
-	srv, err := h.Runtime.Store.SharedSMTP.Get(c.UserContext(), c.Params("id"))
+func (h *SharedHandler) Delete(c fiber.Ctx) error {
+	srv, err := h.Runtime.Store.SharedSMTP.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -211,7 +211,7 @@ func (h *SharedHandler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "shared smtp server not found")
 	}
 
-	if err := h.Runtime.Store.SharedSMTP.Delete(c.UserContext(), srv.ID); err != nil {
+	if err := h.Runtime.Store.SharedSMTP.Delete(c.Context(), srv.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -225,8 +225,8 @@ func (h *SharedHandler) Delete(c *fiber.Ctx) error {
 // per-project test. A shared server that fails goes invalid and the
 // delivery path stops considering it, which matters more here: it is
 // the fallback for every project that owns nothing.
-func (h *SharedHandler) Test(c *fiber.Ctx) error {
-	srv, err := h.Runtime.Store.SharedSMTP.Get(c.UserContext(), c.Params("id"))
+func (h *SharedHandler) Test(c fiber.Ctx) error {
+	srv, err := h.Runtime.Store.SharedSMTP.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -236,9 +236,9 @@ func (h *SharedHandler) Test(c *fiber.Ctx) error {
 	}
 
 	now := new(time.Now().UTC())
-	testErr := testTransport(c.UserContext(), &srv.Server)
+	testErr := testTransport(c.Context(), &srv.Server)
 	if testErr != nil {
-		if err := h.Runtime.Store.SharedSMTP.SetStatus(c.UserContext(),
+		if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
 			srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {
 			return response.Internal(c, err)
 		}
@@ -251,7 +251,7 @@ func (h *SharedHandler) Test(c *fiber.Ctx) error {
 		status = ssmodel.StatusEnabled
 	}
 
-	if err := h.Runtime.Store.SharedSMTP.SetStatus(c.UserContext(),
+	if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
 		srv.ID, status, "", now); err != nil {
 		return response.Internal(c, err)
 	}

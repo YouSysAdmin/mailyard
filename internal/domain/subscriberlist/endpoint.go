@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -35,9 +35,9 @@ func validateRules(rules []slmodel.FilterRule) string {
 }
 
 // List serves GET /api/v1/subscriber-lists.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	lists, err := h.Runtime.Store.SubscriberList.List(c.UserContext(), rc.Project.ID)
+	lists, err := h.Runtime.Store.SubscriberList.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -50,9 +50,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/subscriber-lists/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -68,7 +68,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 	// The keys are unchanged.
 	out := ListDetailResponse{SubscriberList: l}
 	if l.Type == slmodel.TypeStatic {
-		n, err := h.Runtime.Store.SubscriberList.CountMembers(c.UserContext(), rc.Project.ID, l.ID)
+		n, err := h.Runtime.Store.SubscriberList.CountMembers(c.Context(), rc.Project.ID, l.ID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -80,7 +80,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/subscriber-lists.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
@@ -111,7 +111,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		l.FilterRules = []slmodel.FilterRule{}
 	}
 
-	if err := h.Runtime.Store.SubscriberList.Put(c.UserContext(), l); err != nil {
+	if err := h.Runtime.Store.SubscriberList.Put(c.Context(), l); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -119,9 +119,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/subscriber-lists/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -152,7 +152,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	l.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.SubscriberList.Put(c.UserContext(), l); err != nil {
+	if err := h.Runtime.Store.SubscriberList.Put(c.Context(), l); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -160,9 +160,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/subscriber-lists/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -171,7 +171,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "subscriber list not found")
 	}
 
-	if err := h.Runtime.Store.SubscriberList.Delete(c.UserContext(), rc.Project.ID, l.ID); err != nil {
+	if err := h.Runtime.Store.SubscriberList.Delete(c.Context(), rc.Project.ID, l.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -179,9 +179,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 }
 
 // ListMembers serves GET /api/v1/subscriber-lists/:id/members.
-func (h *Handler) ListMembers(c *fiber.Ctx) error {
+func (h *Handler) ListMembers(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -191,7 +191,7 @@ func (h *Handler) ListMembers(c *fiber.Ctx) error {
 	}
 
 	pg := paging.From(c)
-	members, err := h.Runtime.Store.SubscriberList.ListMembers(c.UserContext(),
+	members, err := h.Runtime.Store.SubscriberList.ListMembers(c.Context(),
 		rc.Project.ID, l.ID, pg.Limit, pg.Offset)
 	if err != nil {
 		return response.Internal(c, err)
@@ -205,9 +205,9 @@ func (h *Handler) ListMembers(c *fiber.Ctx) error {
 }
 
 // AddMember attaches a subscriber (by id or email) to a static list.
-func (h *Handler) AddMember(c *fiber.Ctx) error {
+func (h *Handler) AddMember(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -234,7 +234,7 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 		return response.NotFound(c, "subscriber not found")
 	}
 
-	if err := h.Runtime.Store.SubscriberList.AddMember(c.UserContext(), rc.Project.ID, l.ID, sub.ID); err != nil {
+	if err := h.Runtime.Store.SubscriberList.AddMember(c.Context(), rc.Project.ID, l.ID, sub.ID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return response.NotFound(c, "subscriber not found")
 		}
@@ -247,9 +247,9 @@ func (h *Handler) AddMember(c *fiber.Ctx) error {
 
 // RemoveMember serves DELETE /api/v1/subscriber-
 // lists/:id/members/:subscriberId.
-func (h *Handler) RemoveMember(c *fiber.Ctx) error {
+func (h *Handler) RemoveMember(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	if err := h.Runtime.Store.SubscriberList.RemoveMember(c.UserContext(),
+	if err := h.Runtime.Store.SubscriberList.RemoveMember(c.Context(),
 		rc.Project.ID, c.Params("id"), c.Params("subscriberId")); err != nil {
 		return response.Internal(c, err)
 	}
@@ -259,7 +259,7 @@ func (h *Handler) RemoveMember(c *fiber.Ctx) error {
 
 // PreviewSegment evaluates ad hoc filter rules and returns the match
 // count plus a sample, so segment authors can iterate.
-func (h *Handler) PreviewSegment(c *fiber.Ctx) error {
+func (h *Handler) PreviewSegment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[previewInput](c)
 	if !ok {
@@ -273,7 +273,7 @@ func (h *Handler) PreviewSegment(c *fiber.Ctx) error {
 	matched := 0
 	sample := []*submodel.Subscriber{} // we need empty slice here
 	for offset := 0; ; offset += resolvePageSize {
-		page, err := h.Runtime.Store.Subscriber.ListPage(c.UserContext(), rc.Project.ID, resolvePageSize, offset)
+		page, err := h.Runtime.Store.Subscriber.ListPage(c.Context(), rc.Project.ID, resolvePageSize, offset)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -299,14 +299,14 @@ func (h *Handler) PreviewSegment(c *fiber.Ctx) error {
 
 // Subscribe is the machine endpoint: upsert the subscriber and attach
 // it to a static list in one call (idempotent).
-func (h *Handler) Subscribe(c *fiber.Ctx) error {
+func (h *Handler) Subscribe(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[subscribeInput](c)
 	if !ok {
 		return resp
 	}
 
-	l, err := h.Runtime.Store.SubscriberList.Get(c.UserContext(), rc.Project.ID, in.ListID)
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, in.ListID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -319,7 +319,7 @@ func (h *Handler) Subscribe(c *fiber.Ctx) error {
 		return response.BadRequest(c, "dynamic lists have no explicit members")
 	}
 
-	sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), rc.Project.ID, in.Email)
+	sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -348,16 +348,16 @@ func (h *Handler) Subscribe(c *fiber.Ctx) error {
 	// caller asserts fresh consent.
 	sub.Status = submodel.StatusSubscribed
 	sub.UnsubscribedAt = nil
-	if err := h.Runtime.Store.Subscriber.Put(c.UserContext(), sub); err != nil {
+	if err := h.Runtime.Store.Subscriber.Put(c.Context(), sub); err != nil {
 		return response.Internal(c, err)
 	}
 
-	if err := h.Runtime.Store.SubscriberList.AddMember(c.UserContext(), rc.Project.ID, l.ID, sub.ID); err != nil {
+	if err := h.Runtime.Store.SubscriberList.AddMember(c.Context(), rc.Project.ID, l.ID, sub.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
 	// Fresh consent also clears a previous per-list opt-out.
-	if err := h.Runtime.Store.SubscriberList.Resubscribe(c.UserContext(), rc.Project.ID, l.ID, sub.ID); err != nil {
+	if err := h.Runtime.Store.SubscriberList.Resubscribe(c.Context(), rc.Project.ID, l.ID, sub.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -365,14 +365,14 @@ func (h *Handler) Subscribe(c *fiber.Ctx) error {
 }
 
 // UnsubscribeByEmail records a per-list opt-out.
-func (h *Handler) UnsubscribeByEmail(c *fiber.Ctx) error {
+func (h *Handler) UnsubscribeByEmail(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[listEmailInput](c)
 	if !ok {
 		return resp
 	}
 
-	sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), rc.Project.ID, in.Email)
+	sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -381,7 +381,7 @@ func (h *Handler) UnsubscribeByEmail(c *fiber.Ctx) error {
 		return response.NotFound(c, "subscriber not found")
 	}
 
-	if err := h.Runtime.Store.SubscriberList.Unsubscribe(c.UserContext(),
+	if err := h.Runtime.Store.SubscriberList.Unsubscribe(c.Context(),
 		rc.Project.ID, c.Params("id"), sub.ID, in.Reason); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return response.NotFound(c, "subscriber list not found")
@@ -394,14 +394,14 @@ func (h *Handler) UnsubscribeByEmail(c *fiber.Ctx) error {
 }
 
 // ResubscribeByEmail clears a per-list opt-out.
-func (h *Handler) ResubscribeByEmail(c *fiber.Ctx) error {
+func (h *Handler) ResubscribeByEmail(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[listEmailInput](c)
 	if !ok {
 		return resp
 	}
 
-	sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), rc.Project.ID, in.Email)
+	sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -410,7 +410,7 @@ func (h *Handler) ResubscribeByEmail(c *fiber.Ctx) error {
 		return response.NotFound(c, "subscriber not found")
 	}
 
-	if err := h.Runtime.Store.SubscriberList.Resubscribe(c.UserContext(),
+	if err := h.Runtime.Store.SubscriberList.Resubscribe(c.Context(),
 		rc.Project.ID, c.Params("id"), sub.ID); err != nil {
 		return response.Internal(c, err)
 	}
@@ -418,13 +418,13 @@ func (h *Handler) ResubscribeByEmail(c *fiber.Ctx) error {
 	return response.Success(c, MembershipChange{Resubscribed: true, ListID: c.Params("id"), Email: sub.Email})
 }
 
-func (h *Handler) resolveSubscriber(c *fiber.Ctx, projID, id, email string) (*submodel.Subscriber, error) {
+func (h *Handler) resolveSubscriber(c fiber.Ctx, projID, id, email string) (*submodel.Subscriber, error) {
 	if id != "" {
-		return h.Runtime.Store.Subscriber.Get(c.UserContext(), projID, id)
+		return h.Runtime.Store.Subscriber.Get(c.Context(), projID, id)
 	}
 
 	if email != "" {
-		return h.Runtime.Store.Subscriber.GetByEmail(c.UserContext(), projID, email)
+		return h.Runtime.Store.Subscriber.GetByEmail(c.Context(), projID, email)
 	}
 
 	return nil, nil

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -70,8 +70,8 @@ const defaultLeafValidity = 365 * 24 * time.Hour
 const defaultCAValidity = 3650 * 24 * time.Hour
 
 // List returns the managed certificates and the current assignments.
-func (h *Handler) List(c *fiber.Ctx) error {
-	rows, err := h.Runtime.Store.Certificate.ListScope(c.UserContext(), certmodel.ScopeManaged)
+func (h *Handler) List(c fiber.Ctx) error {
+	rows, err := h.Runtime.Store.Certificate.ListScope(c.Context(), certmodel.ScopeManaged)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -83,7 +83,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		out = append(out, h.managed(r, assignments))
 	}
 
-	listeners, err := h.listenerStates(c.UserContext(), assignments, out)
+	listeners, err := h.listenerStates(c.Context(), assignments, out)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -193,7 +193,7 @@ func (h *Handler) acmeServing(ctx context.Context) ([]string, error) {
 // installation's own authority signed,
 // and the ability to end it, is exactly what a platform admin has to
 // be able to see.
-func (h *Handler) System(c *fiber.Ctx) error {
+func (h *Handler) System(c fiber.Ctx) error {
 	var out []System
 	for _, scope := range []string{
 		certmodel.ScopeACME,
@@ -202,7 +202,7 @@ func (h *Handler) System(c *fiber.Ctx) error {
 		certmodel.ScopeRelayClient,
 		certmodel.ScopeRelayNode,
 	} {
-		rows, err := h.Runtime.Store.Certificate.ListScope(c.UserContext(), scope)
+		rows, err := h.Runtime.Store.Certificate.ListScope(c.Context(), scope)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -220,7 +220,7 @@ func (h *Handler) System(c *fiber.Ctx) error {
 }
 
 // Upload stores a certificate an administrator already has.
-func (h *Handler) Upload(c *fiber.Ctx) error {
+func (h *Handler) Upload(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[uploadInput](c)
 	if !ok {
 		return resp
@@ -238,7 +238,7 @@ func (h *Handler) Upload(c *fiber.Ctx) error {
 
 // Generate mints a certificate that serves TLS, self-signed or signed
 // by one of this installation's own authorities.
-func (h *Handler) Generate(c *fiber.Ctx) error {
+func (h *Handler) Generate(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[generateInput](c)
 	if !ok {
 		return resp
@@ -274,7 +274,7 @@ func (h *Handler) Generate(c *fiber.Ctx) error {
 // signed, and nothing would notice: the row still parses, its expiry
 // is still in the future, and the leaves keep being served until a
 // client refuses them.
-func (h *Handler) GenerateCA(c *fiber.Ctx) error {
+func (h *Handler) GenerateCA(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[generateCAInput](c)
 	if !ok {
 		return resp
@@ -303,7 +303,7 @@ func (h *Handler) GenerateCA(c *fiber.Ctx) error {
 		Data:    keyPEM + certPEM,
 		CertPEM: certPEM,
 	}
-	won, err := h.Runtime.Store.Certificate.PutIfAbsent(c.UserContext(), rec)
+	won, err := h.Runtime.Store.Certificate.PutIfAbsent(c.Context(), rec)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -326,9 +326,9 @@ func (h *Handler) GenerateCA(c *fiber.Ctx) error {
 // already public, so decrypting the private one to serve it would be
 // holding a key in memory for nothing. That is the same reason the
 // store has a scan/scanPublic split at all.
-func (h *Handler) PEM(c *fiber.Ctx) error {
+func (h *Handler) PEM(c fiber.Ctx) error {
 	name := c.Params("name")
-	rec, err := h.Runtime.Store.Certificate.GetPublic(c.UserContext(), certmodel.ScopeManaged, name)
+	rec, err := h.Runtime.Store.Certificate.GetPublic(c.Context(), certmodel.ScopeManaged, name)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -345,8 +345,8 @@ func (h *Handler) PEM(c *fiber.Ctx) error {
 // Three returns for the reason spelled out on verifySession: the
 // response helpers write the status and return nil, so a lone error
 // would be nil on the refusal path and the caller would sail past it.
-func (h *Handler) loadIssuer(c *fiber.Ctx, name string) (*certgen.Issuer, error, error) {
-	rec, err := h.Runtime.Store.Certificate.Get(c.UserContext(), certmodel.ScopeManaged, name)
+func (h *Handler) loadIssuer(c fiber.Ctx, name string) (*certgen.Issuer, error, error) {
+	rec, err := h.Runtime.Store.Certificate.Get(c.Context(), certmodel.ScopeManaged, name)
 	if err != nil {
 		return nil, response.Internal(c, err), err
 	}
@@ -383,7 +383,7 @@ func daysOr(days int, fallback time.Duration) time.Duration {
 	return time.Duration(days) * 24 * time.Hour
 }
 
-func (h *Handler) store(c *fiber.Ctx, name, data, certPEM string) error {
+func (h *Handler) store(c fiber.Ctx, name, data, certPEM string) error {
 	if resp, refused := h.refuseOverwritingAnAuthority(c, name); refused {
 		return resp
 	}
@@ -398,7 +398,7 @@ func (h *Handler) store(c *fiber.Ctx, name, data, certPEM string) error {
 		Data:    data,
 		CertPEM: certPEM,
 	}
-	if err := h.Runtime.Store.Certificate.Put(c.UserContext(), rec); err != nil {
+	if err := h.Runtime.Store.Certificate.Put(c.Context(), rec); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -417,7 +417,7 @@ func (h *Handler) store(c *fiber.Ctx, name, data, certPEM string) error {
 // over one meant the console called a certificate in use while
 // `openssl s_client` showed no TLS at all. So a dormant assignment
 // does not block the delete and is CLEARED with it.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	name := c.Params("name")
 
 	var dormant []string
@@ -434,7 +434,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		dormant = append(dormant, listener)
 	}
 
-	if err := h.Runtime.Store.Certificate.Delete(c.UserContext(), certmodel.ScopeManaged, name); err != nil {
+	if err := h.Runtime.Store.Certificate.Delete(c.Context(), certmodel.ScopeManaged, name); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -458,17 +458,17 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 // Deleting the row IS how a setting returns to its default here, which
 // is what the settings store does for a value equal to the default - so
 // this is the same write the settings API would make.
-func (h *Handler) clearAssignment(c *fiber.Ctx, listener string) error {
+func (h *Handler) clearAssignment(c fiber.Ctx, listener string) error {
 	key := listenerSettings[listener]
 	if key == "" {
 		return nil
 	}
 
-	if err := h.Runtime.Store.Setting.Delete(c.UserContext(), key); err != nil {
+	if err := h.Runtime.Store.Setting.Delete(c.Context(), key); err != nil {
 		return err
 	}
 
-	_ = h.Runtime.Settings.Reload(c.UserContext())
+	_ = h.Runtime.Settings.Reload(c.Context())
 
 	return nil
 }
@@ -580,8 +580,8 @@ func (h *Handler) assignedListener(name string) string {
 //
 // Two returns for the reason on refuseCAOverAnAssignedName below: the
 // bool is what the caller branches on.
-func (h *Handler) refuseOverwritingAnAuthority(c *fiber.Ctx, name string) (error, bool) {
-	rec, err := h.Runtime.Store.Certificate.GetPublic(c.UserContext(), certmodel.ScopeManaged, name)
+func (h *Handler) refuseOverwritingAnAuthority(c fiber.Ctx, name string) (error, bool) {
+	rec, err := h.Runtime.Store.Certificate.GetPublic(c.Context(), certmodel.ScopeManaged, name)
 	if err != nil {
 		return response.Internal(c, err), true
 	}
@@ -611,7 +611,7 @@ func (h *Handler) refuseOverwritingAnAuthority(c *fiber.Ctx, name string) (error
 // the status and returns NIL, so a lone error is nil on the refusal
 // path and the caller sails past it, which is exactly what happens
 // and answered 201 - same trap as verifySession and passkeySelf.
-func (h *Handler) refuseCAOverAnAssignedName(c *fiber.Ctx, name, certPEM string) (error, bool) {
+func (h *Handler) refuseCAOverAnAssignedName(c fiber.Ctx, name, certPEM string) (error, bool) {
 	listener := h.assignedListener(name)
 	if listener == "" {
 		return nil, false
@@ -688,7 +688,7 @@ func detailsOf(certPEM string) *certmodel.Details {
 // Per node on purpose: the cache is shared, but which hosts a node was
 // configured for is its own, and an operator debugging "why is this
 // one not renewing" is asking about a machine.
-func (h *Handler) ACME(c *fiber.Ctx) error {
+func (h *Handler) ACME(c fiber.Ctx) error {
 	st := h.Runtime.Settings
 	out := ACMEResponse{
 		Hosts:             []ACMEHost{},
@@ -717,7 +717,7 @@ func (h *Handler) ACME(c *fiber.Ctx) error {
 
 		// The plain key is the ECDSA one, which is what a modern
 		// client gets - see acmeHello.
-		rec, err := h.Runtime.Store.Certificate.Get(c.UserContext(), certmodel.ScopeACME, host)
+		rec, err := h.Runtime.Store.Certificate.Get(c.Context(), certmodel.ScopeACME, host)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -745,7 +745,7 @@ func (h *Handler) ACME(c *fiber.Ctx) error {
 // NXDOMAIN looking up A for mail.example.com" is the whole answer, and
 // paraphrasing it into "could not issue certificate" would throw away
 // the only useful part.
-func (h *Handler) Order(c *fiber.Ctx) error {
+func (h *Handler) Order(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[renewInput](c)
 	if !ok {
 		return resp
@@ -770,7 +770,7 @@ func (h *Handler) Order(c *fiber.Ctx) error {
 // cache. autocert has no renew-now of its own: the timer lives inside
 // Manager.cert, so dropping the entry is what turns the next ask into an
 // order.
-func (h *Handler) Renew(c *fiber.Ctx) error {
+func (h *Handler) Renew(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[renewInput](c)
 	if !ok {
 		return resp
@@ -780,7 +780,7 @@ func (h *Handler) Renew(c *fiber.Ctx) error {
 		return response.BadRequest(c, "this node serves no ACME certificate")
 	}
 
-	if err := h.Runtime.TLS.Renew(c.UserContext(), in.Host); err != nil {
+	if err := h.Runtime.TLS.Renew(c.Context(), in.Host); err != nil {
 		return response.BadRequest(c, err.Error())
 	}
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -33,7 +33,7 @@ const maxResetsPerHour = 3
 // condition that changes the answer is the feature being switched off
 // entirely, which is a property of the install rather than of any
 // account.
-func (h *Handler) PasswordResetRequest(c *fiber.Ctx) error {
+func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 	if !h.Runtime.Config.Auth.Local.Enabled {
 		return response.BadRequest(c, "local login is disabled")
 	}
@@ -55,7 +55,7 @@ func (h *Handler) PasswordResetRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	u, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+	u, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -70,7 +70,7 @@ func (h *Handler) PasswordResetRequest(c *fiber.Ctx) error {
 	}
 
 	now := time.Now().UTC()
-	recent, err := h.Runtime.Store.PasswordReset.CountRecentForUser(c.UserContext(), u.ID, now.Add(-time.Hour))
+	recent, err := h.Runtime.Store.PasswordReset.CountRecentForUser(c.Context(), u.ID, now.Add(-time.Hour))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -94,7 +94,7 @@ func (h *Handler) PasswordResetRequest(c *fiber.Ctx) error {
 		CreatedAt: now,
 		RequestIP: c.IP(),
 	}
-	if err := h.Runtime.Store.PasswordReset.Put(c.UserContext(), tok); err != nil {
+	if err := h.Runtime.Store.PasswordReset.Put(c.Context(), tok); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -112,7 +112,7 @@ func (h *Handler) PasswordResetRequest(c *fiber.Ctx) error {
 }
 
 // PasswordResetConfirm redeems a token and sets the new password.
-func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
+func (h *Handler) PasswordResetConfirm(c fiber.Ctx) error {
 	if !h.Runtime.Config.Auth.Local.Enabled {
 		return response.BadRequest(c, "local login is disabled")
 	}
@@ -122,7 +122,7 @@ func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
 		return resp
 	}
 
-	tok, err := h.Runtime.Store.PasswordReset.GetByHash(c.UserContext(), prmodel.Hash(in.Token))
+	tok, err := h.Runtime.Store.PasswordReset.GetByHash(c.Context(), prmodel.Hash(in.Token))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -136,7 +136,7 @@ func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
 		return response.BadRequest(c, "this reset link is invalid or has expired, request a new one")
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), tok.UserID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), tok.UserID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -151,7 +151,7 @@ func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
 	// and it only counts if the loser stops here. Doing it afterwards
 	// also meant a failed write was logged and ignored, leaving a
 	// spent link usable for the rest of its 30 minutes.
-	claimed, err := h.Runtime.Store.PasswordReset.MarkUsed(c.UserContext(), tok.ID, now)
+	claimed, err := h.Runtime.Store.PasswordReset.MarkUsed(c.Context(), tok.ID, now)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -171,7 +171,7 @@ func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
 	// before this request did anything, so an administrator disabling the
 	// account in between had that undone - and the account walked back in
 	// through its own password reset.
-	if err := h.Runtime.Store.User.SetPassword(c.UserContext(), u.ID, hash); err != nil {
+	if err := h.Runtime.Store.User.SetPassword(c.Context(), u.ID, hash); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -180,14 +180,14 @@ func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
 	// A password change that leaves old sessions alive is not a
 	// password change - whoever prompted the reset may be holding a
 	// live cookie.
-	if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.UserContext(), u.ID); err != nil {
+	if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.Context(), u.ID); err != nil {
 		slog.Warn("auth: revoking sessions after reset failed", "user_id", u.ID, "err", err)
 	}
 
 	h.Runtime.Sessions.InvalidateAll()
 
 	// Any other link mailed earlier dies with this one.
-	if err := h.Runtime.Store.PasswordReset.InvalidateForUser(c.UserContext(), u.ID, now); err != nil {
+	if err := h.Runtime.Store.PasswordReset.InvalidateForUser(c.Context(), u.ID, now); err != nil {
 		slog.Warn("auth: invalidating sibling reset tokens failed", "user_id", u.ID, "err", err)
 	}
 
@@ -216,7 +216,7 @@ func (h *Handler) PasswordResetConfirm(c *fiber.Ctx) error {
 // Refused for an account an identity provider owns: there is no local
 // password to change, and writing one would create a way in the IdP
 // knows nothing about.
-func (h *Handler) ChangePassword(c *fiber.Ctx) error {
+func (h *Handler) ChangePassword(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
@@ -229,7 +229,7 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 
 	// Read the row rather than trusting the session copy: the hash is
 	// what the current password is checked against.
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), rc.User.ID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), rc.User.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -264,7 +264,7 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 	// before this request did anything, so an administrator disabling the
 	// account in between had that undone - and the account walked back in
 	// through its own password reset.
-	if err := h.Runtime.Store.User.SetPassword(c.UserContext(), u.ID, hash); err != nil {
+	if err := h.Runtime.Store.User.SetPassword(c.Context(), u.ID, hash); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -274,7 +274,7 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 	// them: a password change is worthless while a stolen cookie is
 	// still live. The caller's own session is re-issued below so they
 	// are not signed out of the page they are standing on.
-	if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.UserContext(), u.ID); err != nil {
+	if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.Context(), u.ID); err != nil {
 		slog.Warn("auth: revoking sessions after password change failed", "user_id", u.ID, "err", err)
 	}
 
@@ -287,7 +287,7 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 	// their mailbox was compromised left a link the attacker had already
 	// taken redeemable for the rest of its window, which sets the
 	// password again and undoes the change.
-	if err := h.Runtime.Store.PasswordReset.InvalidateForUser(c.UserContext(), u.ID, time.Now().UTC()); err != nil {
+	if err := h.Runtime.Store.PasswordReset.InvalidateForUser(c.Context(), u.ID, time.Now().UTC()); err != nil {
 		slog.Warn("auth: invalidating reset tokens after password change failed", "user_id", u.ID, "err", err)
 	}
 

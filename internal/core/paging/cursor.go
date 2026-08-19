@@ -3,7 +3,7 @@
 package paging
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/keyset"
 )
@@ -17,7 +17,7 @@ import (
 
 // CursorFrom reads the cursor query parameter. A malformed value
 // yields the zero cursor, which is the first page.
-func CursorFrom(c *fiber.Ctx) keyset.Cursor {
+func CursorFrom(c fiber.Ctx) keyset.Cursor {
 	return keyset.DecodeCursor(c.Query("cursor"))
 }
 
@@ -30,7 +30,7 @@ type Window struct {
 
 // WindowFrom reads a keyset page request off the query string, with
 // the limit clamped exactly as From clamps it.
-func WindowFrom(c *fiber.Ctx) Window {
+func WindowFrom(c fiber.Ctx) Window {
 	return Window{Limit: From(c).Limit, Cursor: CursorFrom(c)}
 }
 

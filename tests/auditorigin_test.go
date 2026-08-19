@@ -114,7 +114,7 @@ func TestAnAuditEventTakesItsOriginFromOnePlace(t *testing.T) {
 
 	for _, f := range findings {
 		t.Errorf("%s is set by hand on an audit event.\n\n"+
-			"audit.Recorder.Project and .Security take the *fiber.Ctx and stamp both the "+
+			"audit.Recorder.Project and .Security take the fiber.Ctx and stamp both the "+
 			"address and the user agent through audit.Stamp. A copy here is a field the "+
 			"next event type will forget - and the pair has to travel together, because a "+
 			"shared egress address says nothing on its own", f)

@@ -5,7 +5,7 @@ package auth
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/systemmail"
@@ -17,13 +17,13 @@ import (
 // platform admin: the address, and which shared pool server it would
 // leave through. Secrets are never echoed - the pool page is where a
 // server is configured, and this page only says which one is in use.
-func (h *Handler) SystemMailStatus(c *fiber.Ctx) error {
+func (h *Handler) SystemMailStatus(c fiber.Ctx) error {
 	out := SystemMailStatus{
 		Enabled:  h.Runtime.SystemMail.Enabled(),
 		From:     h.Runtime.Settings.String(smodel.KeyPlatformMailFrom),
 		FromName: h.Runtime.Settings.String(smodel.KeyPlatformMailFromName),
 	}
-	srv, err := h.Runtime.SystemMail.Server(c.UserContext())
+	srv, err := h.Runtime.SystemMail.Server(c.Context())
 	switch {
 	case err == nil:
 		out.Server = srv.Name
@@ -40,13 +40,13 @@ func (h *Handler) SystemMailStatus(c *fiber.Ctx) error {
 // SystemMailTest dials the configured server, and delivers a real
 // message when the caller names a recipient. Platform admin only --
 // it is an outbound request to an operator-chosen host.
-func (h *Handler) SystemMailTest(c *fiber.Ctx) error {
+func (h *Handler) SystemMailTest(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[systemMailTestInput](c)
 	if !ok {
 		return resp
 	}
 
-	if err := h.Runtime.SystemMail.TestConnection(c.UserContext()); err != nil {
+	if err := h.Runtime.SystemMail.TestConnection(c.Context()); err != nil {
 		return response.BadRequest(c, "connection failed: "+err.Error())
 	}
 
@@ -56,7 +56,7 @@ func (h *Handler) SystemMailTest(c *fiber.Ctx) error {
 
 	const subject = "Mailyard system mail test"
 	body := "This is a test of the Mailyard system mail settings. If you are reading it, invitations and password resets can be delivered."
-	if err := h.Runtime.SystemMail.Send(c.UserContext(), []string{in.To}, subject,
+	if err := h.Runtime.SystemMail.Send(c.Context(), []string{in.To}, subject,
 		"<p>"+body+"</p>", body+"\n"); err != nil {
 		return response.BadRequest(c, "send failed: "+err.Error())
 	}

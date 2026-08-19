@@ -5,7 +5,7 @@ package project
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -81,13 +81,13 @@ func normalizeRolePermissions(in []string) ([]string, string) {
 }
 
 // ListRoles returns the project's roles with their member counts.
-func (h *Handler) ListRoles(c *fiber.Ctx) error {
+func (h *Handler) ListRoles(c fiber.Ctx) error {
 	w, access, err := h.loadWithMember(c)
 	if err != nil || w == nil || !access.perms.Has(perm.ResourceMembers, perm.ActionRead) {
 		return h.accessFailure(c, w, access, err)
 	}
 
-	roles, err := h.Runtime.Store.Project.ListRoles(c.UserContext(), w.ID)
+	roles, err := h.Runtime.Store.Project.ListRoles(c.Context(), w.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -96,7 +96,7 @@ func (h *Handler) ListRoles(c *fiber.Ctx) error {
 }
 
 // CreateRole adds a role.
-func (h *Handler) CreateRole(c *fiber.Ctx) error {
+func (h *Handler) CreateRole(c fiber.Ctx) error {
 	w, access, err := h.loadWithMember(c)
 	if err != nil || w == nil || !access.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, access, err)
@@ -129,7 +129,7 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 		Description: in.Description,
 		Permissions: perms,
 	}
-	if err := h.Runtime.Store.Project.PutRole(c.UserContext(), role); err != nil {
+	if err := h.Runtime.Store.Project.PutRole(c.Context(), role); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -140,13 +140,13 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 // members carry, so a rename is cosmetic and an edited permission list
 // applies to every holder on their next request - there is no cache to
 // invalidate.
-func (h *Handler) UpdateRole(c *fiber.Ctx) error {
+func (h *Handler) UpdateRole(c fiber.Ctx) error {
 	w, access, err := h.loadWithMember(c)
 	if err != nil || w == nil || !access.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, access, err)
 	}
 
-	role, err := h.Runtime.Store.Project.GetRole(c.UserContext(), w.ID, c.Params("roleId"))
+	role, err := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, c.Params("roleId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -179,7 +179,7 @@ func (h *Handler) UpdateRole(c *fiber.Ctx) error {
 	role.Name = in.Name
 	role.Description = in.Description
 	role.Permissions = perms
-	if err := h.Runtime.Store.Project.PutRole(c.UserContext(), role); err != nil {
+	if err := h.Runtime.Store.Project.PutRole(c.Context(), role); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -195,14 +195,14 @@ func (h *Handler) UpdateRole(c *fiber.Ctx) error {
 // Dropping the DEFAULT role leaves the project pointing at a row that
 // is not there, which reads as "no role", so everybody who never had
 // one of their own silently loses everything.
-func (h *Handler) DeleteRole(c *fiber.Ctx) error {
+func (h *Handler) DeleteRole(c fiber.Ctx) error {
 	w, access, err := h.loadWithMember(c)
 	if err != nil || w == nil || !access.perms.Has(perm.ResourceMembers, perm.ActionDelete) {
 		return h.accessFailure(c, w, access, err)
 	}
 
 	deleted, holding, isDefault, err := h.Runtime.Store.Project.DeleteRole(
-		c.UserContext(), w.ID, c.Params("roleId"))
+		c.Context(), w.ID, c.Params("roleId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -231,7 +231,7 @@ func (h *Handler) DeleteRole(c *fiber.Ctx) error {
 // console shows it on the project settings screen. It decides what
 // every unassigned member may do, which is member policy - the same
 // question CreateRole and UpdateMember answer.
-func (h *Handler) SetDefaultRole(c *fiber.Ctx) error {
+func (h *Handler) SetDefaultRole(c fiber.Ctx) error {
 	w, access, err := h.loadWithMember(c)
 	if err != nil || w == nil || !access.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
 		return h.accessFailure(c, w, access, err)
@@ -246,7 +246,7 @@ func (h *Handler) SetDefaultRole(c *fiber.Ctx) error {
 	// who has none of their own at once - so it takes the same rule as
 	// the other two. See refuseDelegating.
 	if in.RoleID != "" {
-		role, rerr := h.Runtime.Store.Project.GetRole(c.UserContext(), w.ID, in.RoleID)
+		role, rerr := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, in.RoleID)
 		if rerr != nil {
 			return response.Internal(c, rerr)
 		}
@@ -260,7 +260,7 @@ func (h *Handler) SetDefaultRole(c *fiber.Ctx) error {
 		}
 	}
 
-	ok, err = h.Runtime.Store.Project.SetDefaultRole(c.UserContext(), w.ID, in.RoleID)
+	ok, err = h.Runtime.Store.Project.SetDefaultRole(c.Context(), w.ID, in.RoleID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -298,7 +298,7 @@ func (h *Handler) SetDefaultRole(c *fiber.Ctx) error {
 //
 // Two returns, and the bool matters: response.* writes the status and
 // returns nil - see TestARefusalHelperIsReturnedAndNotTested.
-func refuseDelegating(c *fiber.Ctx, caller access, role *projmodel.Role) (error, bool) {
+func refuseDelegating(c fiber.Ctx, caller access, role *projmodel.Role) (error, bool) {
 	short := caller.perms.Missing(role.Permissions)
 	if len(short) == 0 {
 		return nil, false
@@ -312,7 +312,7 @@ func refuseDelegating(c *fiber.Ctx, caller access, role *projmodel.Role) (error,
 // refuseGranting is refuseDelegating for the permission list being
 // WRITTEN into a role, rather than for a role being handed to somebody.
 // Two doors, one rule, one sentence explaining it.
-func refuseGranting(c *fiber.Ctx, caller access, perms []string) (error, bool) {
+func refuseGranting(c fiber.Ctx, caller access, perms []string) (error, bool) {
 	short := caller.perms.Missing(perms)
 	if len(short) == 0 {
 		return nil, false
@@ -326,8 +326,8 @@ func refuseGranting(c *fiber.Ctx, caller access, perms []string) (error, bool) {
 // mustListRoles is the name-collision read. An error here surfaces as
 // an empty list and the UNIQUE constraint still backstops the race,
 // answering 500 instead of a duplicate.
-func mustListRoles(h *Handler, c *fiber.Ctx, projID string) []*projmodel.Role {
-	roles, err := h.Runtime.Store.Project.ListRoles(c.UserContext(), projID)
+func mustListRoles(h *Handler, c fiber.Ctx, projID string) []*projmodel.Role {
+	roles, err := h.Runtime.Store.Project.ListRoles(c.Context(), projID)
 	if err != nil {
 		return nil
 	}
@@ -343,7 +343,7 @@ func mustListRoles(h *Handler, c *fiber.Ctx, projID string) []*projmodel.Role {
 // so the grid and the enforcement cannot disagree about what exists.
 // requireAuth only - the catalogue is static, identical for every
 // project, and holds nothing secret (it ships in the docs).
-func (h *Handler) Catalog(c *fiber.Ctx) error {
+func (h *Handler) Catalog(c fiber.Ctx) error {
 	return response.Success(c, CatalogResponse{
 		Resources: perm.Registry,
 		Actions: []string{

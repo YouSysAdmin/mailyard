@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -26,9 +26,9 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/api-keys.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	keys, err := h.Runtime.Store.APIKey.List(c.UserContext(), rc.Project.ID)
+	keys, err := h.Runtime.Store.APIKey.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -41,14 +41,14 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Create mints a key and returns the plaintext token EXACTLY ONCE.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.UserContext(), h.Runtime.Store, rc.Project.ID, quota.ResAPIKeys, 1); err != nil {
+	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResAPIKeys, 1); err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
@@ -87,7 +87,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 			return response.Internal(c, err)
 		}
 
-		existing, gerr := h.Runtime.Store.APIKey.GetByPrefix(c.UserContext(), prefix)
+		existing, gerr := h.Runtime.Store.APIKey.GetByPrefix(c.Context(), prefix)
 		if gerr != nil {
 			return response.Internal(c, gerr)
 		}
@@ -122,7 +122,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		k.AllowedIPs = []string{}
 	}
 
-	if err := h.Runtime.Store.APIKey.Put(c.UserContext(), k); err != nil {
+	if err := h.Runtime.Store.APIKey.Put(c.Context(), k); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -130,9 +130,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Revoke serves POST /api/v1/api-keys/:id/revoke.
-func (h *Handler) Revoke(c *fiber.Ctx) error {
+func (h *Handler) Revoke(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	k, err := h.Runtime.Store.APIKey.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	k, err := h.Runtime.Store.APIKey.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -141,7 +141,7 @@ func (h *Handler) Revoke(c *fiber.Ctx) error {
 		return response.NotFound(c, "api key not found")
 	}
 
-	if err := h.Runtime.Store.APIKey.Revoke(c.UserContext(), rc.Project.ID, k.ID); err != nil {
+	if err := h.Runtime.Store.APIKey.Revoke(c.Context(), rc.Project.ID, k.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -151,9 +151,9 @@ func (h *Handler) Revoke(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/api-keys/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	k, err := h.Runtime.Store.APIKey.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	k, err := h.Runtime.Store.APIKey.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -162,7 +162,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "api key not found")
 	}
 
-	if err := h.Runtime.Store.APIKey.Delete(c.UserContext(), rc.Project.ID, k.ID); err != nil {
+	if err := h.Runtime.Store.APIKey.Delete(c.Context(), rc.Project.ID, k.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

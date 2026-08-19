@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/edition"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -18,8 +18,8 @@ import (
 // halves of this domain share. The wire types are in types.go.
 
 // List returns every enrolled node. Platform admin.
-func (h *Handler) List(c *fiber.Ctx) error {
-	nodes, err := h.Runtime.Store.RelayNode.ListAll(c.UserContext())
+func (h *Handler) List(c fiber.Ctx) error {
+	nodes, err := h.Runtime.Store.RelayNode.ListAll(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -40,7 +40,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		// serverFor, not the shared store directly. A project's node
 		// lives in smtp_servers, and reading only the shared table
 		// showed tenant nodes with no host and no status at all.
-		srv, err := h.serverFor(c.UserContext(), n)
+		srv, err := h.serverFor(c.Context(), n)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -85,7 +85,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 // The decision an operator makes by hand unless
 // relay_nodes_auto_approve says otherwise. It is a decision worth
 // making: a node in the pool receives the content of real messages.
-func (h *Handler) Approve(c *fiber.Ctx) error {
+func (h *Handler) Approve(c fiber.Ctx) error {
 	node, srv, resp := h.adminNode(c)
 	if resp != nil {
 		return resp
@@ -101,7 +101,7 @@ func (h *Handler) Approve(c *fiber.Ctx) error {
 			"this node belongs to a project and is approved by an administrator of that project")
 	}
 
-	if err := h.Runtime.Store.SharedSMTP.SetStatus(c.UserContext(),
+	if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
 		srv.ID, ssmodel.StatusEnabled, "", nil); err != nil {
 		return response.Internal(c, err)
 	}
@@ -117,7 +117,7 @@ func (h *Handler) Approve(c *fiber.Ctx) error {
 // heartbeating, so putting it back is one click rather than a
 // re-enrolment. Anything already spooled on it still delivers - we
 // stop handing it new work, we do not reach into its queue.
-func (h *Handler) Suspend(c *fiber.Ctx) error {
+func (h *Handler) Suspend(c fiber.Ctx) error {
 	node, srv, resp := h.adminNode(c)
 	if resp != nil {
 		return resp
@@ -142,22 +142,22 @@ func (h *Handler) Suspend(c *fiber.Ctx) error {
 // the pool that nothing is behind - the freshness rule only applies
 // to rows a node still claims, so an orphan would look like an
 // ordinary manually configured server and be handed mail.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	node, srv, resp := h.adminNode(c)
 	if resp != nil {
 		return resp
 	}
 
-	if err := h.Runtime.Store.RelayNode.Delete(c.UserContext(), node.ID); err != nil {
+	if err := h.Runtime.Store.RelayNode.Delete(c.Context(), node.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
 	h.forgetIssued(c, node.ID)
 	if node.Platform() {
-		if err := h.Runtime.Store.SharedSMTP.Delete(c.UserContext(), srv.ID); err != nil {
+		if err := h.Runtime.Store.SharedSMTP.Delete(c.Context(), srv.ID); err != nil {
 			return response.Internal(c, err)
 		}
-	} else if err := h.Runtime.Store.SMTPServer.Delete(c.UserContext(),
+	} else if err := h.Runtime.Store.SMTPServer.Delete(c.Context(),
 		node.ProjectID, srv.ID); err != nil {
 		return response.Internal(c, err)
 	}
@@ -180,7 +180,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 // A node does not come back on its own. It holds a stored identity and
 // never re-enrols, so the operator has to hand it the token again or
 // clear its spool.
-func (h *Handler) ResetAuthority(c *fiber.Ctx) error {
+func (h *Handler) ResetAuthority(c fiber.Ctx) error {
 	if h.CA == nil {
 		// Two ways to have no authority, and they are not the same
 		// thing to be told. A switch is the operator's to turn on, an
@@ -193,7 +193,7 @@ func (h *Handler) ResetAuthority(c *fiber.Ctx) error {
 		return response.BadRequest(c, "relay nodes are not enabled on this installation")
 	}
 
-	nodes, err := h.Runtime.Store.RelayNode.ListAll(c.UserContext())
+	nodes, err := h.Runtime.Store.RelayNode.ListAll(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -203,20 +203,20 @@ func (h *Handler) ResetAuthority(c *fiber.Ctx) error {
 		// ordinary server somebody typed in - the freshness rule only
 		// covers rows a node still claims - and be handed mail forever.
 		if n.Platform() {
-			if derr := h.Runtime.Store.SharedSMTP.Delete(c.UserContext(), n.ServerID); derr != nil {
+			if derr := h.Runtime.Store.SharedSMTP.Delete(c.Context(), n.ServerID); derr != nil {
 				return response.Internal(c, derr)
 			}
-		} else if derr := h.Runtime.Store.SMTPServer.Delete(c.UserContext(),
+		} else if derr := h.Runtime.Store.SMTPServer.Delete(c.Context(),
 			n.ProjectID, n.ServerID); derr != nil {
 			return response.Internal(c, derr)
 		}
 
-		if derr := h.Runtime.Store.RelayNode.Delete(c.UserContext(), n.ID); derr != nil {
+		if derr := h.Runtime.Store.RelayNode.Delete(c.Context(), n.ID); derr != nil {
 			return response.Internal(c, derr)
 		}
 	}
 
-	issued, err := h.CA.Reset(c.UserContext())
+	issued, err := h.CA.Reset(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -237,12 +237,12 @@ func (h *Handler) ResetAuthority(c *fiber.Ctx) error {
 // forgetIssued drops the record of the certificate this node was
 // given. Never fails to delete: the node is going either way, and a
 // leftover bookkeeping row is not worth refusing that over.
-func (h *Handler) forgetIssued(c *fiber.Ctx, nodeID string) {
+func (h *Handler) forgetIssued(c fiber.Ctx, nodeID string) {
 	if h.CA == nil {
 		return
 	}
 
-	if err := h.CA.ForgetNode(c.UserContext(), nodeID); err != nil {
+	if err := h.CA.ForgetNode(c.Context(), nodeID); err != nil {
 		h.log().Warn("relay node: could not forget the issued certificate",
 			"node_id", nodeID, "err", err)
 	}
@@ -251,12 +251,12 @@ func (h *Handler) forgetIssued(c *fiber.Ctx, nodeID string) {
 // setStatus writes to whichever table holds this node's delivery row.
 // Which one follows from the node's project scope and from nothing
 // else - the same rule serverFor uses to read it.
-func (h *Handler) setStatus(c *fiber.Ctx, node *nodemodel.Node, serverID, status, reason string) error {
+func (h *Handler) setStatus(c fiber.Ctx, node *nodemodel.Node, serverID, status, reason string) error {
 	if node.Platform() {
-		return h.Runtime.Store.SharedSMTP.SetStatus(c.UserContext(), serverID, status, reason, nil)
+		return h.Runtime.Store.SharedSMTP.SetStatus(c.Context(), serverID, status, reason, nil)
 	}
 
-	return h.Runtime.Store.SMTPServer.SetStatus(c.UserContext(),
+	return h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 		node.ProjectID, serverID, status, reason, nil)
 }
 
@@ -271,8 +271,8 @@ func (h *Handler) setStatus(c *fiber.Ctx, node *nodemodel.Node, serverID, status
 // instead happens to work today - no path returns one without the
 // other - but that is a property of the current paths, not a promise,
 // and every caller dereferences the server.
-func (h *Handler) adminNode(c *fiber.Ctx) (*nodemodel.Node, *ssmodel.Shared, error) {
-	node, err := h.Runtime.Store.RelayNode.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) adminNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Shared, error) {
+	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return nil, nil, response.Internal(c, err)
 	}
@@ -281,7 +281,7 @@ func (h *Handler) adminNode(c *fiber.Ctx) (*nodemodel.Node, *ssmodel.Shared, err
 		return nil, nil, response.NotFound(c, "relay node not found")
 	}
 
-	srv, err := h.serverFor(c.UserContext(), node)
+	srv, err := h.serverFor(c.Context(), node)
 	if err != nil {
 		return nil, nil, response.Internal(c, err)
 	}

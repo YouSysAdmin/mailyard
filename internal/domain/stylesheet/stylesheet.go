@@ -11,7 +11,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -117,9 +117,9 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/stylesheets.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sheets, err := h.Runtime.Store.Stylesheet.List(c.UserContext(), rc.Project.ID)
+	sheets, err := h.Runtime.Store.Stylesheet.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -132,9 +132,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/stylesheets/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sh, err := h.Runtime.Store.Stylesheet.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	sh, err := h.Runtime.Store.Stylesheet.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -147,7 +147,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/stylesheets.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
@@ -160,7 +160,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		Name:      in.Name,
 		CSS:       in.CSS,
 	}
-	if err := h.Runtime.Store.Stylesheet.Put(c.UserContext(), sh); err != nil {
+	if err := h.Runtime.Store.Stylesheet.Put(c.Context(), sh); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -168,9 +168,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PUT /api/v1/stylesheets/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sh, err := h.Runtime.Store.Stylesheet.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	sh, err := h.Runtime.Store.Stylesheet.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -187,7 +187,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	sh.Name = in.Name
 	sh.CSS = in.CSS
 	sh.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Stylesheet.Put(c.UserContext(), sh); err != nil {
+	if err := h.Runtime.Store.Stylesheet.Put(c.Context(), sh); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -195,9 +195,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/stylesheets/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	sh, err := h.Runtime.Store.Stylesheet.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	sh, err := h.Runtime.Store.Stylesheet.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -206,7 +206,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "stylesheet not found")
 	}
 
-	if err := h.Runtime.Store.Stylesheet.Delete(c.UserContext(), rc.Project.ID, sh.ID); err != nil {
+	if err := h.Runtime.Store.Stylesheet.Delete(c.Context(), rc.Project.ID, sh.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

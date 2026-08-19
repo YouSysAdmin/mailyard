@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -35,7 +35,7 @@ type Handler struct {
 // turned a delete racing an edit into a 500 - and two concurrent
 // version creates race MAX(version)+1 into a duplicate key, which is
 // a retry for the loser, not an internal error.
-func putError(c *fiber.Ctx, err error) error {
+func putError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return response.NotFound(c, "template not found")
@@ -49,9 +49,9 @@ func putError(c *fiber.Ctx, err error) error {
 }
 
 // List serves GET /api/v1/templates.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ts, err := h.Runtime.Store.Template.List(c.UserContext(), rc.Project.ID)
+	ts, err := h.Runtime.Store.Template.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -64,9 +64,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/templates/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -75,7 +75,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 		return response.NotFound(c, "template not found")
 	}
 
-	versions, err := h.Runtime.Store.Template.ListVersions(c.UserContext(), rc.Project.ID, t.ID)
+	versions, err := h.Runtime.Store.Template.ListVersions(c.Context(), rc.Project.ID, t.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -88,14 +88,14 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/templates.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
 	}
 
-	existing, err := h.Runtime.Store.Template.GetByName(c.UserContext(), rc.Project.ID, in.Name)
+	existing, err := h.Runtime.Store.Template.GetByName(c.Context(), rc.Project.ID, in.Name)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -117,13 +117,13 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		t.DefaultLanguage = "en"
 	}
 
-	if err := h.Runtime.Store.Template.Put(c.UserContext(), t); err != nil {
+	if err := h.Runtime.Store.Template.Put(c.Context(), t); err != nil {
 		return response.Internal(c, err)
 	}
 
 	if in.Subject != "" {
 		v := &tmodel.Version{ID: ids.New(), TemplateID: t.ID}
-		if err := h.Runtime.Store.Template.PutVersion(c.UserContext(), rc.Project.ID, v); err != nil {
+		if err := h.Runtime.Store.Template.PutVersion(c.Context(), rc.Project.ID, v); err != nil {
 			return putError(c, err)
 		}
 
@@ -135,11 +135,11 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 			HTML:      in.HTML,
 			Text:      in.Text,
 		}
-		if err := h.Runtime.Store.Template.PutLocalization(c.UserContext(), rc.Project.ID, l); err != nil {
+		if err := h.Runtime.Store.Template.PutLocalization(c.Context(), rc.Project.ID, l); err != nil {
 			return putError(c, err)
 		}
 
-		if err := h.Runtime.Store.Template.SetActiveVersion(c.UserContext(), rc.Project.ID, t.ID, v.ID); err != nil {
+		if err := h.Runtime.Store.Template.SetActiveVersion(c.Context(), rc.Project.ID, t.ID, v.ID); err != nil {
 			return response.Internal(c, err)
 		}
 
@@ -150,9 +150,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/templates/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -167,7 +167,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	if in.Name != "" && in.Name != t.Name {
-		other, err := h.Runtime.Store.Template.GetByName(c.UserContext(), rc.Project.ID, in.Name)
+		other, err := h.Runtime.Store.Template.GetByName(c.Context(), rc.Project.ID, in.Name)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -193,7 +193,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 
 	t.LastEditedBy = callerID(rc)
 	t.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Template.Put(c.UserContext(), t); err != nil {
+	if err := h.Runtime.Store.Template.Put(c.Context(), t); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -201,9 +201,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/templates/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -217,7 +217,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 	// going away. Nothing else would ever find them: retention does not
 	// look at this table, so a stranded object here is permanent.
 	// DeleteAttachment already does this for the one-attachment path.
-	ctx := c.UserContext()
+	ctx := c.Context()
 	keys, err := h.Runtime.Store.Template.StorageKeysForTemplate(ctx, rc.Project.ID, t.ID)
 	if err != nil {
 		return response.Internal(c, err)
@@ -239,9 +239,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 }
 
 // ListVersions serves GET /api/v1/templates/:id/versions.
-func (h *Handler) ListVersions(c *fiber.Ctx) error {
+func (h *Handler) ListVersions(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	versions, err := h.Runtime.Store.Template.ListVersions(c.UserContext(), rc.Project.ID, c.Params("id"))
+	versions, err := h.Runtime.Store.Template.ListVersions(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -254,9 +254,9 @@ func (h *Handler) ListVersions(c *fiber.Ctx) error {
 }
 
 // CreateVersion serves POST /api/v1/templates/:id/versions.
-func (h *Handler) CreateVersion(c *fiber.Ctx) error {
+func (h *Handler) CreateVersion(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -283,7 +283,7 @@ func (h *Handler) CreateVersion(c *fiber.Ctx) error {
 		v.StylesheetID = new(in.StylesheetID)
 	}
 
-	if err := h.Runtime.Store.Template.PutVersion(c.UserContext(), rc.Project.ID, v); err != nil {
+	if err := h.Runtime.Store.Template.PutVersion(c.Context(), rc.Project.ID, v); err != nil {
 		return putError(c, err)
 	}
 
@@ -292,9 +292,9 @@ func (h *Handler) CreateVersion(c *fiber.Ctx) error {
 
 // UpdateVersion serves PATCH
 // /api/v1/templates/:id/versions/:versionId.
-func (h *Handler) UpdateVersion(c *fiber.Ctx) error {
+func (h *Handler) UpdateVersion(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	v, err := h.Runtime.Store.Template.GetVersion(c.UserContext(), rc.Project.ID, c.Params("id"), c.Params("versionId"))
+	v, err := h.Runtime.Store.Template.GetVersion(c.Context(), rc.Project.ID, c.Params("id"), c.Params("versionId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -320,7 +320,7 @@ func (h *Handler) UpdateVersion(c *fiber.Ctx) error {
 		v.SampleData = in.SampleData
 	}
 
-	if err := h.Runtime.Store.Template.PutVersion(c.UserContext(), rc.Project.ID, v); err != nil {
+	if err := h.Runtime.Store.Template.PutVersion(c.Context(), rc.Project.ID, v); err != nil {
 		return putError(c, err)
 	}
 
@@ -329,9 +329,9 @@ func (h *Handler) UpdateVersion(c *fiber.Ctx) error {
 
 // DeleteVersion refuses to drop the active version - deactivate (or
 // activate another) first, so the send path never loses its target.
-func (h *Handler) DeleteVersion(c *fiber.Ctx) error {
+func (h *Handler) DeleteVersion(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -345,7 +345,7 @@ func (h *Handler) DeleteVersion(c *fiber.Ctx) error {
 		return response.Conflict(c, "this version is active, activate another version first")
 	}
 
-	v, err := h.Runtime.Store.Template.GetVersion(c.UserContext(), rc.Project.ID, t.ID, versionID)
+	v, err := h.Runtime.Store.Template.GetVersion(c.Context(), rc.Project.ID, t.ID, versionID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -354,7 +354,7 @@ func (h *Handler) DeleteVersion(c *fiber.Ctx) error {
 		return response.NotFound(c, "version not found")
 	}
 
-	if err := h.Runtime.Store.Template.DeleteVersion(c.UserContext(), rc.Project.ID, t.ID, versionID); err != nil {
+	if err := h.Runtime.Store.Template.DeleteVersion(c.Context(), rc.Project.ID, t.ID, versionID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -362,9 +362,9 @@ func (h *Handler) DeleteVersion(c *fiber.Ctx) error {
 }
 
 // Activate serves POST /api/v1/templates/:id/activate/:versionId.
-func (h *Handler) Activate(c *fiber.Ctx) error {
+func (h *Handler) Activate(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	err := h.Runtime.Store.Template.SetActiveVersion(c.UserContext(),
+	err := h.Runtime.Store.Template.SetActiveVersion(c.Context(),
 		rc.Project.ID, c.Params("id"), c.Params("versionId"))
 	if err != nil {
 		if errors.Is(err, ErrVersionMismatch) {
@@ -379,9 +379,9 @@ func (h *Handler) Activate(c *fiber.Ctx) error {
 
 // ListLocalizations serves GET
 // /api/v1/templates/:id/versions/:versionId/localizations.
-func (h *Handler) ListLocalizations(c *fiber.Ctx) error {
+func (h *Handler) ListLocalizations(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ls, err := h.Runtime.Store.Template.ListLocalizations(c.UserContext(), rc.Project.ID, c.Params("versionId"))
+	ls, err := h.Runtime.Store.Template.ListLocalizations(c.Context(), rc.Project.ID, c.Params("versionId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -395,9 +395,9 @@ func (h *Handler) ListLocalizations(c *fiber.Ctx) error {
 
 // PutLocalization creates or replaces the version's content for one
 // language (upsert keyed on version + language).
-func (h *Handler) PutLocalization(c *fiber.Ctx) error {
+func (h *Handler) PutLocalization(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	v, err := h.Runtime.Store.Template.GetVersion(c.UserContext(), rc.Project.ID, c.Params("id"), c.Params("versionId"))
+	v, err := h.Runtime.Store.Template.GetVersion(c.Context(), rc.Project.ID, c.Params("id"), c.Params("versionId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -420,11 +420,11 @@ func (h *Handler) PutLocalization(c *fiber.Ctx) error {
 		Text:      in.Text,
 		UpdatedAt: new(time.Now().UTC()),
 	}
-	if err := h.Runtime.Store.Template.PutLocalization(c.UserContext(), rc.Project.ID, l); err != nil {
+	if err := h.Runtime.Store.Template.PutLocalization(c.Context(), rc.Project.ID, l); err != nil {
 		return putError(c, err)
 	}
 
-	stored, err := h.Runtime.Store.Template.GetLocalization(c.UserContext(), rc.Project.ID, v.ID, in.Language)
+	stored, err := h.Runtime.Store.Template.GetLocalization(c.Context(), rc.Project.ID, v.ID, in.Language)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -434,9 +434,9 @@ func (h *Handler) PutLocalization(c *fiber.Ctx) error {
 
 // DeleteLocalization serves DELETE
 // /api/v1/templates/:id/localizations/:localizationId.
-func (h *Handler) DeleteLocalization(c *fiber.Ctx) error {
+func (h *Handler) DeleteLocalization(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.Template.GetLocalizationByID(c.UserContext(), rc.Project.ID, c.Params("localizationId"))
+	l, err := h.Runtime.Store.Template.GetLocalizationByID(c.Context(), rc.Project.ID, c.Params("localizationId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -445,7 +445,7 @@ func (h *Handler) DeleteLocalization(c *fiber.Ctx) error {
 		return response.NotFound(c, "localization not found")
 	}
 
-	if err := h.Runtime.Store.Template.DeleteLocalization(c.UserContext(), rc.Project.ID, l.ID); err != nil {
+	if err := h.Runtime.Store.Template.DeleteLocalization(c.Context(), rc.Project.ID, l.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -454,7 +454,7 @@ func (h *Handler) DeleteLocalization(c *fiber.Ctx) error {
 
 // Preview renders ad hoc content (nothing stored). Missing data keys
 // render as zero values so authors see partial output while editing.
-func (h *Handler) Preview(c *fiber.Ctx) error {
+func (h *Handler) Preview(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[previewInput](c)
 	if !ok {
 		return resp
@@ -473,9 +473,9 @@ func (h *Handler) Preview(c *fiber.Ctx) error {
 
 // PreviewVersion renders a stored version's localization, using the
 // version's sample data when the request carries none.
-func (h *Handler) PreviewVersion(c *fiber.Ctx) error {
+func (h *Handler) PreviewVersion(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -484,7 +484,7 @@ func (h *Handler) PreviewVersion(c *fiber.Ctx) error {
 		return response.NotFound(c, "template not found")
 	}
 
-	v, err := h.Runtime.Store.Template.GetVersion(c.UserContext(), rc.Project.ID, t.ID, c.Params("versionId"))
+	v, err := h.Runtime.Store.Template.GetVersion(c.Context(), rc.Project.ID, t.ID, c.Params("versionId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -498,7 +498,7 @@ func (h *Handler) PreviewVersion(c *fiber.Ctx) error {
 		return resp
 	}
 
-	loc, err := ResolveLocalization(c.UserContext(), h.Runtime.Store.Template, rc.Project.ID, t, v.ID, in.Language)
+	loc, err := ResolveLocalization(c.Context(), h.Runtime.Store.Template, rc.Project.ID, t, v.ID, in.Language)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -574,12 +574,12 @@ func ResolveLocalization(ctx context.Context, ts store.TemplateStore, projID str
 
 // versionCSS loads the stylesheet a version references, tolerating a
 // deleted stylesheet (renders unstyled rather than failing).
-func (h *Handler) versionCSS(c *fiber.Ctx, projID string, v *tmodel.Version) (string, error) {
+func (h *Handler) versionCSS(c fiber.Ctx, projID string, v *tmodel.Version) (string, error) {
 	if v.StylesheetID == nil {
 		return "", nil
 	}
 
-	sheet, err := h.Runtime.Store.Stylesheet.Get(c.UserContext(), projID, *v.StylesheetID)
+	sheet, err := h.Runtime.Store.Stylesheet.Get(c.Context(), projID, *v.StylesheetID)
 	if err != nil {
 		return "", err
 	}
@@ -606,8 +606,8 @@ func (h *Handler) versionCSS(c *fiber.Ctx, projID string, v *tmodel.Version) (st
 //
 // Same trap as verifySession, passkeySelf, enrolmentScope and
 // refuseCAOverAnAssignedName.
-func (h *Handler) checkStylesheet(c *fiber.Ctx, projID, id string) (bool, error) {
-	sheet, err := h.Runtime.Store.Stylesheet.Get(c.UserContext(), projID, id)
+func (h *Handler) checkStylesheet(c fiber.Ctx, projID, id string) (bool, error) {
+	sheet, err := h.Runtime.Store.Stylesheet.Get(c.Context(), projID, id)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}

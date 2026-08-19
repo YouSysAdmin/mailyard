@@ -12,7 +12,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -147,9 +147,9 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/unsubscribe-lists.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	lists, err := h.Runtime.Store.UnsubscribeList.List(c.UserContext(), rc.Project.ID)
+	lists, err := h.Runtime.Store.UnsubscribeList.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -161,7 +161,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	// The opt-out tally is the number an operator actually wants to
 	// see next to a list, and it lives in the suppressions table.
 	for _, l := range lists {
-		n, err := h.Runtime.Store.Suppression.CountForList(c.UserContext(), rc.Project.ID, l.ID)
+		n, err := h.Runtime.Store.Suppression.CountForList(c.Context(), rc.Project.ID, l.ID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -173,9 +173,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/unsubscribe-lists/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.UnsubscribeList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.UnsubscribeList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -184,7 +184,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 		return response.NotFound(c, "unsubscribe list not found")
 	}
 
-	n, err := h.Runtime.Store.Suppression.CountForList(c.UserContext(), rc.Project.ID, l.ID)
+	n, err := h.Runtime.Store.Suppression.CountForList(c.Context(), rc.Project.ID, l.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -195,14 +195,14 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/unsubscribe-lists.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
 	}
 
-	existing, err := h.Runtime.Store.UnsubscribeList.GetByName(c.UserContext(), rc.Project.ID, in.Name)
+	existing, err := h.Runtime.Store.UnsubscribeList.GetByName(c.Context(), rc.Project.ID, in.Name)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -219,7 +219,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		Description: in.Description,
 		Active:      true,
 	}
-	if err := h.Runtime.Store.UnsubscribeList.Put(c.UserContext(), l); err != nil {
+	if err := h.Runtime.Store.UnsubscribeList.Put(c.Context(), l); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -227,9 +227,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/unsubscribe-lists/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.UnsubscribeList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.UnsubscribeList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -244,7 +244,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	if in.Name != "" && in.Name != l.Name {
-		clash, err := h.Runtime.Store.UnsubscribeList.GetByName(c.UserContext(), rc.Project.ID, in.Name)
+		clash, err := h.Runtime.Store.UnsubscribeList.GetByName(c.Context(), rc.Project.ID, in.Name)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -269,7 +269,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	l.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.UnsubscribeList.Put(c.UserContext(), l); err != nil {
+	if err := h.Runtime.Store.UnsubscribeList.Put(c.Context(), l); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -280,9 +280,9 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 // alone deliberately: deleting a list must not silently resubscribe
 // everyone who asked to be left out of it, and a recreated list with
 // the same name gets a new id anyway.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.UnsubscribeList.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	l, err := h.Runtime.Store.UnsubscribeList.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -291,7 +291,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "unsubscribe list not found")
 	}
 
-	if err := h.Runtime.Store.UnsubscribeList.Delete(c.UserContext(), rc.Project.ID, l.ID); err != nil {
+	if err := h.Runtime.Store.UnsubscribeList.Delete(c.Context(), rc.Project.ID, l.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

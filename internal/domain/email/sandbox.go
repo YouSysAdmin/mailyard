@@ -5,7 +5,7 @@ package email
 import (
 	"encoding/base64"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
@@ -53,7 +53,7 @@ func sandboxIntent(rc *domain.RequestContext, in *sendInput) (want bool, refusal
 // raw view worth having - a developer sees an actual RFC 5322 message
 // with the headers we would have put on the wire, rather than a
 // pretty-printed copy of our internal struct.
-func (h *Handler) captureSandbox(c *fiber.Ctx, rc *domain.RequestContext, req *SendRequest, retentionDays int) (bool, error) {
+func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *SendRequest, retentionDays int) (bool, error) {
 	// Blob-backed attachments carry a storage key and no content, and
 	// only the delivery processor rehydrates them - which a capture
 	// never reaches. Without this, a template send with a configured
@@ -66,7 +66,7 @@ func (h *Handler) captureSandbox(c *fiber.Ctx, rc *domain.RequestContext, req *S
 			continue
 		}
 
-		raw, err := LoadAttachment(c.UserContext(), h.Runtime.Blob, a)
+		raw, err := LoadAttachment(c.Context(), h.Runtime.Blob, a)
 		if err != nil {
 			return true, response.Internal(c, err)
 		}
@@ -100,7 +100,7 @@ func (h *Handler) captureSandbox(c *fiber.Ctx, rc *domain.RequestContext, req *S
 		apiKeyID = rc.APIKey.ID
 	}
 
-	e, err := svc.Capture(c.UserContext(), &sandbox.Request{
+	e, err := svc.Capture(c.Context(), &sandbox.Request{
 		ProjectID:     rc.Project.ID,
 		Source:        sbmodel.SourceAPI,
 		APIKeyID:      apiKeyID,

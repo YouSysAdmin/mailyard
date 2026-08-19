@@ -26,7 +26,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
 	certmodel "github.com/yousysadmin/mailyard/internal/models/certificate"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -595,8 +595,8 @@ func TestABrowserCanOpenTheConsoleWithACMEOn(t *testing.T) {
 		t.Error("the listener does not advertise acme-tls/1, so tls-alpn-01 validation cannot happen")
 	}
 
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
-	app.Get("/", func(c *fiber.Ctx) error { return c.SendString("ok") })
+	app := fiber.New()
+	app.Get("/", func(c fiber.Ctx) error { return c.SendString("ok") })
 	ln, err := tls.Listen("tcp", "127.0.0.1:0", cfg)
 	if err != nil {
 		t.Fatalf("listen: %v", err)

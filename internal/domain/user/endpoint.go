@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -29,8 +29,8 @@ type Handler struct {
 
 // List returns every user, oldest first. Always an array ("users": []),
 // never null, so the SPA can .map() without a guard.
-func (h *Handler) List(c *fiber.Ctx) error {
-	users, err := h.Runtime.Store.User.List(c.UserContext())
+func (h *Handler) List(c fiber.Ctx) error {
+	users, err := h.Runtime.Store.User.List(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -43,8 +43,8 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get returns a single user by id.
-func (h *Handler) Get(c *fiber.Ctx) error {
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), c.Params("id"))
+func (h *Handler) Get(c fiber.Ctx) error {
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -58,13 +58,13 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 
 // Create adds a user. Duplicate emails are rejected with 409 so the
 // SPA can point at the field instead of showing a generic failure.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
 	}
 
-	existing, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+	existing, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -97,7 +97,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		u.PasswordHash = hash
 	}
 
-	if err := h.Runtime.Store.User.Put(c.UserContext(), u); err != nil {
+	if err := h.Runtime.Store.User.Put(c.Context(), u); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -107,13 +107,13 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 // Update patches a user. Self-edits are limited to email + password:
 // changing your own admin / disabled flags is refused so
 // an admin can't demote or lock out the account they're driving with.
-func (h *Handler) Update(c *fiber.Ctx) error {
+func (h *Handler) Update(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[updateInput](c)
 	if !ok {
 		return resp
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), c.Params("id"))
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -127,7 +127,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 
 	if in.Email != "" && in.Email != u.Email {
-		other, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+		other, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -170,7 +170,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	// remaining exposure here is narrow and known: an admin saving this
 	// form at the instant the account owner enrols a second factor writes
 	// the pre-enrolment totp columns back.
-	if err := h.Runtime.Store.User.Put(c.UserContext(), u); err != nil {
+	if err := h.Runtime.Store.User.Put(c.Context(), u); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -185,13 +185,13 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	// request) so the two controls behaved differently in the one
 	// situation where they are used together.
 	if in.Password != "" {
-		if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.UserContext(), u.ID); err != nil {
+		if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.Context(), u.ID); err != nil {
 			slog.Warn("users: revoking sessions after an admin password set failed",
 				"user_id", u.ID, "err", err)
 		}
 
 		h.Runtime.Sessions.InvalidateAll()
-		if err := h.Runtime.Store.PasswordReset.InvalidateForUser(c.UserContext(), u.ID, time.Now().UTC()); err != nil {
+		if err := h.Runtime.Store.PasswordReset.InvalidateForUser(c.Context(), u.ID, time.Now().UTC()); err != nil {
 			slog.Warn("users: invalidating reset tokens after an admin password set failed",
 				"user_id", u.ID, "err", err)
 		}
@@ -203,13 +203,13 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 // Delete removes a user by id. Deleting yourself is refused (lockout
 // guard) - deleting a missing id is a 404 so a double-click in the UI
 // surfaces as "already gone" rather than silent success.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	id := c.Params("id")
 	if isSelf(c, id) {
 		return response.Forbidden(c, "cannot delete your own account")
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), id)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -218,7 +218,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "user not found")
 	}
 
-	if err := h.Runtime.Store.User.Delete(c.UserContext(), id); err != nil {
+	if err := h.Runtime.Store.User.Delete(c.Context(), id); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -230,13 +230,13 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 // path (profile, 2FA disable) proves possession with a code, and this
 // endpoint deliberately does not - allowing it on yourself would turn
 // any hijacked admin session into a 2FA bypass for that admin.
-func (h *Handler) ResetTOTP(c *fiber.Ctx) error {
+func (h *Handler) ResetTOTP(c fiber.Ctx) error {
 	id := c.Params("id")
 	if isSelf(c, id) {
 		return response.Forbidden(c, "disable your own 2FA from your profile, with a code")
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), id)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -257,7 +257,7 @@ func (h *Handler) ResetTOTP(c *fiber.Ctx) error {
 	// written every other column from a read taken moments earlier -
 	// including `disabled`, which is exactly what an administrator may be
 	// setting at the same time on a compromised account.
-	if err := h.Runtime.Store.User.SetTOTP(c.UserContext(), u.ID, "", false); err != nil {
+	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, "", false); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -285,13 +285,13 @@ func (h *Handler) ResetTOTP(c *fiber.Ctx) error {
 // endpoint deliberately does not, so allowing it on yourself would let
 // a hijacked admin session strip the phishing-resistant factor off the
 // admin it hijacked.
-func (h *Handler) ResetPasskeys(c *fiber.Ctx) error {
+func (h *Handler) ResetPasskeys(c fiber.Ctx) error {
 	id := c.Params("id")
 	if isSelf(c, id) {
 		return response.Forbidden(c, "remove your own passkeys from your profile, with your password")
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), id)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -300,7 +300,7 @@ func (h *Handler) ResetPasskeys(c *fiber.Ctx) error {
 		return response.NotFound(c, "user not found")
 	}
 
-	n, err := h.Runtime.Store.Passkey.DeleteAllForUser(c.UserContext(), u.ID)
+	n, err := h.Runtime.Store.Passkey.DeleteAllForUser(c.Context(), u.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -328,9 +328,9 @@ func (h *Handler) ResetPasskeys(c *fiber.Ctx) error {
 // RevokeSessions kills every session the user holds. Allowed on
 // yourself - it is explicit, and signing yourself out everywhere is a
 // legitimate thing to want.
-func (h *Handler) RevokeSessions(c *fiber.Ctx) error {
+func (h *Handler) RevokeSessions(c fiber.Ctx) error {
 	id := c.Params("id")
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), id)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -339,7 +339,7 @@ func (h *Handler) RevokeSessions(c *fiber.Ctx) error {
 		return response.NotFound(c, "user not found")
 	}
 
-	n, err := h.Runtime.Store.Session.RevokeAllForUser(c.UserContext(), id)
+	n, err := h.Runtime.Store.Session.RevokeAllForUser(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -366,9 +366,9 @@ func (h *Handler) RevokeSessions(c *fiber.Ctx) error {
 
 // Projects lists every project the user is a member of, so an
 // admin can see what an account touches before disabling or deleting it.
-func (h *Handler) Projects(c *fiber.Ctx) error {
+func (h *Handler) Projects(c fiber.Ctx) error {
 	id := c.Params("id")
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), id)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -377,7 +377,7 @@ func (h *Handler) Projects(c *fiber.Ctx) error {
 		return response.NotFound(c, "user not found")
 	}
 
-	proj, err := h.Runtime.Store.Project.ListForUser(c.UserContext(), id)
+	proj, err := h.Runtime.Store.Project.ListForUser(c.Context(), id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -392,7 +392,7 @@ func (h *Handler) Projects(c *fiber.Ctx) error {
 // isSelf reports whether id is the authenticated caller. False when
 // there's no resolved user (auth disabled) - with no session there's
 // no account to lock out.
-func isSelf(c *fiber.Ctx, id string) bool {
+func isSelf(c fiber.Ctx, id string) bool {
 	rc := domain.GetRequestContext(c)
 
 	return rc != nil && rc.User != nil && rc.User.ID == id

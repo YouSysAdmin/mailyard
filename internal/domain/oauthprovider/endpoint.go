@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -53,8 +53,8 @@ func view(rt *env.Runtime, p *opmodel.Provider) ProviderView {
 }
 
 // List serves GET /api/v1/admin/oauth-providers.
-func (h *Handler) List(c *fiber.Ctx) error {
-	ps, err := h.Runtime.Store.OAuthProvider.List(c.UserContext())
+func (h *Handler) List(c fiber.Ctx) error {
+	ps, err := h.Runtime.Store.OAuthProvider.List(c.Context())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -68,8 +68,8 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/admin/oauth-providers/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
-	p, err := h.Runtime.Store.OAuthProvider.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Get(c fiber.Ctx) error {
+	p, err := h.Runtime.Store.OAuthProvider.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -82,7 +82,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/admin/oauth-providers.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[upsertInput](c)
 	if !ok {
 		return resp
@@ -107,7 +107,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		return resp
 	}
 
-	if err := h.Runtime.Store.OAuthProvider.Put(c.UserContext(), p); err != nil {
+	if err := h.Runtime.Store.OAuthProvider.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -115,8 +115,8 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/admin/oauth-providers/:id.
-func (h *Handler) Update(c *fiber.Ctx) error {
-	p, err := h.Runtime.Store.OAuthProvider.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Update(c fiber.Ctx) error {
+	p, err := h.Runtime.Store.OAuthProvider.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -134,7 +134,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 		return resp
 	}
 
-	if err := h.Runtime.Store.OAuthProvider.Put(c.UserContext(), p); err != nil {
+	if err := h.Runtime.Store.OAuthProvider.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -148,8 +148,8 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/admin/oauth-providers/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
-	p, err := h.Runtime.Store.OAuthProvider.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Delete(c fiber.Ctx) error {
+	p, err := h.Runtime.Store.OAuthProvider.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -158,7 +158,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "oauth provider not found")
 	}
 
-	if err := h.Runtime.Store.OAuthProvider.Delete(c.UserContext(), p.ID); err != nil {
+	if err := h.Runtime.Store.OAuthProvider.Delete(c.Context(), p.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -170,8 +170,8 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 // Test runs discovery against the stored configuration and reports
 // what came back, so an operator can find a bad issuer or a typo'd
 // client id before handing the login page to users.
-func (h *Handler) Test(c *fiber.Ctx) error {
-	p, err := h.Runtime.Store.OAuthProvider.Get(c.UserContext(), c.Params("id"))
+func (h *Handler) Test(c fiber.Ctx) error {
+	p, err := h.Runtime.Store.OAuthProvider.Get(c.Context(), c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -180,7 +180,7 @@ func (h *Handler) Test(c *fiber.Ctx) error {
 		return response.NotFound(c, "oauth provider not found")
 	}
 
-	res := h.Runtime.OAuth.Test(c.UserContext(), p)
+	res := h.Runtime.OAuth.Test(c.Context(), p)
 
 	return response.Success(c, TestResponse{Test: res})
 }
@@ -191,7 +191,7 @@ func (h *Handler) Test(c *fiber.Ctx) error {
 // package: the response.* helpers write the status and return nil, so
 // a single error return would make a rejected request indistinguishable
 // from an accepted one and the caller would save it anyway.
-func (h *Handler) apply(c *fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool, error) {
+func (h *Handler) apply(c fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool, error) {
 	p.Name = in.Name
 
 	p.Type = strings.ToLower(in.Type)
@@ -211,7 +211,7 @@ func (h *Handler) apply(c *fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool
 		return false, response.BadRequest(c, "slug is empty after normalization, use letters or digits")
 	}
 
-	taken, err := h.Runtime.Store.OAuthProvider.SlugTaken(c.UserContext(), slug, p.ID)
+	taken, err := h.Runtime.Store.OAuthProvider.SlugTaken(c.Context(), slug, p.ID)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}

@@ -3,7 +3,7 @@
 package contact
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -26,18 +26,18 @@ const (
 )
 
 // List serves GET /api/v1/contacts.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	search := paging.Search(c, "search")
 	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
 	limit, offset := pg.Limit, pg.Offset
 
-	contacts, err := h.Runtime.Store.Contact.List(c.UserContext(), rc.Project.ID, search, limit, offset)
+	contacts, err := h.Runtime.Store.Contact.List(c.Context(), rc.Project.ID, search, limit, offset)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	total, err := h.Runtime.Store.Contact.Count(c.UserContext(), rc.Project.ID, search)
+	total, err := h.Runtime.Store.Contact.Count(c.Context(), rc.Project.ID, search)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -59,9 +59,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/contacts/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ct, err := h.Runtime.Store.Contact.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	ct, err := h.Runtime.Store.Contact.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -84,7 +84,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 //
 // One batched call rather than a lookup per row - a page of 200
 // contacts should not be 200 queries.
-func (h *Handler) markSuppressed(c *fiber.Ctx, projID string, contacts []*cmodel.Contact) error {
+func (h *Handler) markSuppressed(c fiber.Ctx, projID string, contacts []*cmodel.Contact) error {
 	if len(contacts) == 0 {
 		return nil
 	}
@@ -94,7 +94,7 @@ func (h *Handler) markSuppressed(c *fiber.Ctx, projID string, contacts []*cmodel
 		emails = append(emails, ct.Email)
 	}
 
-	_, blocked, err := h.Runtime.Store.Suppression.FilterSuppressed(c.UserContext(), projID, emails)
+	_, blocked, err := h.Runtime.Store.Suppression.FilterSuppressed(c.Context(), projID, emails)
 	if err != nil {
 		return err
 	}

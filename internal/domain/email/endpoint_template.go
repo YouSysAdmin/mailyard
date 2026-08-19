@@ -3,7 +3,7 @@
 package email
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -11,7 +11,7 @@ import (
 )
 
 // SendTemplate renders a stored template and queues the result.
-func (h *Handler) SendTemplate(c *fiber.Ctx) error {
+func (h *Handler) SendTemplate(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[templateSendInput](c)
 	if !ok {
@@ -42,7 +42,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 	if want, refusal := sandboxIntent(rc, base); refusal != "" {
 		return response.BadRequest(c, refusal)
 	} else if want {
-		out, t, rerr := svc.RenderTemplate(c.UserContext(), rc.Project.ID, ref)
+		out, t, rerr := svc.RenderTemplate(c.Context(), rc.Project.ID, ref)
 		if rerr != nil {
 			return sendFailure(c, rerr)
 		}
@@ -63,7 +63,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 		}
 
 		req.Subject, req.HTML, req.Text, req.TemplateName = out.Subject, out.HTML, out.Text, t.Name
-		if aerr := svc.AttachTemplateFiles(c.UserContext(), rc.Project.ID, t.ID, req); aerr != nil {
+		if aerr := svc.AttachTemplateFiles(c.Context(), rc.Project.ID, t.ID, req); aerr != nil {
 			return response.Internal(c, aerr)
 		}
 
@@ -72,7 +72,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 		return cerr
 	}
 
-	if req.Route, err = svc.ResolveRoute(c.UserContext(), rc.Project.ID, in.SMTPServerID, in.SMTPGroup); err != nil {
+	if req.Route, err = svc.ResolveRoute(c.Context(), rc.Project.ID, in.SMTPServerID, in.SMTPGroup); err != nil {
 		return sendFailure(c, err)
 	}
 
@@ -81,7 +81,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 	}
 
 	if in.DryRun {
-		out, t, err := svc.RenderTemplate(c.UserContext(), rc.Project.ID, ref)
+		out, t, err := svc.RenderTemplate(c.Context(), rc.Project.ID, ref)
 		if err != nil {
 			return sendFailure(c, err)
 		}
@@ -93,7 +93,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 		req.Subject = out.Subject
 		req.HTML = out.HTML
 		req.Text = out.Text
-		if err := svc.Validate(c.UserContext(), rc.Project.ID, req); err != nil {
+		if err := svc.Validate(c.Context(), rc.Project.ID, req); err != nil {
 			return sendFailure(c, err)
 		}
 
@@ -102,7 +102,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 		})
 	}
 
-	e, blocked, err := svc.SendWithTemplate(c.UserContext(), rc.Project.ID, callerID(rc), apiKeyID(rc), ref, req)
+	e, blocked, err := svc.SendWithTemplate(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), ref, req)
 	if err != nil {
 		return sendFailure(c, err)
 	}
@@ -112,7 +112,7 @@ func (h *Handler) SendTemplate(c *fiber.Ctx) error {
 
 // Batch queues up to 100 sends in one call and reports per-item
 // outcomes (207-style in a 200 body).
-func (h *Handler) Batch(c *fiber.Ctx) error {
+func (h *Handler) Batch(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[batchInput](c)
 	if !ok {
@@ -147,7 +147,7 @@ func (h *Handler) Batch(c *fiber.Ctx) error {
 	}
 
 	svc := NewService(h.Runtime)
-	results := svc.SendBatch(c.UserContext(), rc.Project.ID, callerID(rc), apiKeyID(rc), in.From, ref, items)
+	results := svc.SendBatch(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), in.From, ref, items)
 	accepted := 0
 	for _, r := range results {
 		if r.Error == "" {
@@ -161,7 +161,7 @@ func (h *Handler) Batch(c *fiber.Ctx) error {
 }
 
 // RenderPreview renders a template send without queueing anything.
-func (h *Handler) RenderPreview(c *fiber.Ctx) error {
+func (h *Handler) RenderPreview(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[renderPreviewInput](c)
 	if !ok {
@@ -169,7 +169,7 @@ func (h *Handler) RenderPreview(c *fiber.Ctx) error {
 	}
 
 	svc := NewService(h.Runtime)
-	out, t, err := svc.RenderTemplate(c.UserContext(), rc.Project.ID,
+	out, t, err := svc.RenderTemplate(c.Context(), rc.Project.ID,
 		&TemplateRef{ID: in.TemplateID, Name: in.TemplateName, Language: in.Language, Data: in.Data})
 	if err != nil {
 		return sendFailure(c, err)
@@ -183,7 +183,7 @@ func (h *Handler) RenderPreview(c *fiber.Ctx) error {
 // SendTest sends a template to a handful of addresses for a live
 // check from the editor. Registered on the templates route group
 // (POST /api/templates/:id/send-test).
-func (h *Handler) SendTest(c *fiber.Ctx) error {
+func (h *Handler) SendTest(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[testSendInput](c)
 	if !ok {
@@ -192,7 +192,7 @@ func (h *Handler) SendTest(c *fiber.Ctx) error {
 
 	svc := NewService(h.Runtime)
 	ref := &TemplateRef{ID: c.Params("id"), Language: in.Language, Data: in.Data}
-	e, blocked, err := svc.SendWithTemplate(c.UserContext(), rc.Project.ID, callerID(rc), apiKeyID(rc),
+	e, blocked, err := svc.SendWithTemplate(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc),
 		ref, &SendRequest{From: in.From, To: in.To})
 	if err != nil {
 		return sendFailure(c, err)

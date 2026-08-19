@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
@@ -18,9 +18,9 @@ import (
 )
 
 // ListAttachments serves GET /api/v1/templates/:id/attachments.
-func (h *Handler) ListAttachments(c *fiber.Ctx) error {
+func (h *Handler) ListAttachments(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -29,7 +29,7 @@ func (h *Handler) ListAttachments(c *fiber.Ctx) error {
 		return response.NotFound(c, "template not found")
 	}
 
-	atts, err := h.Runtime.Store.Template.ListAttachments(c.UserContext(), rc.Project.ID, t.ID)
+	atts, err := h.Runtime.Store.Template.ListAttachments(c.Context(), rc.Project.ID, t.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -42,9 +42,9 @@ func (h *Handler) ListAttachments(c *fiber.Ctx) error {
 }
 
 // UploadAttachment serves POST /api/v1/templates/:id/attachments.
-func (h *Handler) UploadAttachment(c *fiber.Ctx) error {
+func (h *Handler) UploadAttachment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -78,7 +78,7 @@ func (h *Handler) UploadAttachment(c *fiber.Ctx) error {
 	}
 	if h.Runtime.Blob != nil {
 		key := fmt.Sprintf("templates/%s/%s_%s", t.ID, a.ID, blob.SanitizeFilename(in.Filename))
-		if err := h.Runtime.Blob.Put(c.UserContext(), key, bytes.NewReader(raw), in.ContentType); err != nil {
+		if err := h.Runtime.Blob.Put(c.Context(), key, bytes.NewReader(raw), in.ContentType); err != nil {
 			return response.Internal(c, err)
 		}
 
@@ -87,9 +87,9 @@ func (h *Handler) UploadAttachment(c *fiber.Ctx) error {
 		a.Content = in.Content
 	}
 
-	if err := h.Runtime.Store.Template.PutAttachment(c.UserContext(), a); err != nil {
+	if err := h.Runtime.Store.Template.PutAttachment(c.Context(), a); err != nil {
 		if a.StorageKey != "" {
-			_ = h.Runtime.Blob.Delete(c.UserContext(), a.StorageKey)
+			_ = h.Runtime.Blob.Delete(c.Context(), a.StorageKey)
 		}
 
 		return response.Internal(c, err)
@@ -100,9 +100,9 @@ func (h *Handler) UploadAttachment(c *fiber.Ctx) error {
 
 // DownloadAttachment streams the bytes from the blob store or the
 // inline column.
-func (h *Handler) DownloadAttachment(c *fiber.Ctx) error {
+func (h *Handler) DownloadAttachment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	a, err := h.Runtime.Store.Template.GetAttachment(c.UserContext(), rc.Project.ID,
+	a, err := h.Runtime.Store.Template.GetAttachment(c.Context(), rc.Project.ID,
 		c.Params("id"), c.Params("attId"))
 	if err != nil {
 		return response.Internal(c, err)
@@ -112,7 +112,7 @@ func (h *Handler) DownloadAttachment(c *fiber.Ctx) error {
 		return response.NotFound(c, "attachment not found")
 	}
 
-	raw, err := blob.Load(c.UserContext(), h.Runtime.Blob, a.StorageKey, a.Content, a.Filename)
+	raw, err := blob.Load(c.Context(), h.Runtime.Blob, a.StorageKey, a.Content, a.Filename)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -122,9 +122,9 @@ func (h *Handler) DownloadAttachment(c *fiber.Ctx) error {
 
 // DeleteAttachment serves DELETE
 // /api/v1/templates/:id/attachments/:attId.
-func (h *Handler) DeleteAttachment(c *fiber.Ctx) error {
+func (h *Handler) DeleteAttachment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	a, err := h.Runtime.Store.Template.GetAttachment(c.UserContext(), rc.Project.ID,
+	a, err := h.Runtime.Store.Template.GetAttachment(c.Context(), rc.Project.ID,
 		c.Params("id"), c.Params("attId"))
 	if err != nil {
 		return response.Internal(c, err)
@@ -134,7 +134,7 @@ func (h *Handler) DeleteAttachment(c *fiber.Ctx) error {
 		return response.NotFound(c, "attachment not found")
 	}
 
-	if err := h.Runtime.Store.Template.DeleteAttachment(c.UserContext(), rc.Project.ID,
+	if err := h.Runtime.Store.Template.DeleteAttachment(c.Context(), rc.Project.ID,
 		a.TemplateID, a.ID); err != nil {
 		return response.Internal(c, err)
 	}
@@ -143,7 +143,7 @@ func (h *Handler) DeleteAttachment(c *fiber.Ctx) error {
 	// same key, so their attachment downloads stop working - the
 	// delivered mail itself already carried the bytes.
 	if a.StorageKey != "" && h.Runtime.Blob != nil {
-		if derr := h.Runtime.Blob.Delete(c.UserContext(), a.StorageKey); derr != nil {
+		if derr := h.Runtime.Blob.Delete(c.Context(), a.StorageKey); derr != nil {
 			h.Runtime.Log.Warn("template: blob cleanup failed", "key", a.StorageKey, "err", derr)
 		}
 	}

@@ -3,7 +3,8 @@
 package sandbox
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
+	"strconv"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
@@ -30,15 +31,15 @@ type Handler struct {
 // Bundled rather than left to a second endpoint because "where did my
 // message go" is the first question this page has to answer, and the
 // answer is usually one of those two numbers.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	p := paging.From(c)
-	msgs, err := h.Runtime.Store.Sandbox.List(c.UserContext(), rc.Project.ID, p.Limit, p.Offset)
+	msgs, err := h.Runtime.Store.Sandbox.List(c.Context(), rc.Project.ID, p.Limit, p.Offset)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	total, err := h.Runtime.Store.Sandbox.Count(c.UserContext(), rc.Project.ID)
+	total, err := h.Runtime.Store.Sandbox.Count(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -54,9 +55,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/sandbox/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Sandbox.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Sandbox.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -74,9 +75,9 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 // into the message that produced it, and the questions a developer
 // brings here - is my custom header actually set, why is this
 // multipart wrong - are only answerable from the bytes.
-func (h *Handler) Raw(c *fiber.Ctx) error {
+func (h *Handler) Raw(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	raw, err := h.Runtime.Store.Sandbox.Raw(c.UserContext(), rc.Project.ID, c.Params("id"))
+	raw, err := h.Runtime.Store.Sandbox.Raw(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -98,9 +99,9 @@ func (h *Handler) Raw(c *fiber.Ctx) error {
 // because the bytes are stored once. That costs a parse per download
 // and buys a table with nothing to keep in sync and no blob store to
 // leave orphans in when a message is trimmed away.
-func (h *Handler) Attachment(c *fiber.Ctx) error {
+func (h *Handler) Attachment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	raw, err := h.Runtime.Store.Sandbox.Raw(c.UserContext(), rc.Project.ID, c.Params("id"))
+	raw, err := h.Runtime.Store.Sandbox.Raw(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -114,7 +115,7 @@ func (h *Handler) Attachment(c *fiber.Ctx) error {
 		return response.BadRequest(c, "this message could not be parsed, download the raw source instead")
 	}
 
-	idx, err := c.ParamsInt("idx")
+	idx, err := strconv.Atoi(c.Params("idx"))
 	if err != nil || idx < 0 || idx >= len(parsed.Attachments) {
 		return response.NotFound(c, "attachment not found")
 	}
@@ -138,9 +139,9 @@ func (h *Handler) Attachment(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/sandbox/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	if err := h.Runtime.Store.Sandbox.Delete(c.UserContext(), rc.Project.ID, c.Params("id")); err != nil {
+	if err := h.Runtime.Store.Sandbox.Delete(c.Context(), rc.Project.ID, c.Params("id")); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -153,9 +154,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 // the product. Nothing here was ever delivered and nothing depends on
 // it, so the person testing against it is the right person to decide
 // when the noise stops being useful.
-func (h *Handler) Clear(c *fiber.Ctx) error {
+func (h *Handler) Clear(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	n, err := h.Runtime.Store.Sandbox.Clear(c.UserContext(), rc.Project.ID)
+	n, err := h.Runtime.Store.Sandbox.Clear(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -168,7 +169,7 @@ func (h *Handler) Clear(c *fiber.Ctx) error {
 // The role matters to the console: a developer has to be shown a
 // single page rather than a navigation full of links that will all
 // answer 403.
-func (h *Handler) Info(c *fiber.Ctx) error {
+func (h *Handler) Info(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	cfg := h.Runtime.Config.Submission
 	host := cfg.Hostname
@@ -217,14 +218,14 @@ func sandboxOnly(rc *domain.RequestContext) bool {
 // chooses its window under the plan's ceiling, so reporting the
 // installation's values would give a developer a number their own
 // captures do not obey.
-func (h *Handler) retentionFor(c *fiber.Ctx, projID string) int {
+func (h *Handler) retentionFor(c fiber.Ctx, projID string) int {
 	days := h.Runtime.Settings.Int(smodel.KeySandboxRetentionDays)
-	if w, err := h.Runtime.Store.Project.Get(c.UserContext(), projID); err == nil && w != nil &&
+	if w, err := h.Runtime.Store.Project.Get(c.Context(), projID); err == nil && w != nil &&
 		w.SandboxRetentionDays > 0 {
 		days = w.SandboxRetentionDays
 	}
 
-	if _, ceiling, err := quota.Sandbox(c.UserContext(), h.Runtime.Store, projID); err == nil &&
+	if _, ceiling, err := quota.Sandbox(c.Context(), h.Runtime.Store, projID); err == nil &&
 		ceiling > 0 && (days <= 0 || days > ceiling) {
 		days = ceiling
 	}
@@ -232,8 +233,8 @@ func (h *Handler) retentionFor(c *fiber.Ctx, projID string) int {
 	return days
 }
 
-func (h *Handler) maxMessagesFor(c *fiber.Ctx, projID string) int {
-	if msgs, _, err := quota.Sandbox(c.UserContext(), h.Runtime.Store, projID); err == nil && msgs > 0 {
+func (h *Handler) maxMessagesFor(c fiber.Ctx, projID string) int {
+	if msgs, _, err := quota.Sandbox(c.Context(), h.Runtime.Store, projID); err == nil && msgs > 0 {
 		return msgs
 	}
 

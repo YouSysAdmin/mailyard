@@ -8,7 +8,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // searchOf runs Search over a query string the way a request would.
@@ -17,7 +17,7 @@ func searchOf(t *testing.T, raw string) string {
 
 	app := fiber.New()
 	var got string
-	app.Get("/", func(c *fiber.Ctx) error {
+	app.Get("/", func(c fiber.Ctx) error {
 		got = Search(c, "q")
 
 		return nil

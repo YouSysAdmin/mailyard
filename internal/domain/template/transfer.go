@@ -3,7 +3,7 @@
 package template
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -18,9 +18,9 @@ import (
 const transferFormat = "mailyard-template-v1"
 
 // Export returns the template as a portable JSON document.
-func (h *Handler) Export(c *fiber.Ctx) error {
+func (h *Handler) Export(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	t, err := h.Runtime.Store.Template.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -29,7 +29,7 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 		return response.NotFound(c, "template not found")
 	}
 
-	versions, err := h.Runtime.Store.Template.ListVersions(c.UserContext(), rc.Project.ID, t.ID)
+	versions, err := h.Runtime.Store.Template.ListVersions(c.Context(), rc.Project.ID, t.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -50,7 +50,7 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 			SampleData: v.SampleData,
 		}
 		if v.StylesheetID != nil {
-			sheet, err := h.Runtime.Store.Stylesheet.Get(c.UserContext(), rc.Project.ID, *v.StylesheetID)
+			sheet, err := h.Runtime.Store.Stylesheet.Get(c.Context(), rc.Project.ID, *v.StylesheetID)
 			if err != nil {
 				return response.Internal(c, err)
 			}
@@ -60,7 +60,7 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 			}
 		}
 
-		locs, err := h.Runtime.Store.Template.ListLocalizations(c.UserContext(), rc.Project.ID, v.ID)
+		locs, err := h.Runtime.Store.Template.ListLocalizations(c.Context(), rc.Project.ID, v.ID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -81,7 +81,7 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 // must not collide - rename in the document to import a copy.
 // Stylesheets are re-created (new ids) so the import never mutates
 // existing sheets.
-func (h *Handler) Import(c *fiber.Ctx) error {
+func (h *Handler) Import(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	doc, resp, ok := validation.Bind[transferDoc](c)
 	if !ok {
@@ -92,7 +92,7 @@ func (h *Handler) Import(c *fiber.Ctx) error {
 		return response.BadRequest(c, "unsupported export format, want "+transferFormat)
 	}
 
-	existing, err := h.Runtime.Store.Template.GetByName(c.UserContext(), rc.Project.ID, doc.Template.Name)
+	existing, err := h.Runtime.Store.Template.GetByName(c.Context(), rc.Project.ID, doc.Template.Name)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -114,7 +114,7 @@ func (h *Handler) Import(c *fiber.Ctx) error {
 		t.DefaultLanguage = "en"
 	}
 
-	if err := h.Runtime.Store.Template.Put(c.UserContext(), t); err != nil {
+	if err := h.Runtime.Store.Template.Put(c.Context(), t); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -133,14 +133,14 @@ func (h *Handler) Import(c *fiber.Ctx) error {
 				Name:      tv.Stylesheet.Name,
 				CSS:       tv.Stylesheet.CSS,
 			}
-			if err := h.Runtime.Store.Stylesheet.Put(c.UserContext(), sheet); err != nil {
+			if err := h.Runtime.Store.Stylesheet.Put(c.Context(), sheet); err != nil {
 				return response.Internal(c, err)
 			}
 
 			v.StylesheetID = new(sheet.ID)
 		}
 
-		if err := h.Runtime.Store.Template.PutVersion(c.UserContext(), rc.Project.ID, v); err != nil {
+		if err := h.Runtime.Store.Template.PutVersion(c.Context(), rc.Project.ID, v); err != nil {
 			return putError(c, err)
 		}
 
@@ -153,7 +153,7 @@ func (h *Handler) Import(c *fiber.Ctx) error {
 				HTML:      tl.HTML,
 				Text:      tl.Text,
 			}
-			if err := h.Runtime.Store.Template.PutLocalization(c.UserContext(), rc.Project.ID, l); err != nil {
+			if err := h.Runtime.Store.Template.PutLocalization(c.Context(), rc.Project.ID, l); err != nil {
 				return putError(c, err)
 			}
 		}
@@ -164,7 +164,7 @@ func (h *Handler) Import(c *fiber.Ctx) error {
 	}
 
 	if activeID != "" {
-		if err := h.Runtime.Store.Template.SetActiveVersion(c.UserContext(), rc.Project.ID, t.ID, activeID); err != nil {
+		if err := h.Runtime.Store.Template.SetActiveVersion(c.Context(), rc.Project.ID, t.ID, activeID); err != nil {
 			return response.Internal(c, err)
 		}
 

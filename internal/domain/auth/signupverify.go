@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -60,7 +60,7 @@ func (h *Handler) sendVerificationMail(ctx context.Context, u *usermodel.User, c
 // VerifyEmailConfirm redeems a verification token, marks the account
 // verified, and signs it in - clicking the link proves the mailbox,
 // which is a stronger claim than the password typed minutes earlier.
-func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
+func (h *Handler) VerifyEmailConfirm(c fiber.Ctx) error {
 	if !h.Runtime.Config.Auth.Local.Enabled {
 		return response.BadRequest(c, "local login is disabled")
 	}
@@ -70,7 +70,7 @@ func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
 		return resp
 	}
 
-	tok, err := h.Runtime.Store.SignupVerify.GetByHash(c.UserContext(), svmodel.Hash(in.Token))
+	tok, err := h.Runtime.Store.SignupVerify.GetByHash(c.Context(), svmodel.Hash(in.Token))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -85,7 +85,7 @@ func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
 		return response.BadRequest(c, "this verification link is invalid or has expired, request a new one from the sign-in page")
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), tok.UserID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), tok.UserID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -97,7 +97,7 @@ func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
 	// Burn the token before changing anything - the conditional UPDATE
 	// is what makes the link single use, and it only counts if the
 	// loser of a race stops here.
-	claimed, err := h.Runtime.Store.SignupVerify.MarkUsed(c.UserContext(), tok.ID, now)
+	claimed, err := h.Runtime.Store.SignupVerify.MarkUsed(c.Context(), tok.ID, now)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -108,14 +108,14 @@ func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
 		return response.BadRequest(c, "this verification link is invalid or has expired, request a new one from the sign-in page")
 	}
 
-	if err := h.Runtime.Store.User.MarkEmailVerified(c.UserContext(), u.ID); err != nil {
+	if err := h.Runtime.Store.User.MarkEmailVerified(c.Context(), u.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
 	u.EmailVerified = true
 
 	// Any other link mailed earlier dies with this one.
-	if err := h.Runtime.Store.SignupVerify.InvalidateForUser(c.UserContext(), u.ID, now); err != nil {
+	if err := h.Runtime.Store.SignupVerify.InvalidateForUser(c.Context(), u.ID, now); err != nil {
 		slog.Warn("auth: invalidating sibling verification tokens failed", "user_id", u.ID, "err", err)
 	}
 
@@ -131,7 +131,7 @@ func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	if err := h.Runtime.Store.User.TouchLastLogin(c.UserContext(), u.Email); err != nil {
+	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
 		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
 	}
 
@@ -143,7 +143,7 @@ func (h *Handler) VerifyEmailConfirm(c *fiber.Ctx) error {
 // The response is identical whether the address is unknown, disabled,
 // or already verified - an unauthenticated endpoint that
 // distinguishes them is an account enumeration oracle.
-func (h *Handler) VerifyEmailResend(c *fiber.Ctx) error {
+func (h *Handler) VerifyEmailResend(c fiber.Ctx) error {
 	if !h.Runtime.Config.Auth.Local.Enabled {
 		return response.BadRequest(c, "local login is disabled")
 	}
@@ -164,7 +164,7 @@ func (h *Handler) VerifyEmailResend(c *fiber.Ctx) error {
 		})
 	}
 
-	u, err := h.Runtime.Store.User.Get(c.UserContext(), in.Email)
+	u, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -176,7 +176,7 @@ func (h *Handler) VerifyEmailResend(c *fiber.Ctx) error {
 	}
 
 	now := time.Now().UTC()
-	recent, err := h.Runtime.Store.SignupVerify.CountRecentForUser(c.UserContext(), u.ID, now.Add(-time.Hour))
+	recent, err := h.Runtime.Store.SignupVerify.CountRecentForUser(c.Context(), u.ID, now.Add(-time.Hour))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -187,7 +187,7 @@ func (h *Handler) VerifyEmailResend(c *fiber.Ctx) error {
 		return accepted()
 	}
 
-	if err := h.sendVerificationMail(c.UserContext(), u, c.IP()); err != nil {
+	if err := h.sendVerificationMail(c.Context(), u, c.IP()); err != nil {
 		return response.Internal(c, err)
 	}
 

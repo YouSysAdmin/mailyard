@@ -5,7 +5,7 @@ package smtpserver
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -28,19 +28,19 @@ type GroupHandler struct {
 // project created since migration 00003 gets its default group, and
 // answering with an empty list would show a console that offers no
 // group to put a server in.
-func (h *GroupHandler) List(c *fiber.Ctx) error {
+func (h *GroupHandler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	if _, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.UserContext(), rc.Project.ID); err != nil {
+	if _, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.Context(), rc.Project.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
-	groups, err := h.Runtime.Store.SMTPGroup.List(c.UserContext(), rc.Project.ID)
+	groups, err := h.Runtime.Store.SMTPGroup.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
 	for _, g := range groups {
-		servers, err := h.Runtime.Store.SMTPServer.ListInGroup(c.UserContext(), rc.Project.ID, g.ID)
+		servers, err := h.Runtime.Store.SMTPServer.ListInGroup(c.Context(), rc.Project.ID, g.ID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -56,9 +56,9 @@ func (h *GroupHandler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/smtp-server-groups/:id.
-func (h *GroupHandler) Get(c *fiber.Ctx) error {
+func (h *GroupHandler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	g, err := h.Runtime.Store.SMTPGroup.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	g, err := h.Runtime.Store.SMTPGroup.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -67,7 +67,7 @@ func (h *GroupHandler) Get(c *fiber.Ctx) error {
 		return response.NotFound(c, "smtp server group not found")
 	}
 
-	g.Servers, err = h.Runtime.Store.SMTPServer.ListInGroup(c.UserContext(), rc.Project.ID, g.ID)
+	g.Servers, err = h.Runtime.Store.SMTPServer.ListInGroup(c.Context(), rc.Project.ID, g.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -76,7 +76,7 @@ func (h *GroupHandler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/smtp-server-groups.
-func (h *GroupHandler) Create(c *fiber.Ctx) error {
+func (h *GroupHandler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[groupCreateInput](c)
 	if !ok {
@@ -91,7 +91,7 @@ func (h *GroupHandler) Create(c *fiber.Ctx) error {
 		return response.BadRequest(c, "name must contain at least one letter or digit")
 	}
 
-	taken, err := h.Runtime.Store.SMTPGroup.SlugTaken(c.UserContext(), rc.Project.ID, slug, "")
+	taken, err := h.Runtime.Store.SMTPGroup.SlugTaken(c.Context(), rc.Project.ID, slug, "")
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -103,7 +103,7 @@ func (h *GroupHandler) Create(c *fiber.Ctx) error {
 	// Make sure the project has a default before adding a second
 	// group, so send that names none always resolves. The new group
 	// is never the default - promoting is an explicit PATCH.
-	if _, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.UserContext(), rc.Project.ID); err != nil {
+	if _, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.Context(), rc.Project.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -114,7 +114,7 @@ func (h *GroupHandler) Create(c *fiber.Ctx) error {
 		Slug:        slug,
 		Description: in.Description,
 	}
-	if err := h.Runtime.Store.SMTPGroup.Put(c.UserContext(), g); err != nil {
+	if err := h.Runtime.Store.SMTPGroup.Put(c.Context(), g); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -122,9 +122,9 @@ func (h *GroupHandler) Create(c *fiber.Ctx) error {
 }
 
 // Update serves PATCH /api/v1/smtp-server-groups/:id.
-func (h *GroupHandler) Update(c *fiber.Ctx) error {
+func (h *GroupHandler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	g, err := h.Runtime.Store.SMTPGroup.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	g, err := h.Runtime.Store.SMTPGroup.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -147,7 +147,7 @@ func (h *GroupHandler) Update(c *fiber.Ctx) error {
 	}
 
 	if in.Slug != "" && in.Slug != g.Slug {
-		taken, err := h.Runtime.Store.SMTPGroup.SlugTaken(c.UserContext(), rc.Project.ID, in.Slug, g.ID)
+		taken, err := h.Runtime.Store.SMTPGroup.SlugTaken(c.Context(), rc.Project.ID, in.Slug, g.ID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -159,7 +159,7 @@ func (h *GroupHandler) Update(c *fiber.Ctx) error {
 		g.Slug = in.Slug
 	}
 
-	if err := h.Runtime.Store.SMTPGroup.Put(c.UserContext(), g); err != nil {
+	if err := h.Runtime.Store.SMTPGroup.Put(c.Context(), g); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -173,7 +173,7 @@ func (h *GroupHandler) Update(c *fiber.Ctx) error {
 	// rather than pretending nothing happened, and Put no longer carries
 	// is_default at all.
 	if in.MakeDefault && !g.Default {
-		promoted, err := h.Runtime.Store.SMTPGroup.SetDefault(c.UserContext(), rc.Project.ID, g.ID)
+		promoted, err := h.Runtime.Store.SMTPGroup.SetDefault(c.Context(), rc.Project.ID, g.ID)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -192,9 +192,9 @@ func (h *GroupHandler) Update(c *fiber.Ctx) error {
 //
 // The servers survive on purpose: a group is a routing label, and
 // deleting a label must not delete the credentials behind it.
-func (h *GroupHandler) Delete(c *fiber.Ctx) error {
+func (h *GroupHandler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	g, err := h.Runtime.Store.SMTPGroup.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	g, err := h.Runtime.Store.SMTPGroup.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -208,7 +208,7 @@ func (h *GroupHandler) Delete(c *fiber.Ctx) error {
 			"the default group cannot be deleted - make another group the default first")
 	}
 
-	def, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.UserContext(), rc.Project.ID)
+	def, err := h.Runtime.Store.SMTPGroup.EnsureDefault(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -217,7 +217,7 @@ func (h *GroupHandler) Delete(c *fiber.Ctx) error {
 		return response.Internal(c, errNoDefaultGroup)
 	}
 
-	if err := h.Runtime.Store.SMTPGroup.Delete(c.UserContext(), rc.Project.ID, g.ID, def.ID); err != nil {
+	if err := h.Runtime.Store.SMTPGroup.Delete(c.Context(), rc.Project.ID, g.ID, def.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

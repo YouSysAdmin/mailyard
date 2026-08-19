@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
@@ -37,14 +37,14 @@ const touchInterval = time.Minute
 // reason verifySession has two: the response helpers write the status
 // and return nil, so a single error return would let a refused request
 // fall through.
-func stampAPIKey(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
+func stampAPIKey(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	rc := domain.GetRequestContext(c)
 	raw := bearerToken(c)
 	if raw == "" || !strings.HasPrefix(raw, akmodel.Prefix) {
 		return false, response.Unauthorized(c, "api key required")
 	}
 
-	k, err := rt.Store.APIKey.GetByPrefix(c.UserContext(), akmodel.TokenPrefix(raw))
+	k, err := rt.Store.APIKey.GetByPrefix(c.Context(), akmodel.TokenPrefix(raw))
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -70,7 +70,7 @@ func stampAPIKey(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 		}
 	}
 
-	proj, err := rt.Store.Project.Get(c.UserContext(), k.ProjectID)
+	proj, err := rt.Store.Project.Get(c.Context(), k.ProjectID)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -96,7 +96,7 @@ func stampAPIKey(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 	rc.Permissions = permission.ForKey(k.Permissions, k.Sandbox)
 
 	if k.LastUsedAt == nil || now.Sub(*k.LastUsedAt) > touchInterval {
-		if err := rt.Store.APIKey.TouchLastUsed(c.UserContext(), k.ID, now); err != nil {
+		if err := rt.Store.APIKey.TouchLastUsed(c.Context(), k.ID, now); err != nil {
 			slog.Warn("apikey: touch last used failed", "key_id", k.ID, "err", err)
 		}
 	}
@@ -135,13 +135,13 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 	// Charge the budget when the helper answered 401 and nothing else.
 	// The response helpers write the status and return nil, so the
 	// status IS the discriminator - there is no error to inspect.
-	charge := func(c *fiber.Ctx) {
+	charge := func(c fiber.Ctx) {
 		if c.Response().StatusCode() == fiber.StatusUnauthorized {
 			authFailures.Allow(c.IP())
 		}
 	}
 
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if authFailures.Exceeded(c.IP()) {
 			slog.Warn("apikey: authentication budget exhausted", "client_ip", c.IP())
 
@@ -206,14 +206,14 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 //
 // Same uniform 401 on every rejection leg as the tenant path, for the
 // same reason: a probe must not learn which part it got wrong.
-func stampAdminKey(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
+func stampAdminKey(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	rc := domain.GetRequestContext(c)
 	if rc == nil {
 		return false, response.Internal(c, errors.New("request context middleware not installed"))
 	}
 
 	raw := bearerToken(c)
-	k, err := rt.Store.AdminAPIKey.GetByPrefix(c.UserContext(), akmodel.TokenPrefix(raw))
+	k, err := rt.Store.AdminAPIKey.GetByPrefix(c.Context(), akmodel.TokenPrefix(raw))
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -227,7 +227,7 @@ func stampAdminKey(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 
 	rc.AdminAPIKey = k
 	if k.LastUsedAt == nil || now.Sub(*k.LastUsedAt) > touchInterval {
-		if err := rt.Store.AdminAPIKey.TouchLastUsed(c.UserContext(), k.ID, now); err != nil {
+		if err := rt.Store.AdminAPIKey.TouchLastUsed(c.Context(), k.ID, now); err != nil {
 			slog.Warn("apikey: touch last used failed", "key_id", k.ID, "err", err)
 		}
 	}
@@ -236,7 +236,7 @@ func stampAdminKey(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 }
 
 // bearerToken pulls the Authorization bearer value ("" when absent).
-func bearerToken(c *fiber.Ctx) string {
+func bearerToken(c fiber.Ctx) string {
 	if token, ok := strings.CutPrefix(c.Get("Authorization"), "Bearer "); ok {
 		return token
 	}

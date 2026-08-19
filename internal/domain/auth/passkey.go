@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -71,7 +71,7 @@ func (h *Handler) ceremonySealer() *crypto.Service {
 // deriving the RP from it keeps the check equal to what the
 // authenticator actually bound - rather than to server.public_url,
 // which an operator can leave stale and a proxy can rewrite.
-func (h *Handler) webauthnService(c *fiber.Ctx) (*corepasskey.Service, error) {
+func (h *Handler) webauthnService(c fiber.Ctx) (*corepasskey.Service, error) {
 	origin := c.Get(fiber.HeaderOrigin)
 	if origin == "" {
 		return nil, fmt.Errorf("passkeys need a browser that sends an Origin header")
@@ -85,7 +85,7 @@ func (h *Handler) webauthnService(c *fiber.Ctx) (*corepasskey.Service, error) {
 	return corepasskey.New(u.Hostname(), origin)
 }
 
-func (h *Handler) setCeremony(c *fiber.Ctx, name string, sess *corepasskey.SessionData) error {
+func (h *Handler) setCeremony(c fiber.Ctx, name string, sess *corepasskey.SessionData) error {
 	sealer := h.ceremonySealer()
 	if !sealer.Enabled() {
 		return fmt.Errorf("no auth.jwt_secret configured")
@@ -117,7 +117,7 @@ func (h *Handler) setCeremony(c *fiber.Ctx, name string, sess *corepasskey.Sessi
 // takeCeremony reads the ceremony cookie and CLEARS it, so a
 // challenge is answerable exactly once. Leaving it in place would let
 // the same challenge be replayed for as long as the cookie lived.
-func (h *Handler) takeCeremony(c *fiber.Ctx, name string) (*corepasskey.SessionData, error) {
+func (h *Handler) takeCeremony(c fiber.Ctx, name string) (*corepasskey.SessionData, error) {
 	raw := c.Cookies(name)
 	c.Cookie(&fiber.Cookie{
 		Name: name, Value: "", Path: "/", HTTPOnly: true,
@@ -151,7 +151,7 @@ func (h *Handler) takeCeremony(c *fiber.Ctx, name string) (*corepasskey.SessionD
 // hypothetical - it is what a lone error return produces here, and the
 // SSO-only leg answered 500 from a recovered nil dereference instead
 // of 403.
-func (h *Handler) passkeySelf(c *fiber.Ctx) (*usermodel.User, error, bool) {
+func (h *Handler) passkeySelf(c fiber.Ctx) (*usermodel.User, error, bool) {
 	if !h.passkeysAvailable() {
 		return nil, response.Forbidden(c, "passkeys are not enabled on this install"), false
 	}
@@ -161,7 +161,7 @@ func (h *Handler) passkeySelf(c *fiber.Ctx) (*usermodel.User, error, bool) {
 		return nil, response.Unauthorized(c, "not authenticated"), false
 	}
 
-	u, err := h.Runtime.Store.User.GetByID(c.UserContext(), rc.User.ID)
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), rc.User.ID)
 	if err != nil {
 		return nil, response.Internal(c, err), false
 	}
@@ -187,8 +187,8 @@ func (h *Handler) passkeySelf(c *fiber.Ctx) (*usermodel.User, error, bool) {
 //
 // The handle is the account id. See the migration for why there is no
 // separate column for it.
-func (h *Handler) webauthnUser(c *fiber.Ctx, u *usermodel.User) (*corepasskey.User, []*pkmodel.Passkey, error) {
-	rows, err := h.Runtime.Store.Passkey.ListForUser(c.UserContext(), u.ID)
+func (h *Handler) webauthnUser(c fiber.Ctx, u *usermodel.User) (*corepasskey.User, []*pkmodel.Passkey, error) {
+	rows, err := h.Runtime.Store.Passkey.ListForUser(c.Context(), u.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -210,13 +210,13 @@ func (h *Handler) webauthnUser(c *fiber.Ctx, u *usermodel.User) (*corepasskey.Us
 }
 
 // PasskeyList returns the caller's enrolled passkeys.
-func (h *Handler) PasskeyList(c *fiber.Ctx) error {
+func (h *Handler) PasskeyList(c fiber.Ctx) error {
 	u, resp, ok := h.passkeySelf(c)
 	if !ok {
 		return resp
 	}
 
-	rows, err := h.Runtime.Store.Passkey.ListForUser(c.UserContext(), u.ID)
+	rows, err := h.Runtime.Store.Passkey.ListForUser(c.Context(), u.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -229,7 +229,7 @@ func (h *Handler) PasskeyList(c *fiber.Ctx) error {
 }
 
 // PasskeyRegisterBegin starts enrolment.
-func (h *Handler) PasskeyRegisterBegin(c *fiber.Ctx) error {
+func (h *Handler) PasskeyRegisterBegin(c fiber.Ctx) error {
 	u, resp, ok := h.passkeySelf(c)
 	if !ok {
 		return resp
@@ -249,7 +249,7 @@ func (h *Handler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 		return response.Forbidden(c, "incorrect password")
 	}
 
-	n, err := h.Runtime.Store.Passkey.CountForUser(c.UserContext(), u.ID)
+	n, err := h.Runtime.Store.Passkey.CountForUser(c.Context(), u.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -286,7 +286,7 @@ func (h *Handler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 // The body is the raw WebAuthn attestation, exactly as the browser
 // produced it, so the label rides in ?name= rather than wrapping the
 // body in an envelope the parser would have to be taught about.
-func (h *Handler) PasskeyRegisterFinish(c *fiber.Ctx) error {
+func (h *Handler) PasskeyRegisterFinish(c fiber.Ctx) error {
 	u, resp, ok := h.passkeySelf(c)
 	if !ok {
 		return resp
@@ -336,7 +336,7 @@ func (h *Handler) PasskeyRegisterFinish(c *fiber.Ctx) error {
 		Credential:   encoded,
 		CreatedAt:    time.Now().UTC(),
 	}
-	if err := h.Runtime.Store.Passkey.Put(c.UserContext(), row); err != nil {
+	if err := h.Runtime.Store.Passkey.Put(c.Context(), row); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -349,7 +349,7 @@ func (h *Handler) PasskeyRegisterFinish(c *fiber.Ctx) error {
 }
 
 // PasskeyRename relabels one. No password: a label is not a way in.
-func (h *Handler) PasskeyRename(c *fiber.Ctx) error {
+func (h *Handler) PasskeyRename(c fiber.Ctx) error {
 	u, resp, ok := h.passkeySelf(c)
 	if !ok {
 		return resp
@@ -360,7 +360,7 @@ func (h *Handler) PasskeyRename(c *fiber.Ctx) error {
 		return bindResp
 	}
 
-	ok, err := h.Runtime.Store.Passkey.Rename(c.UserContext(), u.ID, c.Params("id"), in.Name)
+	ok, err := h.Runtime.Store.Passkey.Rename(c.Context(), u.ID, c.Params("id"), in.Name)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -374,7 +374,7 @@ func (h *Handler) PasskeyRename(c *fiber.Ctx) error {
 
 // PasskeyDelete removes one, behind the same password confirmation as
 // enrolment.
-func (h *Handler) PasskeyDelete(c *fiber.Ctx) error {
+func (h *Handler) PasskeyDelete(c fiber.Ctx) error {
 	u, resp, ok := h.passkeySelf(c)
 	if !ok {
 		return resp
@@ -389,7 +389,7 @@ func (h *Handler) PasskeyDelete(c *fiber.Ctx) error {
 		return response.Forbidden(c, "incorrect password")
 	}
 
-	removed, err := h.Runtime.Store.Passkey.Delete(c.UserContext(), u.ID, c.Params("id"))
+	removed, err := h.Runtime.Store.Passkey.Delete(c.Context(), u.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -408,7 +408,7 @@ func (h *Handler) PasskeyDelete(c *fiber.Ctx) error {
 
 // PasskeyLoginBegin starts a usernameless assertion. Open endpoint:
 // nobody has identified themselves yet, which is the point.
-func (h *Handler) PasskeyLoginBegin(c *fiber.Ctx) error {
+func (h *Handler) PasskeyLoginBegin(c fiber.Ctx) error {
 	if !h.passkeysAvailable() {
 		return response.BadRequest(c, "passkey sign-in is not available")
 	}
@@ -438,7 +438,7 @@ func (h *Handler) PasskeyLoginBegin(c *fiber.Ctx) error {
 // AND unlocked it - two factors in one gesture, and a phishing-proof
 // pair, which is more than a password plus a code that can be typed
 // into somebody else's page.
-func (h *Handler) PasskeyLoginFinish(c *fiber.Ctx) error {
+func (h *Handler) PasskeyLoginFinish(c fiber.Ctx) error {
 	if !h.passkeysAvailable() {
 		return response.BadRequest(c, "passkey sign-in is not available")
 	}
@@ -453,7 +453,7 @@ func (h *Handler) PasskeyLoginFinish(c *fiber.Ctx) error {
 		return response.BadRequest(c, "the sign-in expired, start again")
 	}
 
-	ctx := c.UserContext()
+	ctx := c.Context()
 
 	var (
 		matched *usermodel.User

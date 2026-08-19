@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
@@ -31,7 +31,7 @@ import (
 // Registered after slog-fiber: GetRequestID reads the ID that
 // middleware minted at request start.
 func requestContext(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		appURL := rt.Config.Server.PublicURL
 		if appURL == "" {
 			appURL = c.BaseURL()
@@ -70,7 +70,7 @@ func requestContext(rt *env.Runtime) fiber.Handler {
 // inside individual handlers, which creates a misleading "this is
 // gated" signal across the rest.
 func requireAuth(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if ok, resp := stampSession(c, rt); !ok {
 			return resp
 		}
@@ -85,7 +85,7 @@ func requireAuth(rt *env.Runtime) fiber.Handler {
 // Split out of requireAuth so machineAuth can run it as one branch of
 // a decision. Two return values for the reason verifySession has two:
 // the response helpers write the status and return nil.
-func stampSession(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
+func stampSession(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	if rt.Config.Auth.Disabled {
 		return true, nil
 	}
@@ -104,7 +104,7 @@ func stampSession(c *fiber.Ctx, rt *env.Runtime) (bool, error) {
 		return false, response.Unauthorized(c, "authentication required")
 	}
 
-	u, err := rt.Store.User.GetByID(c.UserContext(), claims.UserID)
+	u, err := rt.Store.User.GetByID(c.Context(), claims.UserID)
 	if err != nil {
 		return false, response.Internal(c, err)
 	}
@@ -130,7 +130,7 @@ const sessionTouchInterval = 5 * time.Minute
 // RequestContext. No-op when auth is disabled: with no user concept
 // there is no tier to enforce.
 func requireAdmin(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if rt.Config.Auth.Disabled {
 			return c.Next()
 		}
@@ -156,7 +156,7 @@ func requireAdmin(rt *env.Runtime) fiber.Handler {
 // console with, so the button the console offers and the request the
 // server accepts cannot drift apart.
 func requireProjectCreation(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if !project.MayCreate(rt, domain.GetRequestContext(c)) {
 			return response.Forbidden(c,
 				"creating projects is restricted to platform administrators on this installation")
@@ -168,7 +168,7 @@ func requireProjectCreation(rt *env.Runtime) fiber.Handler {
 
 // extractToken pulls the session token from the cookie first, then
 // falls back to a Bearer header for CLI / curl callers.
-func extractToken(c *fiber.Ctx) string {
+func extractToken(c fiber.Ctx) string {
 	if v := c.Cookies(authdomain.SessionCookie); v != "" {
 		return v
 	}
@@ -185,7 +185,7 @@ func extractToken(c *fiber.Ctx) string {
 // console login with a return path instead, and falls back to the
 // JSON answer for callers that did not ask for HTML.
 func requirePageAuth(rt *env.Runtime) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if rt.Config.Auth.Disabled {
 			return c.Next()
 		}
@@ -198,7 +198,7 @@ func requirePageAuth(rt *env.Runtime) fiber.Handler {
 			return response.Unauthorized(c, "authentication required")
 		}
 
-		return c.Redirect(env.ConsolePath+"/login?next="+url.QueryEscape(c.OriginalURL()), fiber.StatusFound)
+		return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/login?next=" + url.QueryEscape(c.OriginalURL()))
 	}
 }
 
@@ -206,7 +206,7 @@ func requirePageAuth(rt *env.Runtime) fiber.Handler {
 // a session, that the session has not been revoked. Same rules as the
 // API path - it shares resolveSession - but reports a plain bool so
 // the caller decides between a redirect and a 401.
-func pageSessionIsLive(c *fiber.Ctx, rt *env.Runtime) bool {
+func pageSessionIsLive(c fiber.Ctx, rt *env.Runtime) bool {
 	_, ok := resolveSession(c, rt)
 
 	return ok
@@ -227,7 +227,7 @@ func pageSessionIsLive(c *fiber.Ctx, rt *env.Runtime) bool {
 //
 // ok=false means the caller must reject. claims is returned even then
 // when the token itself parsed, so a caller can log who was refused.
-func resolveSession(c *fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims, ok bool) {
+func resolveSession(c fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims, ok bool) {
 	raw := extractToken(c)
 	if raw == "" {
 		return nil, false
@@ -248,7 +248,7 @@ func resolveSession(c *fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims
 		return claims, true
 	}
 
-	sess, err := rt.Store.Session.Get(c.UserContext(), claims.SessionID)
+	sess, err := rt.Store.Session.Get(c.Context(), claims.SessionID)
 	// A missing row means the session was purged after expiry, which
 	// is the same answer as revoked: this token is finished.
 	if err != nil || sess == nil || !sess.Active(now) {
@@ -260,7 +260,7 @@ func resolveSession(c *fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims
 	// Refresh last_seen_at at most once per touch interval. Writing on
 	// every request would put a write in front of every read.
 	if now.Sub(sess.LastSeenAt) > sessionTouchInterval {
-		if terr := rt.Store.Session.Touch(c.UserContext(), sess.ID, now); terr != nil {
+		if terr := rt.Store.Session.Touch(c.Context(), sess.ID, now); terr != nil {
 			slog.Warn("auth: session touch failed", "session_id", sess.ID, "err", terr)
 		}
 	}
@@ -271,6 +271,6 @@ func resolveSession(c *fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims
 // wantsHTML reports whether the caller is a browser navigating, as
 // opposed to a script. Accept is the only signal available before the
 // response is written.
-func wantsHTML(c *fiber.Ctx) bool {
+func wantsHTML(c fiber.Ctx) bool {
 	return strings.Contains(c.Get(fiber.HeaderAccept), "text/html")
 }

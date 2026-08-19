@@ -3,7 +3,7 @@
 package validation
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
 )
@@ -25,7 +25,7 @@ import (
 //	if !ok {
 //	    return resp
 //	}
-func Bind[T any](c *fiber.Ctx) (out T, resp error, ok bool) {
+func Bind[T any](c fiber.Ctx) (out T, resp error, ok bool) {
 	in, err := BindAndValidate[T](c)
 	if err != nil {
 		fes := Humanize(err)

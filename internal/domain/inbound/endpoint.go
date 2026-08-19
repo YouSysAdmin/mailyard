@@ -3,9 +3,10 @@
 package inbound
 
 import (
+	"strconv"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -24,7 +25,7 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/inbound-emails.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	f := store.InboundFilter{
 		Status: c.Query("status"),
@@ -43,7 +44,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		f.BeforeID = c.Query("before_id")
 	}
 
-	emails, err := h.Runtime.Store.Inbound.List(c.UserContext(), rc.Project.ID, f)
+	emails, err := h.Runtime.Store.Inbound.List(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -56,9 +57,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Stats serves GET /api/v1/inbound-emails/stats.
-func (h *Handler) Stats(c *fiber.Ctx) error {
+func (h *Handler) Stats(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	counts, err := h.Runtime.Store.Inbound.CountByStatus(c.UserContext(), rc.Project.ID)
+	counts, err := h.Runtime.Store.Inbound.CountByStatus(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -67,9 +68,9 @@ func (h *Handler) Stats(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/inbound-emails/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Inbound.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Inbound.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -87,9 +88,9 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 // parsing failed (see service.go) - for a cleanly parsed message the
 // answer is an honest 404 rather than a reconstruction pretending to
 // be the original.
-func (h *Handler) Raw(c *fiber.Ctx) error {
+func (h *Handler) Raw(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Inbound.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Inbound.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -112,9 +113,9 @@ func (h *Handler) Raw(c *fiber.Ctx) error {
 // operator whose consumer was down can replay the notification
 // without re-delivering the mail itself. The payload mirrors the one
 // built at ingest (service.go).
-func (h *Handler) Retry(c *fiber.Ctx) error {
+func (h *Handler) Retry(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Inbound.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Inbound.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -124,11 +125,11 @@ func (h *Handler) Retry(c *fiber.Ctx) error {
 	}
 
 	domainName := ""
-	if d, derr := h.Runtime.Store.Domain.Get(c.UserContext(), rc.Project.ID, e.DomainID); derr == nil && d != nil {
+	if d, derr := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, e.DomainID); derr == nil && d != nil {
 		domainName = d.Domain
 	}
 
-	h.Runtime.Dispatch.Emit(c.UserContext(), e.ProjectID, webhookmodel.EventInboundReceived, e.Sender, map[string]any{
+	h.Runtime.Dispatch.Emit(c.Context(), e.ProjectID, webhookmodel.EventInboundReceived, e.Sender, map[string]any{
 		"id":          e.ID,
 		"domain":      domainName,
 		"sender":      e.Sender,
@@ -143,9 +144,9 @@ func (h *Handler) Retry(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/inbound-emails/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Inbound.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Inbound.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -154,7 +155,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "inbound email not found")
 	}
 
-	if err := h.Runtime.Store.Inbound.Delete(c.UserContext(), rc.Project.ID, e.ID); err != nil {
+	if err := h.Runtime.Store.Inbound.Delete(c.Context(), rc.Project.ID, e.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -163,7 +164,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 	if h.Runtime.Blob != nil {
 		for _, a := range e.Attachments {
 			if a.StorageKey != "" {
-				if derr := h.Runtime.Blob.Delete(c.UserContext(), a.StorageKey); derr != nil {
+				if derr := h.Runtime.Blob.Delete(c.Context(), a.StorageKey); derr != nil {
 					h.Runtime.Log.Warn("inbound: blob cleanup failed", "key", a.StorageKey, "err", derr)
 				}
 			}
@@ -175,9 +176,9 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 
 // Attachment streams one attachment's bytes, reading inline content
 // or the blob store as appropriate.
-func (h *Handler) Attachment(c *fiber.Ctx) error {
+func (h *Handler) Attachment(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	e, err := h.Runtime.Store.Inbound.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	e, err := h.Runtime.Store.Inbound.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -186,13 +187,13 @@ func (h *Handler) Attachment(c *fiber.Ctx) error {
 		return response.NotFound(c, "inbound email not found")
 	}
 
-	idx, err := c.ParamsInt("idx")
+	idx, err := strconv.Atoi(c.Params("idx"))
 	if err != nil || idx < 0 || idx >= len(e.Attachments) {
 		return response.NotFound(c, "attachment not found")
 	}
 
 	a := e.Attachments[idx]
-	raw, err := blob.Load(c.UserContext(), h.Runtime.Blob, a.StorageKey, a.Content, a.Filename)
+	raw, err := blob.Load(c.Context(), h.Runtime.Blob, a.StorageKey, a.Content, a.Filename)
 	if err != nil {
 		return response.Internal(c, err)
 	}

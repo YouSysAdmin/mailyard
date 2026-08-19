@@ -3,7 +3,7 @@
 package subscriber
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	smodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
 )
 

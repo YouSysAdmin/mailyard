@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/keyset"
@@ -101,9 +101,9 @@ type Export struct {
 }
 
 // ExportData collects a project snapshot.
-func (h *Handler) ExportData(c *fiber.Ctx) error {
+func (h *Handler) ExportData(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ctx := c.UserContext()
+	ctx := c.Context()
 	projID := rc.Project.ID
 	st := h.Runtime.Store
 
@@ -248,14 +248,14 @@ func orEmpty(in []any) []any {
 // Note what this does not do: it leaves the email log alone. Removing
 // the record that a message was sent is a separate decision with
 // separate consequences (billing, deliverability disputes), so it lives behind DeleteEmailLogs.
-func (h *Handler) DeleteContacts(c *fiber.Ctx) error {
+func (h *Handler) DeleteContacts(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[deleteContactsInput](c)
 	if !ok {
 		return resp
 	}
 
-	ctx := c.UserContext()
+	ctx := c.Context()
 	projID := rc.Project.ID
 
 	if in.Email == "" {
@@ -300,14 +300,14 @@ func (h *Handler) DeleteContacts(c *fiber.Ctx) error {
 // In-flight rows (queued, scheduled, processing) are never touched -
 // deleting one would strand work the queue is about to claim. The
 // same rule the retention sweep follows.
-func (h *Handler) DeleteEmailLogs(c *fiber.Ctx) error {
+func (h *Handler) DeleteEmailLogs(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[deleteLogsInput](c)
 	if !ok {
 		return resp
 	}
 
-	ctx := c.UserContext()
+	ctx := c.Context()
 	projID := rc.Project.ID
 
 	if in.Email != "" {

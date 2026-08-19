@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/safetext"
 
@@ -36,7 +36,7 @@ const maxUserAgent = 400
 // authProviderID records how the user authenticated, empty for a
 // local password login, and is what project SSO enforcement
 // compares against later.
-func (h *Handler) startSession(c *fiber.Ctx, u *usermodel.User, authProviderID string) error {
+func (h *Handler) startSession(c fiber.Ctx, u *usermodel.User, authProviderID string) error {
 	ttl := sessionTTL(h.Runtime)
 	now := time.Now().UTC()
 
@@ -57,7 +57,7 @@ func (h *Handler) startSession(c *fiber.Ctx, u *usermodel.User, authProviderID s
 
 		AuthProviderID: authProviderID,
 	}
-	if err := h.Runtime.Store.Session.Put(c.UserContext(), sess); err != nil {
+	if err := h.Runtime.Store.Session.Put(c.Context(), sess); err != nil {
 		return err
 	}
 
@@ -76,13 +76,13 @@ func (h *Handler) startSession(c *fiber.Ctx, u *usermodel.User, authProviderID s
 
 // ListSessions returns the caller's active sign-ins, marking the one
 // making the request.
-func (h *Handler) ListSessions(c *fiber.Ctx) error {
+func (h *Handler) ListSessions(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
 	}
 
-	sessions, err := h.Runtime.Store.Session.ListForUser(c.UserContext(), rc.User.ID, time.Now().UTC())
+	sessions, err := h.Runtime.Store.Session.ListForUser(c.Context(), rc.User.ID, time.Now().UTC())
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -101,7 +101,7 @@ func (h *Handler) ListSessions(c *fiber.Ctx) error {
 
 // RevokeSession kills one of the caller's sessions. Revoking the
 // current one is allowed and behaves like signing out.
-func (h *Handler) RevokeSession(c *fiber.Ctx) error {
+func (h *Handler) RevokeSession(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
@@ -110,7 +110,7 @@ func (h *Handler) RevokeSession(c *fiber.Ctx) error {
 	id := c.Params("id")
 	// Scoped by user id, so a session belonging to somebody else is
 	// reported as missing rather than refused.
-	ok, err := h.Runtime.Store.Session.Revoke(c.UserContext(), rc.User.ID, id)
+	ok, err := h.Runtime.Store.Session.Revoke(c.Context(), rc.User.ID, id)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -137,7 +137,7 @@ func (h *Handler) RevokeSession(c *fiber.Ctx) error {
 }
 
 // RevokeOtherSessions signs the caller out everywhere except here.
-func (h *Handler) RevokeOtherSessions(c *fiber.Ctx) error {
+func (h *Handler) RevokeOtherSessions(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
@@ -145,12 +145,12 @@ func (h *Handler) RevokeOtherSessions(c *fiber.Ctx) error {
 
 	// Collect the ids first so the local cache can be cleared - after
 	// the update they are indistinguishable from long-revoked rows.
-	existing, err := h.Runtime.Store.Session.ListForUser(c.UserContext(), rc.User.ID, time.Now().UTC())
+	existing, err := h.Runtime.Store.Session.ListForUser(c.Context(), rc.User.ID, time.Now().UTC())
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	n, err := h.Runtime.Store.Session.RevokeOthers(c.UserContext(), rc.User.ID, rc.SessionID)
+	n, err := h.Runtime.Store.Session.RevokeOthers(c.Context(), rc.User.ID, rc.SessionID)
 	if err != nil {
 		return response.Internal(c, err)
 	}

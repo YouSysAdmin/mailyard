@@ -7,7 +7,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -27,9 +27,9 @@ type Handler struct {
 // the client needs to actually connect. Bundling them means the
 // console can render ready-to-paste connection details and warn when
 // the listener is switched off, without a second round trip.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	creds, err := h.Runtime.Store.SMTPCredential.List(c.UserContext(), rc.Project.ID)
+	creds, err := h.Runtime.Store.SMTPCredential.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -46,7 +46,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 
 // Create mints a credential and returns the plaintext password
 // EXACTLY ONCE.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
@@ -65,7 +65,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 			return response.Internal(c, err)
 		}
 
-		existing, gerr := h.Runtime.Store.SMTPCredential.GetByUsername(c.UserContext(), username)
+		existing, gerr := h.Runtime.Store.SMTPCredential.GetByUsername(c.Context(), username)
 		if gerr != nil {
 			return response.Internal(c, gerr)
 		}
@@ -86,7 +86,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 
 	groupID := ""
 	if in.SMTPGroup != "" {
-		g, err := h.Runtime.Store.SMTPGroup.GetBySlug(c.UserContext(), rc.Project.ID, in.SMTPGroup)
+		g, err := h.Runtime.Store.SMTPGroup.GetBySlug(c.Context(), rc.Project.ID, in.SMTPGroup)
 		if err != nil {
 			return response.Internal(c, err)
 		}
@@ -113,7 +113,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		cred.AllowedIPs = []string{}
 	}
 
-	if err := h.Runtime.Store.SMTPCredential.Put(c.UserContext(), cred); err != nil {
+	if err := h.Runtime.Store.SMTPCredential.Put(c.Context(), cred); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -125,9 +125,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Revoke serves POST /api/v1/smtp-credentials/:id/revoke.
-func (h *Handler) Revoke(c *fiber.Ctx) error {
+func (h *Handler) Revoke(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cred, err := h.Runtime.Store.SMTPCredential.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -136,7 +136,7 @@ func (h *Handler) Revoke(c *fiber.Ctx) error {
 		return response.NotFound(c, "smtp credential not found")
 	}
 
-	if err := h.Runtime.Store.SMTPCredential.Revoke(c.UserContext(), rc.Project.ID, cred.ID); err != nil {
+	if err := h.Runtime.Store.SMTPCredential.Revoke(c.Context(), rc.Project.ID, cred.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -146,9 +146,9 @@ func (h *Handler) Revoke(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/smtp-credentials/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	cred, err := h.Runtime.Store.SMTPCredential.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -157,7 +157,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "smtp credential not found")
 	}
 
-	if err := h.Runtime.Store.SMTPCredential.Delete(c.UserContext(), rc.Project.ID, cred.ID); err != nil {
+	if err := h.Runtime.Store.SMTPCredential.Delete(c.Context(), rc.Project.ID, cred.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

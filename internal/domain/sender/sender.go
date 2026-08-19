@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -122,9 +122,9 @@ type Handler struct {
 }
 
 // List serves GET /api/v1/senders.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	out, err := h.Runtime.Store.Sender.List(c.UserContext(), rc.Project.ID)
+	out, err := h.Runtime.Store.Sender.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -139,7 +139,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 // Create registers an address after checking the domain is verified
 // by this project - the point of the entity is that From selectors
 // only ever offer addresses the operator can legitimately use.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
@@ -148,7 +148,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 
 	at := strings.LastIndex(in.Email, "@")
 	domainName := in.Email[at+1:]
-	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.UserContext(), domainName)
+	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), domainName)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -158,7 +158,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 			"domain "+domainName+" is not verified by this project, verify it under Domains first")
 	}
 
-	existing, err := h.Runtime.Store.Sender.GetByEmail(c.UserContext(), rc.Project.ID, in.Email)
+	existing, err := h.Runtime.Store.Sender.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -174,7 +174,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		Email:     in.Email,
 		Name:      in.Name,
 	}
-	if err := h.Runtime.Store.Sender.Put(c.UserContext(), m); err != nil {
+	if err := h.Runtime.Store.Sender.Put(c.Context(), m); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -182,9 +182,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/senders/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	m, err := h.Runtime.Store.Sender.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	m, err := h.Runtime.Store.Sender.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -193,7 +193,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "sender not found")
 	}
 
-	if err := h.Runtime.Store.Sender.Delete(c.UserContext(), rc.Project.ID, m.ID); err != nil {
+	if err := h.Runtime.Store.Sender.Delete(c.Context(), rc.Project.ID, m.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

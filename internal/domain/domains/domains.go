@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
@@ -345,9 +345,9 @@ func (h *Handler) lookup() LookupTXT {
 }
 
 // List serves GET /api/v1/domains.
-func (h *Handler) List(c *fiber.Ctx) error {
+func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	out, err := h.Runtime.Store.Domain.List(c.UserContext(), rc.Project.ID)
+	out, err := h.Runtime.Store.Domain.List(c.Context(), rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -360,9 +360,9 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 // Get serves GET /api/v1/domains/:id.
-func (h *Handler) Get(c *fiber.Ctx) error {
+func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	d, err := h.Runtime.Store.Domain.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	d, err := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -375,14 +375,14 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 }
 
 // Create serves POST /api/v1/domains.
-func (h *Handler) Create(c *fiber.Ctx) error {
+func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.UserContext(), h.Runtime.Store, rc.Project.ID, quota.ResDomains, 1); err != nil {
+	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResDomains, 1); err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
@@ -392,7 +392,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 
 	// Names are globally unique - a domain claimed by another
 	// project must look taken, not missing.
-	existing, err := h.Runtime.Store.Domain.GetByName(c.UserContext(), in.Domain)
+	existing, err := h.Runtime.Store.Domain.GetByName(c.Context(), in.Domain)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -413,7 +413,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		Domain:            strings.ToLower(in.Domain),
 		VerificationToken: hex.EncodeToString(token),
 	}
-	if err := h.Runtime.Store.Domain.Put(c.UserContext(), d); err != nil {
+	if err := h.Runtime.Store.Domain.Put(c.Context(), d); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -422,9 +422,9 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 
 // Verify runs the live DNS TXT check and stores the outcome. Safe to
 // call repeatedly - a lost record un-verifies the domain again.
-func (h *Handler) Verify(c *fiber.Ctx) error {
+func (h *Handler) Verify(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	d, err := h.Runtime.Store.Domain.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	d, err := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -436,7 +436,7 @@ func (h *Handler) Verify(c *fiber.Ctx) error {
 	// Four lookups, so a longer budget than the single-record check
 	// this replaced. Still bounded: an unreachable resolver must fail
 	// the request, not hold a console connection open.
-	ctx, cancel := context.WithTimeout(c.UserContext(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(c.Context(), 20*time.Second)
 	defer cancel()
 
 	res := CheckAll(ctx, h.lookup(), d)
@@ -473,7 +473,7 @@ func (h *Handler) Verify(c *fiber.Ctx) error {
 	d.DMARCVerified = res.DMARC
 	d.CheckedAt = &now
 
-	if err := h.Runtime.Store.Domain.Put(c.UserContext(), d); err != nil {
+	if err := h.Runtime.Store.Domain.Put(c.Context(), d); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -486,9 +486,9 @@ func (h *Handler) Verify(c *fiber.Ctx) error {
 }
 
 // Delete serves DELETE /api/v1/domains/:id.
-func (h *Handler) Delete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	d, err := h.Runtime.Store.Domain.Get(c.UserContext(), rc.Project.ID, c.Params("id"))
+	d, err := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -497,7 +497,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 		return response.NotFound(c, "domain not found")
 	}
 
-	if err := h.Runtime.Store.Domain.Delete(c.UserContext(), rc.Project.ID, d.ID); err != nil {
+	if err := h.Runtime.Store.Domain.Delete(c.Context(), rc.Project.ID, d.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
