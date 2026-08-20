@@ -370,6 +370,12 @@ func runServe(cmd *cobra.Command, r role) error {
 	// processor its delivery leg. Started before the HTTP server so
 	// rows left queued by a previous run drain immediately.
 	relayClient := relayClientSource(cfg, st)
+	if relayClient != nil {
+		// The console proves a server row by dialling it through the
+		// same transport the worker delivers through, so a node row
+		// needs the same identity - see smtpserver.testTransport.
+		rt.RelayNodeTLS = relayClient.WorkerTLS
+	}
 
 	worker := queue.NewWorker(st.Email, &email.Processor{
 		Store:         st,

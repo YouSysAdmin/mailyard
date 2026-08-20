@@ -1,6 +1,8 @@
 package env
 
 import (
+	"context"
+	"crypto/tls"
 	"log/slog"
 
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
@@ -50,6 +52,19 @@ type Runtime struct {
 	// does not import the campaign domain). Nil until serve.go wires
 	// it.
 	CampaignWake func()
+
+	// RelayNodeTLS builds the transport for dialling one relay node:
+	// our client certificate, the relay authority as the root, and
+	// ServerName set to the host. A plain func for the same reason as
+	// CampaignWake above - env cannot import the email domain, which
+	// imports env.
+	//
+	// Nil where relay nodes are not configured, which is every
+	// community installation. A caller holding a node row and no
+	// builder must REFUSE rather than dial with the default config:
+	// a node's certificate is signed by our own authority and can
+	// never verify against the system roots.
+	RelayNodeTLS func(ctx context.Context, host string) (*tls.Config, error)
 
 	// Tracking signs the public /t/ URLs. Always set in serve.go,
 	// disabled (Enabled() false) when server.public_url is empty.

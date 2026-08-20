@@ -4,7 +4,9 @@ package smtpserver
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -253,7 +255,7 @@ func (h *Handler) Test(c fiber.Ctx) error {
 	// Through the provider, so "test" means whatever proving reachability
 	// means for it: a dial and an AUTH for SMTP, an account read for an
 	// API. Neither sends anything.
-	testErr := testTransport(c.Context(), srv)
+	testErr := testTransport(c.Context(), srv, h.Runtime.RelayNodeTLS)
 	if testErr != nil {
 		if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 			rc.Project.ID, srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {
@@ -364,8 +366,35 @@ func (h *Handler) invalidateSESTopics() {
 // pool - because "is this row reachable" is one question and the two
 // handlers answering it differently is how one of them ends up still
 // dialling a provider that has no host.
-func testTransport(ctx context.Context, srv *ssmodel.Server) error {
-	t, err := transport.Open(srv.Spec(nil))
+//
+// A RELAY NODE is dialled the way the delivery worker dials it, which
+// is the whole point of nodeTLS: mutual TLS against our own authority,
+// no AUTH. Passing nil instead asks the SYSTEM roots about a
+// certificate our own CA signed, which cannot pass - so the button
+// answered "certificate signed by unknown authority" for a node that
+// delivers perfectly well, and then WROTE that verdict onto the row,
+// which is what takes a node out of the rotation. The delivery path
+// resolves the same thing in email.Processor.nodeTLS.
+func testTransport(ctx context.Context, srv *ssmodel.Server,
+	nodeTLS func(context.Context, string) (*tls.Config, error)) error {
+	var dialTLS *tls.Config
+	if srv.IsNode() {
+		if nodeTLS == nil {
+			// Same answer as the delivery path: dialling without the
+			// certificate would fail at the handshake anyway, and much
+			// less clearly.
+			return fmt.Errorf("server %s is a relay node but no client identity is configured", srv.Name)
+		}
+
+		built, err := nodeTLS(ctx, srv.Host)
+		if err != nil {
+			return err
+		}
+
+		dialTLS = built
+	}
+
+	t, err := transport.Open(srv.Spec(dialTLS))
 	if err != nil {
 		// A row naming a provider that will not open is a configuration
 		// error, and reporting it as the test result is exactly right:
