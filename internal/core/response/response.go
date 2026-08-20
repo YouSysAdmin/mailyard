@@ -17,13 +17,16 @@ import (
 )
 
 // Success writes 200 with data as the body.
+//
+// Through withEmptyLists, so an empty list is [] and never null - see
+// there for why that is decided here and not at each accumulator.
 func Success(c fiber.Ctx, data any) error {
-	return c.Status(fiber.StatusOK).JSON(data)
+	return c.Status(fiber.StatusOK).JSON(withEmptyLists(data))
 }
 
 // Created writes 201 with data as the body.
 func Created(c fiber.Ctx, data any) error {
-	return c.Status(fiber.StatusCreated).JSON(data)
+	return c.Status(fiber.StatusCreated).JSON(withEmptyLists(data))
 }
 
 // NoContent writes 204 and no body.
