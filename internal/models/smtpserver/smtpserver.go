@@ -168,6 +168,18 @@ func (s *Server) Normalize() {
 	if s.Provider == "" {
 		s.Provider = transport.ProviderSMTP
 	}
+
+	// A domain that arrived with whitespace or in capitals would be
+	// stored as typed and then never match, because AllowsDomain
+	// compares against a bare lowercase host. The list reaches here
+	// from three writers and one of them is an ENVIRONMENT VARIABLE
+	// split on commas - viper does not trim what it splits, so
+	// "a.com, b.com" yields a second entry that begins with a space.
+	// The failure is a send with no candidates at all, which is loud
+	// but says nothing about a stray space.
+	for i, d := range s.AllowedDomains {
+		s.AllowedDomains[i] = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(d), "@")))
+	}
 }
 
 // Spec says how to reach this row, and is the one place that answers it.
@@ -274,7 +286,11 @@ func (s *Server) AllowsDomain(sender string) bool {
 
 	host := strings.ToLower(sender[at+1:])
 	for _, d := range s.AllowedDomains {
-		if strings.EqualFold(strings.TrimPrefix(d, "@"), host) {
+		// Trimmed here as well as in Normalize, for the same reason
+		// the "@" is: this is what the comparison tolerates, and a row
+		// written before Normalize learned to clean the list must not
+		// quietly stop matching.
+		if strings.EqualFold(strings.TrimPrefix(strings.TrimSpace(d), "@"), host) {
 			return true
 		}
 	}

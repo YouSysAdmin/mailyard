@@ -904,8 +904,60 @@ func Load(path string) (*Config, error) {
 	// raw values are still visible: these keys no longer have a field to
 	// land in, so nothing about the parsed Config can show they were set.
 	c.RemovedKeys = removedKeysIn(v)
+	trimStringSlices(reflect.ValueOf(&c))
 
 	return &c, nil
+}
+
+// trimStringSlices strips surrounding whitespace from every entry of
+// every []string in the config.
+//
+// EVERY list here can arrive from an environment variable, and viper
+// splits one on commas WITHOUT trimming - so the natural
+// "a.example.com, b.example.com" yields a second entry that begins with
+// a space. What that costs depends on who reads it and none of the
+// answers are good: server.trusted_proxies fails the BOOT, because
+// netip.ParsePrefix refuses " 10.0.0.0/8" and proxylisten.ParseTrusted
+// reports a value that looks correct in the file. A relay node's
+// allowed domain simply never matches, and the symptom is a send that
+// resolves no candidates. cors.allowed_origins silently stops matching
+// the origin it names.
+//
+// Done ONCE, here, rather than in each consumer: there are seven such
+// fields today and the next one would arrive without the trim, since
+// nothing about writing a config field tells you this is a problem.
+// Trimming is safe for all of them - not one takes a value where
+// leading or trailing space is meaningful.
+func trimStringSlices(v reflect.Value) {
+	for v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return
+		}
+
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := range v.NumField() {
+		f := v.Field(i)
+		if f.Kind() == reflect.Struct || f.Kind() == reflect.Pointer {
+			trimStringSlices(f)
+
+			continue
+		}
+
+		if f.Kind() != reflect.Slice || f.Type().Elem().Kind() != reflect.String || !f.CanSet() {
+			continue
+		}
+
+		for j := range f.Len() {
+			e := f.Index(j)
+			e.SetString(strings.TrimSpace(e.String()))
+		}
+	}
 }
 
 // removedKeysIn names every removed TLS key the operator actually set.

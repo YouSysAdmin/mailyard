@@ -55,3 +55,30 @@ func TestTheDomainRuleStandsWithoutAnAddressRule(t *testing.T) {
 		t.Error("the domain rule must decide on its own")
 	}
 }
+
+// The list arrives from an environment variable often enough that this
+// is the ordinary case, not the pathological one: viper splits
+// MAILYARD_RELAY_NODE_DOMAINS on commas and does NOT trim what it
+// split, so "a.com, b.com" reaches the row as ["a.com", " b.com"].
+// Stored as typed, the second one matches nothing and the only symptom
+// is a send that resolves no candidates at all.
+func TestADomainListIsCleanedOnTheWayIn(t *testing.T) {
+	s := &Server{AllowedDomains: []string{"A.com", " b.com", "@c.com"}}
+	s.Normalize()
+
+	for i, want := range []string{"a.com", "b.com", "c.com"} {
+		if s.AllowedDomains[i] != want {
+			t.Errorf("entry %d = %q, want %q", i, s.AllowedDomains[i], want)
+		}
+	}
+}
+
+// And the comparison tolerates a row that was written before the
+// cleaning existed.
+func TestAnUncleanedRowStillMatches(t *testing.T) {
+	s := &Server{AllowedDomains: []string{" example.com"}}
+
+	if !s.AllowsDomain("hi@example.com") {
+		t.Error("a stray space in a stored entry must not blackhole the domain")
+	}
+}
