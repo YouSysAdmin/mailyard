@@ -180,7 +180,11 @@ func New(opts Options) (*Server, error) {
 	// the embedded documentation actually contains.
 	app.Use(securityHeaders(scriptSrcFor(docsite.FS())))
 	app.Use(skipPaths(
-		slogfiber.NewWithFilters(opts.Runtime.Log, accessLogFilters()...),
+		// redactURLs first: the paths whose URL is itself a credential
+		// are logged by route pattern and never reach slog-fiber, which
+		// records the raw path, the query and every route param.
+		redactURLs(opts.Runtime.Log,
+			slogfiber.NewWithFilters(opts.Runtime.Log, accessLogFilters()...)),
 		streamingPaths...,
 	))
 	app.Use(requestContext(opts.Runtime, resolver))
@@ -374,7 +378,18 @@ func securityHeaders(scriptSrc string) fiber.Handler {
 
 		c.Set("X-Content-Type-Options", "nosniff")
 		c.Set("X-Frame-Options", "DENY")
-		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// no-referrer, not strict-origin-when-cross-origin: that one
+		// still sends the FULL URL on same-origin requests, and three
+		// SPA documents carry a credential in theirs - /reset-password,
+		// /verify-email and /invitations all take ?token=. The console
+		// fires six API calls on page load, each arrived with the
+		// reset token in its Referer, and the access logger records
+		// the referer field - so the token walked around redactURLs
+		// through a side door. Nothing of ours reads Referer (checked,
+		// server and console both), Origin is unaffected (CORS and
+		// passkeys keep working), and a click-tracking redirect now
+		// leaks nothing to the destination site either.
+		c.Set("Referrer-Policy", "no-referrer")
 		c.Set("Cross-Origin-Opener-Policy", "same-origin")
 		c.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 		c.Set("Content-Security-Policy",
