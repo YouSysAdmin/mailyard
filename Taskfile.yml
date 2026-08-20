@@ -333,7 +333,8 @@ tasks:
         offenders="$(git diff --name-status oss/master HEAD | while read -r status path; do
           case "$path" in
             internal/ee/*|*_ee.go|*_ee_test.go) owned=yes ;;
-            .github/workflows/ci-ee.yaml|.goreleaser.ee.yml) owned=yes ;;
+            .github/workflows/ci-ee.yaml|.github/workflows/release-ee.yaml) owned=yes ;;
+            .goreleaser.ee.yml) owned=yes ;;
             docs/content/en/smtp-domains/relay-nodes-operations.md) owned=yes ;;
             docs/content/en/getting-started/scaling-roles.md) owned=yes ;;
             examples/mailyard-relay.yaml.example) owned=yes ;;

@@ -9,7 +9,17 @@ permissions:
   packages: write
 
 jobs:
+  # PUBLIC REPOSITORY ONLY, and guarded by NAME for the same reason
+  # no-enterprise-source in ci.yaml is: what is being asserted is which
+  # repository this is. This file is SHARED - the private overlay carries
+  # a byte-identical copy, because the overlay only adds - so without the
+  # guard a tag in the overlay ran goreleaser with no -f, which picks up
+  # .goreleaser.yml, and the ENTERPRISE tree published the COMMUNITY
+  # image name from a private repository whose token cannot write that
+  # package. The enterprise release is release-ee.yaml, which names
+  # .goreleaser.ee.yml explicitly.
   release:
+    if: github.repository == 'YouSysAdmin/mailyard'
     runs-on: ubuntu-latest
     steps:
       # No submodules and no PAT. The documentation theme was one, in
