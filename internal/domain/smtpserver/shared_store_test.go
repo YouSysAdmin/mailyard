@@ -56,13 +56,13 @@ func TestSharedServerSurvivesARoundTrip(t *testing.T) {
 			Encryption:      smtpclient.EncryptionSTARTTLS,
 			SkipDKIM:        true,
 			AllowedEmails:   []string{"news@user.com", "*@other.com"},
+			AllowedDomains:  []string{"user.com"},
 			Priority:        7,
 			Status:          ssmodel.StatusEnabled,
 			ValidationError: "last test failed",
 			ValidatedAt:     &validated,
 		},
-		AllowedDomains: []string{"user.com"},
-		SecurityMode:   ssmodel.SecurityStrict,
+		SecurityMode: ssmodel.SecurityStrict,
 	}
 	if err := s.Put(t.Context(), want); err != nil {
 		t.Fatalf("Put: %v", err)

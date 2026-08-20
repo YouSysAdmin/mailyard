@@ -46,7 +46,8 @@ func ResolveCandidates(ctx context.Context, st *store.Store, projID, sender stri
 		// A pin is a pin: no falling back to the group or the pool. The
 		// caller named this server, and quietly using a different one
 		// would send from an address they did not choose.
-		if srv == nil || srv.Status != ssmodel.StatusEnabled || !srv.AllowsSender(sender) {
+		if srv == nil || srv.Status != ssmodel.StatusEnabled ||
+			!srv.AllowsSender(sender) || !srv.AllowsDomain(sender) {
 			return nil, nil
 		}
 
@@ -66,7 +67,13 @@ func ResolveCandidates(ctx context.Context, st *store.Store, projID, sender stri
 		}
 
 		for _, srv := range servers {
-			if srv.Status == ssmodel.StatusEnabled && srv.AllowsSender(sender) {
+			// Both rules, on every member. A group is exactly where
+			// they earn their keep: a project splitting its relay
+			// nodes by domain has several enabled servers here, and
+			// without the domain rule failover walks straight onto a
+			// node that is in nobody's SPF record for this sender.
+			if srv.Status == ssmodel.StatusEnabled &&
+				srv.AllowsSender(sender) && srv.AllowsDomain(sender) {
 				usable = append(usable, srv)
 			}
 		}

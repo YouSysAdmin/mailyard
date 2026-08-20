@@ -35,7 +35,7 @@ func NewStore(db *sql.DB, cr *crypto.Service) *Store {
 // path reads this row on every send and has no use for a credential.
 const serverSelect = `
 SELECT s.id, s.project_id, s.created_by, s.name, s.host, s.port, s.username,
-       s.password, s.encryption, s.skip_dkim, s.allowed_emails, s.group_id,
+       s.password, s.encryption, s.skip_dkim, s.allowed_emails, s.allowed_domains, s.group_id,
        s.priority, s.status, s.validation_error, s.validated_at, s.created_at,
        s.ses_topic_arn, s.provider, s.provider_config, rn.id, rn.last_seen_at
 FROM smtp_servers s` + relaynode.FreshJoin + `s.id`
@@ -144,10 +144,10 @@ func (s *Store) Put(ctx context.Context, srv *ssmodel.Server) error {
 	_, err = s.Exec(ctx, `
         INSERT INTO smtp_servers (
             id, project_id, created_by, name, host, port, username, password,
-            encryption, skip_dkim, allowed_emails, group_id, priority,
+            encryption, skip_dkim, allowed_emails, allowed_domains, group_id, priority,
             status, validation_error, validated_at, created_at, ses_topic_arn,
             provider, provider_config
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name             = excluded.name,
             host             = excluded.host,
@@ -157,6 +157,7 @@ func (s *Store) Put(ctx context.Context, srv *ssmodel.Server) error {
             encryption       = excluded.encryption,
             skip_dkim        = excluded.skip_dkim,
             allowed_emails   = excluded.allowed_emails,
+            allowed_domains  = excluded.allowed_domains,
             group_id         = excluded.group_id,
             priority         = excluded.priority,
             status           = excluded.status,
@@ -168,6 +169,7 @@ func (s *Store) Put(ctx context.Context, srv *ssmodel.Server) error {
     `,
 		srv.ID, srv.ProjectID, srv.CreatedBy, srv.Name, srv.Host, srv.Port,
 		srv.Username, stored, srv.Encryption, srv.SkipDKIM, database.MustJSON(srv.AllowedEmails),
+		database.MustJSON(srv.AllowedDomains),
 		database.NullStr(srv.GroupID), srv.Priority,
 		srv.Status, srv.ValidationError, database.NullTime(srv.ValidatedAt), srv.CreatedAt,
 		srv.SESTopicARN, srv.Provider, database.MustJSON(srv.ProviderConfig),
@@ -195,9 +197,14 @@ func (s *Store) SetStatus(ctx context.Context, projID, id, status, validationErr
 	return err
 }
 
-// PickEnabled returns the first enabled server whose allowed_emails
-// admits the sender, or (nil, nil) when none qualifies. Oldest first
-// so the pick is stable.
+// PickEnabled returns the first enabled server whose sender rules
+// admit the sender, or (nil, nil) when none qualifies. Oldest first so
+// the pick is stable.
+//
+// Nothing in the tree calls this - email.ResolveCandidates is the one
+// answer to which server carries a message. It asks both rules, so
+// this asks both too: a second path that disagreed would be worse
+// than a second path.
 func (s *Store) PickEnabled(ctx context.Context, projID, senderEmail string) (*ssmodel.Server, error) {
 	servers, err := s.List(ctx, projID)
 	if err != nil {
@@ -205,7 +212,8 @@ func (s *Store) PickEnabled(ctx context.Context, projID, senderEmail string) (*s
 	}
 
 	for _, srv := range servers {
-		if srv.Status == ssmodel.StatusEnabled && srv.AllowsSender(senderEmail) {
+		if srv.Status == ssmodel.StatusEnabled && srv.AllowsSender(senderEmail) &&
+			srv.AllowsDomain(senderEmail) {
 			return srv, nil
 		}
 	}
@@ -215,10 +223,10 @@ func (s *Store) PickEnabled(ctx context.Context, projID, senderEmail string) (*s
 
 func (s *Store) scanServer(r interface{ Scan(...any) error }) (*ssmodel.Server, error) {
 	var srv ssmodel.Server
-	var allowed, providerConfig string
+	var allowed, allowedDomains, providerConfig string
 	var validatedAt, lastSeenAt sql.NullTime
 	if err := r.Scan(&srv.ID, &srv.ProjectID, &srv.CreatedBy, &srv.Name, &srv.Host,
-		&srv.Port, &srv.Username, &srv.Password, &srv.Encryption, &srv.SkipDKIM, &allowed,
+		&srv.Port, &srv.Username, &srv.Password, &srv.Encryption, &srv.SkipDKIM, &allowed, &allowedDomains,
 		database.Str(&srv.GroupID), &srv.Priority,
 		&srv.Status, &srv.ValidationError, &validatedAt, &srv.CreatedAt,
 		&srv.SESTopicARN, &srv.Provider, &providerConfig,
@@ -227,6 +235,7 @@ func (s *Store) scanServer(r interface{ Scan(...any) error }) (*ssmodel.Server, 
 	}
 
 	database.MustUnmarshalJSON(allowed, &srv.AllowedEmails)
+	database.MustUnmarshalJSON(allowedDomains, &srv.AllowedDomains)
 	database.MustUnmarshalJSON(providerConfig, &srv.ProviderConfig)
 	if validatedAt.Valid {
 		srv.ValidatedAt = new(validatedAt.Time)

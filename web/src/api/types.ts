@@ -239,6 +239,10 @@ export interface SMTPServer {
   // for providers that rewrite headers and re-sign (Amazon SES).
   skip_dkim: boolean
   allowed_emails: string[]
+  // allowed_domains restricts which sender domains this server carries.
+  // Empty carries any, and the match is exact - a listed name does not
+  // cover its subdomains, because SPF is written per name.
+  allowed_domains: string[]
   // ses_topic_arn is the SNS topic SES publishes this server's bounces
   // to. Only SES replaces the envelope sender, so it is the only case
   // where feedback cannot come back as a DSN.

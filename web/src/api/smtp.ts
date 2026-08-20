@@ -17,6 +17,7 @@ export interface SMTPServerPayload {
   skip_dkim?: boolean
   ses_topic_arn?: string
   allowed_emails?: string[]
+  allowed_domains?: string[]
   group_id?: string
   priority?: number
 }

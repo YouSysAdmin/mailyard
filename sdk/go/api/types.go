@@ -1520,6 +1520,7 @@ type Server struct {
 	Encryption      string            `json:"encryption"`
 	SkipDKIM        bool              `json:"skip_dkim"`
 	AllowedEmails   []string          `json:"allowed_emails"`
+	AllowedDomains  []string          `json:"allowed_domains"`
 	GroupID         string            `json:"group_id,omitempty"`
 	Priority        int64             `json:"priority"`
 	Status          string            `json:"status"`
@@ -1585,6 +1586,7 @@ type Shared struct {
 	Encryption      string            `json:"encryption"`
 	SkipDKIM        bool              `json:"skip_dkim"`
 	AllowedEmails   []string          `json:"allowed_emails"`
+	AllowedDomains  []string          `json:"allowed_domains"`
 	GroupID         string            `json:"group_id,omitempty"`
 	Priority        int64             `json:"priority"`
 	Status          string            `json:"status"`
@@ -1596,7 +1598,6 @@ type Shared struct {
 	LastSeenAt      *time.Time        `json:"last_seen_at,omitempty"`
 	Provider        string            `json:"provider,omitempty"`
 	ProviderConfig  map[string]string `json:"provider_config,omitempty"`
-	AllowedDomains  []string          `json:"allowed_domains"`
 	SecurityMode    string            `json:"security_mode"`
 	PlatformOnly    bool              `json:"platform_only"`
 }
@@ -1696,6 +1697,7 @@ type SmtpserverCreateInput struct {
 	ProviderConfig map[string]string `json:"provider_config"`
 	SESTopicARN    string            `json:"ses_topic_arn"`
 	AllowedEmails  []string          `json:"allowed_emails"`
+	AllowedDomains []string          `json:"allowed_domains"`
 	GroupID        string            `json:"group_id"`
 	Priority       int64             `json:"priority"`
 }
@@ -1723,6 +1725,7 @@ type SmtpserverUpdateInput struct {
 	SkipDKIM       *bool              `json:"skip_dkim"`
 	SESTopicARN    *string            `json:"ses_topic_arn"`
 	AllowedEmails  *[]string          `json:"allowed_emails"`
+	AllowedDomains *[]string          `json:"allowed_domains"`
 	GroupID        string             `json:"group_id"`
 	Priority       *int64             `json:"priority"`
 	ProviderConfig *map[string]string `json:"provider_config"`

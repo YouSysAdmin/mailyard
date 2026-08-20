@@ -52,6 +52,12 @@ type createInput struct {
 	SESTopicARN   string   `json:"ses_topic_arn" validate:"omitempty,max=512" normalize:"trim"`
 	AllowedEmails []string `json:"allowed_emails" validate:"omitempty,dive,min=3,max=320"`
 
+	// AllowedDomains restricts the sender DOMAINS this server carries.
+	// Empty carries any. The rule a project splits relay nodes by -
+	// allowed_emails is per address and says nothing when addresses
+	// are not enumerated.
+	AllowedDomains []string `json:"allowed_domains" validate:"omitempty,dive,min=1,max=253"`
+
 	// GroupID places the server in a pool. Empty joins the project's
 	// default group, which is what every server did before groups
 	// existed.
@@ -72,8 +78,14 @@ type updateInput struct {
 	SkipDKIM      *bool     `json:"skip_dkim"`
 	SESTopicARN   *string   `json:"ses_topic_arn" validate:"omitzero,max=512" normalize:"trim"`
 	AllowedEmails *[]string `json:"allowed_emails" validate:"omitzero,dive,min=3,max=320"`
-	GroupID       string    `json:"group_id" validate:"omitempty,max=64"`
-	Priority      *int      `json:"priority" validate:"omitzero,min=0,max=10000"`
+
+	// AllowedDomains is patchable to an EMPTY list, which is how a
+	// restriction is lifted - a pointer, so absent and empty are
+	// different things here.
+	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,min=1,max=253"`
+
+	GroupID  string `json:"group_id" validate:"omitempty,max=64"`
+	Priority *int   `json:"priority" validate:"omitzero,min=0,max=10000"`
 
 	// Provider is not patchable, deliberately. Switching a live row from
 	// a dial to an API leaves the credentials meaning something else -

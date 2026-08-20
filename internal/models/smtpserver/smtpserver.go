@@ -55,6 +55,19 @@ type Server struct {
 	SkipDKIM      bool     `json:"skip_dkim"`
 	AllowedEmails []string `json:"allowed_emails"`
 
+	// AllowedDomains restricts which sender DOMAINS may relay through
+	// this server. Empty allows any, and the match is EXACT - a listed
+	// name does not cover its subdomains, unlike domain verification.
+	// SPF is why: a relay authorized in the record for example.com is
+	// not thereby authorized for mail.example.com, so covering the
+	// subdomain here would hand back exactly the failure this list
+	// exists to prevent. List the subdomain to allow it.
+	//
+	// Applied in ADDITION to AllowedEmails, which is per address. Both
+	// are asked by ResolveCandidates, on the pinned server, on every
+	// member of a group and on the shared pool alike.
+	AllowedDomains []string `json:"allowed_domains"`
+
 	// GroupID is the pool this server belongs to. Never empty after
 	// migration 00003 - a server always sits in exactly one group, and
 	// a project always has a default one.
@@ -223,11 +236,6 @@ const (
 type Shared struct {
 	Server
 
-	// AllowedDomains restricts which sender DOMAINS may relay through
-	// this server. Empty allows any. Distinct from the embedded
-	// AllowedEmails, which is per address and applies as well.
-	AllowedDomains []string `json:"allowed_domains"`
-
 	// SecurityMode is permissive or strict. See SecurityStrict.
 	SecurityMode string `json:"security_mode"`
 
@@ -244,10 +252,17 @@ type Shared struct {
 }
 
 // AllowsDomain reports whether sender's domain may relay through this
-// shared server. This is the domain rule only - strict mode is
+// server. This is the domain rule only - a shared row's strict mode is
 // enforced by the caller, which is the only place that knows which
 // project is sending.
-func (s *Shared) AllowsDomain(sender string) bool {
+//
+// ONE method for both levels. It lived on Shared, so a project that
+// split its relay nodes by domain had nothing to split them WITH:
+// allowed_emails is per address, is empty by default, and a project
+// sending from several domains under unset addresses got no
+// restriction at all. Moving the field onto Server is what lets the
+// same rule be written once and asked in one place.
+func (s *Server) AllowsDomain(sender string) bool {
 	if len(s.AllowedDomains) == 0 {
 		return true
 	}

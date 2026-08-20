@@ -33,6 +33,7 @@ const { errors, capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 const allowedEmailsText = ref('')
+const allowedDomainsText = ref('')
 
 const form = ref(blank())
 
@@ -60,6 +61,7 @@ watch(
     if (!s) {
       form.value = blank()
       allowedEmailsText.value = ''
+      allowedDomainsText.value = ''
 
       return
     }
@@ -81,6 +83,7 @@ watch(
       priority: s.priority ?? 0,
     }
     allowedEmailsText.value = (s.allowed_emails ?? []).join('\n')
+    allowedDomainsText.value = (s.allowed_domains ?? []).join('\n')
   },
   { immediate: true },
 )
@@ -102,8 +105,8 @@ function collectOptions(): Record<string, string> {
   return out
 }
 
-function parseAllowedEmails(): string[] {
-  return allowedEmailsText.value
+function parseLines(text: string): string[] {
+  return text
     .split(/\r?\n/)
     .map((e) => e.trim())
     .filter((e) => e.length > 0)
@@ -118,7 +121,8 @@ async function save() {
     username: form.value.username.trim(),
     skip_dkim: form.value.skip_dkim,
     ses_topic_arn: form.value.ses_topic_arn.trim(),
-    allowed_emails: parseAllowedEmails(),
+    allowed_emails: parseLines(allowedEmailsText.value),
+    allowed_domains: parseLines(allowedDomainsText.value),
     priority: Number(form.value.priority),
   }
   if (form.value.group_id) payload.group_id = form.value.group_id
@@ -300,6 +304,17 @@ async function save() {
         class="form-textarea"
         rows="3"
         placeholder="user@example.com&#10;*@example.com"
+      ></textarea>
+    </FormField>
+    <FormField
+      hint="One per line. Matched exactly, so a subdomain needs its own line - SPF is written per name. Leave empty to carry any domain."
+    >
+      <template #label>Allowed Sender Domains <span class="text-muted">(optional)</span></template>
+      <textarea
+        v-model="allowedDomainsText"
+        class="form-textarea"
+        rows="3"
+        placeholder="example.com&#10;mail.example.com"
       ></textarea>
     </FormField>
     <template #footer>

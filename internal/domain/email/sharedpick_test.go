@@ -86,9 +86,9 @@ func sharedServer(name string, mutate func(*ssmodel.Shared)) *ssmodel.Shared {
 		Server: ssmodel.Server{
 			ID: name, Name: name, Host: name + ".example.net", Port: 587,
 			Status: ssmodel.StatusEnabled, AllowedEmails: []string{},
+			AllowedDomains: []string{},
 		},
-		AllowedDomains: []string{},
-		SecurityMode:   ssmodel.SecurityPermissive,
+		SecurityMode: ssmodel.SecurityPermissive,
 	}
 	if mutate != nil {
 		mutate(s)
@@ -401,6 +401,57 @@ func TestCandidatesAreFilteredAndOrdered(t *testing.T) {
 
 	if len(names) != 2 || names[0] != "first" || names[1] != "second" {
 		t.Fatalf("got %v, want [first second] - the store's order, minus what cannot carry it", names)
+	}
+}
+
+// A project splitting its relay nodes by domain is the case the column
+// was added for, and the group branch is where it has to hold: every
+// enabled member of a group is a failover candidate, so without the
+// domain rule a send from one domain walks straight onto a node that is
+// in nobody's SPF record for it. Nothing errors - the mail leaves and
+// is refused at the far end.
+func TestAGroupSplitsItsServersByDomain(t *testing.T) {
+	st := routedStore(
+		map[string][]*ssmodel.Server{"g-default": {
+			srv("for-a", func(s *ssmodel.Server) { s.AllowedDomains = []string{"a.test"} }),
+			srv("for-b", func(s *ssmodel.Server) { s.AllowedDomains = []string{"b.test"} }),
+			srv("for-anything", nil),
+		}},
+		nil, map[string]*ssmodel.Group{},
+	)
+	got, err := ResolveCandidates(t.Context(), st, "proj-a", "hi@a.test", Route{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var names []string
+	for _, c := range got {
+		names = append(names, c.Name)
+	}
+
+	if len(names) != 2 || names[0] != "for-a" || names[1] != "for-anything" {
+		t.Fatalf("got %v, want [for-a for-anything] - b.test's node must not be a candidate", names)
+	}
+}
+
+// A pin is not an exemption. The caller naming a server does not make
+// it able to carry the domain, and answering nothing is right: sending
+// through it anyway would leave from an address the record does not
+// authorize, which is the failure the pin cannot see.
+func TestAPinnedServerStillHonoursItsDomainList(t *testing.T) {
+	pinned := srv("pinned", func(s *ssmodel.Server) { s.AllowedDomains = []string{"elsewhere.test"} })
+	st := routedStore(
+		map[string][]*ssmodel.Server{"g-default": {pinned}},
+		map[string]*ssmodel.Server{"pinned": pinned},
+		map[string]*ssmodel.Group{},
+	)
+	got, err := ResolveCandidates(t.Context(), st, "proj-a", "hi@a.test", Route{ServerID: "pinned"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 0 {
+		t.Fatalf("got %d candidates, want none", len(got))
 	}
 }
 

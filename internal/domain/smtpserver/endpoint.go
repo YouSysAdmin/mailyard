@@ -90,6 +90,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		Provider:       in.Provider,
 		ProviderConfig: in.ProviderConfig,
 		AllowedEmails:  in.AllowedEmails,
+		AllowedDomains: in.AllowedDomains,
 		Priority:       in.Priority,
 		Status:         ssmodel.StatusEnabled,
 	}
@@ -112,6 +113,10 @@ func (h *Handler) Create(c fiber.Ctx) error {
 
 	if srv.AllowedEmails == nil {
 		srv.AllowedEmails = []string{}
+	}
+
+	if srv.AllowedDomains == nil {
+		srv.AllowedDomains = []string{}
 	}
 
 	if err := h.Runtime.Store.SMTPServer.Put(c.Context(), srv); err != nil {
@@ -184,6 +189,10 @@ func (h *Handler) Update(c fiber.Ctx) error {
 
 	if in.AllowedEmails != nil {
 		srv.AllowedEmails = *in.AllowedEmails
+	}
+
+	if in.AllowedDomains != nil {
+		srv.AllowedDomains = *in.AllowedDomains
 	}
 
 	if in.Priority != nil {

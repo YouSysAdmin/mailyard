@@ -87,12 +87,12 @@ func (h *SharedHandler) Create(c fiber.Ctx) error {
 			Provider:       in.Provider,
 			ProviderConfig: in.ProviderConfig,
 			AllowedEmails:  in.AllowedEmails,
+			AllowedDomains: in.AllowedDomains,
 			Priority:       in.Priority,
 			Status:         ssmodel.StatusEnabled,
 		},
-		AllowedDomains: in.AllowedDomains,
-		SecurityMode:   in.SecurityMode,
-		PlatformOnly:   in.PlatformOnly,
+		SecurityMode: in.SecurityMode,
+		PlatformOnly: in.PlatformOnly,
 	}
 	normalizeShared(srv)
 	if err := h.Runtime.Store.SharedSMTP.Put(c.Context(), srv); err != nil {
