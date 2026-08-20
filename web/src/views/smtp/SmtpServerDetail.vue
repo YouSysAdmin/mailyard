@@ -37,6 +37,7 @@ const form = ref({
   skip_dkim: false,
 })
 const allowedEmailsText = ref('')
+const allowedDomainsText = ref('')
 
 const { errors: fieldErrors, capture, clear } = useFieldErrors()
 
@@ -51,6 +52,7 @@ function fillForm(s: SMTPServer) {
     skip_dkim: s.skip_dkim ?? false,
   }
   allowedEmailsText.value = (s.allowed_emails ?? []).join('\n')
+  allowedDomainsText.value = (s.allowed_domains ?? []).join('\n')
 }
 
 async function fetchServer() {
@@ -66,6 +68,13 @@ async function fetchServer() {
   }
 }
 
+function parseLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((e) => e.trim())
+    .filter((e) => e.length > 0)
+}
+
 async function save() {
   clear()
   if (!server.value) return
@@ -77,10 +86,8 @@ async function save() {
     username: form.value.username.trim(),
     encryption: form.value.encryption,
     skip_dkim: form.value.skip_dkim,
-    allowed_emails: allowedEmailsText.value
-      .split(/\r?\n/)
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0),
+    allowed_emails: parseLines(allowedEmailsText.value),
+    allowed_domains: parseLines(allowedDomainsText.value),
   }
   // An omitted password keeps the stored one.
   if (form.value.password !== '') {
@@ -221,6 +228,20 @@ onMounted(fetchServer)
                 <span v-else class="text-muted">Any sender</span>
               </div>
             </div>
+            <div>
+              <div class="status-label">Allowed Domains</div>
+              <div class="status-value">
+                <template v-if="server.allowed_domains && server.allowed_domains.length > 0">
+                  <span
+                    v-for="d in server.allowed_domains"
+                    :key="d"
+                    class="badge badge-neutral mr-2"
+                    >{{ d }}</span
+                  >
+                </template>
+                <span v-else class="text-muted">Any domain</span>
+              </div>
+            </div>
           </div>
           <div v-if="projStore.can('smtp:write')" class="flex gap-2 mt-5">
             <button class="btn btn-secondary" :disabled="testing" @click="testServer">
@@ -332,6 +353,20 @@ onMounted(fetchServer)
                 class="form-textarea"
                 rows="3"
                 placeholder="user@example.com&#10;*@example.com"
+                :disabled="!projStore.can('smtp:write')"
+              ></textarea>
+            </FormField>
+            <FormField
+              hint="One per line. Matched exactly, so a subdomain needs its own line - SPF is written per name. Leave empty to carry any domain."
+            >
+              <template #label
+                >Allowed Sender Domains <span class="text-muted">(optional)</span></template
+              >
+              <textarea
+                v-model="allowedDomainsText"
+                class="form-textarea"
+                rows="3"
+                placeholder="example.com&#10;mail.example.com"
                 :disabled="!projStore.can('smtp:write')"
               ></textarea>
             </FormField>
