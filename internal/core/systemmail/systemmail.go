@@ -19,6 +19,7 @@ package systemmail
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -58,12 +59,27 @@ type Sender struct {
 	addr        func() Address
 	log         *slog.Logger
 	sendTimeout time.Duration
+
+	// nodeTLS builds the transport for a pool row that is a RELAY
+	// NODE: our client certificate, the relay authority as the root,
+	// ServerName set to the host. The same builder the delivery worker
+	// and the console's Test button use, for the same reason those two
+	// share it - a node is dialled with mutual TLS and no AUTH, and
+	// dialling it like an ordinary server asks the SYSTEM roots about
+	// a certificate our own CA signed, which can never verify.
+	//
+	// Nil where relay nodes are not configured. A node row picked
+	// while it is nil is REFUSED with a reason, not dialled: the
+	// handshake was going to fail anyway, and much less legibly.
+	nodeTLS func(ctx context.Context, host string) (*tls.Config, error)
 }
 
 // New builds a Sender. It never fails: with no pool or no From
 // address, Enabled reports false and Send says what is missing.
-func New(pool Pool, addr func() Address, log *slog.Logger) *Sender {
-	return &Sender{pool: pool, addr: addr, log: log, sendTimeout: 30 * time.Second}
+// nodeTLS may be nil - see the field.
+func New(pool Pool, addr func() Address, log *slog.Logger,
+	nodeTLS func(ctx context.Context, host string) (*tls.Config, error)) *Sender {
+	return &Sender{pool: pool, addr: addr, log: log, sendTimeout: 30 * time.Second, nodeTLS: nodeTLS}
 }
 
 // Enabled reports whether platform mail is CONFIGURED - a From
@@ -128,6 +144,21 @@ func (s *Sender) Server(ctx context.Context) (*ssmodel.Shared, error) {
 	return first, nil
 }
 
+// dialTLS answers how to reach one pool row - nil for an ordinary
+// server, the mutual-TLS config for a relay node. The same question
+// email.Processor.nodeTLS answers on the delivery path.
+func (s *Sender) dialTLS(ctx context.Context, srv *ssmodel.Shared) (*tls.Config, error) {
+	if !srv.IsNode() {
+		return nil, nil
+	}
+
+	if s.nodeTLS == nil {
+		return nil, fmt.Errorf("systemmail: %s is a relay node but no client identity is configured", srv.Name)
+	}
+
+	return s.nodeTLS(ctx, srv.Host)
+}
+
 // Send delivers one message. Returns nil without doing anything when
 // no From address is configured, so callers do not have to branch -
 // check Enabled() first only when the outcome changes what you tell
@@ -167,7 +198,12 @@ func (s *Sender) Send(ctx context.Context, to []string, subject, html, text stri
 		return err
 	}
 
-	t, err := transport.Open(srv.Spec(nil))
+	nodeTLS, err := s.dialTLS(ctx, srv)
+	if err != nil {
+		return err
+	}
+
+	t, err := transport.Open(srv.Spec(nodeTLS))
 	if err != nil {
 		return fmt.Errorf("systemmail: %s: %w", srv.Name, err)
 	}
@@ -216,7 +252,12 @@ func (s *Sender) TestConnection(ctx context.Context) error {
 		return err
 	}
 
-	t, err := transport.Open(srv.Spec(nil))
+	nodeTLS, err := s.dialTLS(ctx, srv)
+	if err != nil {
+		return err
+	}
+
+	t, err := transport.Open(srv.Spec(nodeTLS))
 	if err != nil {
 		return err
 	}

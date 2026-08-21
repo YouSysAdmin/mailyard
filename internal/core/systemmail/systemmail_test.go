@@ -4,6 +4,7 @@ package systemmail
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"strings"
@@ -54,14 +55,14 @@ func TestEnabledNeedsAnAddressAndAPool(t *testing.T) {
 		"neither":          {nil, "", false},
 	}
 	for name, tc := range cases {
-		s := New(tc.pool, at(tc.from, ""), discard())
+		s := New(tc.pool, at(tc.from, ""), discard(), nil)
 		if s.Enabled() != tc.want {
 			t.Errorf("%s: Enabled() = %v, want %v", name, s.Enabled(), tc.want)
 		}
 	}
 
 	// Unconfigured Send must not error, so callers can fire and forget.
-	s := New(nil, at("", ""), discard())
+	s := New(nil, at("", ""), discard(), nil)
 	if err := s.Send(t.Context(), []string{"a@example.com"}, "s", "h", "t"); err != nil {
 		t.Errorf("unconfigured Send returned %v, want nil", err)
 	}
@@ -91,7 +92,7 @@ func TestServerPrefersAReservedRow(t *testing.T) {
 		"empty pool": {nil, "", ErrNoServer},
 	}
 	for name, tc := range cases {
-		s := New(&fakePool{servers: tc.servers}, at("a@example.com", ""), discard())
+		s := New(&fakePool{servers: tc.servers}, at("a@example.com", ""), discard(), nil)
 		srv, err := s.Server(t.Context())
 		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("%s: err = %v, want %v", name, err, tc.wantErr)
@@ -107,7 +108,7 @@ func TestServerPrefersAReservedRow(t *testing.T) {
 // An empty pool is not silence. The caller decides what to tell the
 // user, and "no server" has a different fix from "the server said no".
 func TestSendReportsAnEmptyPool(t *testing.T) {
-	s := New(&fakePool{}, at("a@example.com", ""), discard())
+	s := New(&fakePool{}, at("a@example.com", ""), discard(), nil)
 	err := s.Send(t.Context(), []string{"b@example.com"}, "s", "h", "t")
 	if !errors.Is(err, ErrNoServer) {
 		t.Errorf("Send with an empty pool returned %v, want ErrNoServer", err)
@@ -134,12 +135,12 @@ func TestNilSenderIsSafe(t *testing.T) {
 // quotes the name with a comma in it, where the hand-composed form
 // produced two addresses.
 func TestHeaderFromUsesDisplayName(t *testing.T) {
-	with := New(nil, at("ops@example.com", "Mailyard Ops"), discard())
+	with := New(nil, at("ops@example.com", "Mailyard Ops"), discard(), nil)
 	if got := with.headerFrom(); got != `"Mailyard Ops" <ops@example.com>` {
 		t.Errorf("headerFrom() = %q", got)
 	}
 
-	without := New(nil, at("ops@example.com", ""), discard())
+	without := New(nil, at("ops@example.com", ""), discard(), nil)
 	if got := without.headerFrom(); got != "ops@example.com" {
 		t.Errorf("headerFrom() = %q", got)
 	}
@@ -184,5 +185,44 @@ func TestInvitationFallsBackWhenInviterUnknown(t *testing.T) {
 	_, _, text := Invitation("Acme", "", "https://example.com/x", 168)
 	if !strings.Contains(text, "A project admin") {
 		t.Errorf("expected a fallback inviter, got %q", text)
+	}
+}
+
+// A pool row that is a relay node is dialled with OUR transport or not
+// at all. Spec(nil) asked the system roots about a certificate our own
+// CA signed, so every invitation and password reset through a
+// node-backed pool failed with an x509 error - and SendAsync is fire
+// and forget, so the only symptom was a log line and mail that never
+// came.
+func TestANodeRowNeedsTheRelayTransport(t *testing.T) {
+	node := shared("node1", false)
+	node.NodeID = "rn-1"
+	node.Host = "mx1.example.net"
+
+	// Without the builder: a refusal that names the problem, before
+	// any connection is paid for.
+	s := New(&fakePool{servers: []*ssmodel.Shared{node}}, at("a@example.com", ""), discard(), nil)
+	tlsCfg, err := s.dialTLS(t.Context(), node)
+	if err == nil || tlsCfg != nil {
+		t.Fatalf("dialTLS = (%v, %v), want a refusal naming the missing identity", tlsCfg, err)
+	}
+
+	// With it: the node's host is what the certificate is checked
+	// against, exactly as the delivery worker dials it.
+	s = New(&fakePool{servers: []*ssmodel.Shared{node}}, at("a@example.com", ""), discard(),
+		func(_ context.Context, host string) (*tls.Config, error) {
+			return &tls.Config{ServerName: host, MinVersion: tls.VersionTLS13}, nil
+		})
+	tlsCfg, err = s.dialTLS(t.Context(), node)
+	if err != nil || tlsCfg == nil || tlsCfg.ServerName != "mx1.example.net" {
+		t.Fatalf("dialTLS = (%+v, %v), want the builder's config for the node's host", tlsCfg, err)
+	}
+
+	// And an ordinary server keeps its nil, which is what leaves the
+	// existing dial untouched.
+	plain := shared("plain", false)
+	tlsCfg, err = s.dialTLS(t.Context(), plain)
+	if err != nil || tlsCfg != nil {
+		t.Fatalf("dialTLS on an ordinary server = (%v, %v), want (nil, nil)", tlsCfg, err)
 	}
 }

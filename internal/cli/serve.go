@@ -290,12 +290,22 @@ func runServe(cmd *cobra.Command, r role) error {
 	// server in the config file. One place to configure platform
 	// credentials, and a pool row marked platform_only reserves itself
 	// for this traffic.
+	//
+	// The relay identity is resolved FIRST, because the pool row this
+	// picks can be a relay node, and a node is dialled with our client
+	// certificate and no AUTH - so the sender needs the same transport
+	// builder the delivery worker and the console's Test button use.
+	relayClient := relayClientSource(cfg, st)
+	if relayClient != nil {
+		rt.RelayNodeTLS = relayClient.WorkerTLS
+	}
+
 	rt.SystemMail = systemmail.New(st.SharedSMTP, func() systemmail.Address {
 		return systemmail.Address{
 			From:     rt.Settings.String(smodel.KeyPlatformMailFrom),
 			FromName: rt.Settings.String(smodel.KeyPlatformMailFromName),
 		}
-	}, log)
+	}, log, rt.RelayNodeTLS)
 	if rt.SystemMail.Enabled() {
 		log.Info("platform mail enabled", "from", rt.SystemMail.From())
 	} else {
@@ -368,15 +378,10 @@ func runServe(cmd *cobra.Command, r role) error {
 
 	// Delivery worker: the email store is its queue source, the email
 	// processor its delivery leg. Started before the HTTP server so
-	// rows left queued by a previous run drain immediately.
-	relayClient := relayClientSource(cfg, st)
-	if relayClient != nil {
-		// The console proves a server row by dialling it through the
-		// same transport the worker delivers through, so a node row
-		// needs the same identity - see smtpserver.testTransport.
-		rt.RelayNodeTLS = relayClient.WorkerTLS
-	}
-
+	// rows left queued by a previous run drain immediately. relayClient
+	// was resolved beside SystemMail above - one identity for the three
+	// places a node is dialled from: the worker, the console's Test
+	// button (see smtpserver.testTransport) and platform mail.
 	worker := queue.NewWorker(st.Email, &email.Processor{
 		Store:         st,
 		Log:           log,
