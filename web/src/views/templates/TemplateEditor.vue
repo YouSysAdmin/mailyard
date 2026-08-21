@@ -7,10 +7,13 @@
 // renders for a given set of data, and switching back and forth to
 // check hides exactly the mistakes worth catching.
 //
-// Three documents make up a localization - subject, HTML and text -
-// and they are edited as three tabs over ONE pane. Sample data is the
-// fourth editor and sits below, because it is an input to the preview
-// rather than part of what gets saved.
+// Three documents make up a localization - subject, HTML and text.
+// The two BODIES share one pane as tabs, with sample data as a third
+// tab: they are all multi-line editors over the same space. The
+// subject is not - it is one line, and as a tab it rendered a whole
+// CodeMirror pane for a sentence while hiding the body being written.
+// It sits above the pane as a plain input instead, mirroring the
+// subject row the preview draws at the same height opposite.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { templatesApi, type RenderedPreview } from '../../api/templates'
@@ -25,7 +28,7 @@ import RenderedMessage from '../../components/RenderedMessage.vue'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 
-type DocumentTab = 'html' | 'text' | 'subject'
+type DocumentTab = 'html' | 'text' | 'data'
 
 /** Shown until a version or template supplies its own. */
 const EXAMPLE_DATA = '{\n  "name": "John",\n  "company": "Acme"\n}'
@@ -54,12 +57,13 @@ const stylesheetCSS = ref('')
 
 const tab = ref<DocumentTab>('html')
 
-// The four editors. Each owns its own element, text and teardown, so
-// this view holds intent rather than CodeMirror bookkeeping.
+// The three pane editors. Each owns its own element, text and
+// teardown, so this view holds intent rather than CodeMirror
+// bookkeeping.
 //
-// Three of them are the localization and one is not: editing the
-// sample data re-renders the preview but leaves nothing to save, so it
-// must not arm the unsaved-changes guard.
+// Two of them are the localization and one is not: editing the sample
+// data re-renders the preview but leaves nothing to save, so it must
+// not arm the unsaved-changes guard.
 const editLocalization = () => {
   dirty.value = true
   schedulePreview()
@@ -74,15 +78,17 @@ const textDoc = useCodeMirror({
   placeholder: 'Plain text version...',
   onEdit: editLocalization,
 })
-const subjectDoc = useCodeMirror({
-  placeholder: 'e.g. Welcome {{ .name }}',
-  onEdit: editLocalization,
-})
 const dataDoc = useCodeMirror({
   language: 'json',
   placeholder: '{"key": "value"}',
   onEdit: () => schedulePreview(),
 })
+
+// The subject is a plain input, not a CodeMirror: template syntax works
+// in one line exactly as well, and what an editor pane bought was an
+// empty page under a sentence.
+const subject = ref('')
+const subjectInput = ref<HTMLInputElement | null>(null)
 
 const preview = ref<RenderedPreview | null>(null)
 const previewOpen = ref(true)
@@ -137,7 +143,7 @@ async function renderPreview() {
     const res = await templatesApi.preview({
       // The endpoint requires a subject, and an empty editor is the
       // ordinary state of a template being started.
-      subject: subjectDoc.text.value || ' ',
+      subject: subject.value || ' ',
       html: htmlDoc.text.value,
       text: textDoc.text.value,
       // The version's stylesheet, so the preview is styled the way a
@@ -155,7 +161,7 @@ async function renderPreview() {
 
 /** Put a localization's three documents into the editors. */
 function load(loc: TemplateLocalization | undefined) {
-  subjectDoc.set(loc?.subject ?? '')
+  subject.value = loc?.subject ?? ''
   htmlDoc.set(loc?.html ?? '')
   textDoc.set(loc?.text ?? '')
   dirty.value = false
@@ -196,9 +202,9 @@ async function onLanguageChange(event: Event) {
 async function save() {
   if (saving.value || !language.value) return
 
-  if (!subjectDoc.text.value.trim()) {
+  if (!subject.value.trim()) {
     notify.error('A localization needs a subject')
-    tab.value = 'subject'
+    subjectInput.value?.focus()
 
     return
   }
@@ -209,7 +215,7 @@ async function save() {
     // localization and updates an existing one.
     const res = await templatesApi.putLocalization(templateId, versionId, {
       language: language.value,
-      subject: subjectDoc.text.value,
+      subject: subject.value,
       html: htmlDoc.text.value,
       text: textDoc.text.value,
     })
@@ -313,7 +319,7 @@ onMounted(async () => {
     // mounts into a real element - hence nextTick rather than the
     // zero-delay timeout this used to guess with.
     await nextTick()
-    subjectDoc.mount(start?.subject ?? '')
+    subject.value = start?.subject ?? ''
     htmlDoc.mount(start?.html ?? '')
     textDoc.mount(start?.text ?? '')
     dataDoc.mount(version.value.sample_data || template.value.sample_data || EXAMPLE_DATA)
@@ -400,15 +406,31 @@ onBeforeUnmount(() => {
         <div class="strip">
           <div class="tabs">
             <button
-              v-for="t in ['html', 'text', 'subject'] as DocumentTab[]"
+              v-for="t in ['html', 'text', 'data'] as DocumentTab[]"
               :key="t"
               class="tab"
               :class="{ active: tab === t }"
               @click="tab = t"
             >
-              {{ t === 'html' ? 'HTML' : t === 'text' ? 'Plain Text' : 'Subject' }}
+              {{ t === 'html' ? 'HTML' : t === 'text' ? 'Plain Text' : 'Sample Data' }}
             </button>
           </div>
+        </div>
+
+        <!-- One line above the pane, mirroring the subject row the
+             preview draws at the same height opposite - so what is
+             typed here and what it renders to sit on one eye line. -->
+        <div class="editor-subject">
+          <label class="editor-subject-label" for="editor-subject-input">Subject</label>
+          <input
+            id="editor-subject-input"
+            ref="subjectInput"
+            v-model="subject"
+            type="text"
+            class="form-input editor-subject-input"
+            placeholder="e.g. Welcome {{ .name }}"
+            @input="editLocalization"
+          />
         </div>
 
         <!-- v-show, not v-if: an editor destroyed on tab change loses
@@ -417,13 +439,8 @@ onBeforeUnmount(() => {
         <div class="editor-docs">
           <div v-show="tab === 'html'" :ref="htmlDoc.host" class="editor-doc"></div>
           <div v-show="tab === 'text'" :ref="textDoc.host" class="editor-doc"></div>
-          <div v-show="tab === 'subject'" :ref="subjectDoc.host" class="editor-doc"></div>
+          <div v-show="tab === 'data'" :ref="dataDoc.host" class="editor-doc"></div>
         </div>
-
-        <details class="editor-data" open>
-          <summary class="editor-data-title">Sample Data (JSON)</summary>
-          <div :ref="dataDoc.host" class="editor-doc editor-doc-short"></div>
-        </details>
       </section>
 
       <section v-if="previewOpen" class="editor-preview">
@@ -462,6 +479,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: calc(100dvh - 52px);
   margin: calc(-1 * var(--gutter));
+  /* A visible END. Without it the editors run flush into the window
+     edge, which reads as a scrollbar that stopped working rather than
+     as the bottom of the page - the pane is dark, the edge is dark,
+     and nothing says "this is all of it". Half the gutter: enough to
+     be an edge, not enough to be a row somebody looks for content in. */
+  padding-bottom: calc(var(--gutter) / 2);
   overflow: hidden;
 }
 
@@ -512,13 +535,16 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
-/* Equal halves, collapsing to one when the preview is hidden. */
+/* Equal halves, collapsing to one when the preview is hidden. The
+   bottom border is what makes the inset under it read as a frame
+   rather than a leak. */
 .editor-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .editor-split.solo {
@@ -549,30 +575,40 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-.editor-doc-short,
-.editor-doc-short :deep(.cm-editor) {
-  height: 150px;
-}
-
-.editor-data {
+/* The same recipe as the preview pane's .subject row opposite -
+   height, border and background - so the input and what it renders to
+   line up across the split. */
+.editor-subject {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
-  border-top: 1px solid var(--border-primary);
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
 }
 
-.editor-data-title {
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-}
-
-.editor-data-title:hover {
+.editor-subject-label {
   color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* form-input, flattened into the bar: the system class keeps the
+   focus ring, the placeholder color and the disabled look, and this
+   takes back only what makes it a BOX - a bordered rounded field
+   inside an 8px bar reads as a form, and this row is a title line. */
+.editor-subject-input.form-input {
+  height: auto;
+  padding: 4px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.editor-subject-input.form-input:hover:not(:disabled):not(:focus) {
+  border: none;
 }
 
 .editor-preview {
