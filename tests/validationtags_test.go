@@ -54,7 +54,7 @@ func TestNoPointerFieldSaysOmitempty(t *testing.T) {
 
 		if info.IsDir() {
 			switch info.Name() {
-			case "node_modules", "dist", ".git", "dev-data":
+			case "node_modules", "dist", ".git", "dev-data", "vendor":
 				return filepath.SkipDir
 			}
 
@@ -143,7 +143,7 @@ func TestEveryRuleInUseHasASentence(t *testing.T) {
 
 		if info.IsDir() {
 			switch info.Name() {
-			case "node_modules", "dist", ".git", "dev-data":
+			case "node_modules", "dist", ".git", "dev-data", "vendor":
 				return filepath.SkipDir
 			}
 
