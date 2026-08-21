@@ -109,7 +109,7 @@ type Event struct {
 	Path   string `json:"path,omitempty"`
 
 	// Status is the HTTP status the request returned.
-	Status int `json:"status,omitempty"`
+	Status int `json:"status,omitzero"`
 
 	// Detail is a short human-readable note (a failure reason, the
 	// name of the affected object).

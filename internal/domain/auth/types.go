@@ -289,9 +289,9 @@ type LoginChallenge struct {
 
 	// Requires2FA asks for the authenticator code. Reached only after
 	// the password checked out, so it reveals nothing to a guesser.
-	Requires2FA bool `json:"requires_2fa,omitempty"`
+	Requires2FA bool `json:"requires_2fa,omitzero"`
 
 	// RequiresVerification means the signup link has not been redeemed.
 	// Also checked after the password, for the same reason.
-	RequiresVerification bool `json:"requires_verification,omitempty"`
+	RequiresVerification bool `json:"requires_verification,omitzero"`
 }

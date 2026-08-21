@@ -10,7 +10,6 @@ package eventstream
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -128,7 +127,10 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 // has gone, which is the normal way a stream ends - a reader closing
 // a tab is not an error worth logging.
 func writeEvent(w *bufio.Writer, event string, payload any) bool {
-	body, err := json.Marshal(payload)
+	// Through the wire policy in response - the feed renders the same
+	// shapes the REST responses do, empty lists and coerced bytes
+	// included, so the console never sees two dialects of one model.
+	body, err := response.Marshal(payload)
 	if err != nil {
 		return false
 	}

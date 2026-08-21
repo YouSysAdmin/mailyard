@@ -49,7 +49,7 @@ type Attachment struct {
 
 	// Size in bytes of the decoded content, recorded on offload so
 	// listings stay meaningful without the bytes.
-	Size int64 `json:"size,omitempty"`
+	Size int64 `json:"size,omitzero"`
 }
 
 // Email is one outbound message and its delivery state.
@@ -104,7 +104,7 @@ type Email struct {
 	OpenCount  int        `json:"open_count"`
 	ClickCount int        `json:"click_count"`
 
-	ListUnsubscribePost bool `json:"list_unsubscribe_post,omitempty"`
+	ListUnsubscribePost bool `json:"list_unsubscribe_post,omitzero"`
 
 	Status        string     `json:"status"`
 	ErrorMessage  string     `json:"error_message,omitempty"`

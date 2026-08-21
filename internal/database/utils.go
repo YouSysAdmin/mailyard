@@ -3,9 +3,9 @@
 package database
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -111,59 +111,49 @@ func EscapeLike(s string) string {
 	return strings.ReplaceAll(s, "_", `\_`)
 }
 
+// storedJSONOptions is how a Go value becomes column text, stated once
+// for the same reason MustJSON exists at all - eighteen call sites
+// agreeing by hand is how the sentinel bug started.
+//
+// A nil slice is `[]` and a nil map is `{}`, never `null` - the v2
+// default, and the columns these feed are all NOT NULL DEFAULT '[]' or
+// '{}'. A round trip hides the difference, since `null` reads back as a
+// nil slice, but any predicate written against the sentinel breaks: the
+// retention sweeps look for an attachments_json that is neither the
+// empty array nor the empty string, and `null` matches that, so they
+// rewrite every settled row in the window whether it had an attachment
+// or not. MustJSON used to normalize the top level by hand - the v2
+// default reaches NESTED nils too, which the hand pass never did.
+//
+// Deterministic, because v1 sorted map keys and v2 does not: two writes
+// of the same headers map must produce the same column bytes, or
+// anything computed over them - a diff, a test expectation, an etag -
+// flaps between runs.
+//
+// Invalid UTF-8 is coerced to U+FFFD rather than refused, which is what
+// v1 always did. These bytes are header values and subjects taken from
+// received mail, and Postgres refuses invalid UTF-8 in a TEXT column -
+// so the coercion is load-bearing, not a leniency: without it one
+// latin-1 byte in a header makes the write panic instead of storing the
+// message.
+var storedJSONOptions = json.JoinOptions(
+	json.Deterministic(true),
+	jsontext.AllowInvalidUTF8(true),
+)
+
 // MustJSON marshals v as JSON and panics on error. Stores serialize
 // Go-native maps and slices that json.Marshal cannot fail on, so a
 // panic means a programmer bug - a chan or func in a model field -
 // and crashing beats writing a corrupt column. It returns []byte so
-// callers can pass it straight to driver args.
-//
-// A nil slice comes out as `[]` and a nil map as `{}`, never `null`.
-// encoding/json would write `null` for both, and the columns these feed
-// are all NOT NULL DEFAULT '[]' or '{}'. A round trip hides the
-// difference, since `null` reads back as a nil slice, but any predicate
-// written against the sentinel breaks: the retention sweeps look for an
-// attachments_json that is neither the empty array nor the empty string,
-// and `null` matches that, so they rewrite every settled row in the
-// window whether it had an attachment or not.
-//
-// Handled here rather than at the eighteen call sites - one of them
-// getting it right while another does not is how this started.
+// callers can pass it straight to driver args. The exact bytes are
+// storedJSONOptions' concern - see there.
 func MustJSON(v any) []byte {
-	if norm, ok := emptyJSONFor(v); ok {
-		return norm
-	}
-
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(v, storedJSONOptions)
 	if err != nil {
 		panic(fmt.Sprintf("dbutil.MustJSON: %v (input: %#v)", err, v))
 	}
 
 	return b
-}
-
-// emptyJSONFor answers the empty literal for a nil slice or map, since
-// those are the two shapes whose "none" has a column default to agree
-// with. A nil pointer or interface still marshals to `null`, which is
-// the honest answer for a value that is absent rather than empty.
-func emptyJSONFor(v any) ([]byte, bool) {
-	if v == nil {
-		return nil, false
-	}
-
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Map {
-		return nil, false
-	}
-
-	if !rv.IsNil() {
-		return nil, false
-	}
-
-	if rv.Kind() == reflect.Map {
-		return []byte("{}"), true
-	}
-
-	return []byte("[]"), true
 }
 
 // MustUnmarshalJSON is the read-side complement to MustJSON: parse

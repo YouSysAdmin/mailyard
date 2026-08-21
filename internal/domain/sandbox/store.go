@@ -5,7 +5,7 @@ package sandbox
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"time"
 
@@ -112,22 +112,16 @@ func (s *Store) Put(ctx context.Context, e *sbmodel.Email) error {
 		e.ReceivedAt = e.CreatedAt
 	}
 
-	recipients, err := json.Marshal(orEmptyStrings(e.Recipients))
-	if err != nil {
-		return err
-	}
+	// MustJSON rather than a plain marshal: it writes [] and {} for a
+	// nil slice or map (the column defaults), keeps the bytes
+	// deterministic, and coerces invalid UTF-8 the way headers taken
+	// from received mail need - the same policy every other store
+	// column gets.
+	recipients := database.MustJSON(e.Recipients)
+	headers := database.MustJSON(e.Headers)
+	attachments := database.MustJSON(e.Attachments)
 
-	headers, err := json.Marshal(orEmptyMap(e.Headers))
-	if err != nil {
-		return err
-	}
-
-	attachments, err := json.Marshal(orEmptyAttachments(e.Attachments))
-	if err != nil {
-		return err
-	}
-
-	_, err = s.Exec(ctx, `
+	_, err := s.Exec(ctx, `
         INSERT INTO sandbox_emails (id, project_id, source, credential_id, api_key_id,
             sender, recipients, subject, text_body, html_body, headers, attachments,
             raw, size, client_ip, expires_at, received_at, created_at)
@@ -237,28 +231,4 @@ func scanSandbox(sc scanner) (*sbmodel.Email, error) {
 	}
 
 	return &e, nil
-}
-
-func orEmptyStrings(v []string) []string {
-	if v == nil {
-		return []string{}
-	}
-
-	return v
-}
-
-func orEmptyMap(v map[string]string) map[string]string {
-	if v == nil {
-		return map[string]string{}
-	}
-
-	return v
-}
-
-func orEmptyAttachments(v []sbmodel.Attachment) []sbmodel.Attachment {
-	if v == nil {
-		return []sbmodel.Attachment{}
-	}
-
-	return v
 }

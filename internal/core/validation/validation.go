@@ -38,7 +38,7 @@
 package validation
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"reflect"
 	"strings"
@@ -113,6 +113,12 @@ type fiberCtx interface {
 // then validates struct-tag rules. On any step's failure the
 // (typed-zero, error) pair is returned and the caller writes the
 // response.
+//
+// Parsing is json/v2 with its default strictness, the same policy the
+// app decoder carries (response.Unmarshal): a duplicate member, invalid
+// UTF-8 or a mistyped value is refused rather than absorbed, and names
+// match case-sensitively - a wrong-case key is ignored as unknown, the
+// way an unknown key always was.
 //
 // Order matters:
 //  1. JSON unmarshal so the struct exists.

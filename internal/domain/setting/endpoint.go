@@ -3,7 +3,7 @@
 package setting
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"strings"
 	"time"

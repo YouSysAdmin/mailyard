@@ -14,7 +14,7 @@ package passkey
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/v2"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"

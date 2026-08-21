@@ -5,7 +5,7 @@ package inbound
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"strings"
 	"time"
@@ -107,33 +107,24 @@ func (s *Store) Put(ctx context.Context, e *imodel.Email) error {
 		e.CreatedAt = time.Now().UTC()
 	}
 
-	recipients, err := json.Marshal(emptyIfNil(e.Recipients))
-	if err != nil {
-		return err
-	}
-
-	headers, err := json.Marshal(orEmptyMap(e.Headers))
-	if err != nil {
-		return err
-	}
+	// MustJSON rather than a plain marshal: it writes [] and {} for a
+	// nil slice or map (the column defaults), keeps the bytes
+	// deterministic, and coerces invalid UTF-8 the way headers taken
+	// from received mail need - the same policy every other store
+	// column gets.
+	recipients := database.MustJSON(e.Recipients)
+	headers := database.MustJSON(e.Headers)
+	attachments := database.MustJSON(e.Attachments)
 
 	// Nil Auth stores as an empty string, not "null": the read side
 	// treats empty as "never checked", which is the honest state for a
 	// row written before authentication existed.
 	auth := []byte("")
 	if e.Auth != nil {
-		auth, err = json.Marshal(e.Auth)
-		if err != nil {
-			return err
-		}
+		auth = database.MustJSON(e.Auth)
 	}
 
-	attachments, err := json.Marshal(orEmptyAtt(e.Attachments))
-	if err != nil {
-		return err
-	}
-
-	_, err = s.Exec(ctx, `
+	_, err := s.Exec(ctx, `
         INSERT INTO inbound_emails (id, project_id, domain_id, message_id, dedup_hash,
             sender, recipients, subject, text_body, html_body, headers, attachments,
             raw, size, status, error_message, auth, received_at, created_at)
@@ -251,30 +242,6 @@ func scanInbound(r interface{ Scan(...any) error }) (*imodel.Email, error) {
 	e.Raw = raw
 
 	return &e, nil
-}
-
-func emptyIfNil(in []string) []string {
-	if in == nil {
-		return []string{}
-	}
-
-	return in
-}
-
-func orEmptyMap(in map[string]string) map[string]string {
-	if in == nil {
-		return map[string]string{}
-	}
-
-	return in
-}
-
-func orEmptyAtt(in []imodel.Attachment) []imodel.Attachment {
-	if in == nil {
-		return []imodel.Attachment{}
-	}
-
-	return in
 }
 
 // ----------------------------------------------------------------------------

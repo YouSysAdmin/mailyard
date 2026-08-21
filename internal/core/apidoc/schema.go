@@ -230,7 +230,10 @@ func jsonName(f reflect.StructField) (name string, omitempty, skip bool) {
 	}
 
 	for _, p := range parts[1:] {
-		if p == "omitempty" {
+		// omitzero counts: for what the document derives from this -
+		// "may this member be absent" - the two options are the same
+		// claim, they only differ in which Go values trigger it.
+		if p == "omitempty" || p == "omitzero" {
 			omitempty = true
 		}
 	}

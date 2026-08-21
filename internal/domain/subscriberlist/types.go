@@ -67,8 +67,8 @@ type SubscribeResponse struct {
 // two booleans is set, naming which way the membership moved, and both
 // carry omitempty so the body says only what happened.
 type MembershipChange struct {
-	Unsubscribed bool   `json:"unsubscribed,omitempty"`
-	Resubscribed bool   `json:"resubscribed,omitempty"`
+	Unsubscribed bool   `json:"unsubscribed,omitzero"`
+	Resubscribed bool   `json:"resubscribed,omitzero"`
 	ListID       string `json:"list_id"`
 	Email        string `json:"email"`
 }

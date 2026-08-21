@@ -64,7 +64,7 @@ type Delivery struct {
 	ProjectID    string    `json:"project_id"`
 	Event        string    `json:"event"`
 	Status       string    `json:"status"`
-	HTTPStatus   int       `json:"http_status,omitempty"`
+	HTTPStatus   int       `json:"http_status,omitzero"`
 	ErrorMessage string    `json:"error_message,omitempty"`
 	Attempt      int       `json:"attempt"`
 	CreatedAt    time.Time `json:"created_at"`

@@ -9,7 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -171,7 +171,7 @@ func (p *Provider) userInfoClaims(ctx context.Context, tok *oauth2.Token) (*Clai
 	}
 
 	var raw map[string]any
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&raw); err != nil {
+	if err := json.UnmarshalRead(io.LimitReader(resp.Body, 1<<20), &raw); err != nil {
 		return nil, fmt.Errorf("decode userinfo: %w", err)
 	}
 

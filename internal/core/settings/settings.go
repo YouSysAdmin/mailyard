@@ -15,7 +15,7 @@ package settings
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"maps"
 	"net/mail"
 	"strconv"

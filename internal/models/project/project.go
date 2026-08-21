@@ -134,7 +134,7 @@ type Member struct {
 	// because "everyone here is a Viewer" and "this person was made a
 	// Viewer" are different facts and only one of them survives a
 	// change to the project default.
-	InheritedRole bool `json:"inherited_role,omitempty"`
+	InheritedRole bool `json:"inherited_role,omitzero"`
 
 	// RolePermissions is the role's stored permission strings,
 	// resolved by the membership join. Not serialized: the console

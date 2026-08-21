@@ -60,7 +60,7 @@ type RequestContext struct {
 	// owner-only acts and four destructive deletes - and the second
 	// group is now permission.ActionDelete, leaving exactly the acts
 	// the catalogue genuinely cannot name.
-	ProjectOwner bool `json:"project_owner,omitempty"`
+	ProjectOwner bool `json:"project_owner,omitzero"`
 
 	// Permissions is what this caller may do in Project, and it is
 	// what every tenant gate consults.

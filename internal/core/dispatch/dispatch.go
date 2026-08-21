@@ -19,7 +19,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -28,6 +27,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
+	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
@@ -101,7 +101,11 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 		return
 	}
 
-	body, err := json.Marshal(map[string]any{
+	// Through the wire policy in response - a webhook body is the
+	// product's JSON the same way an API response is, so an empty list
+	// in a payload is [] there too, and a bad byte out of received
+	// mail cannot make the delivery fail unsent.
+	body, err := response.Marshal(map[string]any{
 		"event":     event,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 		"data":      payload,

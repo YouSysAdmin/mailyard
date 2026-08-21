@@ -18,15 +18,16 @@ import (
 
 // Success writes 200 with data as the body.
 //
-// Through withEmptyLists, so an empty list is [] and never null - see
-// there for why that is decided here and not at each accumulator.
+// c.JSON marshals through this package's Marshal - the server wires it
+// as the app's JSONEncoder - so an empty list is [] and never null. See
+// marshalOptions in wire.go for the whole wire policy.
 func Success(c fiber.Ctx, data any) error {
-	return c.Status(fiber.StatusOK).JSON(withEmptyLists(data))
+	return c.Status(fiber.StatusOK).JSON(data)
 }
 
 // Created writes 201 with data as the body.
 func Created(c fiber.Ctx, data any) error {
-	return c.Status(fiber.StatusCreated).JSON(withEmptyLists(data))
+	return c.Status(fiber.StatusCreated).JSON(data)
 }
 
 // NoContent writes 204 and no body.

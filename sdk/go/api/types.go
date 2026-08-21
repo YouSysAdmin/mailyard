@@ -116,7 +116,7 @@ type Attachment struct {
 	Content     string `json:"content,omitempty"`
 	ContentType string `json:"content_type,omitempty"`
 	StorageKey  string `json:"storage_key,omitempty"`
-	Size        int64  `json:"size,omitempty"`
+	Size        int64  `json:"size,omitzero"`
 }
 
 // AttachmentInput is the request body.
@@ -445,7 +445,7 @@ type Delivery struct {
 	ProjectID    string    `json:"project_id"`
 	Event        string    `json:"event"`
 	Status       string    `json:"status"`
-	HTTPStatus   int64     `json:"http_status,omitempty"`
+	HTTPStatus   int64     `json:"http_status,omitzero"`
 	ErrorMessage string    `json:"error_message,omitempty"`
 	Attempt      int64     `json:"attempt"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -537,7 +537,7 @@ type Email struct {
 	ClickedAt             *time.Time        `json:"clicked_at,omitempty"`
 	OpenCount             int64             `json:"open_count"`
 	ClickCount            int64             `json:"click_count"`
-	ListUnsubscribePost   bool              `json:"list_unsubscribe_post,omitempty"`
+	ListUnsubscribePost   bool              `json:"list_unsubscribe_post,omitzero"`
 	Status                string            `json:"status"`
 	ErrorMessage          string            `json:"error_message,omitempty"`
 	Attempts              int64             `json:"attempts"`
@@ -626,7 +626,7 @@ type Event struct {
 	UserAgent  string    `json:"user_agent,omitempty"`
 	Method     string    `json:"method,omitempty"`
 	Path       string    `json:"path,omitempty"`
-	Status     int64     `json:"status,omitempty"`
+	Status     int64     `json:"status,omitzero"`
 	Detail     string    `json:"detail,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 }
@@ -768,7 +768,7 @@ type InboundEmail struct {
 	HTMLBody     string              `json:"html_body,omitempty"`
 	Headers      map[string]string   `json:"headers,omitempty"`
 	Attachments  []InboundAttachment `json:"attachments,omitempty"`
-	HasRaw       bool                `json:"has_raw,omitempty"`
+	HasRaw       bool                `json:"has_raw,omitzero"`
 	Size         int64               `json:"size"`
 	Auth         *Auth               `json:"auth,omitempty"`
 	Status       string              `json:"status"`
@@ -1014,7 +1014,7 @@ type Member struct {
 	Owner         bool      `json:"owner"`
 	RoleID        string    `json:"role_id,omitempty"`
 	RoleName      string    `json:"role_name,omitempty"`
-	InheritedRole bool      `json:"inherited_role,omitempty"`
+	InheritedRole bool      `json:"inherited_role,omitzero"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -1042,8 +1042,8 @@ type MemberRoleInput struct {
 
 // MembershipChange is the wire body.
 type MembershipChange struct {
-	Unsubscribed bool   `json:"unsubscribed,omitempty"`
-	Resubscribed bool   `json:"resubscribed,omitempty"`
+	Unsubscribed bool   `json:"unsubscribed,omitzero"`
+	Resubscribed bool   `json:"resubscribed,omitzero"`
 	ListID       string `json:"list_id"`
 	Email        string `json:"email"`
 }

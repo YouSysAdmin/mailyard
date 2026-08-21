@@ -146,6 +146,16 @@ func New(opts Options) (*Server, error) {
 		// failure reaching the top of a handler became a 500 carrying
 		// the Postgres message.
 		ErrorHandler: errorHandler,
+
+		// The wire policy, stated once in the response package: every
+		// c.JSON in the tree marshals under it (json/v2 - a nil slice
+		// is [], a nil map stays null, a bad byte from received mail is
+		// coerced instead of failing the response), and request parsing
+		// through the app decoder is v2-strict. Left unset, Fiber falls
+		// back to v1 semantics and empty lists quietly go back to null
+		// - which the generated Python and Ruby clients do not survive.
+		JSONEncoder: func(v any) ([]byte, error) { return response.Marshal(v) },
+		JSONDecoder: func(data []byte, v any) error { return response.Unmarshal(data, v) },
 	}
 
 	// TrustProxy governs what Fiber itself will read out of a forwarding

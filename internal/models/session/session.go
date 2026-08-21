@@ -41,7 +41,7 @@ type Session struct {
 	// Current marks the session making the request, filled by the
 	// handler so the UI can label it and avoid offering to revoke it
 	// as if it were somebody else's.
-	Current bool `json:"current,omitempty"`
+	Current bool `json:"current,omitzero"`
 }
 
 // Active reports whether the session can still authenticate at now.

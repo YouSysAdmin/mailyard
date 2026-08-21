@@ -83,7 +83,7 @@ type Email struct {
 
 	// HasRaw tells the console whether a raw download exists. Computed
 	// from Raw at read time, never stored.
-	HasRaw bool  `json:"has_raw,omitempty"`
+	HasRaw bool  `json:"has_raw,omitzero"`
 	Size   int64 `json:"size"`
 
 	// Auth records what SPF, DKIM and DMARC said about this message.
