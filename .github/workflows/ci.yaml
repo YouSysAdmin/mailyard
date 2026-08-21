@@ -46,9 +46,16 @@ jobs:
       # compiled the linter from source for about two minutes on every
       # run. Pinned, because a linter that changes its mind between
       # runs fails builds nobody broke.
+      #
+      # THE PIN MOVES WITH THE GO VERSION IN go.mod. A golangci-lint
+      # binary refuses a target newer than the Go it was built with, so
+      # the 1.27 bump broke CI while the same tree passed locally -
+      # v2.13.1 is the first release built with go1.27 (checked with
+      # `go version -m` on the release binary, not assumed from its
+      # own version number).
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.13.1
           install-only: true
 
       # vet, golangci-lint, tests, gofmt, vue-tsc and prettier. The store
