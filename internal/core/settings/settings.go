@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"maps"
+	"net/mail"
 	"strconv"
 	"strings"
 	"sync"
@@ -168,6 +169,26 @@ func Validate(key, value string) (string, error) {
 	d, ok := smodel.Lookup(key)
 	if !ok {
 		return "", &Error{msg: "unknown setting " + key}
+	}
+
+	// Per-key rules first, then the type. The from address is checked
+	// HERE, at the write, because the failure it prevents is remote and
+	// unreadable: the value lands verbatim in MAIL FROM, and a value
+	// that is not a bare address earns a 501 from whichever server the
+	// pool points at - reported as a delivery failure, hours later, by
+	// a fire-and-forget sender whose caller already returned success.
+	if key == smodel.KeyPlatformMailFrom {
+		if v := strings.TrimSpace(value); v != "" {
+			parsed, err := mail.ParseAddress(v)
+			if err != nil || parsed.Name != "" || parsed.Address != v {
+				return "", &Error{msg: key + " must be a bare address like no-reply@example.com" +
+					" - the display name goes in platform_mail_from_name"}
+			}
+
+			return v, nil
+		}
+
+		return "", nil
 	}
 
 	switch d.Type {

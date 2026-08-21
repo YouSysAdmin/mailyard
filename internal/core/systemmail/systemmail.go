@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -170,6 +171,18 @@ func (s *Sender) Send(ctx context.Context, to []string, subject, html, text stri
 
 	if len(to) == 0 {
 		return fmt.Errorf("systemmail: no recipients")
+	}
+
+	// Refused HERE, with the setting named, rather than at the far
+	// end. The From lands verbatim in MAIL FROM - EnvelopeAddress
+	// hands back what it cannot parse - so a stored value that is not
+	// an address earned a 501 protocol error from whichever server the
+	// pool points at, reported as that server's failure. The write
+	// path refuses this too now, but a row stored before it learned to
+	// still has to fail legibly.
+	if _, err := mail.ParseAddress(strings.TrimSpace(s.addr().From)); err != nil {
+		return fmt.Errorf("systemmail: platform_mail_from %q is not a usable address"+
+			" - set a bare address like no-reply@example.com", s.addr().From)
 	}
 
 	srv, err := s.Server(ctx)
