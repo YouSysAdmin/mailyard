@@ -83,12 +83,10 @@ func (f *fakeDomains) GetVerifiedCovering(_ context.Context, name string) (*dmod
 
 func sharedServer(name string, mutate func(*ssmodel.Shared)) *ssmodel.Shared {
 	s := &ssmodel.Shared{
-		Server: ssmodel.Server{
-			ID: name, Name: name, Host: name + ".example.net", Port: 587,
-			Status: ssmodel.StatusEnabled, AllowedEmails: []string{},
-			AllowedDomains: []string{},
-		},
-		SecurityMode: ssmodel.SecurityPermissive,
+		ID: name, Name: name, Host: name + ".example.net", Port: 587,
+		Status: ssmodel.StatusEnabled, AllowedEmails: []string{},
+		AllowedDomains: []string{},
+		SecurityMode:   ssmodel.SecurityPermissive,
 	}
 	if mutate != nil {
 		mutate(s)

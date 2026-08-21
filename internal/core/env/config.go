@@ -941,8 +941,7 @@ func trimStringSlices(v reflect.Value) {
 		return
 	}
 
-	for i := range v.NumField() {
-		f := v.Field(i)
+	for _, f := range v.Fields() {
 		if f.Kind() == reflect.Struct || f.Kind() == reflect.Pointer {
 			trimStringSlices(f)
 

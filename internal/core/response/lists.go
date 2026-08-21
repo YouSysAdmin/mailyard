@@ -68,8 +68,8 @@ func fillEmptyLists(v reflect.Value, depth int) {
 		}
 
 	case reflect.Struct:
-		for i := range v.NumField() {
-			if f := v.Field(i); f.CanSet() {
+		for _, f := range v.Fields() {
+			if f.CanSet() {
 				fillEmptyLists(f, depth+1)
 			}
 		}

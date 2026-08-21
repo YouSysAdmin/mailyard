@@ -106,8 +106,7 @@ func TestRefusalDoesNotRevealAnotherProjectsDomain(t *testing.T) {
 	}
 
 	// And it must stay a caller mistake, not a 500.
-	var requestError *RequestError
-	if !errors.As(unknown, &requestError) {
+	if _, ok := errors.AsType[*RequestError](unknown); !ok {
 		t.Errorf("refusal is %T, want *RequestError so the endpoint answers 400", unknown)
 	}
 

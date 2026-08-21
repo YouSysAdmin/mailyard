@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-go@v6
-        with: { go-version: '1.26' }
+        with: { go-version: '1.27' }
 
       # Node builds the console only. The documentation is Hugo.
       - uses: actions/setup-node@v4

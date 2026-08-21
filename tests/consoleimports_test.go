@@ -81,7 +81,7 @@ func TestTheConsoleImportsNothingItDoesNotUse(t *testing.T) {
 
 		var names []string
 		for _, m := range named.FindAllStringSubmatch(script, -1) {
-			for _, part := range strings.Split(m[1], ",") {
+			for part := range strings.SplitSeq(m[1], ",") {
 				n := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(part), "type "))
 				// `X as Y` binds Y.
 				if at := strings.LastIndex(n, " as "); at >= 0 {
@@ -130,7 +130,7 @@ func TestTheConsoleImportsNothingItDoesNotUse(t *testing.T) {
 func stripImportLines(src string) string {
 	var out []string
 	inside := false
-	for _, line := range strings.Split(src, "\n") {
+	for line := range strings.SplitSeq(src, "\n") {
 		if inside {
 			if strings.Contains(line, "from '") || strings.Contains(line, "from \"") {
 				inside = false

@@ -45,24 +45,22 @@ func TestSharedServerSurvivesARoundTrip(t *testing.T) {
 	validated := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
 
 	want := &ssmodel.Shared{
-		Server: ssmodel.Server{
-			ID:              ids.New(),
-			CreatedBy:       "admin-1",
-			Name:            "pool-1",
-			Host:            "smtp.example.com",
-			Port:            2525,
-			Username:        "poolbox",
-			Password:        "s3cret-password",
-			Encryption:      smtpclient.EncryptionSTARTTLS,
-			SkipDKIM:        true,
-			AllowedEmails:   []string{"news@user.com", "*@other.com"},
-			AllowedDomains:  []string{"user.com"},
-			Priority:        7,
-			Status:          ssmodel.StatusEnabled,
-			ValidationError: "last test failed",
-			ValidatedAt:     &validated,
-		},
-		SecurityMode: ssmodel.SecurityStrict,
+		ID:              ids.New(),
+		CreatedBy:       "admin-1",
+		Name:            "pool-1",
+		Host:            "smtp.example.com",
+		Port:            2525,
+		Username:        "poolbox",
+		Password:        "s3cret-password",
+		Encryption:      smtpclient.EncryptionSTARTTLS,
+		SkipDKIM:        true,
+		AllowedEmails:   []string{"news@user.com", "*@other.com"},
+		AllowedDomains:  []string{"user.com"},
+		Priority:        7,
+		Status:          ssmodel.StatusEnabled,
+		ValidationError: "last test failed",
+		ValidatedAt:     &validated,
+		SecurityMode:    ssmodel.SecurityStrict,
 	}
 	if err := s.Put(t.Context(), want); err != nil {
 		t.Fatalf("Put: %v", err)
@@ -122,14 +120,12 @@ func TestSharedServerSurvivesARoundTrip(t *testing.T) {
 func newNode(t *testing.T, s *SharedStore, ns *relaynode.Store, name, status string, seen *time.Time) (*ssmodel.Shared, *nodemodel.Node) {
 	t.Helper()
 	srv := &ssmodel.Shared{
-		Server: ssmodel.Server{
-			ID:         ids.New(),
-			Name:       name,
-			Host:       name + ".example.com",
-			Port:       2587,
-			Encryption: smtpclient.EncryptionSSL,
-			Status:     status,
-		},
+		ID:         ids.New(),
+		Name:       name,
+		Host:       name + ".example.com",
+		Port:       2587,
+		Encryption: smtpclient.EncryptionSSL,
+		Status:     status,
 	}
 	if err := s.Put(t.Context(), srv); err != nil {
 		t.Fatalf("Put server: %v", err)
@@ -273,10 +269,9 @@ func TestANodeThatNeverReportedIsNotInThePool(t *testing.T) {
 // installation that runs no nodes at all.
 func TestAManualServerIsNeverStale(t *testing.T) {
 	s := testSharedStore(t)
-	plain := &ssmodel.Shared{Server: ssmodel.Server{
+	plain := &ssmodel.Shared{
 		ID: ids.New(), Name: "manual", Host: "smtp.example.com",
-		Port: 587, Status: ssmodel.StatusEnabled,
-	}}
+		Port: 587, Status: ssmodel.StatusEnabled}
 	if err := s.Put(t.Context(), plain); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
@@ -368,10 +363,9 @@ func TestAnAdminEditCannotUnenrollANode(t *testing.T) {
 	now := time.Now().UTC()
 	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, &now)
 
-	edit := &ssmodel.Shared{Server: ssmodel.Server{
+	edit := &ssmodel.Shared{
 		ID: srv.ID, Name: "renamed", Host: srv.Host, Port: srv.Port,
-		Status: ssmodel.StatusEnabled, Priority: 3,
-	}}
+		Status: ssmodel.StatusEnabled, Priority: 3}
 	if err := s.Put(t.Context(), edit); err != nil {
 		t.Fatalf("Put: %v", err)
 	}

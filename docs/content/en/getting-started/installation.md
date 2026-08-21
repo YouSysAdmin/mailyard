@@ -219,7 +219,7 @@ Two things to know before you do:
 
 ### Prerequisites
 
-- Go 1.26+
+- Go 1.27+
 - PostgreSQL 15+
 - Node.js 18+, to build the console
 - [go-task](https://taskfile.dev) 3+, which runs the build steps

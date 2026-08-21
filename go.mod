@@ -1,8 +1,8 @@
 module github.com/yousysadmin/mailyard
 
-go 1.26
+go 1.27
 
-toolchain go1.26.6
+toolchain go1.27.0
 
 require (
 	blitiri.com.ar/go/spf v1.5.1

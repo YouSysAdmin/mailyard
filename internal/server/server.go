@@ -246,8 +246,7 @@ func perRequestLimits(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 // through response.Internal, which logs it, softens a malformed uuid to
 // a 404, and tells the caller nothing it should not know.
 func errorHandler(c fiber.Ctx, err error) error {
-	var fe *fiber.Error
-	if errors.As(err, &fe) {
+	if fe, ok := errors.AsType[*fiber.Error](err); ok {
 		return response.Coded(c, fe.Code, strings.ToLower(fe.Message))
 	}
 
