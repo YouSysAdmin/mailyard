@@ -9,8 +9,7 @@ package ids
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // New returns a UUIDv7 as a string.
@@ -19,9 +18,11 @@ import (
 // at the right-hand edge of the index instead of dirtying a random
 // page. It only shows once the index outgrows memory - at 2M rows,
 // 16.2s for v4 against 9.1s for v7. It also gives the (created_at, id)
-// keyset cursor a tiebreaker in insertion order.
+// keyset cursor a tiebreaker in insertion order - the stdlib generator
+// documents that guarantee ("always returns UUIDs which sort in
+// increasing order"), where google/uuid merely happened to provide it.
 func New() string {
-	return uuid.Must(uuid.NewV7()).String()
+	return uuid.NewV7().String()
 }
 
 // MintedAt returns the millisecond a v7 id was minted, and whether it
@@ -46,7 +47,9 @@ func New() string {
 // a window that silently excludes the row.
 func MintedAt(id string) (time.Time, bool) {
 	u, err := uuid.Parse(id)
-	if err != nil || u.Version() != 7 {
+	// The version lives in the top four bits of byte 6 - the stdlib
+	// uuid package has no Version method, so it is read directly.
+	if err != nil || u[6]>>4 != 7 {
 		return time.Time{}, false
 	}
 

@@ -6,8 +6,7 @@ import (
 	"slices"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 )
@@ -22,8 +21,8 @@ func TestNewIsVersion7AndOrdered(t *testing.T) {
 			t.Fatalf("parse %q: %v", s, err)
 		}
 
-		if u.Version() != 7 {
-			t.Fatalf("%s is version %d, want 7", s, u.Version())
+		if v := u[6] >> 4; v != 7 {
+			t.Fatalf("%s is version %d, want 7", s, v)
 		}
 
 		out = append(out, s)
@@ -67,7 +66,7 @@ func TestMintedAtReadsTheTimestampBackOut(t *testing.T) {
 // would build a window that quietly misses the row.
 func TestMintedAtRefusesWhatIsNotAV7(t *testing.T) {
 	for _, tc := range []struct{ what, id string }{
-		{"a v4", uuid.Must(uuid.NewRandom()).String()},
+		{"a v4", uuid.NewV4().String()},
 		{"the nil uuid", "00000000-0000-0000-0000-000000000000"},
 		{"not a uuid at all", "banana"},
 		{"empty", ""},

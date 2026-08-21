@@ -22,8 +22,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // cursorSep separates the timestamp from the id. Not a character
