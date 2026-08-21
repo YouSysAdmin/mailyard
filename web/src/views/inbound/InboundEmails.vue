@@ -189,6 +189,17 @@ watch(
 
 watch(status, () => {
   pagedBack.value = false
+  // The rows AND the selection belong to the PREVIOUS filter, and both
+  // go before the load. The selection, so the auto-select watch can
+  // open the newest message of the new filter - and so an empty answer
+  // leaves the reader pane free to say so instead of showing a message
+  // the list no longer lists. The rows, because dropping the selection
+  // alone is a race: the route updates before the fetch answers, and
+  // the auto-select watch would put the old filter's newest message
+  // right back.
+  emails.value = []
+  hasMore.value = false
+  if (selectedId.value) router.replace('/inbound-emails')
   load()
 })
 
@@ -224,12 +235,14 @@ onMounted(() => loadAll())
 
     <LoadingBlock v-if="loading" />
 
-    <EmptyState v-else-if="emails.length === 0" title="No inbound emails">
-      <p v-if="status">No messages with this status yet. Try another filter.</p>
-      <p v-else>Messages received for your verified domains will appear here.</p>
-    </EmptyState>
+    <!-- The split renders whether or not there is anything in it. It
+         used to be replaced by an EmptyState when the list was empty,
+         and the STATUS FILTER lives inside the split - so a filter that
+         matched nothing removed the one control that could undo it,
+         and the only way out was reloading the page. An empty list is
+         now said in the reader pane, with every control still standing.
 
-    <!-- The split is the only thing that grows, so the two panes share
+         The split is the only thing that grows, so the two panes share
          exactly what the page has left and neither the window nor the
          panes' parent scrolls. -->
     <div v-else class="card reader-split">
@@ -276,6 +289,10 @@ onMounted(() => loadAll())
 
       <div class="reader-pane">
         <InboundReader v-if="selectedId" :id="selectedId" @delete="deleteEmail" />
+        <EmptyState v-else-if="emails.length === 0" title="No inbound emails">
+          <p v-if="status">No messages with this status yet. Try another filter.</p>
+          <p v-else>Messages received for your verified domains will appear here.</p>
+        </EmptyState>
         <EmptyState v-else title="Nothing selected">
           <p>Pick a message on the left to read it.</p>
         </EmptyState>

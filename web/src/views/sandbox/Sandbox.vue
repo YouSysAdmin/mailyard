@@ -260,14 +260,14 @@ onMounted(() => {
 
     <LoadingBlock v-if="loading" />
 
-    <EmptyState v-else-if="emails.length === 0" title="Nothing captured yet">
-      <p>
-        Send a message with a sandbox credential and it will appear here instead of going to a
-        recipient.
-      </p>
-    </EmptyState>
+    <!-- The split renders whether or not there is anything in it, the
+         same as the inbound page and for the same reason: swapping the
+         whole split for an EmptyState makes the page change shape the
+         moment the list empties - here, the instant "Empty sandbox"
+         finishes - and an empty list is an ordinary state on a page
+         people keep open while a suite runs. The reader pane says it.
 
-    <!-- The split is the only thing that grows, so the two panes share
+         The split is the only thing that grows, so the two panes share
          exactly what the page has left and neither the window nor the
          panes' parent scrolls. -->
     <div v-else class="card reader-split">
@@ -296,6 +296,12 @@ onMounted(() => {
 
       <div class="reader-pane">
         <SandboxReader v-if="selectedId" :id="selectedId" @deleted="forget" />
+        <EmptyState v-else-if="emails.length === 0" title="Nothing captured yet">
+          <p>
+            Send a message with a sandbox credential and it will appear here instead of going to a
+            recipient.
+          </p>
+        </EmptyState>
         <EmptyState v-else title="Nothing selected">
           <p>Pick a capture on the left to read it.</p>
         </EmptyState>
