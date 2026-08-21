@@ -20,12 +20,14 @@ package dbtest
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -157,9 +159,44 @@ func Schema(t *testing.T, db *sql.DB, stmts ...string) {
 	for _, s := range stmts {
 		//sqlconst:allow DDL written in the test itself, never from a request
 		if _, err := db.ExecContext(t.Context(), s); err != nil {
+			if extensionRace(err, s) {
+				// The extension exists NOW, which is all the statement
+				// was for - a concurrent package won the insert.
+				continue
+			}
+
 			t.Fatalf("setup statement failed: %v\n%s", err, s)
 		}
 	}
+}
+
+// extensionRace reports whether err is the loser's half of two
+// packages creating the same extension at once.
+//
+// Every test gets a schema of its own, but an EXTENSION is
+// database-global - one row in pg_extension - and `go test ./...`
+// runs package binaries in parallel against one database. CREATE
+// EXTENSION IF NOT EXISTS is check-then-insert with nothing
+// serializing two checkers, so the loser gets 23505 on
+// pg_extension_name_index (or 42710 when it lost after the winner
+// committed). Both mean the same thing: by the time the error is
+// raised the winner's row is committed, so the state the statement
+// wanted is the state the database is in.
+//
+// Scoped to CREATE EXTENSION IF NOT EXISTS statements, because a
+// 23505 from anything else - a data INSERT in a migration - is a bug
+// that must keep failing loudly.
+func extensionRace(err error, stmt string) bool {
+	if !strings.Contains(stmt, "CREATE EXTENSION IF NOT EXISTS") {
+		return false
+	}
+
+	var pg *pgconn.PgError
+	if !errors.As(err, &pg) {
+		return false
+	}
+
+	return pg.Code == "23505" || pg.Code == "42710"
 }
 
 // schemaName turns a test name into a legal, unique identifier.
