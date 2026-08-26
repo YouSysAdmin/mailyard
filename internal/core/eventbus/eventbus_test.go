@@ -3,6 +3,7 @@
 package eventbus
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -10,9 +11,9 @@ import (
 
 func TestPublishReachesOnlyItsProject(t *testing.T) {
 	b := New()
-	a := b.Subscribe("proj-a")
+	a, _ := b.Subscribe("proj-a")
 	defer a.Close()
-	other := b.Subscribe("proj-b")
+	other, _ := b.Subscribe("proj-b")
 	defer other.Close()
 
 	b.Publish(Event{Type: TypeEmailSent, ProjectID: "proj-a"})
@@ -39,7 +40,7 @@ func TestPublishReachesOnlyItsProject(t *testing.T) {
 
 func TestPublishDropsRatherThanBlocking(t *testing.T) {
 	b := New()
-	sub := b.Subscribe("proj")
+	sub, _ := b.Subscribe("proj")
 	defer sub.Close()
 
 	// Nobody is reading. Publishing far past the buffer must return
@@ -66,7 +67,7 @@ func TestPublishDropsRatherThanBlocking(t *testing.T) {
 
 func TestCloseIsIdempotentAndStopsDelivery(t *testing.T) {
 	b := New()
-	sub := b.Subscribe("proj")
+	sub, _ := b.Subscribe("proj")
 	sub.Close()
 	sub.Close() // must not panic on a double close
 
@@ -86,8 +87,8 @@ func TestCloseIsIdempotentAndStopsDelivery(t *testing.T) {
 // A live subscriber must observe its channel closing.
 func TestBusCloseEndsLiveSubscriptions(t *testing.T) {
 	b := New()
-	a := b.Subscribe("proj-a")
-	c := b.Subscribe("proj-b")
+	a, _ := b.Subscribe("proj-a")
+	c, _ := b.Subscribe("proj-b")
 
 	b.Close()
 	b.Close() // shutdown paths may run twice, must not panic
@@ -118,7 +119,7 @@ func TestSubscribeAfterCloseIsAlreadyFinished(t *testing.T) {
 	b := New()
 	b.Close()
 
-	sub := b.Subscribe("proj")
+	sub, _ := b.Subscribe("proj")
 	select {
 	case _, ok := <-sub.C:
 		if ok {
@@ -141,7 +142,7 @@ func TestConcurrentPublishAndSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
-			s := b.Subscribe("proj")
+			s, _ := b.Subscribe("proj")
 			defer s.Close()
 			for range 50 {
 				b.Publish(Event{Type: TypeEmailSent, ProjectID: "proj"})
@@ -152,5 +153,25 @@ func TestConcurrentPublishAndSubscribe(t *testing.T) {
 	wg.Wait()
 	if n, _, _ := b.Stats(); n != 0 {
 		t.Errorf("subscribers left = %d, want 0", n)
+	}
+}
+
+// A project, and the node, can hold only so many live streams - a
+// stream is a held connection, and the route had no other bound.
+func TestSubscribeRefusesPastTheCeiling(t *testing.T) {
+	b := New()
+	for i := 0; i < MaxSubscribersPerProject; i++ {
+		if _, err := b.Subscribe("proj"); err != nil {
+			t.Fatalf("subscription %d refused: %v", i, err)
+		}
+	}
+
+	if _, err := b.Subscribe("proj"); !errors.Is(err, ErrTooManySubscribers) {
+		t.Fatalf("past the per-project ceiling: got %v, want ErrTooManySubscribers", err)
+	}
+
+	// Another project is unaffected by the first one's ceiling.
+	if _, err := b.Subscribe("other"); err != nil {
+		t.Fatalf("a second project refused: %v", err)
 	}
 }

@@ -19,6 +19,7 @@
 package eventbus
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,6 +53,23 @@ type Event struct {
 	// At is when it happened.
 	At time.Time `json:"at"`
 }
+
+// Ceilings on live subscribers. A stream holds a fasthttp slot, a
+// goroutine and a buffered channel for up to eventstream.MaxStreamLife,
+// and the route had no cap: one signed-in account could open streams
+// until server.max_concurrent_requests was spent and the HTTP edge
+// answered nobody. Both numbers sit far below that default (4096) and
+// far above what a console genuinely opens, which is one per tab.
+const (
+	// MaxSubscribersPerProject bounds one project's listeners.
+	MaxSubscribersPerProject = 64
+
+	// MaxSubscribers bounds the node.
+	MaxSubscribers = 1024
+)
+
+// ErrTooManySubscribers is Subscribe refusing past a ceiling.
+var ErrTooManySubscribers = errors.New("too many live event streams")
 
 // buffer is how many events a single subscriber may fall behind by
 // before its events start being dropped. Small on purpose: a browser
@@ -106,19 +124,26 @@ func New() *Bus {
 	return &Bus{subs: map[string]map[uint64]*Subscription{}}
 }
 
-// Subscribe returns a subscription to one project's events.
+// Subscribe returns a subscription to one project's events, or
+// ErrTooManySubscribers when the project or the node is at its ceiling.
 //
 // After Close the returned subscription is already finished, so a
 // request that arrives during shutdown ends immediately instead of
 // waiting for a heartbeat that will never come.
-func (b *Bus) Subscribe(projectID string) *Subscription {
+func (b *Bus) Subscribe(projectID string) (*Subscription, error) {
 	ch := make(chan Event, buffer)
 	b.mu.Lock()
 	if b.closed {
 		b.mu.Unlock()
 		close(ch)
 
-		return &Subscription{C: ch, bus: b, projectID: projectID, ch: ch}
+		return &Subscription{C: ch, bus: b, projectID: projectID, ch: ch}, nil
+	}
+
+	if len(b.subs[projectID]) >= MaxSubscribersPerProject || b.countLocked() >= MaxSubscribers {
+		b.mu.Unlock()
+
+		return nil, ErrTooManySubscribers
 	}
 
 	b.nextID++
@@ -136,7 +161,17 @@ func (b *Bus) Subscribe(projectID string) *Subscription {
 	b.subs[projectID][sub.id] = sub
 	b.mu.Unlock()
 
-	return sub
+	return sub, nil
+}
+
+// countLocked is the live subscriber total, under the lock.
+func (b *Bus) countLocked() int {
+	n := 0
+	for _, m := range b.subs {
+		n += len(m)
+	}
+
+	return n
 }
 
 func (b *Bus) unsubscribe(s *Subscription) {

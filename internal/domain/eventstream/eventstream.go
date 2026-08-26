@@ -73,7 +73,12 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 
 	// Subscribe before the write loop starts so events raised between
 	// the handler running and the stream opening are not lost.
-	sub := h.Runtime.Events.Subscribe(projectID)
+	sub, err := h.Runtime.Events.Subscribe(projectID)
+	if err != nil {
+		// Headers already set for a stream are harmless on a JSON
+		// answer, and 429 is what the console's reconnect backs off on.
+		return response.TooManyRequests(c, err.Error())
+	}
 
 	// Fiber hands the connection to fasthttp's stream writer, which
 	// runs after the handler returns. Everything the loop needs is
