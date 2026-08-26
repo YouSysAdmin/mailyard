@@ -20,8 +20,17 @@ server:
   public_url: ""
 
   # Reverse-proxy CIDRs whose X-Forwarded-For is trusted. Leave empty
-  # when exposed directly.
+  # when exposed directly. Name EVERY hop: the caller's address is found
+  # by walking the header from the right and stopping at the first entry
+  # not in this list, so a hop left out becomes the answer.
   # trusted_proxies: ["10.0.0.0/8"]
+
+  # Connections served at once. A memory bound, not a tuning knob: a
+  # request body is read into memory before auth or the rate limiter
+  # can refuse it, and the body cap is ~34 MB at the defaults, so an
+  # unbounded connection count is an unbounded process. 0 leaves the
+  # HTTP library's own ceiling of 262144.
+  max_concurrent_requests: 4096
   # Whether TLS is terminated HERE. WHICH certificate is served is not
   # configured in this file at all - it is assigned in the console,
   # under Administration -> Certificates, and stored in the database so
@@ -104,6 +113,11 @@ inbound:
   # prefers it and does not verify.
   tls:
     enabled: true
+  # Refuse a message whose From domain publishes DMARC p=reject and
+  # nothing it vouches for passed. Off by default: the verdict is
+  # stored either way, forwarded mail breaks SPF routinely, so turn it
+  # on after looking at what real traffic scores.
+  reject_on_dmarc_fail: false
 
 # -----------------------------------------------------------------------------
 # Let's Encrypt.
@@ -176,11 +190,30 @@ database:
   #   suppressions: false   # off by default: that page writes a block
   #                         # and reads the list straight back
 
+  # Connection pool, per node, to the primary and separately to each
+  # replica. 0 for max_open_conns removes the cap, which is how one
+  # busy node exhausts the server's max_connections for everybody.
+  # Idle matches open so a steady load does not reconnect constantly.
+  # Lifetime recycles connections so a fleet drifts back onto a
+  # rebalanced or failed-over database.
+  max_open_conns: 25
+  max_idle_conns: 25
+  conn_max_lifetime: 30m
+  conn_max_idle_time: 5m
+
 # -----------------------------------------------------------------------------
 # Logging configuration
 # -----------------------------------------------------------------------------
 logging:
+  # trace, debug, info, warn or error.
   level: info
+  # json or text. json for anything that ships logs somewhere.
+  format: json
+  # stdout or stderr.
+  output: stdout
+  # Color applies to text format on an interactive terminal only - a
+  # file or a pipe always gets plain text.
+  color: true
 
 # -----------------------------------------------------------------------------
 # Auth configuration
@@ -192,6 +225,14 @@ auth:
   # Generate with: openssl rand -hex 32
   jwt_secret: "change-me-to-a-long-random-string-32b"
   session_ttl: 12h
+  # Public self-signup. Off by default: this is an operator console, and
+  # open signup on an internet-facing install means strangers with
+  # accounts. New accounts are always plain users.
+  registration_enabled: false
+  # WebAuthn passkeys on local accounts. On by default, since nothing
+  # happens until somebody enrols one. An account an identity provider
+  # owns never gets one - that would be a way in the IdP cannot revoke.
+  passkeys_enabled: true
   local:
     enabled: true
     # Bootstrap admin, created on first start with an empty users
@@ -215,6 +256,11 @@ sending:
   # where the sending IPs are ours. A project using its own SMTP server
   # sets its own address in Project settings.
   # bounce_address: "bounces@mail.example.com"
+  # The host tenants put in their SPF record, e.g. "_spf.mail.example.com".
+  # Only this installation knows it, so there is no default and the
+  # console asks for it rather than printing a placeholder somebody
+  # would publish verbatim.
+  # spf_include: ""
 
 # -----------------------------------------------------------------------------
 # Relay nodes: machines you run that deliver straight to recipient mail
@@ -237,11 +283,23 @@ relay_nodes:
   # A node enrolled by a PROJECT presents an API key holding relay:write
   # instead and never sees this.
   auto_register_token: ""
+  # What the relay certificate authority calls itself. Cosmetic: it is
+  # what an operator sees inspecting a node's certificate.
+  ca_common_name: "Mailyard Relay CA"
 
 webhook:
   timeout: 10s
+  # A webhook that fails every attempt is DISABLED and the project's
+  # owners are mailed the reason - it is re-enabled by hand once the
+  # endpoint is fixed.
   max_attempts: 3
   retry_delay: 10s
+  # Let webhooks reach loopback, RFC 1918 and other reserved addresses.
+  # Off by default: URLs are chosen by project members, and without the
+  # guard one can aim a delivery at the cloud metadata service and use
+  # this process as a proxy into the private network. Turn it on only
+  # for receivers that really are on this network.
+  allow_private_targets: false
 
 campaign:
   batch_size: 100
@@ -305,6 +363,23 @@ storage:
     access_key: ""
     secret_key: ""
     use_path_style: false
+
+# Cross-origin browser access to the API. Off by default: the console
+# is same-origin and the SDKs are not browsers. Turn it on for a
+# browser app of your own on another origin, and list ONLY origins you
+# control - allow_credentials sends the session cookie to every one of
+# them. "*" is accepted for origins but cannot be combined with
+# allow_credentials.
+cors:
+  enabled: false
+  allowed_origins: []
+  # allowed_origins: ["https://app.example.com"]
+  allowed_methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+  allowed_headers: ["Content-Type", "Authorization", "X-Mailyard-Project-Id"]
+  expose_headers: []
+  allow_credentials: false
+  # Seconds a browser may cache the preflight.
+  max_age: 300
 
 # Prometheus scrape at GET /metrics.
 metrics:
