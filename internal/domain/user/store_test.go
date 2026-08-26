@@ -5,6 +5,7 @@ package user
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/yousysadmin/mailyard/internal/database/dbtest"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
@@ -95,5 +96,38 @@ func TestClaimTOTPStepIsAtomic(t *testing.T) {
 
 	if wins != 1 {
 		t.Errorf("%d of %d concurrent claims succeeded, want exactly 1", wins, racers)
+	}
+}
+
+// The password lockout is one statement on the row: the limit-th wrong
+// password locks, the count resets with it, and a right password clears
+// both.
+func TestRecordLoginFailureLocksAtTheLimit(t *testing.T) {
+	s := newTestStore(t)
+	const id = "1ce81574-b36f-4f3e-8e6e-dabcaaf8f5b1"
+
+	for i := 1; i < 3; i++ {
+		locked, err := s.RecordLoginFailure(t.Context(), id, 3, time.Minute)
+		if err != nil || locked {
+			t.Fatalf("failure %d: locked=%v err=%v, want unlocked", i, locked, err)
+		}
+	}
+
+	locked, err := s.RecordLoginFailure(t.Context(), id, 3, time.Minute)
+	if err != nil || !locked {
+		t.Fatalf("third failure: locked=%v err=%v, want locked", locked, err)
+	}
+
+	until, err := s.LoginLockedUntil(t.Context(), id)
+	if err != nil || until == nil || !until.After(time.Now()) {
+		t.Fatalf("LoginLockedUntil = %v, %v, want a future time", until, err)
+	}
+
+	if err := s.ClearLoginFailures(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+
+	if until, _ := s.LoginLockedUntil(t.Context(), id); until != nil {
+		t.Fatalf("still locked until %v after a right password", until)
 	}
 }

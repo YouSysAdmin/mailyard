@@ -325,6 +325,13 @@ type UserStore interface {
 	RecordTOTPFailure(ctx context.Context, userID string, limit int, lock time.Duration) (bool, error)
 	ClearTOTPFailures(ctx context.Context, userID string) error
 
+	// The same three for the password. The per-IP limiter bounds one
+	// address, this bounds one account, and a guess spread across
+	// addresses meets the second where it walks past the first.
+	LoginLockedUntil(ctx context.Context, userID string) (*time.Time, error)
+	RecordLoginFailure(ctx context.Context, userID string, limit int, lock time.Duration) (bool, error)
+	ClearLoginFailures(ctx context.Context, userID string) error
+
 	// Recovery codes stand in for the authenticator at sign-in. Replace
 	// drops every code the account had and stores the new set of
 	// hashes. Claim spends one, reporting false when no unspent code

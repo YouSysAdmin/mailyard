@@ -270,6 +270,54 @@ func (s *Store) ClearTOTPFailures(ctx context.Context, userID string) error {
 	return err
 }
 
+// LoginLockedUntil returns the end of the current password lockout, or
+// nil. The first-factor twin of TOTPLockedUntil.
+func (s *Store) LoginLockedUntil(ctx context.Context, userID string) (*time.Time, error) {
+	var until sql.NullTime
+	err := s.QueryRow(ctx, `SELECT login_locked_until FROM users WHERE id = ?`, userID).Scan(&until)
+	if errors.Is(err, sql.ErrNoRows) || !until.Valid {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &until.Time, nil
+}
+
+// RecordLoginFailure counts one wrong password. On reaching limit it
+// locks sign-in for lock and resets the count. One statement, as
+// RecordTOTPFailure is, so two nodes counting the same attempt agree.
+func (s *Store) RecordLoginFailure(ctx context.Context, userID string, limit int, lock time.Duration) (bool, error) {
+	var until sql.NullTime
+	err := s.QueryRow(ctx, `
+        UPDATE users SET
+            login_locked_until = CASE WHEN login_failures + 1 >= ?
+                THEN now() + make_interval(secs => ?) ELSE login_locked_until END,
+            login_failures = CASE WHEN login_failures + 1 >= ? THEN 0 ELSE login_failures + 1 END
+        WHERE id = ?
+        RETURNING login_locked_until
+    `, limit, lock.Seconds(), limit, userID).Scan(&until)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return until.Valid && until.Time.After(time.Now()), nil
+}
+
+// ClearLoginFailures forgets the count and the lock after a right
+// password.
+func (s *Store) ClearLoginFailures(ctx context.Context, userID string) error {
+	_, err := s.Exec(ctx, `UPDATE users SET login_failures = 0, login_locked_until = NULL WHERE id = ?`, userID)
+
+	return err
+}
+
 // ReplaceRecoveryCodes stores a fresh set, dropping whatever the account
 // had. One transaction: a failure half way must not leave the owner
 // with some of the old set and some of the new.

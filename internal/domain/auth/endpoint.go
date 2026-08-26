@@ -76,11 +76,24 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		return response.Unauthorized(c, "invalid credentials")
 	}
 
-	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
-		h.recordLoginFailure(c, u, in.Email, "wrong password")
+	// A locked account answers like a wrong password, and BEFORE the
+	// password is looked at, so a right guess during the lockout learns
+	// nothing. The dummy verify keeps the timing of the other legs.
+	if h.loginLocked(c.Context(), u.ID) {
+		_ = authenticator.VerifyDummyPassword(in.Password)
+		h.recordLoginFailure(c, u, in.Email, "account locked")
 
 		return response.Unauthorized(c, "invalid credentials")
 	}
+
+	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
+		h.recordLoginFailure(c, u, in.Email, "wrong password")
+		h.recordPasswordFailure(c.Context(), u.ID)
+
+		return response.Unauthorized(c, "invalid credentials")
+	}
+
+	h.clearPasswordFailures(c.Context(), u.ID)
 
 	// Signup verification. Checked only after the password, so the
 	// flag leaks nothing to someone guessing credentials. The refusal
@@ -282,6 +295,56 @@ func (h *Handler) currentSession(c fiber.Ctx) (*sessmodel.Session, string) {
 // failure IS the event an operator needs to see. The address is
 // recorded even when no account matches - a burst against unknown
 // addresses is exactly the pattern worth spotting.
+// loginMaxFailures wrong passwords in a row lock sign-in for
+// loginLockout. Ten is more than a person mistypes and turns a
+// dictionary into years. The per-IP limiter bounds one address, this
+// bounds one account - a guess spread over many addresses walks past
+// the first and meets the second.
+const (
+	loginMaxFailures = 10
+	loginLockout     = 15 * time.Minute
+)
+
+// loginLocked reports whether the account is inside a password
+// lockout. A store error counts as locked: failing open here is what
+// the lockout exists to not do.
+func (h *Handler) loginLocked(ctx context.Context, userID string) bool {
+	until, err := h.Runtime.Store.User.LoginLockedUntil(ctx, userID)
+	if err != nil {
+		slog.Error("auth: login lock read failed", "user_id", userID, "err", err)
+
+		return true
+	}
+
+	if until != nil && time.Now().Before(*until) {
+		slog.Warn("auth: login refused, account is locked", "user_id", userID, "until", until)
+
+		return true
+	}
+
+	return false
+}
+
+// recordPasswordFailure counts one wrong password on the account.
+func (h *Handler) recordPasswordFailure(ctx context.Context, userID string) {
+	locked, err := h.Runtime.Store.User.RecordLoginFailure(ctx, userID, loginMaxFailures, loginLockout)
+	if err != nil {
+		slog.Error("auth: login failure count failed", "user_id", userID, "err", err)
+	}
+
+	if locked {
+		slog.Warn("auth: account locked after repeated wrong passwords",
+			"user_id", userID, "failures", loginMaxFailures, "for", loginLockout)
+	}
+}
+
+// clearPasswordFailures forgets the count after a right password.
+func (h *Handler) clearPasswordFailures(ctx context.Context, userID string) {
+	if err := h.Runtime.Store.User.ClearLoginFailures(ctx, userID); err != nil {
+		slog.Error("auth: login failure reset failed", "user_id", userID, "err", err)
+	}
+}
+
 func (h *Handler) recordLoginFailure(c fiber.Ctx, u *usermodel.User, attempted, reason string) {
 	ev := &amodel.Event{
 		Type:       amodel.TypeLoginFailed,

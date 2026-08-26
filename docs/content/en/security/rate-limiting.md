@@ -46,6 +46,11 @@ Fixed-window counters on the HTTP edge, configured under `ratelimit`:
 
 Setting an individual value to `0` disables that limiter while leaving the others in place.
 
+The login limiter is per client address. The account counts its own failures too: ten wrong passwords in a row lock
+sign-in for that account for fifteen minutes, whatever addresses they came from, and the answer during the lockout is the
+same `invalid credentials` a wrong password gets. A right password clears the count. Passkey and SSO sign-in are not
+subject to it - neither takes a password to guess.
+
 The last three are paced by other software rather than by a person at a keyboard, which is why they sit an order of
 magnitude higher. SNS retries hard and for hours, so throttling it loses bounces. A hundred nodes reporting every two
 minutes from behind one NAT address is fifty legitimate requests a minute, and setting that budget too low drops the
