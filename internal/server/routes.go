@@ -1165,7 +1165,7 @@ func auditWrites(rt *env.Runtime) fiber.Handler {
 		ev := &amodel.Event{
 			Type:   coreaudit.RouteType(c.Method(), c.Path()),
 			Method: c.Method(),
-			Path:   c.Path(),
+			Path:   auditPath(c),
 			Status: status,
 		}
 		if rc != nil {

@@ -53,6 +53,33 @@ func sensitivePathPrefixes() []string {
 	}
 }
 
+// underPrefix reports whether a normalized path is prefix itself or a
+// path beneath it, on a segment boundary - /tracking covers
+// /tracking/view/x and never /trackingfoo.
+func underPrefix(path, prefix string) bool {
+	return path == prefix || strings.HasPrefix(path, prefix+"/")
+}
+
+// auditPath is what the audit trail records as the path: the route
+// PATTERN for a request whose path carries a capability, the path
+// itself otherwise. The invitation accept and decline routes take the
+// token as a path segment, and auditWrites wrote c.Path() verbatim - so
+// the plaintext of a token that projmodel.HashInvitationToken keeps out
+// of the invitations table landed in audit_log.path, readable by anyone
+// holding audit:read on the project. The token is spent by the time the
+// event is written, which is why this is tidiness and not a breach, but
+// a trail should not be the one table with the secret in it.
+func auditPath(c fiber.Ctx) string {
+	path := normalizePath(c.Path())
+	for _, p := range sensitivePathPrefixes() {
+		if underPrefix(path, normalizePath(p)) {
+			return c.Route().Path
+		}
+	}
+
+	return c.Path()
+}
+
 // redactURLs wraps the access logger: a request whose URL carries a
 // capability is logged HERE, by route pattern, and never reaches the
 // wrapped logger. Everything else passes through untouched.
@@ -79,7 +106,7 @@ func redactURLs(log *slog.Logger, inner fiber.Handler) fiber.Handler {
 		path := normalizePath(c.Path())
 		redact := false
 		for _, p := range prefixes {
-			if path == p || strings.HasPrefix(path, p+"/") {
+			if underPrefix(path, p) {
 				redact = true
 
 				break
