@@ -12,6 +12,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
+import ActionMenu from '../../components/ActionMenu.vue'
 
 const router = useRouter()
 
@@ -209,8 +210,12 @@ function addAsSubscriber(c: Contact) {
             </thead>
             <tbody>
               <tr v-for="c in contacts" :key="c.id">
-                <td class="cell-title">{{ c.email }}</td>
-                <td>{{ c.name || '-' }}</td>
+                <!-- Both truncate with the full value on hover: a long
+                     address used to squeeze the name into a one-word
+                     column, and a long name did the same to everything
+                     after it. -->
+                <td class="cell-title truncate w-search" :title="c.email">{{ c.email }}</td>
+                <td class="truncate w-filter" :title="c.name">{{ c.name || '-' }}</td>
                 <td class="text-right">{{ c.sent_count }}</td>
                 <td class="text-right">{{ c.fail_count }}</td>
                 <td>
@@ -219,30 +224,38 @@ function addAsSubscriber(c: Contact) {
                 <td>{{ formatDate(c.last_sent_at, 'Never') }}</td>
                 <td class="text-right">
                   <div class="table-actions">
-                    <!-- Suppressed means we will not send to this
-                         address, so offering to compose one is offering
-                         a message that gets dropped at accept time. -->
-                    <button
-                      v-if="!c.suppressed"
-                      class="btn btn-secondary btn-sm"
-                      @click="composeTo(c.email)"
-                    >
-                      Send email
-                    </button>
-                    <button
-                      v-if="projStore.can('subscribers:write')"
-                      class="btn btn-secondary btn-sm"
-                      @click="addAsSubscriber(c)"
-                    >
-                      Add to subscribers
-                    </button>
-                    <button
-                      v-if="projStore.can('contacts:delete')"
-                      class="btn btn-danger btn-sm"
-                      @click="remove(c)"
-                    >
-                      Delete
-                    </button>
+                    <ActionMenu>
+                      <!-- Suppressed means we will not send to this
+                           address, so offering to compose one is offering
+                           a message that gets dropped at accept time. -->
+                      <button
+                        v-if="!c.suppressed"
+                        type="button"
+                        class="action-menu-item"
+                        role="menuitem"
+                        @click="composeTo(c.email)"
+                      >
+                        Send email
+                      </button>
+                      <button
+                        v-if="projStore.can('subscribers:write')"
+                        type="button"
+                        class="action-menu-item"
+                        role="menuitem"
+                        @click="addAsSubscriber(c)"
+                      >
+                        Add to subscribers
+                      </button>
+                      <button
+                        v-if="projStore.can('contacts:delete')"
+                        type="button"
+                        class="action-menu-item action-menu-item-danger"
+                        role="menuitem"
+                        @click="remove(c)"
+                      >
+                        Delete
+                      </button>
+                    </ActionMenu>
                   </div>
                 </td>
               </tr>
