@@ -3,7 +3,6 @@
 package webhook
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -25,7 +24,7 @@ func TestTheSigningSecretIsSealedAtRest(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := NewStore(db, crypto.New("0123456789abcdef0123456789abcdef"))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `
@@ -83,7 +82,7 @@ func TestEditingAWebhookKeepsItsSecret(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := NewStore(db, crypto.New("0123456789abcdef0123456789abcdef"))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `

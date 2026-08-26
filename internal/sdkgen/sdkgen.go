@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"go/format"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -161,8 +162,8 @@ var handWritten = map[string]bool{
 
 func pkgOf(t reflect.Type) string {
 	pkg := t.PkgPath()
-	if i := strings.LastIndex(pkg, "/"); i >= 0 {
-		pkg = pkg[i+1:]
+	if _, base, ok := strings.CutLast(pkg, "/"); ok {
+		pkg = base
 	}
 
 	return pkg
@@ -566,7 +567,7 @@ func (g *generator) renderTypes() string {
 		names = append(names, n)
 	}
 
-	sort.Strings(names)
+	slices.Sort(names)
 
 	var b strings.Builder
 	b.WriteString(header)

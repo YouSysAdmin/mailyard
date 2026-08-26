@@ -22,7 +22,7 @@ type Attachment struct {
 	Filename    string `json:"filename"`
 	Content     string `json:"content,omitempty"`
 	ContentType string `json:"content_type,omitempty"`
-	Size        int64  `json:"size,omitempty"`
+	Size        int64  `json:"size,omitzero"`
 }
 
 // SendRequest is one outbound message.
@@ -45,7 +45,7 @@ type SendRequest struct {
 
 	// DryRun validates and renders without storing or sending. The
 	// response is a DryRunResult, so use SendDryRun for it.
-	DryRun bool `json:"dry_run,omitempty"`
+	DryRun bool `json:"dry_run,omitzero"`
 
 	// UnsubscribeListID scopes the send to a transactional opt-out
 	// list: Mailyard mints the one-click link and filters against the
@@ -59,7 +59,7 @@ type SendRequest struct {
 	// it.
 	ListUnsubscribeURL    string `json:"list_unsubscribe_url,omitempty"`
 	ListUnsubscribeMailto string `json:"list_unsubscribe_mailto,omitempty"`
-	ListUnsubscribePost   bool   `json:"list_unsubscribe_post,omitempty"`
+	ListUnsubscribePost   bool   `json:"list_unsubscribe_post,omitzero"`
 
 	// SMTPGroup routes through a named server group by slug. Empty
 	// uses the project's default group.
@@ -71,7 +71,7 @@ type SendRequest struct {
 	// DisableTracking suppresses the open pixel and click rewriting
 	// for this message. There is no "force on" counterpart: enabling
 	// tracking is the project owner's decision, not a caller's.
-	DisableTracking bool `json:"disable_tracking,omitempty"`
+	DisableTracking bool `json:"disable_tracking,omitzero"`
 
 	// Sandbox captures the message instead of delivering it. A
 	// POINTER because absent and false differ: a sandbox-flagged key
@@ -80,7 +80,7 @@ type SendRequest struct {
 	Sandbox *bool `json:"sandbox,omitempty"`
 
 	// SandboxRetentionDays may only SHORTEN the platform window.
-	SandboxRetentionDays int `json:"sandbox_retention_days,omitempty"`
+	SandboxRetentionDays int `json:"sandbox_retention_days,omitzero"`
 }
 
 // TemplateSendRequest renders a stored template and queues the
@@ -97,18 +97,18 @@ type TemplateSendRequest struct {
 	Attachments []Attachment      `json:"attachments,omitempty"`
 
 	SendAt          string `json:"send_at,omitempty"`
-	DryRun          bool   `json:"dry_run,omitempty"`
-	DisableTracking bool   `json:"disable_tracking,omitempty"`
+	DryRun          bool   `json:"dry_run,omitzero"`
+	DisableTracking bool   `json:"disable_tracking,omitzero"`
 
 	SMTPGroup    string `json:"smtp_group,omitempty"`
 	SMTPServerID string `json:"smtp_server_id,omitempty"`
 
 	ListUnsubscribeURL    string `json:"list_unsubscribe_url,omitempty"`
 	ListUnsubscribeMailto string `json:"list_unsubscribe_mailto,omitempty"`
-	ListUnsubscribePost   bool   `json:"list_unsubscribe_post,omitempty"`
+	ListUnsubscribePost   bool   `json:"list_unsubscribe_post,omitzero"`
 
 	Sandbox              *bool `json:"sandbox,omitempty"`
-	SandboxRetentionDays int   `json:"sandbox_retention_days,omitempty"`
+	SandboxRetentionDays int   `json:"sandbox_retention_days,omitzero"`
 }
 
 // BatchRequest queues up to 100 messages in one call. With a template
@@ -136,7 +136,7 @@ type BatchItem struct {
 	// particular.
 	ListUnsubscribeURL    string `json:"list_unsubscribe_url,omitempty"`
 	ListUnsubscribeMailto string `json:"list_unsubscribe_mailto,omitempty"`
-	ListUnsubscribePost   bool   `json:"list_unsubscribe_post,omitempty"`
+	ListUnsubscribePost   bool   `json:"list_unsubscribe_post,omitzero"`
 }
 
 // Email is one outbound message and its delivery state.
@@ -365,7 +365,7 @@ type WebhookDelivery struct {
 	ProjectID    string    `json:"project_id"`
 	Event        string    `json:"event"`
 	Status       string    `json:"status"`
-	HTTPStatus   int       `json:"http_status,omitempty"`
+	HTTPStatus   int       `json:"http_status,omitzero"`
 	ErrorMessage string    `json:"error_message,omitempty"`
 	Attempt      int       `json:"attempt"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -448,7 +448,7 @@ type InboundEmail struct {
 
 	// Auth is the SPF, DKIM and DMARC verdict stamped at ingest.
 	Auth   *InboundAuth `json:"auth,omitempty"`
-	HasRaw bool         `json:"has_raw,omitempty"`
+	HasRaw bool         `json:"has_raw,omitzero"`
 	Size   int64        `json:"size"`
 
 	Status       string    `json:"status"`

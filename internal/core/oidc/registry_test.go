@@ -3,7 +3,7 @@
 package oidc
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,7 +22,7 @@ func discoveryServer(t *testing.T) *httptest.Server {
 	t.Cleanup(srv.Close)
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = json.MarshalWrite(w, map[string]any{
 			"issuer":                 srv.URL + "/",
 			"authorization_endpoint": srv.URL + "/auth",
 			"token_endpoint":         srv.URL + "/token",

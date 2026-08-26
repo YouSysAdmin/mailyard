@@ -4,7 +4,6 @@ package emailverify
 
 import (
 	"context"
-	"errors"
 	"net"
 	"testing"
 )
@@ -183,18 +182,6 @@ func TestCacheHitAvoidsSecondLookup(t *testing.T) {
 
 	if r.calls == before {
 		t.Error("fresh=true should have caused a new lookup")
-	}
-}
-
-func TestDNSErrorUnwrapping(t *testing.T) {
-	var target *net.DNSError
-	wrapped := errors.Join(errors.New("context"), &net.DNSError{Err: "x", IsNotFound: true})
-	if !asDNSError(wrapped, &target) {
-		t.Fatal("a wrapped DNSError must still be classified")
-	}
-
-	if !target.IsNotFound {
-		t.Error("unwrapped error lost its IsNotFound flag")
 	}
 }
 

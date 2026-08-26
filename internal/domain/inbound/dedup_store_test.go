@@ -22,7 +22,7 @@ func dedupStore(t *testing.T) (*Store, string, context.Context) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `

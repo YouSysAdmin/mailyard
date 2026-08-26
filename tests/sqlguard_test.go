@@ -205,7 +205,7 @@ func sqlSinkArg(call *ast.CallExpr) (int, bool) {
 	//
 	// Being stringy is the whole test, and "the call has one argument"
 	// is not a usable substitute for it. Tried, and it reported two
-	// calls that have nothing to do with SQL: c.count(context.Background())
+	// calls that have nothing to do with SQL: c.count(t.Context())
 	// in the metrics collector, and Fiber's own c.Query(param) reading a
 	// query-string value. That is the over-matching this table's comment
 	// warns about, arriving through the back door.

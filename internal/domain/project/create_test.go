@@ -36,7 +36,7 @@ func runtimeWith(t *testing.T, userCreation bool, authDisabled bool) *env.Runtim
 	}
 
 	svc := settings.New(rows)
-	if err := svc.Reload(context.Background()); err != nil {
+	if err := svc.Reload(t.Context()); err != nil {
 		t.Fatalf("reload settings: %v", err)
 	}
 

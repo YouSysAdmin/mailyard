@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -83,7 +83,7 @@ func TestAFailureIsReportedToThePerson(t *testing.T) {
 		t.Fatalf("walk %s: %v", root, err)
 	}
 
-	sort.Strings(findings)
+	slices.Sort(findings)
 
 	if len(findings) > 0 {
 		t.Errorf("%d place(s) report a failure to the browser console:\n  %s\n"+

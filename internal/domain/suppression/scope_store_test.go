@@ -94,7 +94,7 @@ func TestUnblockingAnAddressKeepsItsListOptOuts(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const email = "bob@x.test"
 	proj, listA, listB := seedScopes(t, s, ctx, email)
@@ -142,7 +142,7 @@ func TestALiftedListOptOutTakesOnlyThatList(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const email = "bob@x.test"
 	proj, listA, listB := seedScopes(t, s, ctx, email)
@@ -180,7 +180,7 @@ func TestErasureTakesEveryScope(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const email = "bob@x.test"
 	proj, _, _ := seedScopes(t, s, ctx, email)

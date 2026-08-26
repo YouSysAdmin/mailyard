@@ -838,12 +838,12 @@ func (h *Handler) DeclineInvitation(c fiber.Ctx) error {
 // counts - which is the point, since a bounce domain wants its own MX
 // and SPF and so is never the apex.
 func (h *Handler) ownsVerifiedDomain(c fiber.Ctx, projID, addr string) (bool, error) {
-	at := strings.LastIndex(addr, "@")
-	if at < 0 {
+	_, host, ok := strings.CutLast(addr, "@")
+	if !ok {
 		return false, nil
 	}
 
-	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), addr[at+1:])
+	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), host)
 	if err != nil {
 		return false, err
 	}

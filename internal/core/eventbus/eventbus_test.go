@@ -139,16 +139,14 @@ func TestConcurrentPublishAndSubscribe(t *testing.T) {
 	// touch it at once by design.
 	b := New()
 	var wg sync.WaitGroup
-	for i := range 8 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+	for range 8 {
+		wg.Go(func() {
 			s := b.Subscribe("proj")
 			defer s.Close()
 			for range 50 {
 				b.Publish(Event{Type: TypeEmailSent, ProjectID: "proj"})
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()

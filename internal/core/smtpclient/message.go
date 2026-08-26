@@ -85,8 +85,8 @@ func (m *Message) messageID() string {
 
 	host := "localhost"
 	if addr := EnvelopeAddress(m.From); addr != "" {
-		if at := strings.LastIndex(addr, "@"); at >= 0 && at < len(addr)-1 {
-			host = addr[at+1:]
+		if _, h, ok := strings.CutLast(addr, "@"); ok && h != "" {
+			host = h
 		}
 	}
 

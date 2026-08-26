@@ -19,6 +19,7 @@ package emailverify
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"sync"
@@ -303,9 +304,8 @@ func (v *Verifier) domainAcceptsMail(ctx context.Context, domain string, now tim
 
 	// A DNS error that says the name does not exist is a real answer -
 	// anything else (timeout, SERVFAIL) is not.
-	var dnsErr *net.DNSError
 	if err != nil {
-		if ok := asDNSError(err, &dnsErr); ok && !dnsErr.IsNotFound {
+		if dnsErr, ok := errors.AsType[*net.DNSError](err); ok && !dnsErr.IsNotFound {
 			return false, false
 		}
 	}
@@ -319,7 +319,7 @@ func (v *Verifier) domainAcceptsMail(ctx context.Context, domain string, now tim
 	}
 
 	if herr != nil {
-		if ok := asDNSError(herr, &dnsErr); ok && !dnsErr.IsNotFound {
+		if dnsErr, ok := errors.AsType[*net.DNSError](herr); ok && !dnsErr.IsNotFound {
 			return false, false
 		}
 	}
@@ -358,12 +358,11 @@ func (v *Verifier) storeMX(domain string, ok bool, now time.Time) {
 // parts. Deliberately stricter than net/mail.ParseAddress, which
 // accepts display names and comments that are not usable here.
 func splitAddress(addr string) (local, domain string, ok bool) {
-	at := strings.LastIndex(addr, "@")
-	if at <= 0 || at == len(addr)-1 {
+	local, domain, found := strings.CutLast(addr, "@")
+	if !found || local == "" || domain == "" {
 		return "", "", false
 	}
 
-	local, domain = addr[:at], addr[at+1:]
 	if strings.ContainsAny(addr, " \t\r\n\"<>,;") {
 		return "", "", false
 	}

@@ -79,7 +79,7 @@ func TestAnOwnerMutationWaitsForTheOwnerRows(t *testing.T) {
 	dbtest.Migrate(t, db)
 	peer := dbtest.Peer(t)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID, a, b := twoOwners(t, s, ctx)
 
@@ -151,7 +151,7 @@ func TestDeletingARoleWaitsForTheProjectRow(t *testing.T) {
 	dbtest.Migrate(t, db)
 	peer := dbtest.Peer(t)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `
@@ -211,7 +211,7 @@ func TestTheLastOwnerIsStillRefusedAndTheRestStillWork(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID, a, b := twoOwners(t, s, ctx)
 

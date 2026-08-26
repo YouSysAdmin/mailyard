@@ -70,7 +70,7 @@ func TestRevokingOtherSessionsWithNoSessionToKeep(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	userID, _ := seedSessions(t, s, ctx)
 	if got := liveCount(t, s, ctx, userID); got != 3 {
@@ -98,7 +98,7 @@ func TestRevokingOtherSessionsKeepsTheCallersOwn(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	userID, sessions := seedSessions(t, s, ctx)
 	keep := sessions[1]

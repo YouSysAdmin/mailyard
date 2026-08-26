@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"io/fs"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -91,7 +91,7 @@ func inlineScriptHashes(site fs.FS) []string {
 		out = append(out, h)
 	}
 
-	sort.Strings(out)
+	slices.Sort(out)
 
 	return out
 }

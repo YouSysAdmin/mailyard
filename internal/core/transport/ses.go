@@ -219,43 +219,38 @@ func classifySES(err error) error {
 
 	// Permanent: the message or the account is the problem, and asking
 	// again with the same bytes gets the same answer.
-	var (
-		rejected  *sestypes.MessageRejected
-		unverif   *sestypes.MailFromDomainNotVerifiedException
-		suspended *sestypes.AccountSuspendedException
-		paused    *sestypes.SendingPausedException
-		badReq    *sestypes.BadRequestException
-		notFound  *sestypes.NotFoundException
-	)
 	switch {
-	case errors.As(err, &rejected),
-		errors.As(err, &unverif),
-		errors.As(err, &suspended),
-		errors.As(err, &paused),
+	case is[*sestypes.MessageRejected](err),
+		is[*sestypes.MailFromDomainNotVerifiedException](err),
+		is[*sestypes.AccountSuspendedException](err),
+		is[*sestypes.SendingPausedException](err),
 		// A malformed request or a configuration set that does not
 		// exist. Both are configuration, and retrying re-sends the same
 		// request.
-		errors.As(err, &badReq),
-		errors.As(err, &notFound):
+		is[*sestypes.BadRequestException](err),
+		is[*sestypes.NotFoundException](err):
 		return &sesFailure{permanent: true, err: err}
 	}
 
 	// Explicitly transient, listed so the reasoning is visible rather
 	// than resting on the default: throttling and quota are the two
 	// failures that most want a retry.
-	var (
-		throttled *sestypes.TooManyRequestsException
-		overLimit *sestypes.LimitExceededException
-		internal  *sestypes.InternalServiceErrorException
-	)
 	switch {
-	case errors.As(err, &throttled),
-		errors.As(err, &overLimit),
-		errors.As(err, &internal):
+	case is[*sestypes.TooManyRequestsException](err),
+		is[*sestypes.LimitExceededException](err),
+		is[*sestypes.InternalServiceErrorException](err):
 		return &sesFailure{err: err}
 	}
 
 	return &sesFailure{err: err}
+}
+
+// is reports whether err wraps an error of type E. It exists so
+// classifySES can list the exception types it recognises one per line.
+func is[E error](err error) bool {
+	_, ok := errors.AsType[E](err)
+
+	return ok
 }
 
 func sesDescriptor() Descriptor {

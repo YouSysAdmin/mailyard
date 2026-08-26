@@ -3,7 +3,6 @@
 package oauthprovider
 
 import (
-	"context"
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
@@ -29,7 +28,7 @@ func TestProviderSlugTakenWorksWithNoExceptionID(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := NewStore(db, crypto.New("0123456789abcdef0123456789abcdef"))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if taken, err := s.SlugTaken(ctx, "okta", ""); err != nil || taken {
 		t.Fatalf("with no exception id on an empty table: taken=%v err=%v", taken, err)

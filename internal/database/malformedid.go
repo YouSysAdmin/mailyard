@@ -39,8 +39,8 @@ const uuidParseRoutine = "string_to_uuid"
 //	int    code=22P02 routine="pg_strtoint32_safe" file=numutils.c
 //	jsonb  code=22P02 routine="json_errsave_error" file=jsonfuncs.c
 func MalformedID(err error) bool {
-	var pg *pgconn.PgError
-	if !errors.As(err, &pg) {
+	pg, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return false
 	}
 

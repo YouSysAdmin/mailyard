@@ -24,8 +24,8 @@ import (
 // Matched as a prefix, since a partitioned or renamed index can carry a
 // suffix Postgres appended to keep names unique.
 func UniqueViolation(err error, index string) bool {
-	var pg *pgconn.PgError
-	if !errors.As(err, &pg) {
+	pg, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return false
 	}
 

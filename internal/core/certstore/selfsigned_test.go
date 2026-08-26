@@ -3,7 +3,6 @@
 package certstore
 
 import (
-	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -35,7 +34,7 @@ func fingerprint(t *testing.T, c tls.Certificate) string {
 // cannot tell N identities from an interception.
 func TestSelfSignedIsGeneratedOnceAndReused(t *testing.T) {
 	store := newFake()
-	ctx := context.Background()
+	ctx := t.Context()
 	hosts := []string{"mail.example.com", "localhost"}
 
 	first, err := SelfSigned(ctx, store, hosts, "")
@@ -84,7 +83,7 @@ func TestConcurrentCallersConvergeOnOneCertificate(t *testing.T) {
 	for range n {
 		wg.Go(func() {
 			barrier.Wait()
-			cert, err := SelfSigned(context.Background(), store, hosts, "")
+			cert, err := SelfSigned(t.Context(), store, hosts, "")
 			if err != nil {
 				t.Errorf("SelfSigned: %v", err)
 
@@ -110,7 +109,7 @@ func TestConcurrentCallersConvergeOnOneCertificate(t *testing.T) {
 // every client rejects and no log explains.
 func TestADifferentHostSetGetsItsOwnCertificate(t *testing.T) {
 	store := newFake()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a, err := SelfSigned(ctx, store, []string{"one.example.com"}, "")
 	if err != nil {
@@ -131,7 +130,7 @@ func TestADifferentHostSetGetsItsOwnCertificate(t *testing.T) {
 // table.
 func TestReplaceMintsANewPair(t *testing.T) {
 	store := newFake()
-	ctx := context.Background()
+	ctx := t.Context()
 	hosts := []string{"mail.example.com"}
 
 	before, err := SelfSigned(ctx, store, hosts, "")

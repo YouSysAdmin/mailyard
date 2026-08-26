@@ -146,8 +146,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
-	at := strings.LastIndex(in.Email, "@")
-	domainName := in.Email[at+1:]
+	_, domainName, _ := strings.CutLast(in.Email, "@")
 	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), domainName)
 	if err != nil {
 		return response.Internal(c, err)

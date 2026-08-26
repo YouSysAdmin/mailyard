@@ -995,8 +995,8 @@ func warnBounceAddressUnreachable(ctx context.Context, cfg *env.Config, st *stor
 		return
 	}
 
-	at := strings.LastIndex(addr, "@")
-	if at < 0 {
+	_, host, ok := strings.CutLast(addr, "@")
+	if !ok {
 		return
 	}
 
@@ -1007,7 +1007,7 @@ func warnBounceAddressUnreachable(ctx context.Context, cfg *env.Config, st *stor
 		return
 	}
 
-	d, err := st.Domain.GetVerifiedCovering(ctx, addr[at+1:])
+	d, err := st.Domain.GetVerifiedCovering(ctx, host)
 	if err != nil {
 		log.Warn("sending.bounce_address: could not check whether its domain is verified", "err", err)
 
@@ -1016,6 +1016,6 @@ func warnBounceAddressUnreachable(ctx context.Context, cfg *env.Config, st *stor
 
 	if d == nil {
 		log.Warn("sending.bounce_address is on a domain no project has verified, so the inbound listener will refuse its reports at RCPT",
-			"bounce_address", addr, "domain", addr[at+1:])
+			"bounce_address", addr, "domain", host)
 	}
 }

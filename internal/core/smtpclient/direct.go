@@ -177,8 +177,7 @@ func SendDirect(ctx context.Context, cfg DirectConfig, hosts []string, msg *Raw)
 		// A permanent refusal from the exchanger itself - not from a
 		// recipient - is the domain's answer, not this host's. Trying
 		// its siblings asks the same mail system the same question.
-		var se *SendError
-		if errors.As(err, &se) && se.Permanent() {
+		if se, ok := errors.AsType[*SendError](err); ok && se.Permanent() {
 			return nil, err
 		}
 

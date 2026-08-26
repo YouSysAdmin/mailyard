@@ -23,7 +23,7 @@ package mailyard
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -142,9 +142,9 @@ func IsUnauthorized(err error) bool {
 }
 
 func statusIs(err error, code int) bool {
-	var e *Error
+	e, ok := errors.AsType[*Error](err)
 
-	return errors.As(err, &e) && e.StatusCode == code
+	return ok && e.StatusCode == code
 }
 
 // do performs one request and decodes the response into T.

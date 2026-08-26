@@ -3,7 +3,7 @@
 package smtpserver
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 	"time"

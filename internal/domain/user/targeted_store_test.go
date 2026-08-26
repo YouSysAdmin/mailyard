@@ -18,7 +18,7 @@ func userStore(t *testing.T) (*Store, context.Context) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 
-	return &Store{Base: database.NewBase(db)}, context.Background()
+	return &Store{Base: database.NewBase(db)}, t.Context()
 }
 
 // A password reset must not re-enable a disabled account.

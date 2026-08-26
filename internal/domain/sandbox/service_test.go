@@ -157,7 +157,7 @@ func TestAMessageCanShortenItsRetentionButNotExtendIt(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := svc.expiryFor(context.Background(), "", now, tc.requested)
+			got := svc.expiryFor(t.Context(), "", now, tc.requested)
 			if got == nil {
 				t.Fatal("no expiry was set")
 			}
@@ -177,11 +177,11 @@ func TestAnUnlimitedPlatformWindowStillHonorsAShorterRequest(t *testing.T) {
 	svc, _ := testService(t, map[string]string{smodel.KeySandboxRetentionDays: "0"})
 	now := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
 
-	if got := svc.expiryFor(context.Background(), "", now, 0); got != nil {
+	if got := svc.expiryFor(t.Context(), "", now, 0); got != nil {
 		t.Errorf("an unlimited window produced an expiry of %v", got)
 	}
 
-	got := svc.expiryFor(context.Background(), "", now, 2)
+	got := svc.expiryFor(t.Context(), "", now, 2)
 	if got == nil || !got.Equal(now.AddDate(0, 0, 2)) {
 		t.Errorf("a shortened window came out as %v", got)
 	}

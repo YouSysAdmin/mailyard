@@ -129,7 +129,7 @@ func TestShutdownStopsTheACMEWatcher(t *testing.T) {
 
 	// Let the first pass land, then stop.
 	waitFor(t, func() bool { return len(store.asked()) > 0 })
-	if err := b.Shutdown(context.Background()); err != nil {
+	if err := b.Shutdown(t.Context()); err != nil {
 		t.Fatalf("Shutdown: %v", err)
 	}
 

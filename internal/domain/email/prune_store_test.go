@@ -18,7 +18,7 @@ func pruneFixture(t *testing.T) (*Store, string, context.Context) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `

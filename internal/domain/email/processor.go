@@ -402,11 +402,10 @@ func (p *Processor) signerFor(ctx context.Context, e *emailmodel.Email) (*dkim.S
 
 // senderDomain is the lowercase host part of an RFC 5322 address.
 func senderDomain(from string) string {
-	addr := smtpclient.EnvelopeAddress(from)
-	at := strings.LastIndex(addr, "@")
-	if at < 0 || at == len(addr)-1 {
+	_, host, ok := strings.CutLast(smtpclient.EnvelopeAddress(from), "@")
+	if !ok || host == "" {
 		return ""
 	}
 
-	return strings.ToLower(addr[at+1:])
+	return strings.ToLower(host)
 }

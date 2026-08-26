@@ -3,7 +3,6 @@
 package analytics
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -27,7 +26,7 @@ func TestTheRollupAgreesWithCountingTheRows(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	store := NewStore(db)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `

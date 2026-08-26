@@ -25,8 +25,8 @@ type FieldError struct {
 // BindAndValidate) collapse to a single field-less entry so the
 // caller can still render something.
 func Humanize(err error) []FieldError {
-	var ve validator.ValidationErrors
-	if !errors.As(err, &ve) {
+	ve, ok := errors.AsType[validator.ValidationErrors](err)
+	if !ok {
 		return []FieldError{{Message: err.Error()}}
 	}
 

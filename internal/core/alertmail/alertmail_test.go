@@ -99,7 +99,7 @@ func TestEachTierMailsItsOwnAudience(t *testing.T) {
 			t.Fatalf("%s: %s is not a mailable event", tc.name, tc.event.Type)
 		}
 
-		n.deliver(context.Background(), a, tc.event)
+		n.deliver(t.Context(), a, tc.event)
 	}
 
 	sent := mail.all()
@@ -125,7 +125,7 @@ func TestARepeatIsCollapsedAndADifferentEventIsNot(t *testing.T) {
 	created, _ := Lookup("apikey.created")
 	deleted, _ := Lookup("apikey.deleted")
 	for range 5 {
-		n.deliver(context.Background(), created, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
+		n.deliver(t.Context(), created, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
 	}
 
 	if got := len(mail.all()); got != 1 {
@@ -133,14 +133,14 @@ func TestARepeatIsCollapsedAndADifferentEventIsNot(t *testing.T) {
 	}
 
 	// A different event type is different news.
-	n.deliver(context.Background(), deleted, &amodel.Event{Type: "apikey.deleted", ProjectID: "p1"})
+	n.deliver(t.Context(), deleted, &amodel.Event{Type: "apikey.deleted", ProjectID: "p1"})
 	if got := len(mail.all()); got != 2 {
 		t.Errorf("a different event type sent %d mails in total, want 2", got)
 	}
 
 	// And so is the same event in another project - collapsing per
 	// audience, not globally, or one busy tenant would silence the rest.
-	n.deliver(context.Background(), created, &amodel.Event{Type: "apikey.created", ProjectID: "p2"})
+	n.deliver(t.Context(), created, &amodel.Event{Type: "apikey.created", ProjectID: "p2"})
 	if got := len(mail.all()); got != 3 {
 		t.Errorf("another project sent %d mails in total, want 3", got)
 	}
@@ -185,7 +185,7 @@ func TestTheSettingGatesEverything(t *testing.T) {
 		t.Error("on() is false while the setting is on")
 	}
 
-	n.deliver(context.Background(), a, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
+	n.deliver(t.Context(), a, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
 	if got := len(mail.all()); got != 1 {
 		t.Errorf("sent %d mails with the setting on, want 1", got)
 	}
@@ -216,12 +216,12 @@ func TestNoAudienceSendsNothing(t *testing.T) {
 	project, _ := Lookup("apikey.created")
 	account, _ := Lookup(amodel.TypeTOTPDisabled)
 	// A project with no owners and no alert address.
-	n.deliver(context.Background(), project, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
+	n.deliver(t.Context(), project, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
 	// A project-tier event with no project at all, which happens: the
 	// /projects routes decide access in handlers.
-	n.deliver(context.Background(), project, &amodel.Event{Type: "apikey.created"})
+	n.deliver(t.Context(), project, &amodel.Event{Type: "apikey.created"})
 	// An account event whose user has since been deleted.
-	n.deliver(context.Background(), account, &amodel.Event{Type: amodel.TypeTOTPDisabled, ActorID: "gone"})
+	n.deliver(t.Context(), account, &amodel.Event{Type: amodel.TypeTOTPDisabled, ActorID: "gone"})
 	if got := len(mail.all()); got != 0 {
 		t.Errorf("sent %d mails with no audience, want 0", got)
 	}
@@ -234,7 +234,7 @@ func TestTheMailNamesTheActorAndTheAction(t *testing.T) {
 	n := testNotifier(mail, &fakeRecipients{project: []string{"owner@example.com"}})
 
 	a, _ := Lookup("apikey.created")
-	n.deliver(context.Background(), a, &amodel.Event{
+	n.deliver(t.Context(), a, &amodel.Event{
 		Type: "apikey.created", ProjectID: "p1",
 		ActorEmail: "dev@example.com", Method: "POST", Path: "/api/v1/api-keys/",
 	})
@@ -258,7 +258,7 @@ func TestNoPublicURLMeansNoLink(t *testing.T) {
 	n.ConsoleURL = ""
 
 	a, _ := Lookup("admin.apikeys")
-	n.deliver(context.Background(), a, &amodel.Event{Type: "admin.apikeys"})
+	n.deliver(t.Context(), a, &amodel.Event{Type: "admin.apikeys"})
 	sent := mail.all()
 	if len(sent) != 1 {
 		t.Fatalf("sent %d mails, want 1", len(sent))

@@ -3,7 +3,6 @@
 package campaign
 
 import (
-	"context"
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -31,7 +30,7 @@ func TestMarkingAMessageWithNoEmailIDSucceeds(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c := seedCampaign(t, s, ctx, cmodel.StatusSending)
 	msg := &cmodel.Message{
@@ -78,7 +77,7 @@ func TestAnEmptyEmailIDLeavesARecordedOneAlone(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c := seedCampaign(t, s, ctx, cmodel.StatusSending)
 	msg := &cmodel.Message{

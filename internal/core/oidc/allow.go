@@ -49,13 +49,13 @@ func (p *Provider) Admit(c *Claims) error {
 			return errors.New("allowed_domains set but id_token has no email claim")
 		}
 
-		idx := strings.LastIndex(email, "@")
-		if idx < 0 || idx == len(email)-1 {
+		_, host, ok := strings.CutLast(email, "@")
+		if !ok || host == "" {
 			return fmt.Errorf("malformed email %q", email)
 		}
 
-		if !slices.Contains(cfg.AllowedDomains, email[idx+1:]) {
-			return fmt.Errorf("domain %q not on allowed_domains list", email[idx+1:])
+		if !slices.Contains(cfg.AllowedDomains, host) {
+			return fmt.Errorf("domain %q not on allowed_domains list", host)
 		}
 	}
 

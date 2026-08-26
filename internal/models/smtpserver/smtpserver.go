@@ -279,12 +279,12 @@ func (s *Server) AllowsDomain(sender string) bool {
 		return true
 	}
 
-	at := strings.LastIndex(sender, "@")
-	if at < 0 || at == len(sender)-1 {
+	_, host, ok := strings.CutLast(sender, "@")
+	if !ok || host == "" {
 		return false
 	}
 
-	host := strings.ToLower(sender[at+1:])
+	host = strings.ToLower(host)
 	for _, d := range s.AllowedDomains {
 		// Trimmed here as well as in Normalize, for the same reason
 		// the "@" is: this is what the comparison tolerates, and a row

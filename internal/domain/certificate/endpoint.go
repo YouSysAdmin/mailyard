@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -661,8 +660,8 @@ func (h *Handler) managed(r *certmodel.Certificate, assignments map[string]strin
 		}
 	}
 
-	sort.Strings(m.UsedBy)
-	sort.Strings(m.Dormant)
+	slices.Sort(m.UsedBy)
+	slices.Sort(m.Dormant)
 
 	return m
 }

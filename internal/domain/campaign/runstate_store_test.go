@@ -52,7 +52,7 @@ func TestABatchEndingDoesNotUndoAPause(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c := seedCampaign(t, s, ctx, cmodel.StatusSending)
 
@@ -92,7 +92,7 @@ func TestACancelledCampaignIsNotCompleted(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c := seedCampaign(t, s, ctx, cmodel.StatusSending)
 
@@ -127,7 +127,7 @@ func TestASendingCampaignStillAdvances(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c := seedCampaign(t, s, ctx, cmodel.StatusSending)
 
@@ -156,7 +156,7 @@ func TestSetRunStateRefusesWithNoGuard(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	c := seedCampaign(t, s, ctx, cmodel.StatusSending)
 
@@ -173,7 +173,7 @@ func TestStatusOfAMissingCampaignIsEmpty(t *testing.T) {
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
 
-	status, err := s.Status(context.Background(), ids.New(), ids.New())
+	status, err := s.Status(t.Context(), ids.New(), ids.New())
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}

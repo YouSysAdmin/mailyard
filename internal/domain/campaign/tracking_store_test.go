@@ -3,7 +3,6 @@
 package campaign
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -31,7 +30,7 @@ func TestTrackingReadsRunAgainstTheRealSchema(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `
@@ -146,7 +145,7 @@ func TestATransactionalTrackedLinkHasNoCampaign(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `

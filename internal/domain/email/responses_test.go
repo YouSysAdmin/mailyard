@@ -3,10 +3,10 @@
 package email
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/response"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
 )
 
@@ -35,7 +35,7 @@ func TestResponseKeysAreStable(t *testing.T) {
 			// suppressed_recipients must be [] and never null: it is
 			// built through emptyIfNil precisely so a client does not
 			// have to tell an empty list from a missing one.
-			want: `{"email":{"id":"9e2f6f11-cdd3-4058-86f2-29f3ad60b06a","project_id":"","sender":"","recipients":null,"subject":"","tracked":false,"open_count":0,"click_count":0,"status":"sent","attempts":2,"max_attempts":0,"created_at":"0001-01-01T00:00:00Z"},"suppressed_recipients":[]}`,
+			want: `{"email":{"id":"9e2f6f11-cdd3-4058-86f2-29f3ad60b06a","project_id":"","sender":"","recipients":[],"subject":"","tracked":false,"open_count":0,"click_count":0,"status":"sent","attempts":2,"max_attempts":0,"created_at":"0001-01-01T00:00:00Z"},"suppressed_recipients":[]}`,
 		},
 		{
 			name: "dry run",
@@ -72,7 +72,7 @@ func TestResponseKeysAreStable(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := json.Marshal(c.body)
+			got, err := response.Marshal(c.body)
 			if err != nil {
 				t.Fatalf("marshal: %v", err)
 			}
@@ -84,11 +84,12 @@ func TestResponseKeysAreStable(t *testing.T) {
 	}
 }
 
-// A nil slice would marshal as null, which is why every list-bearing
-// response runs its slice through emptyIfNil. This pins the helper
-// rather than trusting each call site to remember.
+// The encoder writes a nil slice as [] itself now, so emptyIfNil is
+// belt and braces rather than the only thing keeping null off the wire.
+// Pinned anyway, because a call site reading it as a no-op and removing
+// it would be right today and wrong the day the encoder policy moves.
 func TestEmptyIfNilNeverYieldsNull(t *testing.T) {
-	out, err := json.Marshal(emptyIfNil(nil))
+	out, err := response.Marshal(emptyIfNil(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

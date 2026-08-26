@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -51,8 +51,8 @@ func TestEveryV1RouteIsDocumented(t *testing.T) {
 		}
 	}
 
-	sort.Strings(missing)
-	sort.Strings(orphaned)
+	slices.Sort(missing)
+	slices.Sort(orphaned)
 	for _, r := range missing {
 		t.Errorf("route %s has no entry in any domain's APIDocs - add one beside its handler", r)
 	}

@@ -3,7 +3,6 @@
 package database_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/database"
@@ -21,7 +20,7 @@ import (
 // would notice.
 func TestOnlyAMalformedUUIDReadsAsAMissingResource(t *testing.T) {
 	db := dbtest.Open(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cases := []struct {
 		name string

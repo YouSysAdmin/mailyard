@@ -4,7 +4,6 @@ package certificate
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -339,7 +338,7 @@ func TestAutocertCacheWritesTheRealRow(t *testing.T) {
 	dbtest.Migrate(t, db)
 	s := NewStore(db, crypto.New("test-key-at-least-32-characters-long"))
 	cache := &certstore.Cache{Store: s}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	certPEM, keyPEM, err := tlsutils.SelfSignedPEM(tlsutils.SelfSignedOptions{
 		Hosts:     []string{"mail.example.com"},

@@ -147,8 +147,8 @@ func (r *registry) reserve(t reflect.Type) string {
 	name := t.Name()
 	if taken, exists := r.nameTaken(name); exists && taken != t {
 		pkg := t.PkgPath()
-		if i := strings.LastIndex(pkg, "/"); i >= 0 {
-			pkg = pkg[i+1:]
+		if _, base, ok := strings.CutLast(pkg, "/"); ok {
+			pkg = base
 		}
 
 		name = strings.ToUpper(pkg[:1]) + pkg[1:] + name

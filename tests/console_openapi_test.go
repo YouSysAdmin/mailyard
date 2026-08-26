@@ -3,7 +3,7 @@
 package tests
 
 import (
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,8 +78,8 @@ func TestEveryConsoleRouteIsDocumented(t *testing.T) {
 		}
 	}
 
-	sort.Strings(missing)
-	sort.Strings(orphaned)
+	slices.Sort(missing)
+	slices.Sort(orphaned)
 
 	for _, m := range missing {
 		t.Errorf("console route %s has no entry in any domain's ConsoleDocs - regenerate, "+

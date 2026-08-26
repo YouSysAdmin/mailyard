@@ -3,7 +3,6 @@
 package email
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -33,7 +32,7 @@ func TestAStoredTemplateResolvesAReservedVariable(t *testing.T) {
         VALUES ('`+projID+`', 'Test', 'test', 'en', now())`)
 
 	ts := templatedomain.NewStore(db)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tpl := &tmodel.Template{
 		ID:              ids.New(),

@@ -3,7 +3,6 @@
 package smtpserver
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -28,7 +27,7 @@ import (
 func TestAProjectServerSurvivesARoundTrip(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `
@@ -107,7 +106,7 @@ func TestAProjectServerSurvivesARoundTrip(t *testing.T) {
 func TestTheStoreCleansTheDomainListItWrites(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `

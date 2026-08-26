@@ -15,8 +15,8 @@ import (
 // those do not cover, like the partition sweep telling "the table is
 // already gone" apart from "the lock timed out".
 func SQLState(err error) string {
-	var pg *pgconn.PgError
-	if !errors.As(err, &pg) {
+	pg, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return ""
 	}
 

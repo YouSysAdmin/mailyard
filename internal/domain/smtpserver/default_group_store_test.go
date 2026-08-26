@@ -18,7 +18,7 @@ func groupStore(t *testing.T) (*GroupStore, string, context.Context) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &GroupStore{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	proj := ids.New()
 	if _, err := db.ExecContext(ctx, `

@@ -147,12 +147,12 @@ func (s *Signer) VerifyWebViewToken(tok string) (string, error) {
 		return "", errors.New("wrong token kind")
 	}
 
-	idx := strings.LastIndex(rest, ":")
-	if idx < 1 {
+	payload, expiry, ok := strings.CutLast(rest, ":")
+	if !ok || payload == "" {
 		return "", errors.New("invalid token payload")
 	}
 
-	exp, err := strconv.ParseInt(rest[idx+1:], 10, 64)
+	exp, err := strconv.ParseInt(expiry, 10, 64)
 	if err != nil {
 		return "", errors.New("invalid token expiry")
 	}
@@ -161,7 +161,7 @@ func (s *Signer) VerifyWebViewToken(tok string) (string, error) {
 		return "", errors.New("link expired")
 	}
 
-	return rest[:idx], nil
+	return payload, nil
 }
 
 // sign returns a short URL-safe MAC over payload.

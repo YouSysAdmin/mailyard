@@ -3,7 +3,6 @@
 package project
 
 import (
-	"context"
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -18,7 +17,7 @@ func roleFixture(t *testing.T) (*Store, string, string) {
 	dbtest.Migrate(t, db)
 	st := NewStore(db)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	mk := func(name string) string {
 		id := ids.New()
 		if _, err := db.ExecContext(ctx, `
@@ -36,7 +35,7 @@ func roleFixture(t *testing.T) (*Store, string, string) {
 func addRoleMember(t *testing.T, st *Store, projID string, owner bool) string {
 	t.Helper()
 	userID := ids.New()
-	_, err := st.DB().ExecContext(context.Background(), `
+	_, err := st.DB().ExecContext(t.Context(), `
 		INSERT INTO users (id, email, account_type) VALUES ($1, $2, 1)`,
 		userID, userID+"@example.invalid")
 	if err != nil {
@@ -44,7 +43,7 @@ func addRoleMember(t *testing.T, st *Store, projID string, owner bool) string {
 	}
 
 	m := &projmodel.Member{ProjectID: projID, UserID: userID, Owner: owner}
-	if err := st.PutMember(context.Background(), m); err != nil {
+	if err := st.PutMember(t.Context(), m); err != nil {
 		t.Fatalf("put member: %v", err)
 	}
 
@@ -53,7 +52,7 @@ func addRoleMember(t *testing.T, st *Store, projID string, owner bool) string {
 
 func TestRoleRoundTripAndMemberResolution(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	role := &projmodel.Role{
 		ProjectID:   proj,
@@ -96,7 +95,7 @@ func TestRoleRoundTripAndMemberResolution(t *testing.T) {
 // and it is resolved in SQL so no code path can forget to apply it.
 func TestAMemberWithNoRoleInheritsTheProjectDefault(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	user := addRoleMember(t, st, proj, false)
 
@@ -161,7 +160,7 @@ func TestAMemberWithNoRoleInheritsTheProjectDefault(t *testing.T) {
 // about ownership.
 func TestReAddingAMemberKeepsTheirRoleAndOwnership(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	role := &projmodel.Role{ProjectID: proj, Name: "narrow", Permissions: []string{"emails:read"}}
 	if err := st.PutRole(ctx, role); err != nil {
@@ -198,7 +197,7 @@ func TestReAddingAMemberKeepsTheirRoleAndOwnership(t *testing.T) {
 // indistinguishable from one that does not exist.
 func TestRolesDoNotCrossProjects(t *testing.T) {
 	st, proj, other := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	foreign := &projmodel.Role{ProjectID: other, Name: "theirs", Permissions: []string{"emails:read"}}
 	if err := st.PutRole(ctx, foreign); err != nil {
@@ -250,7 +249,7 @@ func TestRolesDoNotCrossProjects(t *testing.T) {
 // project default at once, so it must refuse.
 func TestDeleteRoleRefusesWhileMembersCarryIt(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	role := &projmodel.Role{ProjectID: proj, Name: "held", Permissions: []string{"emails:read"}}
 	if err := st.PutRole(ctx, role); err != nil {
@@ -289,7 +288,7 @@ func TestDeleteRoleRefusesWhileMembersCarryIt(t *testing.T) {
 // everything at once.
 func TestDeleteRoleRefusesTheProjectDefault(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	role := &projmodel.Role{ProjectID: proj, Name: "member", Permissions: []string{"emails:read"}}
 	if err := st.PutRole(ctx, role); err != nil {
@@ -328,7 +327,7 @@ func TestDeleteRoleRefusesTheProjectDefault(t *testing.T) {
 // what the delete refusal and the console are built on.
 func TestRoleMemberCountIncludesInheritedHolders(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	role := &projmodel.Role{ProjectID: proj, Name: "member", Permissions: []string{"emails:read"}}
 	if err := st.PutRole(ctx, role); err != nil {
@@ -372,7 +371,7 @@ func TestRoleMemberCountIncludesInheritedHolders(t *testing.T) {
 // project default.
 func TestAnEmptyRoleIsALockdownNotAnAbsence(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	open := &projmodel.Role{ProjectID: proj, Name: "member", Permissions: []string{"emails:read"}}
 	if err := st.PutRole(ctx, open); err != nil {
@@ -414,7 +413,7 @@ func TestAnEmptyRoleIsALockdownNotAnAbsence(t *testing.T) {
 // resigning at the same moment cannot both win.
 func TestAProjectKeepsAtLeastOneOwner(t *testing.T) {
 	st, proj, _ := roleFixture(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sole := addRoleMember(t, st, proj, true)
 	plain := addRoleMember(t, st, proj, false)

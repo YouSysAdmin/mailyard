@@ -4,6 +4,7 @@ package email
 
 import (
 	"database/sql"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -234,7 +235,7 @@ func TestClaimDueNeverHandsOneRowToTwoNodes(t *testing.T) {
 	var maxAttempts int
 	//sqlconst:allow constant statement, the test's own assertion
 	if err := s.DB().QueryRowContext(t.Context(),
-		`SELECT max(attempts) FROM emails`).Scan(&maxAttempts); err != nil && err != sql.ErrNoRows {
+		`SELECT max(attempts) FROM emails`).Scan(&maxAttempts); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		t.Fatal(err)
 	}
 

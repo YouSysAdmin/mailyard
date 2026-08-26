@@ -3,7 +3,6 @@
 package email
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -29,7 +28,7 @@ func TestPagingTheLogDoesNotSkipMessagesThatShareATimestamp(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `
@@ -97,7 +96,7 @@ func TestATimestampOnlyCursorStillPages(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `

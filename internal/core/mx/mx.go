@@ -204,8 +204,7 @@ func (l *Lookup) store(domain string, targets []Target) {
 func (l *Lookup) resolve(ctx context.Context, domain string) ([]Target, error) {
 	records, err := l.res.LookupMX(ctx, domain)
 	if err != nil {
-		var dnsErr *net.DNSError
-		if !errors.As(err, &dnsErr) || !dnsErr.IsNotFound {
+		if dnsErr, ok := errors.AsType[*net.DNSError](err); !ok || !dnsErr.IsNotFound {
 			// SERVFAIL, a timeout, a resolver that is down. Not an
 			// answer at all, and treating it as one bounces somebody's
 			// mail because of our network.
@@ -235,8 +234,7 @@ func (l *Lookup) resolve(ctx context.Context, domain string) ([]Target, error) {
 	// No MX: the domain itself, if it resolves. RFC 5321 section 5.1.
 	hosts, herr := l.res.LookupHost(ctx, domain)
 	if herr != nil {
-		var dnsErr *net.DNSError
-		if errors.As(herr, &dnsErr) && dnsErr.IsNotFound {
+		if dnsErr, ok := errors.AsType[*net.DNSError](herr); ok && dnsErr.IsNotFound {
 			return nil, &Error{Domain: domain, Perm: true, Err: errors.New("domain has no mail exchanger and no address")}
 		}
 

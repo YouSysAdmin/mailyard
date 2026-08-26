@@ -134,12 +134,12 @@ func NewService(rt *env.Runtime) *Service {
 // ResolveDomain returns the verified domain owning the recipient
 // address, or nil when no project claims it.
 func (s *Service) ResolveDomain(ctx context.Context, rcpt string) (*dmodel.Domain, error) {
-	at := strings.LastIndex(rcpt, "@")
-	if at < 0 || at == len(rcpt)-1 {
+	_, host, ok := strings.CutLast(rcpt, "@")
+	if !ok || host == "" {
 		return nil, nil
 	}
 
-	return s.Domains.GetVerifiedCovering(ctx, rcpt[at+1:])
+	return s.Domains.GetVerifiedCovering(ctx, host)
 }
 
 // Conn carries what the transport knew and the bytes cannot say.

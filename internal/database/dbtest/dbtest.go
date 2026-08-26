@@ -23,7 +23,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -191,8 +191,8 @@ func extensionRace(err error, stmt string) bool {
 		return false
 	}
 
-	var pg *pgconn.PgError
-	if !errors.As(err, &pg) {
+	pg, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return false
 	}
 
@@ -258,7 +258,7 @@ func MigrationsUp(t *testing.T) []string {
 	}
 
 	// Lexical order is migration order - goose zero-pads them so this holds.
-	sort.Strings(names)
+	slices.Sort(names)
 
 	out := make([]string, 0, len(names))
 	for _, name := range names {

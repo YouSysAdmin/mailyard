@@ -4,7 +4,7 @@ package tests
 
 import (
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -80,7 +80,7 @@ func TestEveryTenantQueryNamesTheProject(t *testing.T) {
 			continue
 		}
 
-		sort.Strings(hit)
+		slices.Sort(hit)
 		findings = append(findings, key+" touches "+strings.Join(dedupe(hit), ", ")+
 			" with no project_id anywhere in the statement\n        "+
 			clip(oneLine(q.sql), 160))
@@ -102,7 +102,7 @@ func TestEveryTenantQueryNamesTheProject(t *testing.T) {
 		}
 	}
 
-	sort.Strings(stale)
+	slices.Sort(stale)
 	if len(stale) > 0 {
 		t.Errorf("crossProjectByDesign lists %d entr(ies) that no longer match any query:\n  %s",
 			len(stale), strings.Join(stale, "\n  "))

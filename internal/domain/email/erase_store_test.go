@@ -3,7 +3,6 @@
 package email
 
 import (
-	"context"
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -29,7 +28,7 @@ func TestErasureFindsEveryStoredMailboxShape(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `
@@ -95,7 +94,7 @@ func TestTheKeySetMatchesWhatErasureDeletes(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `

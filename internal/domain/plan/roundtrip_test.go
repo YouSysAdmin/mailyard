@@ -3,7 +3,6 @@
 package plan
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -32,7 +31,7 @@ func TestEveryLimitSurvivesTheRoundTrip(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	store := NewStore(db)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Every numeric field of the request, set to a DISTINCT value: a
 	// mapping that copies the wrong field passes an all-ones test.

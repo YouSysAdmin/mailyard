@@ -3,7 +3,6 @@
 package analytics
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -32,7 +31,7 @@ func TestTwoNodesRecomputingAtOnceDoNotFail(t *testing.T) {
 	peer := dbtest.Peer(t)
 	first := NewStore(db)
 	second := NewStore(peer)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	projID := ids.New()
 	if _, err := db.ExecContext(ctx, `

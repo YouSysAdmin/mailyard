@@ -49,7 +49,7 @@ func checker(h partition.Health, m *recorder) *Checker {
 // about that every day is how an alert becomes a filter rule.
 func TestAHealthyCountSaysNothing(t *testing.T) {
 	m := &recorder{enabled: true}
-	if err := checker(partition.Health{Partitions: 45, Ceiling: 400}, m).Run(context.Background()); err != nil {
+	if err := checker(partition.Health{Partitions: 45, Ceiling: 400}, m).Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestAHealthyCountSaysNothing(t *testing.T) {
 // months of runway.
 func TestTheWarningArrivesBeforeTheCeiling(t *testing.T) {
 	m := &recorder{enabled: true}
-	if err := checker(partition.Health{Partitions: 320, Ceiling: 400}, m).Run(context.Background()); err != nil {
+	if err := checker(partition.Health{Partitions: 320, Ceiling: 400}, m).Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func TestTheWarningArrivesBeforeTheCeiling(t *testing.T) {
 
 func TestAtTheCeilingItSaysSo(t *testing.T) {
 	m := &recorder{enabled: true}
-	if err := checker(partition.Health{Partitions: 400, Ceiling: 400}, m).Run(context.Background()); err != nil {
+	if err := checker(partition.Health{Partitions: 400, Ceiling: 400}, m).Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestItMailsOnceADay(t *testing.T) {
 	c := checker(partition.Health{Partitions: 320, Ceiling: 400}, m)
 
 	for range 5 {
-		if err := c.Run(context.Background()); err != nil {
+		if err := c.Run(t.Context()); err != nil {
 			t.Fatalf("run: %v", err)
 		}
 	}
@@ -114,7 +114,7 @@ func TestItMailsOnceADay(t *testing.T) {
 	// A day later it is worth saying again - the condition has not
 	// been fixed and the count has grown.
 	c.lastMailed = time.Now().Add(-25 * time.Hour)
-	if err := c.Run(context.Background()); err != nil {
+	if err := c.Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -126,7 +126,7 @@ func TestItMailsOnceADay(t *testing.T) {
 // Platform mail is optional, and every caller of it has to degrade.
 func TestItSurvivesMailBeingOff(t *testing.T) {
 	m := &recorder{enabled: false}
-	if err := checker(partition.Health{Partitions: 400, Ceiling: 400}, m).Run(context.Background()); err != nil {
+	if err := checker(partition.Health{Partitions: 400, Ceiling: 400}, m).Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -140,12 +140,12 @@ func TestItSurvivesMailBeingOff(t *testing.T) {
 func TestAFailedSendIsRetriedTomorrow(t *testing.T) {
 	m := &recorder{enabled: true, err: errors.New("smtp down")}
 	c := checker(partition.Health{Partitions: 320, Ceiling: 400}, m)
-	if err := c.Run(context.Background()); err != nil {
+	if err := c.Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
 	m.err = nil
-	if err := c.Run(context.Background()); err != nil {
+	if err := c.Run(t.Context()); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -160,7 +160,7 @@ func TestAnUnreadableCountIsAnError(t *testing.T) {
 	c := &Checker{Counter: countFunc(func(context.Context) (partition.Health, error) {
 		return partition.Health{}, errors.New("catalog unavailable")
 	})}
-	if err := c.Run(context.Background()); err == nil {
+	if err := c.Run(t.Context()); err == nil {
 		t.Fatal("a failed count was reported as a healthy sweep")
 	}
 }

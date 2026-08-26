@@ -3,8 +3,6 @@
 package emailverify
 
 import (
-	"errors"
-	"net"
 	"strings"
 )
 
@@ -61,10 +59,4 @@ func isRoleAccount(local string) bool {
 	_, ok := roleAccounts[strings.ToLower(local)]
 
 	return ok
-}
-
-// asDNSError unwraps to *net.DNSError, so a wrapped resolver error is
-// still classified correctly.
-func asDNSError(err error, target **net.DNSError) bool {
-	return errors.As(err, target)
 }

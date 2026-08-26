@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -87,8 +86,8 @@ func TestEveryProjectRouteDeclaresAPermission(t *testing.T) {
 		t.Fatalf("only found %d project route groups, the router parse is broken", groups)
 	}
 
-	sort.Strings(undeclared)
-	sort.Strings(missingAction)
+	slices.Sort(undeclared)
+	slices.Sort(missingAction)
 
 	reportRouteProblems(t, undeclared, missingAction)
 }
@@ -330,7 +329,7 @@ func TestRouteResourcesExistInTheCatalogue(t *testing.T) {
 		}
 	}
 
-	sort.Strings(unenforced)
+	slices.Sort(unenforced)
 	if len(unenforced) > 0 {
 		t.Errorf("catalogue defines %v, which no route group enforces.\n"+
 			"A permission nothing honours is a promise to whoever reads the grid. "+

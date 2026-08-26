@@ -266,12 +266,12 @@ func domainOf(addr string) string {
 		}
 	}
 
-	at := strings.LastIndex(addr, "@")
-	if at < 0 || at == len(addr)-1 {
+	_, host, ok := strings.CutLast(addr, "@")
+	if !ok || host == "" {
 		return ""
 	}
 
-	return strings.ToLower(strings.Trim(addr[at+1:], " \t>"))
+	return strings.ToLower(strings.Trim(host, " \t>"))
 }
 
 // AuthenticationResults renders the RFC 8601 header recording what we

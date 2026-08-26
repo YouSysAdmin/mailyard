@@ -16,7 +16,7 @@ go get github.com/yousysadmin/mailyard/sdk/go
 
 A separate module from the server on purpose: importing a client must not drag in
 Fiber, pgx, the AWS SDK and everything else a mail server needs. This module has **no
-dependencies at all** - it is `net/http` and `encoding/json`.
+dependencies at all** - it is `net/http` and `encoding/json/v2` (Go 1.27+).
 
 ## Sending
 

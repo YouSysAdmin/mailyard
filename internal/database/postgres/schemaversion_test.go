@@ -3,7 +3,6 @@
 package postgres
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -71,7 +70,7 @@ func TestASchemaBehindTheBinaryRefusesToServe(t *testing.T) {
 
 	// goose's own bookkeeping table, since dbtest applies the SQL
 	// directly rather than through goose.
-	if _, err := db.ExecContext(context.Background(), `CREATE TABLE goose_db_version (
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE goose_db_version (
 		id SERIAL PRIMARY KEY,
 		version_id BIGINT NOT NULL,
 		is_applied BOOLEAN NOT NULL,
@@ -85,7 +84,7 @@ func TestASchemaBehindTheBinaryRefusesToServe(t *testing.T) {
 	}
 
 	record := func(v int64) {
-		if _, err := db.ExecContext(context.Background(),
+		if _, err := db.ExecContext(t.Context(),
 			`INSERT INTO goose_db_version (version_id, is_applied) VALUES ($1, true)`, v); err != nil {
 			t.Fatalf("record version %d: %v", v, err)
 		}
