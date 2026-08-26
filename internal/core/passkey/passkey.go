@@ -15,6 +15,7 @@ package passkey
 import (
 	"bytes"
 	"encoding/json/v2"
+	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -58,6 +59,11 @@ func DecodeCredential(raw string) (*Credential, error) {
 // Service is a relying party bound to one (rpID, origin).
 type Service struct{ wa *webauthn.WebAuthn }
 
+// ceremonyTimeout is how long a challenge stays answerable. Long
+// enough for a roaming authenticator and a slow person, short enough
+// that a captured challenge is worthless by the time it is read.
+const ceremonyTimeout = 5 * time.Minute
+
 // New builds the RP for rpID (the host, no scheme or port) and origin
 // (the exact scheme://host[:port] the browser used).
 func New(rpID, origin string) (*Service, error) {
@@ -65,6 +71,14 @@ func New(rpID, origin string) (*Service, error) {
 		RPID:          rpID,
 		RPDisplayName: displayName,
 		RPOrigins:     []string{origin},
+		// Enforced HERE, not only advertised to the browser. Without
+		// Enforce the sealed ceremony cookie carries no server-checked
+		// expiry, so a captured challenge and its assertion stayed
+		// answerable until the JWT secret rotated.
+		Timeouts: webauthn.TimeoutsConfig{
+			Login:        webauthn.TimeoutConfig{Enforce: true, Timeout: ceremonyTimeout, TimeoutUVD: ceremonyTimeout},
+			Registration: webauthn.TimeoutConfig{Enforce: true, Timeout: ceremonyTimeout, TimeoutUVD: ceremonyTimeout},
+		},
 	})
 	if err != nil {
 		return nil, err
