@@ -86,8 +86,8 @@ func (h *Handler) List(c fiber.Ctx) error {
 // relay_nodes_auto_approve says otherwise. It is a decision worth
 // making: a node in the pool receives the content of real messages.
 func (h *Handler) Approve(c fiber.Ctx) error {
-	node, srv, resp := h.adminNode(c)
-	if resp != nil {
+	node, srv, resp, ok := h.adminNode(c)
+	if !ok {
 		return resp
 	}
 
@@ -118,8 +118,8 @@ func (h *Handler) Approve(c fiber.Ctx) error {
 // re-enrolment. Anything already spooled on it still delivers - we
 // stop handing it new work, we do not reach into its queue.
 func (h *Handler) Suspend(c fiber.Ctx) error {
-	node, srv, resp := h.adminNode(c)
-	if resp != nil {
+	node, srv, resp, ok := h.adminNode(c)
+	if !ok {
 		return resp
 	}
 
@@ -143,8 +143,8 @@ func (h *Handler) Suspend(c fiber.Ctx) error {
 // to rows a node still claims, so an orphan would look like an
 // ordinary manually configured server and be handed mail.
 func (h *Handler) Delete(c fiber.Ctx) error {
-	node, srv, resp := h.adminNode(c)
-	if resp != nil {
+	node, srv, resp, ok := h.adminNode(c)
+	if !ok {
 		return resp
 	}
 
@@ -262,33 +262,30 @@ func (h *Handler) setStatus(c fiber.Ctx, node *nodemodel.Node, serverID, status,
 
 // adminNode resolves :id into a node and its delivery row.
 //
-// Three returns for the same reason as authenticate: response.*
-// writes the status and returns nil, so a lone error would be nil on
-// the refusal path.
-//
-// The RESPONSE is what a caller tests. Non-nil means the refusal is
-// already written; nil means BOTH pointers are set. Testing a pointer
-// instead happens to work today - no path returns one without the
-// other - but that is a property of the current paths, not a promise,
-// and every caller dereferences the server.
-func (h *Handler) adminNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Shared, error) {
+// OK is a BOOL beside the response: false means the refusal is
+// already written and resp carries it, true means BOTH pointers are set. It used to be an error,
+// and since response.* writes the status and returns nil, the refusal
+// path returned nil and every caller dereferenced a nil node - a 500
+// on any unknown id, found by the live permission audit. See
+// verifySession for the same trap and projectNode for the same fix.
+func (h *Handler) adminNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Shared, error, bool) {
 	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
 	if err != nil {
-		return nil, nil, response.Internal(c, err)
+		return nil, nil, response.Internal(c, err), false
 	}
 
 	if node == nil {
-		return nil, nil, response.NotFound(c, "relay node not found")
+		return nil, nil, response.NotFound(c, "relay node not found"), false
 	}
 
 	srv, err := h.serverFor(c.Context(), node)
 	if err != nil {
-		return nil, nil, response.Internal(c, err)
+		return nil, nil, response.Internal(c, err), false
 	}
 
 	if srv == nil {
-		return nil, nil, response.NotFound(c, "relay node has no server row")
+		return nil, nil, response.NotFound(c, "relay node has no server row"), false
 	}
 
-	return node, srv, nil
+	return node, srv, nil, true
 }

@@ -76,8 +76,8 @@ func (h *Handler) ListMine(c fiber.Ctx) error {
 
 // ApproveMine lets one of the project's nodes start carrying its mail.
 func (h *Handler) ApproveMine(c fiber.Ctx) error {
-	node, srv, resp := h.projectNode(c)
-	if resp != nil {
+	node, srv, resp, ok := h.projectNode(c)
+	if !ok {
 		return resp
 	}
 
@@ -96,8 +96,8 @@ func (h *Handler) ApproveMine(c fiber.Ctx) error {
 // node keeps its certificate and keeps reporting, so putting it back
 // is one click rather than a re-enrolment.
 func (h *Handler) SuspendMine(c fiber.Ctx) error {
-	node, srv, resp := h.projectNode(c)
-	if resp != nil {
+	node, srv, resp, ok := h.projectNode(c)
+	if !ok {
 		return resp
 	}
 
@@ -117,8 +117,8 @@ func (h *Handler) SuspendMine(c fiber.Ctx) error {
 // rule only applies to rows a node still claims, that orphan would
 // look like an ordinary server and be handed mail forever.
 func (h *Handler) DeleteMine(c fiber.Ctx) error {
-	node, srv, resp := h.projectNode(c)
-	if resp != nil {
+	node, srv, resp, ok := h.projectNode(c)
+	if !ok {
 		return resp
 	}
 
@@ -143,33 +143,32 @@ func (h *Handler) DeleteMine(c fiber.Ctx) error {
 // project answers exactly like one that does not exist, so this
 // cannot be used to discover that somebody else's node is there.
 //
-// Three returns for the reason spelled out on authenticate and
-// verifySession - response.* writes the status and returns nil, so a
-// single error return would be nil on the refusal path and the caller
-// would fall straight through it.
-//
-// The RESPONSE is what a caller tests - see adminNode, which carries
-// the same contract for the platform-admin side.
-func (h *Handler) projectNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Server, error) {
+// OK is a BOOL beside the response, not an error alone, for the reason spelled out
+// on verifySession: response.* writes the status and returns nil, so a
+// caller testing an error result falls straight through the refusal.
+// This helper shipped that way and the live permission audit caught it
+// as a 500 - a nil node dereferenced after a 404 had been written.
+// adminNode carries the same contract for the platform-admin side.
+func (h *Handler) projectNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Server, error, bool) {
 	rc := domain.GetRequestContext(c)
 
 	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
 	if err != nil {
-		return nil, nil, response.Internal(c, err)
+		return nil, nil, response.Internal(c, err), false
 	}
 
 	if node == nil || node.ProjectID != rc.Project.ID {
-		return nil, nil, response.NotFound(c, "relay node not found")
+		return nil, nil, response.NotFound(c, "relay node not found"), false
 	}
 
 	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), node.ProjectID, node.ServerID)
 	if err != nil {
-		return nil, nil, response.Internal(c, err)
+		return nil, nil, response.Internal(c, err), false
 	}
 
 	if srv == nil {
-		return nil, nil, response.NotFound(c, "relay node has no server row")
+		return nil, nil, response.NotFound(c, "relay node has no server row"), false
 	}
 
-	return node, srv, nil
+	return node, srv, nil, true
 }

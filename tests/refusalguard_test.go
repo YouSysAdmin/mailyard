@@ -154,12 +154,22 @@ func TestARefusalHelperIsReturnedAndNotTested(t *testing.T) {
 
 // returnsLoneError reports whether the function's only result is an error.
 func returnsLoneError(fn *ast.FuncDecl) bool {
+	// LAST result is error, however many precede it. It was "the only
+	// result", and relaynode.projectNode returned (node, server,
+	// error) with the same trap in the third slot: every caller tested
+	// it, fell through the refusal, and dereferenced a nil node. Found
+	// by the live permission audit as a 500, not by this test.
 	res := fn.Type.Results
-	if res == nil || len(res.List) != 1 || len(res.List[0].Names) > 1 {
+	if res == nil || len(res.List) == 0 {
 		return false
 	}
 
-	id, ok := res.List[0].Type.(*ast.Ident)
+	last := res.List[len(res.List)-1]
+	if len(last.Names) > 1 {
+		return false
+	}
+
+	id, ok := last.Type.(*ast.Ident)
 
 	return ok && id.Name == "error"
 }
