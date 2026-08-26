@@ -30,7 +30,7 @@ type PasskeyResetResponse struct {
 // OIDC-only accounts have none and can only sign in through the IdP.
 type createInput struct {
 	Email    string `json:"email"      validate:"required,email,max=320"    normalize:"normalize"`
-	Password string `json:"password"   validate:"omitempty,min=8,max=256,bcryptlen"   normalize:"trim"`
+	Password string `json:"password"   validate:"omitempty,min=12,max=256,bcryptlen"   normalize:"trim"`
 
 	// Admin is the whole of platform administration - it replaced a
 	// role string and a super_user boolean that meant the same thing.
@@ -42,7 +42,7 @@ type createInput struct {
 // "absent" apart from "set to false".
 type updateInput struct {
 	Email    string `json:"email"      validate:"omitempty,email,max=320"   normalize:"normalize"`
-	Password string `json:"password"   validate:"omitempty,min=8,max=256,bcryptlen"   normalize:"trim"`
+	Password string `json:"password"   validate:"omitempty,min=12,max=256,bcryptlen"   normalize:"trim"`
 	Admin    *bool  `json:"admin"`
 	Disabled *bool  `json:"disabled"`
 

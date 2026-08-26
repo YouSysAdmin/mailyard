@@ -41,8 +41,13 @@ type loginInput struct {
 // rather than login's min=1, which only exists to reject empty input
 // without leaking policy.
 type registerInput struct {
-	Email    string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
-	Password string `json:"password" validate:"required,min=8,max=256,bcryptlen" normalize:"trim"`
+	Email string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
+	// Twelve, the same floor reset and change carry. It was eight on
+	// this one route - the weakest floor on the one route that needs no
+	// credential to reach. The number is repeated in each tag because a
+	// struct tag cannot name a constant, and tests/passwordpolicy_test.go
+	// is what keeps the copies equal.
+	Password string `json:"password" validate:"required,min=12,max=256,bcryptlen" normalize:"trim"`
 }
 
 // passkeyReauthInput is the password confirmation guarding the
