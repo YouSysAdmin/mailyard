@@ -4,6 +4,7 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -46,8 +47,14 @@ func (h *Handler) SystemMailTest(c fiber.Ctx) error {
 		return resp
 	}
 
+	// The detail goes to the log, the answer says which step failed. A
+	// dial error carries the peer's greeting or the resolver's view of
+	// the name, which belongs with the operator's logs, not in a
+	// response - platform admin or not, an API answer is copied around.
 	if err := h.Runtime.SystemMail.TestConnection(c.Context()); err != nil {
-		return response.BadRequest(c, "connection failed: "+err.Error())
+		slog.Warn("systemmail: connection test failed", "err", err)
+
+		return response.BadRequest(c, "connection failed, see the server log for the reason")
 	}
 
 	if in.To == "" {
@@ -58,7 +65,9 @@ func (h *Handler) SystemMailTest(c fiber.Ctx) error {
 	body := "This is a test of the Mailyard system mail settings. If you are reading it, invitations and password resets can be delivered."
 	if err := h.Runtime.SystemMail.Send(c.Context(), []string{in.To}, subject,
 		"<p>"+body+"</p>", body+"\n"); err != nil {
-		return response.BadRequest(c, "send failed: "+err.Error())
+		slog.Warn("systemmail: test send failed", "to", in.To, "err", err)
+
+		return response.BadRequest(c, "send failed, see the server log for the reason")
 	}
 
 	return response.Success(c, MessageResponse{Message: "Test message sent to " + in.To + "."})
