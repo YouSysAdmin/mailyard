@@ -1,0 +1,48 @@
+# GitHub Pages overlay, `hugo -e pages` (.github/workflows/docs.yaml,
+# `task pages`). Merged over config/_default: everything not named here
+# is the embedded build's. baseURL comes from the workflow, since it is
+# whatever Pages hands out (the project path today, a custom domain
+# whenever one is set).
+enableRobotsTXT = true
+
+[params]
+# The home page is the landing, not the documentation index. The theme's
+# home.html branches on this and nothing else does.
+landing = true
+
+tagline = ""
+tagline_sub = "Mailyard"
+lead = "Self-hosted email delivery for developers. Transactional sending over HTTP or SMTP, templates, campaigns, inbound mail, and a console that shows what happened to every message. One Go binary and a PostgreSQL."
+trust_badges = ["# single binary", "# PostgreSQL", "# REST + SMTP", "# multi-tenant", "# BUSL 1.1"]
+
+terminal_title = "~/mailyard"
+terminal_lines = [
+  '<span class="cs-prefix cs-brand">$</span> mailyard serve --init',
+  '<span class="cs-dim">listen:</span>  <span class="cs-ok">:3000</span> http, <span class="cs-ok">:587</span> submission',
+  '<span class="cs-dim">console:</span> http://localhost:3000/app',
+  '',
+  '<span class="cs-prefix cs-brand">$</span> curl -X POST localhost:3000/api/v1/emails/send \',
+  '    -H "Authorization: Bearer myk_..." \',
+  """    -d '{"from":"hello@example.com","to":["ada@example.org"],""",
+  """         "subject":"Welcome","text":"It works."}'""",
+  '<span class="cs-dim">{</span>"id":"0198f2c1-...","status":"queued"<span class="cs-dim">}</span>',
+]
+
+[[params.features]]
+title = "Transactional sending"
+description = "POST /api/v1/emails/send or plain SMTP submission on 587 with an API key as the password. Single, template, batch and scheduled sends, attachments, a delivery log per message."
+[[params.features]]
+title = "Templates and campaigns"
+description = "Versioned templates with per-language localizations, CSS inlining and preview. Campaigns over static or dynamic subscriber lists, A/B variants, throttling, hosted one-click unsubscribe."
+[[params.features]]
+title = "Your own delivery"
+description = "Per-project SMTP servers in named groups with failover, SES as a provider, verified sender domains with DKIM, bounce handling that feeds the suppression list."
+[[params.features]]
+title = "Inbound on your domains"
+description = "Point MX at the host, claim a domain with a DNS TXT record, and received mail is stored per project and delivered as webhooks."
+[[params.features]]
+title = "Multi-tenant by design"
+description = "Projects with their own roles and permissions, members and invitations, usage plans with volume limits, per-project usage and analytics."
+[[params.features]]
+title = "One binary"
+description = "Go and PostgreSQL. The binary carries the console, this documentation and its own migrations. Local sign-in with passkeys and TOTP, or OIDC. Prometheus metrics, structured logs, signed webhooks."

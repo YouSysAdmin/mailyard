@@ -95,6 +95,25 @@ tasks:
     cmds:
       - hugo server --baseURL http://localhost:1313/docs/
 
+  # The GitHub Pages build, `hugo -e pages`: the same site with
+  # config/pages/hugo.toml layered on, which turns the home page into the
+  # landing. Written to docs/pages-dist, never docs/dist, so it cannot end
+  # up embedded. The baseURL is what Pages serves today - a custom domain
+  # is `task pages BASE=https://...`.
+  pages:
+    desc: Build the GitHub Pages site (landing home) into docs/pages-dist
+    dir: docs
+    vars:
+      BASE: '{{.BASE | default "http://localhost:8000/mailyard/"}}'
+    cmds:
+      - hugo -e pages --minify --cleanDestinationDir --baseURL "{{.BASE}}" --destination pages-dist
+
+  pages-dev:
+    desc: Serve the GitHub Pages build with live reload on :1314
+    dir: docs
+    cmds:
+      - hugo server -e pages --baseURL http://localhost:1314/
+
   binary:
     desc: Build bin/mailyard from whatever is in web/dist and docs/dist
     env:

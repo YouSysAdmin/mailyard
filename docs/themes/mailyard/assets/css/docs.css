@@ -26,14 +26,19 @@
 .cs-btn:active {
   transform: scale(0.98);
 }
+/* Ink on paper, inverted with the theme: fg-0 is near-black on the light
+   theme and near-white on the dark one, bg-0 the opposite. The mid-ramp
+   brand-500 sat here and on the light theme was a grey button, the one
+   grey thing on a black-and-white page. */
 .cs-btn-primary {
-  background: var(--brand-500);
-  color: #1a0a03;
-  border-color: var(--brand-500);
+  background: var(--fg-0);
+  color: var(--bg-0);
+  border-color: var(--fg-0);
 }
 .cs-btn-primary:hover {
-  background: var(--brand-400);
-  border-color: var(--brand-400);
+  background: var(--fg-1);
+  border-color: var(--fg-1);
+  color: var(--bg-0);
 }
 .cs-btn-ghost {
   background: var(--bg-3);

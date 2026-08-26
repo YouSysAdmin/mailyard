@@ -1,3 +1,7 @@
+# GitHub Pages: the documentation site the binary embeds, built in the
+# `pages` environment (docs/config/pages), which makes the home page the
+# landing, under whatever baseURL Pages hands out. No Node, Go or Sass:
+# the theme is plain CSS and JS bundled by Hugo pipes.
 name: Docs build and deploy
 on:
   release:
@@ -17,57 +21,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DART_SASS_VERSION: 1.99.0
-      GO_VERSION: 1.27.0
       HUGO_VERSION: 0.163.3
-      NODE_VERSION: 24.14.1
       TZ: Europe/Kyiv
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          submodules: recursive
           fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v6
-      - name: Create directory for user-specific executable files
-        run: |
-          mkdir -p "${HOME}/.local"
-      - name: Install Dart Sass
-        run: |
-          curl -sLJO "https://github.com/sass/dart-sass/releases/download/${DART_SASS_VERSION}/dart-sass-${DART_SASS_VERSION}-linux-x64.tar.gz"
-          tar -C "${HOME}/.local" -xf "dart-sass-${DART_SASS_VERSION}-linux-x64.tar.gz"
-          rm "dart-sass-${DART_SASS_VERSION}-linux-x64.tar.gz"
-          echo "${HOME}/.local/dart-sass" >> "${GITHUB_PATH}"
       - name: Install Hugo
         run: |
           curl -sLJO "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
-          mkdir "${HOME}/.local/hugo"
+          mkdir -p "${HOME}/.local/hugo"
           tar -C "${HOME}/.local/hugo" -xf "hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
           rm "hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
           echo "${HOME}/.local/hugo" >> "${GITHUB_PATH}"
-      - name: Verify installations
-        run: |
-          echo "Dart Sass: $(sass --version)"
-          echo "Go: $(go version)"
-          echo "Hugo: $(hugo version)"
-          echo "Node.js: $(node --version)"
-      - name: Install Node.js dependencies
-        run: |
-          [[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true
-      - name: Configure Git
-        run: |
-          git config core.quotepath false
       - name: Cache restore
         id: cache-restore
         uses: actions/cache/restore@v5
@@ -76,16 +46,18 @@ jobs:
           key: hugo-${{ github.run_id }}
           restore-keys:
             hugo-
+      # --destination overrides publishDir (dist, which is what the binary
+      # embeds and .gitignore expects).
       - name: Build the site
+        env:
+          BASE: ${{ steps.pages.outputs.base_url }}
         run: |
-          hugo build \
-            --source ./docs \
-            --gc \
-            --minify \
-            --baseURL "${{ steps.pages.outputs.base_url }}/" \
-            --cacheDir "${{ runner.temp }}/hugo_cache"
+          hugo version
+          hugo build --source ./docs -e pages --minify \
+            --baseURL "${BASE}/" \
+            --cacheDir "${RUNNER_TEMP}/hugo_cache" \
+            --destination "${GITHUB_WORKSPACE}/site"
       - name: Cache save
-        id: cache-save
         uses: actions/cache/save@v5
         with:
           path: ${{ runner.temp }}/hugo_cache
@@ -93,7 +65,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ./docs/public
+          path: ./site
   deploy:
     environment:
       name: github-pages

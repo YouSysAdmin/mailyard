@@ -1,4 +1,8 @@
-# Mailyard documentation site.
+# Mailyard documentation site - the DEFAULT environment, which is the build
+# the binary embeds. config/pages/hugo.toml is layered over this one by
+# `hugo -e pages` for GitHub Pages: same content, same theme, and the home
+# page becomes the landing (params.landing) instead of the documentation
+# index. Nothing else differs, so a page reads the same on both.
 #
 # The build output is EMBEDDED IN THE BINARY (docs/dist, see docsite.go) and
 # served under /docs by the running instance, which is why baseURL is a bare
@@ -15,9 +19,9 @@ theme = "mailyard"
 defaultContentLanguage = "en"
 defaultContentLanguageInSubdir = false
 
-# Nothing here is published to the open web - the site answers behind a
-# console session - so a sitemap, a robots.txt and RSS feeds are files
-# nobody can fetch and no crawler will ask for. Tags are not used.
+# This build answers behind a console session, so a sitemap, a robots.txt
+# and RSS feeds are files nobody can fetch and no crawler will ask for.
+# The pages environment turns robots.txt back on. Tags are not used.
 enableRobotsTXT = false
 disableKinds = ["RSS", "sitemap", "taxonomy", "term"]
 
@@ -31,17 +35,16 @@ description = "Self-hosted email delivery platform for developers"
 sidebarCollapsible = true
 sidebarCollapsed = true
 
-# No repository column in the footer and no edit-on-github links: these
-# docs ship inside the product, and a reader of them is signed in to an
-# instance rather than looking at a source tree.
-show_footer_project = false
-repoURL = ""
-edit_base = ""
-
-# No top-right CTA. The one link worth having would point at the console,
-# whose mount path is decided once in Go (env.ConsolePath) - repeating it
-# here would be a second place to change it.
-cta_url = ""
+# Repository links: the project column in the footer, an edit-on-github
+# link under the TOC and the GitHub button in the top bar. edit_base is
+# joined with .File.Path, which is relative to contentDir (content/en), so
+# it stops at docs/content/en/.
+show_footer_project = true
+repoURL = "https://github.com/YouSysAdmin/mailyard"
+edit_base = "https://github.com/YouSysAdmin/mailyard/edit/master/docs/content/en/"
+cta_url = "https://github.com/YouSysAdmin/mailyard"
+cta_label = "GitHub"
+cta_icon = "github"
 
 # Top navigation. Four entries, not all fifteen sections: the sidebar is
 # the map, and this is the shortlist somebody arrives wanting.

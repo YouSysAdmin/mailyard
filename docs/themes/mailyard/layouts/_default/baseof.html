@@ -3,16 +3,16 @@
 <head>
   {{ partial "head.html" . }}
 </head>
-{{- /* THERE IS NO LANDING PAGE, so the home page is a documentation page like
-    any other: it keeps the sidebar, the TOC column and the ordinary body
-    class, where the upstream theme drops all three for a hero. These docs
-    ship inside the product and a marketing splash in front of them is a page
-    nobody signed in to read. */ -}}
-<body class="cs-doc">
+{{- /* The embedded build has NO LANDING PAGE, so its home is a documentation
+    page like any other and keeps the sidebar, the TOC column and the
+    ordinary body class. Only the pages environment (params.landing) gets
+    the one-column hero, and only on the home page - see home.html. */ -}}
+{{- $landing := and .IsHome site.Params.landing -}}
+<body class="cs-doc{{ if $landing }} cs-home{{ end }}">
   {{ partial "nav.html" . }}
   <div class="cs-shell">
-    {{ partial "sidebar.html" . }}
-    <main class="cs-main" id="content">
+    {{ if not $landing }}{{ partial "sidebar.html" . }}{{ end }}
+    <main class="cs-main{{ if $landing }} cs-main-wide{{ end }}" id="content">
       {{ block "main" . }}{{ end }}
     </main>
     {{- /* "On this page" TOC, on for any page with enough headings. Set
@@ -20,7 +20,7 @@
         right column, so this just fills it. */ -}}
     {{ $toc := true }}
     {{ if isset .Params "toc" }}{{ $toc = .Params.toc }}{{ end }}
-    {{ if and $toc (gt (len .TableOfContents) 50) }}
+    {{ if and (not $landing) $toc (gt (len .TableOfContents) 50) }}
       {{ partial "toc.html" . }}
     {{ end }}
   </div>

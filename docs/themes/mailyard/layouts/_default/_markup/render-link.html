@@ -1,0 +1,17 @@
+{{- /*
+  Internal links in the prose are written as `/docs/<section>/<page>`,
+  which is exactly right when the site is mounted at /docs/ (inside the
+  binary) and exactly wrong anywhere else: on GitHub Pages the site sits
+  at /mailyard/ and a root-relative /docs/... link leaves it. So a
+  link starting with /docs/ is re-rooted through relURL, which prepends
+  whatever path the configured baseURL carries - /docs/x stays /docs/x,
+  and under Pages it becomes /mailyard/x. Every other destination
+  (absolute URLs, anchors, mailto) is written as it came.
+*/ -}}
+{{- $href := .Destination -}}
+{{- if eq $href "/docs/" -}}
+  {{- $href = site.Home.RelPermalink -}}
+{{- else if hasPrefix $href "/docs/" -}}
+  {{- $href = strings.TrimPrefix "/docs/" $href | relURL -}}
+{{- end -}}
+<a href="{{ $href }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text }}</a>
