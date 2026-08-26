@@ -7,22 +7,30 @@ One Go binary and a PostgreSQL. The binary carries the console, the documentatio
 
 ## Features
 
-- Transactional email: `POST /api/v1/emails/send` (API keys with scopes, IP allowlists) or plain SMTP submission on port
-  587 using an API key as the AUTH password.
-- Templates: versioned, per-language localizations, `{{ var }}`rendering, CSS inlining, preview and test sends,
+- **Amazon SES, natively.** SES is a provider on an SMTP server row: sending goes over the SES API, and bounce and
+  complaint notifications come back over SNS into the same bounce handling as everything else.
+- **Sending.** `POST /api/v1/emails/send`, or plain SMTP submission on :587 with an API key as the AUTH password.
+  Single, template, batch and scheduled sends, attachments (inline, or offloaded to filesystem/S3), a delivery log
+  per message, and a sandbox that captures mail instead of delivering it.
+- **Templates.** Versioned, per-language localizations, `{{ var }}` rendering, CSS inlining, preview and test sends,
   import/export.
-- Campaigns: subscriber lists (static or rule-based dynamic segments), A/B variants, throttled sending, delivery at each
+- **Campaigns.** Subscriber lists (static or rule-based dynamic segments), A/B variants, throttling, delivery at each
   recipient's local time, open/click tracking, hosted one-click unsubscribe (RFC 8058).
-- Inbound: point MX at the host and receive on port 25, claim domains with a DNS TXT record, received mail is stored per
-  project and emitted as webhooks.
-- Deliverability: suppression lists (doubling as inbound blocklists), bounce records, automatic suppression on permanent
-  SMTP rejects.
-- Multi-tenant projects with roles (owner/admin/editor/viewer), usage plans with volume limits and resource caps,
-  per-project usage stats.
-- Auth: local login with TOTP 2FA, or OIDC/SSO. Secrets (SMTP passwords, TOTP seeds) encrypted at rest.
-- Attachments inline by default, or offloaded to filesystem/S3 storage.
-- Observability: Prometheus metrics at `/metrics` (opt in), structured logs, outgoing webhooks with HMAC signatures and
-  delivery logs.
+- **Your own delivery.** Per-project SMTP servers in named groups with failover, a platform-wide shared pool, DKIM signing for verified domains, approved
+  sender addresses, bounce records feeding the suppression list. Address verification (syntax, disposable, role, MX).
+- **Inbound.** Point MX at the host and receive on :25, claim domains with a DNS TXT record, SPF/DKIM/DMARC checked
+  at ingest, received mail stored per project and emitted as webhooks.
+- **Multi-tenant.** Projects with their own roles over a permission catalogue, members and invitations, usage plans
+  with volume limits and resource caps, per-project usage and analytics, export and erasure per address or in bulk.
+- **Auth.** Local sign-in with passkeys and TOTP, or OIDC/SSO. Sessions are tracked and revocable. Secrets (SMTP
+  passwords, TOTP seeds, private keys) sealed at rest.
+- **Operations.** TLS for every listener from one certificate chain (assigned, ACME, or self-signed), Prometheus
+  metrics, structured logs, an audit log, alert mail, retention windows, maintenance mode, PostgreSQL read replicas.
+- **Integration.** Outgoing webhooks with HMAC signatures and delivery logs. Both API surfaces are described in
+  OpenAPI (`mailyard export-api-spec`), and three clients are generated from it: [Go, Python and Ruby](sdk).
+
+Documentation: [yousysadmin.github.io/mailyard](https://yousysadmin.github.io/mailyard/), or `/docs` on any running
+instance.
 
 ## Quick start
 
@@ -60,15 +68,16 @@ auth:
     local:
         enabled: true
         email: admin@example.com               # bootstrap user
-crypto:
-    encryption_key: "<any long random string>"   # required, seals secrets at rest
 database:
     dsn: "postgres://mailyard:secret@localhost:5432/mailyard?sslmode=require"
+    crypto:
+        encryption_key: "<any long random string>"   # required, min 32 chars, seals secrets at rest
 ```
 
 First start prints the bootstrap admin password to stderr once. The console lives at `/app`, and the documentation is
 served from the same binary at `/docs` (signed-in users only). Every setting maps to an env var
-(`MAILYARD_AUTH_JWT_SECRET`, `MAILYARD_DATABASE_DSN`, ...).
+(`MAILYARD_AUTH_JWT_SECRET`, `MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY`, ...). A serving node refuses to start on a
+schema older than itself - run one node with `--init` to migrate, the rest follow.
 
 Docker:
 
@@ -79,7 +88,8 @@ docker run -p 3000:3000 -p 587:587 -p 25:25 -v mailyard-data:/data \
   -e MAILYARD_AUTH_JWT_SECRET=... \
   -e MAILYARD_AUTH_LOCAL_ENABLED=true \
   -e MAILYARD_AUTH_LOCAL_EMAIL=admin@example.com \
-  mailyard:devel
+  -e MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY=... \
+  mailyard:<version>            # task docker tags the image with git describe
 ```
 
 ## Optional listeners and services
@@ -88,19 +98,24 @@ docker run -p 3000:3000 -p 587:587 -p 25:25 -v mailyard-data:/data \
 |----------------------|---------|------------------------------------------------------|
 | `submission.enabled` | off     | SMTP submission on :587, AUTH with an API key        |
 | `inbound.enabled`    | off     | MX listener on :25 for verified domains              |
+| `server.tls.enabled` | off     | TLS on the HTTP listener (the SMTP ones default on)  |
 | `storage.backend`    | inline  | `fs` or `s3` attachment storage                      |
 | `metrics.enabled`    | off     | Prometheus scrape endpoint, `metrics.token` gates it |
+| `database.replica_dsns` | none | Read replicas for the list and analytics queries    |
 
 ## Development
 
 ```sh
-task check        # go vet + tests + gofmt + SPA type-check + prettier
+task check        # vet + golangci-lint + tests + gofmt + SPA type-check + prettier
+task test-db      # store tests against the compose database
 cd web && npm run dev   # vite dev server proxying /api to :3000
-cd web && npm run format  # prettier over src
 task docs-dev     # the embedded documentation, live, on :1313/docs/
+task pages-dev    # the public site (landing plus docs), live, on :1314/
+task sdk          # regenerate and check the three clients
 ```
 
-Building the documentation into the binary needs [Hugo](https://gohugo.io)
+Building the documentation into the binary needs [Hugo](https://gohugo.io). The public site is the same Hugo
+source built in the `pages` environment by `.github/workflows/docs.yaml`.
 
 
 ## License
