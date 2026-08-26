@@ -124,6 +124,12 @@ void refresh()
    scrolling inside its own wrapper. */
 .grid > * {
   min-width: 0;
+  /* The stylesheet spaces STACKED cards with `.card + .card { margin-top }`,
+     and every card here but the first is a sibling of one - so the second
+     and third sat 24px lower than the first, centred-looking, on top of
+     the gap the grid already puts between rows. The grid owns the
+     spacing, the cards do not. */
+  margin-top: 0;
 }
 
 .wide {
