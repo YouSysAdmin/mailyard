@@ -62,6 +62,41 @@ func TestAStampedEventOutlivesItsRequest(t *testing.T) {
 	}
 }
 
+// TestAStampedPathOutlivesItsRequest is the same failure one field over.
+// The route middleware fills Path from c.Path(), which Fiber answers as
+// an unsafe view of the pooled context's path buffer, and it was left
+// pointing there after the user agent was fixed.
+func TestAStampedPathOutlivesItsRequest(t *testing.T) {
+	paths := []string{
+		"/api/v1/templates/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"/api/v1/x",
+		"/api/v1/smtp-servers/cccccccccccccccccccccccccccccccccccc/test",
+	}
+
+	var kept []*amodel.Event
+	app := fiber.New()
+	app.Get("/*", func(c fiber.Ctx) error {
+		e := &amodel.Event{Type: "test.event", Path: c.Path()}
+		Stamp(e, c)
+		kept = append(kept, e)
+
+		return c.SendString("ok")
+	})
+
+	for _, p := range paths {
+		if _, err := app.Test(httptest.NewRequest(fiber.MethodGet, p, nil)); err != nil {
+			t.Fatalf("Test: %v", err)
+		}
+	}
+
+	for i, want := range paths {
+		if kept[i].Path != want {
+			t.Errorf("event %d recorded path %q, want %q - the field is a view of a reused buffer",
+				i, kept[i].Path, want)
+		}
+	}
+}
+
 // TestAStampedUserAgentIsBoundedAndStorable keeps the two things the clamp
 // is there for: a caller cannot write an unbounded column, and cannot
 // write bytes Postgres refuses.
