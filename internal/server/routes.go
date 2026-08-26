@@ -655,10 +655,13 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	emails.Post("/:id/retry", permWrite, eh.Retry)
 
 	// Send-test lives on the templates surface but is a send, so the
-	// email handler owns it. It is templates:write either way - a
-	// sandbox credential has no templates permission to spend, so it
-	// never reaches this route at all.
-	tpl.Post("/:id/send-test", permWrite, eh.SendTest)
+	// email handler owns it. refuseSandboxCredential is on the ROUTE
+	// because this is not under the /emails group that carries it: a
+	// sandbox key can hold templates:write (ForKey ADDS the sandbox
+	// grants to whatever the key carries), and SendTest calls the
+	// service directly, past both sandbox apply points - so without
+	// this a sandbox credential sent real mail here.
+	tpl.Post("/:id/send-test", refuseSandboxCredential, permWrite, eh.SendTest)
 
 	// API keys - the machine credential management surface. Creating
 	// or revoking a credential is project-admin tier.
@@ -870,9 +873,12 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	camps.Get("/:id", permRead, ch.Get)
 	camps.Patch("/:id", permWrite, ch.Update)
 	camps.Delete("/:id", permDelete, ch.Delete)
-	camps.Post("/:id/send", permWrite, ch.Send)
+	// A campaign send is real mail to a whole list, and nothing on the
+	// campaign path consults the credential's sandbox flag - see the
+	// note on send-test.
+	camps.Post("/:id/send", refuseSandboxCredential, permWrite, ch.Send)
 	camps.Post("/:id/pause", permWrite, ch.Pause)
-	camps.Post("/:id/resume", permWrite, ch.Resume)
+	camps.Post("/:id/resume", refuseSandboxCredential, permWrite, ch.Resume)
 	camps.Post("/:id/cancel", permWrite, ch.Cancel)
 	camps.Post("/:id/duplicate", permWrite, ch.Duplicate)
 	camps.Get("/:id/messages", permRead, ch.Messages)
