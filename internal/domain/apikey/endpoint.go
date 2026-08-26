@@ -4,6 +4,7 @@ package apikey
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -59,6 +60,21 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	perms, bad := normalizePermissions(in.Permissions)
 	if bad != "" {
 		return response.BadRequest(c, bad)
+	}
+
+	// You cannot MINT what you do not hold - the same rule roles have
+	// in refuseGranting, and for the same reason: without it a caller
+	// trusted only with apikeys:write minted a key carrying "*" and
+	// held every permission in the project two requests later. An
+	// owner holds All and so is never short.
+	if _, wildcard := rc.Permissions[perm.All]; slices.Contains(perms, perm.All) && !wildcard {
+		return response.Forbidden(c, "a key cannot carry \"*\" unless you hold it yourself - ask a project owner")
+	}
+
+	if short := rc.Permissions.Missing(perms); len(short) > 0 {
+		return response.Forbidden(c,
+			"a key cannot carry a permission you do not hold yourself: "+
+				strings.Join(short, ", ")+" - ask a project owner")
 	}
 
 	var expiresAt *time.Time
