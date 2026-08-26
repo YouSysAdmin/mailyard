@@ -70,7 +70,7 @@ func (h *Handler) startSession(c fiber.Ctx, u *usermodel.User, authProviderID st
 		return err
 	}
 
-	c.Cookie(buildSessionCookie(h.Runtime, tok, ttl))
+	c.Cookie(buildSessionCookie(c, h.Runtime, tok, ttl))
 
 	return nil
 }
@@ -129,7 +129,7 @@ func (h *Handler) RevokeSession(c fiber.Ctx) error {
 		Detail:     "revoked session " + id,
 	})
 	if id == rc.SessionID {
-		c.Cookie(buildSessionCookie(h.Runtime, "", -time.Hour))
+		c.Cookie(buildSessionCookie(c, h.Runtime, "", -time.Hour))
 	}
 
 	slog.Info("auth: session revoked", "user_id", rc.User.ID, "session_id", id)

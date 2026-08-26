@@ -108,7 +108,7 @@ func (h *Handler) setCeremony(c fiber.Ctx, name string, sess *corepasskey.Sessio
 		Path:     "/",
 		HTTPOnly: true,
 		SameSite: "Strict",
-		Secure:   cookieSecure(h.Runtime),
+		Secure:   cookieSecure(c, h.Runtime),
 		Expires:  time.Now().Add(passkeyCeremonyTTL),
 	})
 
@@ -122,7 +122,7 @@ func (h *Handler) takeCeremony(c fiber.Ctx, name string) (*corepasskey.SessionDa
 	raw := c.Cookies(name)
 	c.Cookie(&fiber.Cookie{
 		Name: name, Value: "", Path: "/", HTTPOnly: true,
-		SameSite: "Strict", Secure: cookieSecure(h.Runtime),
+		SameSite: "Strict", Secure: cookieSecure(c, h.Runtime),
 		Expires: time.Unix(0, 0), MaxAge: -1,
 	})
 	if raw == "" {

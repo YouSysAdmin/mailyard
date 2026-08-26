@@ -234,7 +234,7 @@ func (h *Handler) Logout(c fiber.Ctx) error {
 		})
 	}
 
-	c.Cookie(buildSessionCookie(h.Runtime, "", -time.Hour))
+	c.Cookie(buildSessionCookie(c, h.Runtime, "", -time.Hour))
 
 	return response.NoContent(c)
 }
@@ -374,24 +374,29 @@ func sessionTTL(rt *env.Runtime) time.Duration {
 // HttpOnly + SameSite=Strict + Secure when the operator advertises
 // the tool over HTTPS. Path=/ so the SPA + every /api/* call shares it.
 //
-// Secure is derived from server.public_url rather than c.Protocol()
-// so a TLS-terminating reverse proxy (HTTPS to the client, plain HTTP
-// upstream) still gets the Secure flag set.
-func buildSessionCookie(rt *env.Runtime, value string, ttl time.Duration) *fiber.Cookie {
+// Secure comes from server.public_url OR the connection - see
+// cookieSecure for why it takes both.
+func buildSessionCookie(c fiber.Ctx, rt *env.Runtime, value string, ttl time.Duration) *fiber.Cookie {
 	return &fiber.Cookie{
 		Name:     SessionCookie,
 		Value:    value,
 		Path:     "/",
 		HTTPOnly: true,
 		SameSite: "Strict",
-		Secure:   cookieSecure(rt),
+		Secure:   cookieSecure(c, rt),
 		Expires:  time.Now().Add(ttl),
 	}
 }
 
-// cookieSecure reports whether the operator's advertised public URL
-// is HTTPS. Used by both the session cookie and the OIDC state
-// cookie. Returns false when public_url is empty (local dev).
-func cookieSecure(rt *env.Runtime) bool {
-	return strings.HasPrefix(strings.ToLower(rt.Config.Server.PublicURL), "https://")
+// cookieSecure reports whether the cookie may only travel over TLS:
+// the operator's advertised public URL is HTTPS, OR this request
+// arrived over it. The first half is what keeps the flag on behind a
+// TLS-terminating proxy that talks plain HTTP upstream. The second is
+// what protects an HTTPS install whose public_url was left empty or on
+// http - without it the session cookie went out without Secure and
+// one plain-http fetch to the host leaked it. c.Secure() reads the
+// forwarded scheme only from a trusted proxy, so it cannot be turned
+// OFF by a header. False for plain-http local dev.
+func cookieSecure(c fiber.Ctx, rt *env.Runtime) bool {
+	return c.Secure() || strings.HasPrefix(strings.ToLower(rt.Config.Server.PublicURL), "https://")
 }

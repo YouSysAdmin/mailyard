@@ -74,7 +74,7 @@ func (h *Handler) OAuthStart(c fiber.Ctx) error {
 	// The slug rides in the cookie, not just the URL, so the callback
 	// cannot be pointed at a different provider than the one the
 	// round-trip started with.
-	c.Cookie(buildOIDCStateCookie(h.Runtime, row.Slug+"|"+cookieValue, coreoidc.StateCookieTTL))
+	c.Cookie(buildOIDCStateCookie(c, h.Runtime, row.Slug+"|"+cookieValue, coreoidc.StateCookieTTL))
 
 	return c.Redirect().Status(fiber.StatusFound).To(redirect)
 }
@@ -100,7 +100,7 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	if errParam := c.Query("error"); errParam != "" {
 		desc := c.Query("error_description")
 		h.auditOIDCFailed(c, "", fmt.Sprintf("idp returned error: %s (%s)", errParam, desc))
-		c.Cookie(buildOIDCStateCookie(h.Runtime, "", -time.Hour))
+		c.Cookie(buildOIDCStateCookie(c, h.Runtime, "", -time.Hour))
 
 		return redirectLogin(c, "sso_idp_error")
 	}
@@ -109,7 +109,7 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	code := c.Query("code")
 	if state == "" || code == "" {
 		h.auditOIDCFailed(c, "", "callback missing state or code")
-		c.Cookie(buildOIDCStateCookie(h.Runtime, "", -time.Hour))
+		c.Cookie(buildOIDCStateCookie(c, h.Runtime, "", -time.Hour))
 
 		return redirectLogin(c, "sso_bad_callback")
 	}
@@ -126,14 +126,14 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 		// The round-trip started at a different provider. Refuse rather
 		// than validating this code against the wrong client.
 		h.auditOIDCFailed(c, "", "state cookie belongs to provider "+cookieSlug+", callback is "+row.Slug)
-		c.Cookie(buildOIDCStateCookie(h.Runtime, "", -time.Hour))
+		c.Cookie(buildOIDCStateCookie(c, h.Runtime, "", -time.Hour))
 
 		return redirectLogin(c, "sso_state_mismatch")
 	}
 
 	jwtSecret := []byte(crypto.DeriveKey(h.Runtime.Config.Auth.JWTSecret, crypto.KeyOIDCState))
 	claims, invite, err := flow.Exchange(c.Context(), jwtSecret, state, code, cookieValue)
-	c.Cookie(buildOIDCStateCookie(h.Runtime, "", -time.Hour))
+	c.Cookie(buildOIDCStateCookie(c, h.Runtime, "", -time.Hour))
 	if err != nil {
 		h.auditOIDCFailed(c, "", "exchange/verify: "+err.Error())
 
@@ -374,14 +374,14 @@ func redirectLogin(c fiber.Ctx, code string) error {
 	return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/login?err=" + code)
 }
 
-func buildOIDCStateCookie(rt *env.Runtime, value string, ttl time.Duration) *fiber.Cookie {
+func buildOIDCStateCookie(c fiber.Ctx, rt *env.Runtime, value string, ttl time.Duration) *fiber.Cookie {
 	return &fiber.Cookie{
 		Name:     coreoidc.StateCookie,
 		Value:    value,
 		Path:     "/",
 		HTTPOnly: true,
 		SameSite: "Lax", // Lax (not Strict) so the IdP redirect carries it back
-		Secure:   cookieSecure(rt),
+		Secure:   cookieSecure(c, rt),
 		Expires:  time.Now().Add(ttl),
 	}
 }
