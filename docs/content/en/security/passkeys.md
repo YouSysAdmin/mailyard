@@ -76,9 +76,10 @@ reason [2FA reset](/docs/security/two-factor-auth) is.
 
 - **Passkeys need HTTPS**, except on `localhost`, which browsers exempt. Behind a reverse proxy this is a browser rule,
   not a Mailyard one.
-- **The relying party comes from the browser's `Origin`**, not from
-  `server.public_url`. So a passkey enrolled at one hostname does not work at another, which is what binding to an
-  origin means - if the console is reachable at two names, people will need one passkey per name.
+- **The relying party comes from the browser's `Origin`**, checked against `server.public_url`: the origin's host
+  must be that host or a subdomain of it, and a request from any other name is refused. So a passkey enrolled at one
+  hostname does not work at another, which is what binding to an origin means - if the console is reachable at two
+  names, people will need one passkey per name, and both names must sit under `server.public_url`.
 - Enrolment, removal and passkey sign-in each land in the
   [security log](/docs/admin/user-management) as `auth.passkey.*`. A rejected assertion is recorded as a failed sign-in,
   the same as a wrong password.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -66,12 +67,22 @@ func (h *Handler) ceremonySealer() *crypto.Service {
 	return crypto.NewFor(h.Runtime.Config.Auth.JWTSecret, crypto.KeyPasskey)
 }
 
-// webauthnService builds the relying party from the browser's Origin.
+// webauthnService builds the relying party from the browser's Origin,
+// checked against server.public_url when there is one.
 //
 // The Origin is what the browser signs into the client data, so
 // deriving the RP from it keeps the check equal to what the
-// authenticator actually bound - rather than to server.public_url,
-// which an operator can leave stale and a proxy can rewrite.
+// authenticator actually bound. Taken on its own word, though, the
+// header made the relying party whatever the caller declared, and the
+// library's origin and rpIdHash checks compared the assertion against
+// the very value the request supplied. Nothing exploitable followed -
+// an authenticator releases a credential only for the RP it was
+// enrolled under - but a proxy rewriting Origin made every passkey
+// silently unusable, and a compromised sibling host was a valid RP
+// for stored credentials. So the host has to be public_url's, or a
+// subdomain of it: the same name under which the passkey was
+// enrolled. With no public_url configured the header stands alone,
+// which is the development case.
 func (h *Handler) webauthnService(c fiber.Ctx) (*corepasskey.Service, error) {
 	origin := c.Get(fiber.HeaderOrigin)
 	if origin == "" {
@@ -83,7 +94,19 @@ func (h *Handler) webauthnService(c fiber.Ctx) (*corepasskey.Service, error) {
 		return nil, fmt.Errorf("the Origin header is not a usable origin")
 	}
 
+	if want := h.Runtime.Config.TLSHost(); want != "" && !sameOrUnder(u.Hostname(), want) {
+		return nil, fmt.Errorf("the Origin %q is not the configured server.public_url host %q", u.Hostname(), want)
+	}
+
 	return corepasskey.New(u.Hostname(), origin)
+}
+
+// sameOrUnder reports whether host is name itself or a subdomain of it,
+// compared case-insensitively.
+func sameOrUnder(host, name string) bool {
+	host, name = strings.ToLower(host), strings.ToLower(name)
+
+	return host == name || strings.HasSuffix(host, "."+name)
 }
 
 func (h *Handler) setCeremony(c fiber.Ctx, name string, sess *corepasskey.SessionData) error {
