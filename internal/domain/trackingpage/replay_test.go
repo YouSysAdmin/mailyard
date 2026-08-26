@@ -34,6 +34,8 @@ func (r *replayEmails) GetAny(context.Context, string) (*emailmodel.Email, error
 
 func (r *replayEmails) MarkOpened(context.Context, string, time.Time, time.Time) (bool, int64, error) {
 	r.opens++
+	// The next GetAny reads the count back, as the real store does.
+	r.row.OpenCount = int(r.opens)
 
 	return r.opens == 1, r.opens, nil
 }
@@ -66,8 +68,8 @@ func (r *replayCampaigns) InsertTrackingEvent(context.Context, *cmodel.TrackingE
 // There is deliberately no rate limiter on /tracking: Gmail fetches
 // every image through its own proxies, so a per-IP bound throttles real
 // opens from a shared proxy long before it inconveniences a replay loop.
-// The ceiling is on the event instead, which is the thing that grows -
-// the counters are increments on one row and stay exact.
+// The ceiling is on the message instead: past trackedEventsPerEmail a
+// hit costs the one read that finds the count and nothing else.
 //
 // This drives the real handler through a real request, 200 times with a
 // valid signature, and counts what reached the store.
@@ -111,12 +113,14 @@ func TestReplayingThePixelStopsWritingEvents(t *testing.T) {
 		}
 	}
 
-	// The counters saw every hit - that is what they are for.
-	if emails.opens != replays {
-		t.Errorf("counted %d opens, want all %d - the counters must stay exact", emails.opens, replays)
+	// The counter stopped at the ceiling: past it a replay must not
+	// write at all.
+	if emails.opens != trackedEventsPerEmail {
+		t.Errorf("counted %d opens for %d replays, want the ceiling of %d - past it a hit must cost no write",
+			emails.opens, replays, trackedEventsPerEmail)
 	}
 
-	// The event timeline stopped.
+	// And so did the event timeline.
 	if camps.events != trackedEventsPerEmail {
 		t.Errorf("wrote %d tracking_events rows for %d replays, want the ceiling of %d - "+
 			"an unauthenticated URL that never expires must not grow a table without bound",

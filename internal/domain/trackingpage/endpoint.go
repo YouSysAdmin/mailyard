@@ -54,11 +54,12 @@ type Handler struct {
 // enough to stop a replay loop throttles genuine opens first. That is
 // why the /tracking group has no limiter on it.
 //
-// The counters on the email row keep counting - they are increments on a
-// single row and stay exact. What stops is the per-event timeline, and
-// fifty events answers everything that timeline is good for. A message
-// with ten thousand recorded opens tells you nothing the fiftieth did
-// not.
+// At the ceiling the handler stops WRITING altogether - no counter
+// increment, no campaign lookup, no event row - and answers the pixel or
+// the redirect off the one read it has already done. Fifty answers
+// everything the counters and the timeline are good for: a message with
+// ten thousand recorded opens tells you nothing the fiftieth did not,
+// and a replay loop past that point has to cost a read, not four writes.
 const trackedEventsPerEmail = 50
 
 func (h *Handler) signer() *tracking.Signer { return h.Runtime.Tracking }
@@ -123,10 +124,13 @@ func (h *Handler) Open(c fiber.Ctx) error {
 		return pixel()
 	}
 
+	if e.OpenCount >= trackedEventsPerEmail {
+		return pixel()
+	}
+
 	// e.CreatedAt, not a derived value: the row was read three lines up,
 	// so the partition is known exactly. See the store method.
-	_, opens, err := h.Runtime.Store.Email.MarkOpened(ctx, emailID, e.CreatedAt, now)
-	if err != nil {
+	if _, _, err := h.Runtime.Store.Email.MarkOpened(ctx, emailID, e.CreatedAt, now); err != nil {
 		slog.Error("tracking: mark opened", "email_id", emailID, "err", err)
 	}
 
@@ -138,16 +142,6 @@ func (h *Handler) Open(c fiber.Ctx) error {
 		if _, err := h.Runtime.Store.Campaign.MarkOpened(ctx, m.ID, now); err != nil {
 			slog.Error("tracking: mark campaign message opened", "message_id", m.ID, "err", err)
 		}
-	}
-
-	// The counters above stay exact for good. The per-event timeline stops
-	// at trackedEventsPerEmail, which is what keeps a replayed URL from
-	// growing the table without bound.
-	if opens > trackedEventsPerEmail {
-		slog.Debug("tracking: open counted but not recorded, the event ceiling is reached",
-			"email_id", emailID, "opens", opens, "ceiling", trackedEventsPerEmail)
-
-		return pixel()
 	}
 
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
@@ -187,6 +181,12 @@ func (h *Handler) Click(c fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
 	}
 
+	// See trackedEventsPerEmail: past the ceiling this is a redirect and
+	// nothing else.
+	if e.ClickCount >= trackedEventsPerEmail {
+		return redirectToTracked(c, link.OriginalURL)
+	}
+
 	// The REDIRECT is unconditional, the RECORDING is not.
 	//
 	// Opens were defended against automated fetches and clicks were not,
@@ -212,8 +212,7 @@ func (h *Handler) Click(c fiber.Ctx) error {
 	now := time.Now().UTC()
 	// e.CreatedAt for the reason on the pixel above: the row is already in
 	// hand, so the UPDATE names its partition instead of visiting all of them.
-	clicks, err := h.Runtime.Store.Email.MarkClicked(ctx, emailID, e.CreatedAt, now)
-	if err != nil {
+	if _, err := h.Runtime.Store.Email.MarkClicked(ctx, emailID, e.CreatedAt, now); err != nil {
 		slog.Error("tracking: mark clicked", "email_id", emailID, "err", err)
 	}
 
@@ -226,16 +225,6 @@ func (h *Handler) Click(c fiber.Ctx) error {
 
 	if err := h.Runtime.Store.Campaign.IncrementLinkClicks(ctx, link.ID); err != nil {
 		slog.Error("tracking: count click", "link_id", link.ID, "err", err)
-	}
-
-	// Same ceiling and same reason as the pixel above. The redirect is
-	// unaffected: whether we recorded the click is not the visitor's
-	// problem.
-	if clicks > trackedEventsPerEmail {
-		slog.Debug("tracking: click counted but not recorded, the event ceiling is reached",
-			"email_id", emailID, "clicks", clicks, "ceiling", trackedEventsPerEmail)
-
-		return redirectToTracked(c, link.OriginalURL)
 	}
 
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{

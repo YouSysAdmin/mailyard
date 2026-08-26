@@ -39,7 +39,9 @@ Opening the email loads the GIF, and Mailyard records an **open**. Details:
 - The endpoint always returns a 1×1 transparent GIF with `Cache-Control: no-cache`.
 - Requests from known bot user-agents (such as security scanners and link pre-fetchers) are served the pixel but **not**
   counted.
-- The first open stamps `opened_at` on the email row, and `open_count` keeps counting repeats.
+- The first open stamps `opened_at` on the email row, and `open_count` counts repeats up to fifty. Past that a hit
+  is answered and nothing is written - the URL in a mailbox never expires, and a replayed one must not cost the
+  database anything.
 
 ## Click tracking
 
@@ -161,7 +163,7 @@ For mail sent outside a campaign, the tallies live on the email row itself and c
 |-----------------------------|--------------------------------------------|
 | `tracked`                   | the message went out with tracking applied |
 | `opened_at`, `clicked_at`   | first open and first click                 |
-| `open_count`, `click_count` | totals, including repeats                  |
+| `open_count`, `click_count` | totals, including repeats, capped at fifty |
 
 `tracked` is the field that makes the rest readable. Without it a zero `open_count`
 cannot be told apart from tracking never having been switched on.
