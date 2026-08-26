@@ -67,10 +67,13 @@ type Recorder struct {
 	// the request path, which is what makes it safe for a watcher to do
 	// something as expensive as resolving recipients and sending mail.
 	//
-	// Set once at boot, before serving. Not a slice of watchers: one
-	// consumer exists (alert mail) and a registry would invite the kind
-	// of fan-out where a slow watcher stalls the trail.
-	watch func(*amodel.Event)
+	// Set once at boot, before serving - through an atomic, because
+	// New has already started the writer goroutine by the time Watch
+	// runs, and a plain field written then and read there is a race
+	// whether or not an event ever lands in the gap. Not a slice of
+	// watchers: one consumer exists (alert mail) and a registry would
+	// invite the kind of fan-out where a slow watcher stalls the trail.
+	watch atomic.Pointer[func(*amodel.Event)]
 
 	mu      sync.Mutex
 	dropped int
@@ -139,12 +142,13 @@ func (r *Recorder) write(e *amodel.Event) {
 // blocks must not lose the event it was told about - the trail is the
 // evidence and the notification is a courtesy, in that order.
 func (r *Recorder) notify(e *amodel.Event) {
-	if r.watch == nil {
+	fn := r.watch.Load()
+	if fn == nil {
 		return
 	}
 
 	defer safego.Recover(r.log, "audit: watch", "type", e.Type)
-	r.watch(e)
+	(*fn)(e)
 }
 
 // Watch registers the single consumer of the event stream. Call it at
@@ -154,7 +158,7 @@ func (r *Recorder) Watch(fn func(*amodel.Event)) {
 		return
 	}
 
-	r.watch = fn
+	r.watch.Store(&fn)
 }
 
 // Record queues an event. Never blocks, and never panics: after Close
