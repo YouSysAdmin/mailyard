@@ -101,18 +101,3 @@ func TestGarbageIsAnErrorNotAPassThrough(t *testing.T) {
 		}
 	}
 }
-
-// The legacy-key path belongs to the at-rest service alone. A
-// purpose-built one (see NewFor) must not accept a row sealed under
-// the old derivation. The round trip itself lives in keyderive_test.
-func TestOnlyTheAtRestServiceCarriesTheLegacyKey(t *testing.T) {
-	atRest := New("shared-secret")
-	sealed, err := (&Service{key: atRest.legacyKey}).Encrypt("hunter2")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := NewFor("shared-secret", KeyPasskey).Decrypt(sealed); err == nil {
-		t.Fatal("a non-at-rest service accepted a legacy row")
-	}
-}

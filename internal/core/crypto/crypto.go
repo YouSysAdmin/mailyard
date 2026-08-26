@@ -19,7 +19,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -39,12 +38,6 @@ var ErrNoKey = errors.New("crypto: no encryption key configured")
 // Service holds the derived AES key.
 type Service struct {
 	key []byte
-
-	// legacyKey is the pre-HKDF derivation, a bare SHA-256 of the
-	// secret. Decrypt only: rows written before that change are still
-	// sealed under it, and refusing them would lock an operator out of
-	// every stored SMTP password on upgrade.
-	legacyKey []byte
 }
 
 // New derives a 32-byte AES-256 key from secret.
@@ -58,21 +51,7 @@ type Service struct {
 // An empty secret yields a service that refuses to work rather than
 // one that quietly stores base64. Storing a reversible encoding in a
 // column documented as encrypted at rest is worse than not starting.
-func New(secret string) *Service {
-	s := NewFor(secret, KeyAtRest)
-	if secret != "" {
-		legacy := sha256.Sum256([]byte(secret))
-		s.legacyKey = legacy[:]
-		if s.key == nil {
-			// DeriveKey returns hex it produced itself, so this cannot
-			// happen. Fall back to the legacy key rather than ending up
-			// with no key at all.
-			s.key = legacy[:]
-		}
-	}
-
-	return s
-}
+func New(secret string) *Service { return NewFor(secret, KeyAtRest) }
 
 // NewFor is New with an explicit HKDF purpose label, for a consumer
 // sealing something other than a column at rest - see
@@ -144,21 +123,11 @@ func (s *Service) Decrypt(stored string) (string, error) {
 	}
 
 	pt, err := openWith(s.key, raw)
-	if err == nil {
-		return string(pt), nil
+	if err != nil {
+		return "", err
 	}
 
-	// GCM authentication failing is what a row sealed under the old
-	// bare-SHA-256 key looks like, so try that before calling it a
-	// failure. Nothing re-encrypts on read: the row is upgraded the
-	// next time something writes it.
-	if s.legacyKey != nil {
-		if pt, lerr := openWith(s.legacyKey, raw); lerr == nil {
-			return string(pt), nil
-		}
-	}
-
-	return "", err
+	return string(pt), nil
 }
 
 // openWith unseals nonce||ciphertext under one key.

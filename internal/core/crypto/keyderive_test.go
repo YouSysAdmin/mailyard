@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// A row written before the HKDF change must still decrypt, otherwise
-// upgrading loses every stored SMTP password.
-func TestDecryptReadsLegacySHA256Ciphertext(t *testing.T) {
+// Only the HKDF key opens a row. A bare SHA-256 of the secret is a
+// different key and is refused like any other wrong one.
+func TestTheLegacySHA256KeyIsNotAccepted(t *testing.T) {
 	const secret, plain = "an-operator-secret", "hunter2"
 
 	legacy := sha256.Sum256([]byte(secret))
@@ -25,17 +25,12 @@ func TestDecryptReadsLegacySHA256Ciphertext(t *testing.T) {
 	stored := base64.StdEncoding.EncodeToString(
 		gcm.Seal(nonce, nonce, []byte(plain), nil))
 
-	got, err := New(secret).Decrypt(stored)
-	if err != nil {
-		t.Fatalf("legacy ciphertext failed to decrypt: %v", err)
-	}
-
-	if got != plain {
-		t.Fatalf("got %q, want %q", got, plain)
+	if got, err := New(secret).Decrypt(stored); err == nil {
+		t.Fatalf("a ciphertext under the bare-SHA-256 key opened to %q", got)
 	}
 }
 
-// New writes must use the HKDF key, not the legacy one.
+// New writes use the HKDF key.
 func TestEncryptUsesDerivedKey(t *testing.T) {
 	const secret, plain = "an-operator-secret", "hunter2"
 	s := New(secret)
