@@ -244,9 +244,14 @@ func (v *Verifier) store(addr string, res Result, now time.Time) {
 	}
 }
 
-// maxCacheEntries bounds memory. The cache is an optimization, so
-// dropping it wholesale under pressure is acceptable - the next call
-// simply re-checks.
+// maxCacheEntries bounds memory, for BOTH caches. They are an
+// optimization, so dropping one wholesale under pressure is acceptable -
+// the next call simply re-checks.
+//
+// The MX cache had no bound at all while the result cache had this one:
+// its keys are domains, verify is a read-tier route, and a wildcard DNS
+// zone hands a caller as many resolvable domains as they care to send,
+// so it grew by one entry per request forever.
 const maxCacheEntries = 10000
 
 func (v *Verifier) evictLocked(now time.Time) {
@@ -260,6 +265,16 @@ func (v *Verifier) evictLocked(now time.Time) {
 	// rather than grow without bound.
 	if len(v.results) > maxCacheEntries {
 		v.results = map[string]cachedResult{}
+	}
+
+	for k, e := range v.mxAnswer {
+		if now.Sub(e.at) > v.cfg.MXCacheTTL {
+			delete(v.mxAnswer, k)
+		}
+	}
+
+	if len(v.mxAnswer) > maxCacheEntries {
+		v.mxAnswer = map[string]cachedMX{}
 	}
 }
 
@@ -352,6 +367,9 @@ func (v *Verifier) storeMX(domain string, ok bool, now time.Time) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.mxAnswer[domain] = cachedMX{ok: ok, at: now}
+	if len(v.mxAnswer) > maxCacheEntries {
+		v.evictLocked(now)
+	}
 }
 
 // splitAddress validates the shape and returns the local and domain
