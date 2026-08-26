@@ -17,6 +17,34 @@ import (
 	"unicode/utf8"
 )
 
+// MaskAddress renders an email address for a LOG LINE: the first rune
+// of the local part, three stars, and the domain in full -
+// j***@example.com. The domain is what an operator reading a delivery
+// or bounce log actually needs (which provider is refusing us), and the
+// local part is what makes the line personal data in a mail platform,
+// where logs are shipped somewhere with more readers than the database
+// has. Anything without an @ is masked whole.
+func MaskAddress(addr string) string {
+	local, domain, ok := strings.Cut(strings.TrimSpace(addr), "@")
+	if !ok || local == "" {
+		return "***"
+	}
+
+	first, _ := utf8.DecodeRuneInString(local)
+
+	return string(first) + "***@" + domain
+}
+
+// MaskAddresses is MaskAddress over a list.
+func MaskAddresses(addrs []string) []string {
+	out := make([]string, len(addrs))
+	for i, a := range addrs {
+		out[i] = MaskAddress(a)
+	}
+
+	return out
+}
+
 // Clamp returns s cut to at most max runes, with any invalid UTF-8
 // replaced away so the result is always storable text. The cut is on a
 // rune boundary - a byte slice would split whatever character straddles

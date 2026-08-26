@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/transport"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
@@ -226,7 +227,11 @@ func (s *Sender) Send(ctx context.Context, to []string, subject, html, text stri
 			strings.Join(to, ", "), srv.Name, err)
 	}
 
-	s.log.Info("systemmail: sent", "to", to, "subject", subject, "server", srv.Name)
+	// Masked, and no subject: a subject names what the message is about
+	// - a password reset, an invitation to a named project - and with
+	// the address beside it the line is a record of who was asked to do
+	// what. The event kind is already in the message this sits under.
+	s.log.Info("systemmail: sent", "to", safetext.MaskAddresses(to), "server", srv.Name)
 
 	return nil
 }
@@ -244,7 +249,7 @@ func (s *Sender) SendAsync(to []string, subject, html, text string) {
 		ctx, cancel := context.WithTimeout(context.Background(), s.sendTimeout)
 		defer cancel()
 		if err := s.Send(ctx, to, subject, html, text); err != nil {
-			s.log.Error("systemmail: delivery failed", "to", to, "subject", subject, "err", err)
+			s.log.Error("systemmail: delivery failed", "to", safetext.MaskAddresses(to), "err", err)
 		}
 	})
 }

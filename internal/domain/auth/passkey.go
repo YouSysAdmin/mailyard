@@ -560,7 +560,7 @@ func (h *Handler) PasskeyLoginFinish(c fiber.Ctx) error {
 	}
 
 	if err := h.Runtime.Store.User.TouchLastLogin(ctx, matched.Email); err != nil {
-		slog.Warn("auth: touch last login failed", "email", matched.Email, "err", err)
+		slog.Warn("auth: touch last login failed", "user_id", matched.ID, "err", err)
 	}
 
 	slog.Info("auth: passkey sign-in", "user_id", matched.ID, "passkey_id", row.ID)

@@ -17,6 +17,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/dkim"
 	"github.com/yousysadmin/mailyard/internal/core/queue"
 	"github.com/yousysadmin/mailyard/internal/core/render"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/transport"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
@@ -340,7 +341,7 @@ func (p *Processor) recordRejection(ctx context.Context, e *emailmodel.Email, f 
 	}); err != nil {
 		p.Log.Error("email: auto suppress", "email_id", e.ID, "err", err)
 	} else {
-		p.Log.Info("email: recipient auto-suppressed", "email_id", e.ID, "recipient", recipient)
+		p.Log.Info("email: recipient auto-suppressed", "email_id", e.ID, "recipient", safetext.MaskAddress(recipient))
 	}
 }
 

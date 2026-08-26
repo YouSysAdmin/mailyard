@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/systemmail"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
@@ -65,7 +66,7 @@ func (h *Handler) SystemMailTest(c fiber.Ctx) error {
 	body := "This is a test of the Mailyard system mail settings. If you are reading it, invitations and password resets can be delivered."
 	if err := h.Runtime.SystemMail.Send(c.Context(), []string{in.To}, subject,
 		"<p>"+body+"</p>", body+"\n"); err != nil {
-		slog.Warn("systemmail: test send failed", "to", in.To, "err", err)
+		slog.Warn("systemmail: test send failed", "to", safetext.MaskAddress(in.To), "err", err)
 
 		return response.BadRequest(c, "send failed, see the server log for the reason")
 	}

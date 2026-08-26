@@ -118,7 +118,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	}
 
 	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
-		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
+		slog.Warn("auth: touch last login failed", "user_id", u.ID, "err", err)
 	}
 
 	// No project is minted here, or anywhere else. Creating one per
@@ -126,7 +126,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	// account on top of the project its members were invited into.
 	// Belonging to no project is an ordinary state, and the console
 	// answers it with the projects page and a create button.
-	slog.Info("auth: login", "user_id", u.ID, "email", u.Email)
+	slog.Info("auth: login", "user_id", u.ID)
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeLoginSucceeded,
 		ActorID:    u.ID,
@@ -185,7 +185,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	// No project here either. A self-registered account belongs to
 	// nothing until somebody invites it or it creates one, which is
 	// what the projects page is for.
-	slog.Info("auth: registered", "user_id", u.ID, "email", u.Email, "verification_required", needsVerify)
+	slog.Info("auth: registered", "user_id", u.ID, "verification_required", needsVerify)
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeRegistered,
 		ActorID:    u.ID,
@@ -213,7 +213,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	}
 
 	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
-		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
+		slog.Warn("auth: touch last login failed", "user_id", u.ID, "err", err)
 	}
 
 	return response.Created(c, UserResponse{User: u})

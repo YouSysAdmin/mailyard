@@ -133,7 +133,7 @@ func (h *Handler) VerifyEmailConfirm(c fiber.Ctx) error {
 	}
 
 	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
-		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
+		slog.Warn("auth: touch last login failed", "user_id", u.ID, "err", err)
 	}
 
 	return response.Success(c, UserResponse{User: u})

@@ -166,7 +166,7 @@ func (i *Intake) Record(ctx context.Context, r Report) int {
 			Type:      rec.Type,
 			Reason:    reason,
 		}); err != nil {
-			i.Log.Error("bounce: record failed", "recipient", rec.Address, "err", err)
+			i.Log.Error("bounce: record failed", "recipient", safetext.MaskAddress(rec.Address), "err", err)
 			continue
 		}
 
@@ -182,7 +182,7 @@ func (i *Intake) Record(ctx context.Context, r Report) int {
 				Kind:      kind,
 				Reason:    reason,
 			}); err != nil {
-				i.Log.Error("bounce: suppression failed", "recipient", rec.Address, "err", err)
+				i.Log.Error("bounce: suppression failed", "recipient", safetext.MaskAddress(rec.Address), "err", err)
 				continue
 			}
 		}

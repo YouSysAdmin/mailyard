@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -166,7 +167,7 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	}
 
 	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
-		slog.Warn("auth: touch last login failed", "email", u.Email, "err", err)
+		slog.Warn("auth: touch last login failed", "user_id", u.ID, "err", err)
 	}
 
 	// no project is created or joined here, and that is the whole
@@ -178,7 +179,7 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	// satisfying an allowlist from being a privilege grant, and it means
 	// somebody the provider admits simply belongs to nothing until they
 	// are invited - which the projects page answers.
-	slog.Info("auth: oauth login", "user_id", u.ID, "email", u.Email, "provider", row.Slug)
+	slog.Info("auth: oauth login", "user_id", u.ID, "provider", row.Slug)
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCLogin,
 		ActorID:    u.ID,
@@ -356,7 +357,9 @@ func (h *Handler) linkIdentity(ctx context.Context, prov *opmodel.Provider, u *u
 // trail its
 // sibling auditOIDCDenied was filling.
 func (h *Handler) auditOIDCFailed(c fiber.Ctx, email, reason string) {
-	slog.Warn("auth: oauth login failed", "email", email, "reason", reason, "client_ip", clientip.From(c))
+	// The address is masked in the LOG and kept whole in the audit
+	// event below: the trail is the record, the log is shipped.
+	slog.Warn("auth: oauth login failed", "email", safetext.MaskAddress(email), "reason", reason, "client_ip", clientip.From(c))
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCDenied,
 		ActorEmail: email,
@@ -366,7 +369,7 @@ func (h *Handler) auditOIDCFailed(c fiber.Ctx, email, reason string) {
 }
 
 func (h *Handler) auditOIDCDenied(c fiber.Ctx, claims *coreoidc.Claims, reason string) {
-	slog.Warn("auth: oauth denied", "email", claims.Email, "sub", claims.Subject, "reason", reason, "client_ip", clientip.From(c))
+	slog.Warn("auth: oauth denied", "email", safetext.MaskAddress(claims.Email), "sub", claims.Subject, "reason", reason, "client_ip", clientip.From(c))
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCDenied,
 		ActorEmail: claims.Email,
