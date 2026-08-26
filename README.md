@@ -102,3 +102,14 @@ task docs-dev     # the embedded documentation, live, on :1313/docs/
 
 Building the documentation into the binary needs [Hugo](https://gohugo.io)
 
+
+## License
+
+Mailyard is source-available under the [Business Source License 1.1](LICENSE).
+You may run it in production for your own organization and products - what
+the license withholds is offering Mailyard itself as a hosted email service
+to third parties. Each version converts to the Apache License 2.0 four years
+after its release.
+
+The client libraries under [`sdk/`](sdk) are MIT licensed, so they can be
+embedded in anything.

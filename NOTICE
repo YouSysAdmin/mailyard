@@ -1,0 +1,15 @@
+Mailyard
+Copyright (c) 2021-2026 YouSysAdmin
+
+Mailyard is licensed under the Business Source License 1.1 - see LICENSE.
+The client libraries under sdk/ are licensed separately under the MIT
+License - see the LICENSE file in each of them.
+
+This product bundles third-party material:
+
+  Feather icons - https://feathericons.com
+  Copyright (c) 2013-2023 Cole Bemis
+  MIT License
+  Used as inline SVG in the console (web/src/layouts/icons.ts) and, refit
+  to a 24-unit grid, in the documentation theme
+  (docs/themes/mailyard/assets/icons).
