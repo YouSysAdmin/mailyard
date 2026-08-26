@@ -220,3 +220,50 @@ func scanUser(r interface{ Scan(...any) error }) (*usermodel.User, error) {
 
 	return &u, nil
 }
+
+// TOTPLockedUntil returns the end of the current lockout, or nil.
+func (s *Store) TOTPLockedUntil(ctx context.Context, userID string) (*time.Time, error) {
+	var until sql.NullTime
+	err := s.QueryRow(ctx, `SELECT totp_locked_until FROM users WHERE id = ?`, userID).Scan(&until)
+	if errors.Is(err, sql.ErrNoRows) || !until.Valid {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &until.Time, nil
+}
+
+// RecordTOTPFailure counts one wrong code. On reaching limit it locks
+// the factor for lock and resets the count, so the next window starts
+// clean rather than re-locking on the first wrong code after it. One
+// statement, so two nodes counting the same attempt agree.
+func (s *Store) RecordTOTPFailure(ctx context.Context, userID string, limit int, lock time.Duration) (bool, error) {
+	var until sql.NullTime
+	err := s.QueryRow(ctx, `
+        UPDATE users SET
+            totp_locked_until = CASE WHEN totp_failures + 1 >= ?
+                THEN now() + make_interval(secs => ?) ELSE totp_locked_until END,
+            totp_failures = CASE WHEN totp_failures + 1 >= ? THEN 0 ELSE totp_failures + 1 END
+        WHERE id = ?
+        RETURNING totp_locked_until
+    `, limit, lock.Seconds(), limit, userID).Scan(&until)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return until.Valid && until.Time.After(time.Now()), nil
+}
+
+// ClearTOTPFailures forgets the count and the lock after a right code.
+func (s *Store) ClearTOTPFailures(ctx context.Context, userID string) error {
+	_, err := s.Exec(ctx, `UPDATE users SET totp_failures = 0, totp_locked_until = NULL WHERE id = ?`, userID)
+
+	return err
+}

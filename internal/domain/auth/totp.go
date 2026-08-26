@@ -258,8 +258,35 @@ func (h *Handler) verifyTOTP(encSecret, code string) (step uint64, ok bool) {
 // than verifyTOTP directly - a validated-but-unclaimed code is
 // exactly the replay this exists to stop.
 func (h *Handler) consumeTOTP(ctx context.Context, userID, encSecret, code string) bool {
+	// Locked is refused BEFORE the code is looked at, so a right guess
+	// during the lockout learns nothing. Same answer as a wrong code:
+	// the caller already holds the password, and telling them the
+	// factor is locked tells them their guesses are being counted.
+	until, err := h.Runtime.Store.User.TOTPLockedUntil(ctx, userID)
+	if err != nil {
+		slog.Error("auth: totp lock read failed", "user_id", userID, "err", err)
+
+		return false
+	}
+
+	if until != nil && time.Now().Before(*until) {
+		slog.Warn("auth: totp refused, factor is locked", "user_id", userID, "until", until)
+
+		return false
+	}
+
 	step, ok := h.verifyTOTP(encSecret, code)
 	if !ok {
+		locked, rerr := h.Runtime.Store.User.RecordTOTPFailure(ctx, userID, totpMaxFailures, totpLockout)
+		if rerr != nil {
+			slog.Error("auth: totp failure count failed", "user_id", userID, "err", rerr)
+		}
+
+		if locked {
+			slog.Warn("auth: totp locked after repeated wrong codes",
+				"user_id", userID, "failures", totpMaxFailures, "for", totpLockout)
+		}
+
 		return false
 	}
 
@@ -272,7 +299,22 @@ func (h *Handler) consumeTOTP(ctx context.Context, userID, encSecret, code strin
 
 	if !claimed {
 		slog.Warn("auth: totp code replayed", "user_id", userID, "step", step)
+
+		return false
 	}
 
-	return claimed
+	if err := h.Runtime.Store.User.ClearTOTPFailures(ctx, userID); err != nil {
+		slog.Error("auth: totp failure reset failed", "user_id", userID, "err", err)
+	}
+
+	return true
 }
+
+// totpMaxFailures wrong codes in a row lock the factor for totpLockout.
+// Five is more than a person mistypes and a thousandth of what a guess
+// at six digits needs. Fifteen minutes turns the remaining guesses into
+// years.
+const (
+	totpMaxFailures = 5
+	totpLockout     = 15 * time.Minute
+)

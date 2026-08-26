@@ -308,6 +308,16 @@ type UserStore interface {
 	// validity.
 	ClaimTOTPStep(ctx context.Context, userID string, step uint64) (bool, error)
 
+	// TOTPLockedUntil answers when a locked second factor reopens, or
+	// nil when it is not locked. RecordTOTPFailure counts one wrong
+	// code and reports whether that one locked the factor for lock -
+	// the count is kept in the row for the same reason ClaimTOTPStep
+	// is, so two nodes see one count. ClearTOTPFailures is the reset
+	// on a right code.
+	TOTPLockedUntil(ctx context.Context, userID string) (*time.Time, error)
+	RecordTOTPFailure(ctx context.Context, userID string, limit int, lock time.Duration) (bool, error)
+	ClearTOTPFailures(ctx context.Context, userID string) error
+
 	// MarkEmailVerified flips the signup verification flag in place,
 	// so the confirm handler cannot lose a concurrent Put.
 	MarkEmailVerified(ctx context.Context, userID string) error
