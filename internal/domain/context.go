@@ -6,7 +6,6 @@ package domain
 
 import (
 	"log/slog"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -32,7 +31,6 @@ const ContextKey = "AppReqContext"
 type RequestContext struct {
 	fiber.Ctx
 	AppName    string          `json:"app_name"`
-	AppURL     string          `json:"app_url"`
 	AppVersion string          `json:"app_version"`
 	ClientIP   string          `json:"client_ip"`
 	User       *usermodel.User `json:"user,omitempty"`
@@ -118,7 +116,6 @@ func (ctx *RequestContext) IsSandboxCredential() bool {
 func (ctx *RequestContext) LogValue() slog.Value {
 	attrs := []slog.Attr{
 		slog.String("app_name", ctx.AppName),
-		slog.String("app_url", ctx.AppURL),
 		slog.String("app_version", ctx.AppVersion),
 		slog.String("client_ip", ctx.ClientIP),
 		slog.String("path", ctx.Path),
@@ -149,13 +146,6 @@ func (ctx *RequestContext) LogValue() slog.Value {
 	}
 
 	return slog.GroupValue(attrs...)
-}
-
-// GetAppURL returns the absolute HTTP URL for an app endpoint,
-// joining AppURL (scheme://host, no trailing slash needed) with the
-// endpoint path.
-func (ctx *RequestContext) GetAppURL(endpoint string) string {
-	return strings.TrimRight(ctx.AppURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
 }
 
 // GetRequestContext returns the RequestContext the server middleware

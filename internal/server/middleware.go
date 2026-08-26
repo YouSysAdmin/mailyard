@@ -39,15 +39,9 @@ import (
 // and every log line, without any of them re-reading a header.
 func requestContext(rt *env.Runtime, resolver *clientip.Resolver) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		appURL := rt.Config.Server.PublicURL
-		if appURL == "" {
-			appURL = c.BaseURL()
-		}
-
 		rc := &domain.RequestContext{
 			Ctx:        c,
 			AppName:    pkg.AppName,
-			AppURL:     appURL,
 			AppVersion: pkg.Version,
 			ClientIP:   resolver.Stamp(c),
 			Path:       c.Path(),
