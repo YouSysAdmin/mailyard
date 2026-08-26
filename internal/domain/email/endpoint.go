@@ -45,9 +45,17 @@ func (h *Handler) Send(c fiber.Ctx) error {
 	// within its plan - and a developer testing a signup flow in a
 	// project with nothing configured answers no to all of them. The
 	// sandbox is for exactly that developer.
+	svc := NewService(h.Runtime)
 	if want, refusal := sandboxIntent(rc, &in); refusal != "" {
 		return response.BadRequest(c, refusal)
 	} else if want {
+		// The message half of Validate still applies: a capture is a
+		// message the builder is handed, and the sandbox is not a way
+		// around a line break in a header or the attachment ceiling.
+		if err := svc.ValidateShape(req); err != nil {
+			return sendFailure(c, err)
+		}
+
 		// dry_run means "run the checks, persist nothing" - and a
 		// capture IS persistence: it took a slot of the sandbox ring
 		// buffer, evicted a real capture, and answered 201 as if
@@ -66,7 +74,6 @@ func (h *Handler) Send(c fiber.Ctx) error {
 		return err
 	}
 
-	svc := NewService(h.Runtime)
 	// Resolved before validation so an unknown group is a 400 naming
 	// the group, not a confusing "no smtp server accepts this sender".
 	if req.Route, err = svc.ResolveRoute(c.Context(), rc.Project.ID, in.SMTPServerID, in.SMTPGroup); err != nil {

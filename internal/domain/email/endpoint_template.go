@@ -53,16 +53,23 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		// what would have been sent" - shows an internal path.
 		StripSystemLinks(out)
 
+		req.Subject, req.HTML, req.Text, req.TemplateName = out.Subject, out.HTML, out.Text, t.Name
+		// The message half of Validate, on the rendered result: a
+		// capture is a message the builder is handed, and the sandbox
+		// is not a way around a line break in a header.
+		if verr := svc.ValidateShape(req); verr != nil {
+			return sendFailure(c, verr)
+		}
+
 		// dry_run persists nothing, and a capture is persistence - it
 		// consumed a sandbox slot and evicted a real capture. The
-		// render above already exercised what a sandbox send checks.
+		// render and the check above are what a sandbox send exercises.
 		if in.DryRun {
 			return response.Success(c, TemplateDryRunResponse{
 				DryRun: true, Valid: true, Template: t.Name, Preview: out,
 			})
 		}
 
-		req.Subject, req.HTML, req.Text, req.TemplateName = out.Subject, out.HTML, out.Text, t.Name
 		if aerr := svc.AttachTemplateFiles(c.Context(), rc.Project.ID, t.ID, req); aerr != nil {
 			return response.Internal(c, aerr)
 		}

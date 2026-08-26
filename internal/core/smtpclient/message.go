@@ -176,22 +176,25 @@ func (m *Message) Build() []byte {
 	// receiver that sees an unsigned Date on a signed message has no
 	// way to detect a replay.
 	fmt.Fprintf(&b, "Date: %s\r\n", m.date().Format(time.RFC1123Z))
-	fmt.Fprintf(&b, "Message-ID: <%s>\r\n", m.messageID())
+	fmt.Fprintf(&b, "Message-ID: <%s>\r\n", headerSafe(m.messageID()))
 	if m.EmailID != "" {
-		fmt.Fprintf(&b, "%s: %s\r\n", HeaderEmailID, m.EmailID)
+		fmt.Fprintf(&b, "%s: %s\r\n", HeaderEmailID, headerSafe(m.EmailID))
 	}
 
 	b.WriteString("MIME-Version: 1.0\r\n")
 
 	// RFC 2369 / 8058 List-Unsubscribe. Mailto first, then the https
 	// URL. The one-click POST header applies to the https target only.
+	// Through headerSafe like every other header here: these two are
+	// caller-supplied strings, and the one path that reached Build
+	// without normalizeUnsubscribeLinks was the sandbox.
 	var luParts []string
 	if m.ListUnsubscribeMailto != "" {
-		luParts = append(luParts, "<"+m.ListUnsubscribeMailto+">")
+		luParts = append(luParts, "<"+headerSafe(m.ListUnsubscribeMailto)+">")
 	}
 
 	if m.ListUnsubscribeURL != "" {
-		luParts = append(luParts, "<"+m.ListUnsubscribeURL+">")
+		luParts = append(luParts, "<"+headerSafe(m.ListUnsubscribeURL)+">")
 	}
 
 	if len(luParts) > 0 {

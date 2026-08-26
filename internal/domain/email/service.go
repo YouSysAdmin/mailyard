@@ -294,7 +294,96 @@ func (s *Service) ResolveRoute(ctx context.Context, projID, serverID, groupSlug 
 // Validate runs every pre-flight check without touching the emails
 // table. Returned errors are *RequestError (caller mistakes) or
 // infrastructure errors.
+//
+// Two halves. ValidateShape asks whether the MESSAGE is well formed and
+// needs no store, and runs on every path that builds one - the sandbox
+// included, which skips the rest by design. The remainder asks whether
+// this project may DELIVER it: ownership of the sender, a server to
+// carry it, the list a one-click link binds to.
 func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest) error {
+	if err := s.ValidateShape(req); err != nil {
+		return err
+	}
+
+	// Ownership of the From domain, before anything about servers.
+	// It is the more fundamental failure of the two: being told to
+	// configure an SMTP server is unhelpful when the real answer is
+	// that this project may not send as this address at all.
+	sender := senderAddress(req.From)
+	if err := RequireVerifiedSender(ctx, s.Store, projID, sender); err != nil {
+		return err
+	}
+
+	// Same resolution the processor will run at delivery time, through
+	// the same function, so an accepted send is one that something can
+	// actually carry - including the platform pool, for a project that
+	// has configured no server of its own.
+	srv, err := ResolveServer(ctx, s.Store, projID, sender, req.Route)
+	if err != nil {
+		return err
+	}
+
+	if srv == nil {
+		return reqErrf("no enabled smtp server accepts sender %q, configure one first", sender)
+	}
+
+	// A one-click link is bound to one address. With several
+	// recipients on one message there is no correct link to embed, so
+	// refuse rather than mint one that would unsubscribe the wrong
+	// person.
+	if req.UnsubscribeListID != "" {
+		if len(req.To) > 1 {
+			return reqErrf("a send scoped to an unsubscribe list must have exactly one recipient, got %d", len(req.To))
+		}
+
+		l, err := s.Store.UnsubscribeList.Get(ctx, projID, req.UnsubscribeListID)
+		if err != nil {
+			return err
+		}
+
+		if l == nil {
+			return reqErrf("unsubscribe list %q not found in this project", req.UnsubscribeListID)
+		}
+
+		if !l.Active {
+			return reqErrf("unsubscribe list %q is inactive", l.Name)
+		}
+	}
+
+	// Strict sender mode: the project requires every From address to
+	// be registered under /api/senders.
+	w, err := s.Store.Project.Get(ctx, projID)
+	if err != nil {
+		return err
+	}
+
+	if w != nil && w.StrictSenders {
+		reg, err := s.Store.Sender.GetByEmail(ctx, projID, sender)
+		if err != nil {
+			return err
+		}
+
+		if reg == nil {
+			return reqErrf("sender %q is not a registered sender address (strict mode is on for this project)", sender)
+		}
+	}
+
+	return nil
+}
+
+// ValidateShape is the half of Validate that needs no store: is this a
+// message the builder may be handed. Line breaks in anything that
+// becomes a header, address syntax, the recipient ceiling, a subject
+// and a body, header names against the reserved list, attachment
+// sizes, and the List-Unsubscribe pair.
+//
+// Separate because the sandbox returned BEFORE Validate, and so before
+// every one of these - a sandbox request with "\r\nBcc:" in
+// list_unsubscribe_url wrote a raw message carrying a forged header.
+// Nothing was sent, but "one place decides what may reach Build" was
+// not true, and the ceilings an operator configured did not apply to
+// a surface any key could reach.
+func (s *Service) ValidateShape(req *SendRequest) error {
 	// net/mail accepts a bare CR or LF inside a trailing comment -
 	// `a@b.c (x\r\nBcc: ...)` parses, and Build writes the string
 	// verbatim - so parsing is not the whole check. Proven by running
@@ -371,74 +460,7 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 		return reqErrf("send_at is in the past")
 	}
 
-	// Ownership of the From domain, before anything about servers.
-	// It is the more fundamental failure of the two: being told to
-	// configure an SMTP server is unhelpful when the real answer is
-	// that this project may not send as this address at all.
-	sender := senderAddress(req.From)
-	if err := RequireVerifiedSender(ctx, s.Store, projID, sender); err != nil {
-		return err
-	}
-
-	// Same resolution the processor will run at delivery time, through
-	// the same function, so an accepted send is one that something can
-	// actually carry - including the platform pool, for a project that
-	// has configured no server of its own.
-	srv, err := ResolveServer(ctx, s.Store, projID, sender, req.Route)
-	if err != nil {
-		return err
-	}
-
-	if srv == nil {
-		return reqErrf("no enabled smtp server accepts sender %q, configure one first", sender)
-	}
-
-	if err := normalizeUnsubscribeLinks(req); err != nil {
-		return err
-	}
-
-	// A one-click link is bound to one address. With several
-	// recipients on one message there is no correct link to embed, so
-	// refuse rather than mint one that would unsubscribe the wrong
-	// person.
-	if req.UnsubscribeListID != "" {
-		if len(req.To) > 1 {
-			return reqErrf("a send scoped to an unsubscribe list must have exactly one recipient, got %d", len(req.To))
-		}
-
-		l, err := s.Store.UnsubscribeList.Get(ctx, projID, req.UnsubscribeListID)
-		if err != nil {
-			return err
-		}
-
-		if l == nil {
-			return reqErrf("unsubscribe list %q not found in this project", req.UnsubscribeListID)
-		}
-
-		if !l.Active {
-			return reqErrf("unsubscribe list %q is inactive", l.Name)
-		}
-	}
-
-	// Strict sender mode: the project requires every From address to
-	// be registered under /api/senders.
-	w, err := s.Store.Project.Get(ctx, projID)
-	if err != nil {
-		return err
-	}
-
-	if w != nil && w.StrictSenders {
-		reg, err := s.Store.Sender.GetByEmail(ctx, projID, sender)
-		if err != nil {
-			return err
-		}
-
-		if reg == nil {
-			return reqErrf("sender %q is not a registered sender address (strict mode is on for this project)", sender)
-		}
-	}
-
-	return nil
+	return normalizeUnsubscribeLinks(req)
 }
 
 // withRegisteredName returns the From to store: the caller's own if it
