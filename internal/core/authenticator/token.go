@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // Claims is the minimal session payload.
@@ -68,13 +68,14 @@ func CreateToken(secret, userID, email, sessionID string, ttl time.Duration) (st
 }
 
 // ParseToken verifies the HMAC signature and returns the embedded claims.
-// Expired or malformed tokens fail with a clear error so the caller can write a 401.
+// Expired or malformed tokens fail with a clear error so the caller can
+// write a 401.
 //
-// Validates iss/aud against the constants above so a token minted
-// for a sibling service that happens to share auth.jwt_secret can't
-// be replayed here. jwt/v4 doesn't expose WithIssuer/WithAudience
-// parser options (those are in v5), so the check runs after Parse
-// against the MapClaims.
+// The parser is told everything it must insist on: HS256 and only HS256
+// (so a token signed HS384/HS512 against the same secret, or with no
+// algorithm at all, is refused before the key is even asked for), our
+// issuer, our audience, and that exp is present - a token that never
+// expires is not a session.
 func ParseToken(secret, raw string) (*Claims, error) {
 	if raw == "" {
 		return nil, errors.New("empty token")
@@ -84,16 +85,15 @@ func ParseToken(secret, raw string) (*Claims, error) {
 		return nil, errors.New("jwt secret not configured")
 	}
 
-	parsed, err := jwt.Parse(raw, func(t *jwt.Token) (any, error) {
-		// Pin to HS256 specifically so a token signed with a different
-		// HMAC variant (HS384/HS512) against the same secret cannot be replayed.
-		// The library accepts any HMAC by default.
-		if t.Method != jwt.SigningMethodHS256 {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-
+	mc := jwt.MapClaims{}
+	parsed, err := jwt.ParseWithClaims(raw, mc, func(*jwt.Token) (any, error) {
 		return []byte(secret), nil
-	})
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithIssuer(jwtIssuer),
+		jwt.WithAudience(jwtAudience),
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -102,36 +102,15 @@ func ParseToken(secret, raw string) (*Claims, error) {
 		return nil, errors.New("invalid token")
 	}
 
-	mc, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, errors.New("invalid token claims")
-	}
-
-	if !mc.VerifyIssuer(jwtIssuer, true) {
-		return nil, errors.New("invalid token issuer")
-	}
-
-	// VerifyAudience accepts a string OR []string in the claim and
-	// compares case-sensitively. We only ever issue a single audience
-	// value, but VerifyAudience handles both shapes correctly so a
-	// future v5 migration.
-	if !mc.VerifyAudience(jwtAudience, true) {
-		return nil, errors.New("invalid token audience")
-	}
-
 	uid, _ := mc["user_id"].(string)
 	email, _ := mc["email"].(string)
 	if uid == "" {
 		return nil, errors.New("invalid token user_id")
 	}
 
-	expRaw, ok := mc["exp"].(float64)
-	if !ok {
-		return nil, errors.New("invalid token exp")
-	}
-
-	if time.Now().Unix() > int64(expRaw) {
-		return nil, errors.New("token expired")
+	exp, err := mc.GetExpirationTime()
+	if err != nil || exp == nil {
+		return nil, fmt.Errorf("invalid token exp: %w", err)
 	}
 
 	jti, _ := mc["jti"].(string)
@@ -139,7 +118,7 @@ func ParseToken(secret, raw string) (*Claims, error) {
 	return &Claims{
 		UserID:    uid,
 		Email:     email,
-		Expiry:    time.Unix(int64(expRaw), 0),
+		Expiry:    exp.Time,
 		SessionID: jti,
 	}, nil
 }
