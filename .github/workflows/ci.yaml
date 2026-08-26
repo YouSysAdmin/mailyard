@@ -86,9 +86,16 @@ jobs:
       - uses: actions/setup-go@v6
         with: { go-version: '1.27' }
 
+      # -race here and not in task check: it multiplies the run time,
+      # and the store tests are the ones with real concurrency in them.
       - env:
           MAILYARD_TEST_DSN: postgres://mailyard:mailyard@localhost:5432/mailyard_test?sslmode=disable
-        run: go test ./...
+        run: go test -race ./...
+
+      # Known vulnerabilities in what the binary actually calls. The
+      # dependency graph is large and this is the one check that reads
+      # it against a database rather than against our own rules.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   # Public repository only: nothing enterprise may land here.
   #
