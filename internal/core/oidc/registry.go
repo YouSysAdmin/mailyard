@@ -256,6 +256,19 @@ func (r *Registry) Test(ctx context.Context, p *opmodel.Provider) TestResult {
 		}
 	}
 
+	// The two admission settings whose unsafe value is silent. The
+	// process log says both at build time, but the person deciding is
+	// looking at this screen, not at the log.
+	if !p.RequireEmailVerified {
+		res.Warnings = append(res.Warnings,
+			"require_email_verified is off, so an address this IdP has not verified links to the local account carrying it")
+	}
+
+	if p.AutoRegister && len(p.AllowedDomains) == 0 && len(p.AllowedEmails) == 0 && len(p.AllowedGroups) == 0 {
+		res.Warnings = append(res.Warnings,
+			"auto_register is on with no allowed_domains, allowed_emails or allowed_groups, so every account this IdP holds can create one here")
+	}
+
 	if !p.Enabled {
 		res.Warnings = append(res.Warnings, "provider is disabled, so it is not offered at sign-in")
 	}

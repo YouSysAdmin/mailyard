@@ -76,7 +76,9 @@ function blankForm(): Form {
     enabled: true,
     hidden: false,
     auto_register: true,
-    require_email_verified: false,
+    // On, like the server's own default. Off, an unverified address from
+    // the IdP links to the local account carrying that address.
+    require_email_verified: true,
     allowed_domains: '',
     allowed_emails: '',
     groups_claim: '',
