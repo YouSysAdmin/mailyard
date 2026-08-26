@@ -158,9 +158,13 @@ var Registry = []Definition{
 	{ResourceCampaigns, "Campaigns", "Bulk sends and their per-recipient results.", actRWD, false},
 	{ResourceTemplates, "Templates", "Templates, their versions, stylesheets and languages.", actRWD, false},
 
-	// Read-only by design: the delivery worker writes these rows, not
-	// an operator, and the store has no Put for the API to reach.
-	{ResourceContacts, "Contacts", "Addresses the project has delivered to, and their tallies.", actR, false},
+	// No write by design: the delivery worker writes these rows, not
+	// an operator, and the store has no Put for the API to reach - a
+	// tally somebody can edit is a number nobody can trust. Delete is a
+	// person: a project that has mailed for years holds addresses it
+	// will never mail again, and the next delivery recreates a contact
+	// anyway, so removing one loses a tally and nothing else.
+	{ResourceContacts, "Contacts", "Addresses the project has delivered to, and their tallies.", actRD, false},
 	{ResourceSubscribers, "Subscribers", "Subscribers and the lists campaigns send to.", actRWD, false},
 	{ResourceSuppressions, "Suppressions", "Blocked addresses and unsubscribe lists.", actRWD, false},
 

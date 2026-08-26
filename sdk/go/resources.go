@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 // --- templates -------------------------------------------------------
@@ -272,6 +273,30 @@ func (c *Client) ListContacts(ctx context.Context, search string, limit, offset 
 }
 
 // GetContact returns one contact.
+// DeleteContact forgets one contact and its tallies. It blocks nothing:
+// the next delivery to the address creates a fresh record.
+func (c *Client) DeleteContact(ctx context.Context, id string) error {
+	_, err := do[struct{}](ctx, c, http.MethodDelete, "/contacts/"+url.PathEscape(id), nil, nil)
+
+	return err
+}
+
+// DeleteInactiveContacts removes every contact with no send or failure
+// since before, and returns how many went. The server refuses a cut-off
+// in the future.
+func (c *Client) DeleteInactiveContacts(ctx context.Context, before time.Time) (int64, error) {
+	q := url.Values{}
+	q.Set("inactive_before", before.UTC().Format(time.RFC3339))
+	out, err := do[struct {
+		Deleted int64 `json:"deleted"`
+	}](ctx, c, http.MethodDelete, "/contacts", q, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	return out.Deleted, nil
+}
+
 func (c *Client) GetContact(ctx context.Context, id string) (*Contact, error) {
 	out, err := do[struct {
 		Contact Contact `json:"contact"`

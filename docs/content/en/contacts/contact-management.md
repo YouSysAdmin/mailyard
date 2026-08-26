@@ -4,9 +4,10 @@ description: "Track email recipients"
 weight: 10
 ---
 
-Mailyard tracks every address this project delivers to, with the tallies for it. Contacts are **read-only**: the
-delivery worker writes them, and the API exposes list and detail only. There is no create, update, or delete - a tally
-an operator can edit is a number nobody can trust.
+Mailyard tracks every address this project delivers to, with the tallies for it. The delivery worker **writes** them,
+and there is no create or update in the API - a tally an operator can edit is a number nobody can trust. What there is
+is delete: one record, or everything idle since a date, for a project that has mailed for years and holds addresses it
+never will again.
 
 {{< callout type="note" >}}
 Contacts are not an audience. To build lists you can target with campaigns, use
@@ -69,6 +70,28 @@ GET /api/v1/contacts/{id}
 
 Returns `{ "contact": { ... } }` with the same fields. A contact belonging to another project reads as `404`, never
 `403`.
+
+## Deleting Contacts
+
+Needs `contacts:delete`. Deleting forgets the record and its tallies and **blocks nothing** - the next delivery to the
+address creates a fresh contact. To stop sending to an address, add a suppression instead.
+
+```
+DELETE /api/v1/contacts/{id}
+```
+
+Answers `204`, or `404` for an id this project does not hold.
+
+```
+DELETE /api/v1/contacts?inactive_before=2025-01-01T00:00:00Z
+```
+
+Removes every contact whose last activity - the later of its last send and last failure - is before the cut-off, and
+answers `{ "deleted": 1240, "inactive_before": "..." }`. The cut-off is required and may not be in the future: erasing
+every contact regardless of age is the [data erasure](/docs/data/data-deletion) endpoint's job, behind
+`data:delete` and `confirm_all`.
+
+In the console: **Contacts - Delete** on a row, or **Clean up inactive** in the page header.
 
 ## How Tracking Works
 

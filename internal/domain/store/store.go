@@ -168,6 +168,13 @@ type ContactStore interface {
 	RecordOutcome(ctx context.Context, projID, email, name string, sent bool, at time.Time) error
 	PurgeForEmail(ctx context.Context, projID, email string) (int64, error)
 	PurgeAll(ctx context.Context, projID string) (int64, error)
+
+	// Delete removes one contact by id, reporting whether it existed.
+	// DeleteInactiveBefore removes every contact whose last activity -
+	// the later of its last send and last failure, or its creation when
+	// it has neither - is older than before, and returns how many.
+	Delete(ctx context.Context, projID, id string) (bool, error)
+	DeleteInactiveBefore(ctx context.Context, projID string, before time.Time) (int64, error)
 }
 
 // SessionStore persists tracked sign-ins. Get is the auth-path

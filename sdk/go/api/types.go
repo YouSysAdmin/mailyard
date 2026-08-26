@@ -415,6 +415,12 @@ type DeleteContactsInput struct {
 	ConfirmAll bool   `json:"confirm_all"`
 }
 
+// DeleteInactiveResponse is the response body.
+type DeleteInactiveResponse struct {
+	Deleted        int64     `json:"deleted"`
+	InactiveBefore time.Time `json:"inactive_before"`
+}
+
 // DeleteLogsInput is the request body.
 type DeleteLogsInput struct {
 	OlderThanDays int64  `json:"older_than_days"`

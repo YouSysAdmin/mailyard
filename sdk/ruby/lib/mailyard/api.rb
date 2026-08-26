@@ -396,9 +396,19 @@ module Mailyard
       @t.request("POST", "/campaigns/#{esc(id)}/send", body: body, query: query)
     end
 
+    # Delete contacts idle since a date Needs contacts:delete.
+    def delete_contacts(**query)
+      @t.request("DELETE", "/contacts", body: nil, query: query)
+    end
+
     # Addresses this project has delivered to Needs contacts:read.
     def list_contacts(**query)
       @t.request("GET", "/contacts", body: nil, query: query)
+    end
+
+    # Delete one contact Needs contacts:delete.
+    def delete_contact(id, **query)
+      @t.request("DELETE", "/contacts/#{esc(id)}", body: nil, query: query)
     end
 
     # One contact Needs contacts:read.

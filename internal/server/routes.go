@@ -742,11 +742,14 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	uls.Patch("/:id", permWrite, ulh.Update)
 	uls.Delete("/:id", permDelete, ulh.Delete)
 
-	// Contacts - addresses the project has actually delivered to.
-	// Read-only: the delivery worker writes these, not the operator.
+	// Contacts - addresses the project has actually delivered to. The
+	// delivery worker writes these, not the operator, so there is no
+	// create or update - only the clean-up.
 	cts := v1.Group("/contacts", permOn(perm.ResourceContacts))
 	cts.Get("/", permRead, cth.List)
+	cts.Delete("/", permDelete, cth.DeleteInactive)
 	cts.Get("/:id", permRead, cth.Get)
+	cts.Delete("/:id", permDelete, cth.Delete)
 
 	// In-app notifications. Any member: they describe the project,
 	// and every member is someone who might act on one. Read state is

@@ -528,11 +528,26 @@ func (c *Client) SendCampaign(ctx context.Context, id string, body SendInput, op
 	return do[CampaignResponse](ctx, c, "POST", fmt.Sprintf("/campaigns/%s/send", escape(id)), body, opts)
 }
 
+// DeleteContacts Delete contacts idle since a date.
+//
+// DELETE /contacts
+func (c *Client) DeleteContacts(ctx context.Context, opts ...RequestOption) (DeleteInactiveResponse, error) {
+	return do[DeleteInactiveResponse](ctx, c, "DELETE", "/contacts", nil, opts)
+}
+
 // ListContacts Addresses this project has delivered to.
 //
 // GET /contacts
 func (c *Client) ListContacts(ctx context.Context, opts ...RequestOption) (ContactListResponse, error) {
 	return do[ContactListResponse](ctx, c, "GET", "/contacts", nil, opts)
+}
+
+// DeleteContact Delete one contact.
+//
+// DELETE /contacts/:id
+func (c *Client) DeleteContact(ctx context.Context, id string, opts ...RequestOption) error {
+	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/contacts/%s", escape(id)), nil, opts)
+	return err
 }
 
 // GetContact One contact.

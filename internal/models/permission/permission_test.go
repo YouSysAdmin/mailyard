@@ -58,7 +58,7 @@ func TestEveryResourceDeclaresUsableActions(t *testing.T) {
 func TestParseRefusesAnActionTheResourceDoesNotHave(t *testing.T) {
 	// Real resource, real action, and still not a thing.
 	for _, bad := range []string{
-		"contacts:write", "contacts:delete",
+		"contacts:write", // the worker writes these, a person only reads or deletes
 		"analytics:write", "analytics:delete",
 		"audit:write", "audit:delete",
 		"data:write",      // export or erase, nothing between

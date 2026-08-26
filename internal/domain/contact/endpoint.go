@@ -3,6 +3,8 @@
 package contact
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -12,10 +14,12 @@ import (
 	cmodel "github.com/yousysadmin/mailyard/internal/models/contact"
 )
 
-// Handler serves the read-only /api/contacts surface. There are no
-// create, update, or delete routes on purpose - contacts are written
-// by the delivery worker, and letting an operator edit a tally would
-// make it a number nobody can trust.
+// Handler serves the /api/contacts surface. There is no create or
+// update on purpose - contacts are written by the delivery worker, and
+// letting an operator edit a tally would make it a number nobody can
+// trust. Delete exists because a project that has mailed for years
+// holds addresses it never will again, and the next delivery recreates
+// a contact regardless.
 type Handler struct {
 	Runtime *env.Runtime
 }
@@ -75,6 +79,50 @@ func (h *Handler) Get(c fiber.Ctx) error {
 	}
 
 	return response.Success(c, GetResponse{Contact: ct})
+}
+
+// Delete serves DELETE /api/v1/contacts/:id.
+func (h *Handler) Delete(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	ok, err := h.Runtime.Store.Contact.Delete(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !ok {
+		return response.NotFound(c, "contact not found")
+	}
+
+	return response.NoContent(c)
+}
+
+// DeleteInactive serves DELETE /api/v1/contacts?inactive_before=<RFC 3339>:
+// the clean-up of addresses nothing has happened to since that moment.
+// The cut-off is REQUIRED - a bare DELETE on the collection must not be
+// the erase-everything path, which lives under data:delete and asks
+// for confirm_all.
+func (h *Handler) DeleteInactive(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	raw := c.Query("inactive_before")
+	if raw == "" {
+		return response.BadRequest(c, "inactive_before is required, an RFC 3339 timestamp")
+	}
+
+	before, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return response.BadRequest(c, "inactive_before must be an RFC 3339 timestamp")
+	}
+
+	if before.After(time.Now()) {
+		return response.BadRequest(c, "inactive_before is in the future, which would delete every contact")
+	}
+
+	n, err := h.Runtime.Store.Contact.DeleteInactiveBefore(c.Context(), rc.Project.ID, before)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, DeleteInactiveResponse{Deleted: n, InactiveBefore: before})
 }
 
 // markSuppressed resolves the suppression flag for a page of

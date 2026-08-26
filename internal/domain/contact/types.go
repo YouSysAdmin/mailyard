@@ -3,6 +3,8 @@
 package contact
 
 import (
+	"time"
+
 	cmodel "github.com/yousysadmin/mailyard/internal/models/contact"
 )
 
@@ -31,4 +33,11 @@ type ListResponse struct {
 // GetResponse is one contact.
 type GetResponse struct {
 	Contact *cmodel.Contact `json:"contact"`
+}
+
+// DeleteInactiveResponse says how many contacts the clean-up removed
+// and the cut-off it applied.
+type DeleteInactiveResponse struct {
+	Deleted        int64     `json:"deleted"`
+	InactiveBefore time.Time `json:"inactive_before"`
 }

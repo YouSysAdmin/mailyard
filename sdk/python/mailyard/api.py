@@ -323,9 +323,17 @@ class API:
         "Send"
         return self._t.request("POST", f"/campaigns/{_esc(id)}/send", body=body, query=query)
 
+    def delete_contacts(self, **query: Any) -> Any:
+        "Delete contacts idle since a date Needs contacts:delete."
+        return self._t.request("DELETE", "/contacts", body=None, query=query)
+
     def list_contacts(self, **query: Any) -> Any:
         "Addresses this project has delivered to Needs contacts:read."
         return self._t.request("GET", "/contacts", body=None, query=query)
+
+    def delete_contact(self, id, **query: Any) -> Any:
+        "Delete one contact Needs contacts:delete."
+        return self._t.request("DELETE", f"/contacts/{_esc(id)}", body=None, query=query)
 
     def get_contact(self, id, **query: Any) -> Any:
         "One contact Needs contacts:read."

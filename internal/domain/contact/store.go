@@ -204,3 +204,34 @@ func (s *Store) PurgeAll(ctx context.Context, projID string) (int64, error) {
 
 	return res.RowsAffected()
 }
+
+// Delete removes one contact. The next delivery to the address
+// recreates it with a fresh tally, which is the whole cost.
+func (s *Store) Delete(ctx context.Context, projID, id string) (bool, error) {
+	res, err := s.Exec(ctx, `DELETE FROM contacts WHERE project_id = ? AND id = ?`, projID, id)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// DeleteInactiveBefore removes the contacts nothing has happened to
+// since before. GREATEST skips NULLs in Postgres, so a contact with
+// only failures is judged by its last failure, and one with neither
+// - which cannot exist after the first outcome, but the column allows
+// it - by when it was created.
+func (s *Store) DeleteInactiveBefore(ctx context.Context, projID string, before time.Time) (int64, error) {
+	res, err := s.Exec(ctx, `
+        DELETE FROM contacts
+        WHERE project_id = ?
+          AND COALESCE(GREATEST(last_sent_at, last_failed_at), created_at) < ?
+    `, projID, before)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
+}

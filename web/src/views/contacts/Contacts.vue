@@ -5,15 +5,60 @@ import { contactsApi, type Contact } from '../../api/contacts'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
+import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../composables/formatDate'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'
+import BaseModal from '../../components/BaseModal.vue'
+import FormField from '../../components/FormField.vue'
 
 const router = useRouter()
 
 const notify = useNotificationStore()
 const projStore = useProjectStore()
+const { confirm } = useConfirm()
+
+// The clean-up dialog: a date, and everything idle since it goes.
+const cleanupOpen = ref(false)
+const cleanupBefore = ref('')
+const cleaning = ref(false)
+
+async function remove(c: Contact) {
+  const ok = await confirm({
+    title: 'Delete contact',
+    message: `Delete ${c.email} and its tallies? The next delivery to this address creates a fresh contact - to stop sending to it, add a suppression instead.`,
+    confirmText: 'Delete',
+    variant: 'danger',
+  })
+  if (!ok) return
+
+  try {
+    await contactsApi.remove(c.id)
+    notify.success('Contact deleted')
+    await load()
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to delete the contact'))
+  }
+}
+
+async function cleanup() {
+  if (!cleanupBefore.value) return
+
+  cleaning.value = true
+  try {
+    const res = await contactsApi.removeInactive(new Date(cleanupBefore.value).toISOString())
+    cleanupOpen.value = false
+    cleanupBefore.value = ''
+    notify.success(`Deleted ${res.data.deleted} inactive contacts`)
+    offset.value = 0
+    await load()
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to clean up contacts'))
+  } finally {
+    cleaning.value = false
+  }
+}
 
 const contacts = ref<Contact[]>([])
 const total = ref(0)
@@ -114,13 +159,21 @@ function addAsSubscriber(c: Contact) {
 
 <template>
   <div>
-    <PageHeader title="Contacts" />
+    <PageHeader title="Contacts">
+      <button
+        v-if="projStore.can('contacts:delete')"
+        class="btn btn-secondary"
+        @click="cleanupOpen = true"
+      >
+        Clean up inactive
+      </button>
+    </PageHeader>
 
     <div class="card">
       <div class="card-body">
         <p class="text-sm text-muted mb-3">
-          Every address this project has delivered to, tallied automatically as mail is sent. These
-          records are read-only - to build an audience you can target, use
+          Every address this project has delivered to, tallied automatically as mail is sent. The
+          tallies cannot be edited - to build an audience you can target, use
           <router-link to="/subscriber-lists">Subscriber Lists</router-link>.
         </p>
         <input
@@ -183,6 +236,13 @@ function addAsSubscriber(c: Contact) {
                     >
                       Add to subscribers
                     </button>
+                    <button
+                      v-if="projStore.can('contacts:delete')"
+                      class="btn btn-danger btn-sm"
+                      @click="remove(c)"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -201,6 +261,35 @@ function addAsSubscriber(c: Contact) {
         </div>
       </template>
     </div>
+
+    <BaseModal
+      v-if="cleanupOpen"
+      title="Clean up inactive contacts"
+      form
+      @submit="cleanup"
+      @close="cleanupOpen = false"
+    >
+      <p class="text-sm text-muted mb-3">
+        Deletes every contact with no delivery - sent or failed - since the date you pick. A contact
+        comes back with a fresh tally the next time mail reaches its address, so this forgets
+        history and blocks nothing.
+      </p>
+      <FormField label="No activity since" for="cleanup-before">
+        <input
+          id="cleanup-before"
+          v-model="cleanupBefore"
+          type="datetime-local"
+          class="form-input"
+          required
+        />
+      </FormField>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="cleanupOpen = false">Cancel</button>
+        <button type="submit" class="btn btn-danger" :disabled="cleaning || !cleanupBefore">
+          {{ cleaning ? 'Deleting...' : 'Delete inactive contacts' }}
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
