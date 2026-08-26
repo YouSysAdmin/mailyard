@@ -67,12 +67,16 @@ const baseBodyLimit = 1 * 1024 * 1024
 // fasthttp answers 413 before any handler runs, and the configured
 // limit is a number nothing enforces.
 //
-// The trade is deliberate: this raises the ceiling for every endpoint,
-// not just the send routes, because the limit is a property of the
-// fasthttp server and Fiber has no per-route override - checked again
-// on v3, where BodyLimit still reaches only app.server. Operators who
-// do not send large attachments should lower
-// sending.max_total_attachment_size, which lowers this with it.
+// This is the SERVER's limit, and only the routes in LargeBodyPaths
+// get it. Fiber has no per-route override - checked again on v3, where
+// BodyLimit still reaches only app.server - but fasthttp's
+// HeaderReceived hook can lower it per request, and perRequestLimits
+// does, because a body is buffered in full BEFORE the handler chain
+// runs: neither auth nor a rate limiter gets to refuse it first. Left
+// as one ceiling, a stranger could hold Concurrency times this much
+// memory by posting to the login route. Operators who do not send
+// large attachments should still lower sending.max_total_attachment_size,
+// which lowers this with it.
 func bodyLimitFor(cfg *env.Config) int {
 	total := cfg.Sending.MaxTotalAttachmentSize
 
@@ -227,24 +231,101 @@ func concurrencyFor(cfg *env.Config) int {
 // two numbers that must stay ordered are one number and a margin.
 const streamWriteTimeout = eventstream.MaxStreamLife + 5*time.Minute
 
+// apiBodyLimit is the request body cap on the authenticated API
+// surfaces, /api/v1 and /app/api, for every route that does not carry
+// attachments. Sized from what the biggest ordinary body actually is:
+// a template version is two 1 MiB fields plus sample data, a
+// subscriber import is 10 000 rows. Well under the attachment ceiling,
+// which is what a stranger otherwise gets to make us buffer.
+const apiBodyLimit = 8 * 1024 * 1024
+
+// LargeBodyPaths are the routes whose body may legitimately be as big
+// as the server's limit (bodyLimitFor): attachments travel inside the
+// JSON, base64 encoded, and a relay node forwards a whole received
+// message the same way. A `*` stands for one path segment, an id.
+// Everything else gets apiBodyLimit or, off the API, baseBodyLimit.
+//
+// Exported for the guard in tests/ that asks the router whether each
+// entry still names a route - an entry nobody matches is a route that
+// has been renamed out from under its ceiling and now answers 413.
+var LargeBodyPaths = []string{
+	"/api/v1/emails/send",
+	"/api/v1/emails/send-template",
+	"/api/v1/emails/batch",
+	"/api/v1/templates/*/attachments",
+	// A template export bundle carries every version, each up to a
+	// template's own size.
+	"/api/v1/templates/import",
+	// Enterprise only, but a path is a string and the community binary
+	// has no route here, so the entry costs it nothing.
+	"/api/relay-nodes/inbound",
+}
+
 // perRequestLimits raises the write deadline for the streaming endpoints
-// and changes nothing else.
+// and lowers the body ceiling for every route that does not carry
+// attachments.
 //
 // A zero field in the returned config means "honor the server's own
-// value", so read timeout and body limit are untouched. The URI here is
-// the RAW request target, so the path is normalized the same way the
-// router normalizes it before matching - see normalizePath.
+// value", so the read timeout is untouched everywhere and the body
+// limit only where LargeBodyPaths says so. The URI here is the RAW
+// request target, so the path is normalized the same way the router
+// normalizes it before matching - see normalizePath.
 func perRequestLimits(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 	uri := string(h.RequestURI())
 	if i := strings.IndexAny(uri, "?#"); i >= 0 {
 		uri = uri[:i]
 	}
 
+	cfg := fasthttp.RequestConfig{MaxRequestBodySize: bodyLimitForPath(uri)}
 	if isStreamingPath(uri) {
-		return fasthttp.RequestConfig{WriteTimeout: streamWriteTimeout}
+		cfg.WriteTimeout = streamWriteTimeout
 	}
 
-	return fasthttp.RequestConfig{}
+	return cfg
+}
+
+// bodyLimitForPath is the body ceiling one request gets, where 0 means
+// the server's own. Three tiers: the attachment routes take the
+// server's, the two API prefixes take apiBodyLimit, and everything
+// else - login, the SES webhook, tracking, health, the console shell -
+// takes baseBodyLimit. The auth routes are carved out of the API tier
+// because they are the ones a stranger reaches, and nothing there is
+// bigger than a form.
+func bodyLimitForPath(path string) int {
+	p := normalizePath(path)
+	for _, pattern := range LargeBodyPaths {
+		if pathMatches(pattern, p) {
+			return 0
+		}
+	}
+
+	if strings.HasPrefix(p, env.ConsolePath+"/api/auth/") {
+		return baseBodyLimit
+	}
+
+	if strings.HasPrefix(p, "/api/v1/") || strings.HasPrefix(p, env.ConsolePath+"/api/") {
+		return apiBodyLimit
+	}
+
+	return baseBodyLimit
+}
+
+// pathMatches compares a normalized path against a LargeBodyPaths
+// pattern segment by segment, `*` standing for any one segment.
+func pathMatches(pattern, path string) bool {
+	want := strings.Split(pattern, "/")
+	got := strings.Split(path, "/")
+	if len(want) != len(got) {
+		return false
+	}
+
+	for i := range want {
+		if want[i] != "*" && want[i] != got[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // errorHandler answers every error that reaches the top of the chain,
