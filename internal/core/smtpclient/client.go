@@ -11,10 +11,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/mail"
 	"net/smtp"
 	"net/textproto"
 	"strings"
+	"time"
 )
 
 // Encryption modes for ServerConfig.Encryption.
@@ -154,9 +156,14 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 		tlsConfig = &tls.Config{ServerName: cfg.Host}
 	}
 
+	// A bounded dial. Without one a blackholed host held the caller
+	// for the kernel's SYN timeout - over a minute - and the console's
+	// server test, which reaches this on a request, held the request
+	// with it.
+	dialer := &net.Dialer{Timeout: dialTimeout}
 	switch cfg.Encryption {
 	case EncryptionSSL:
-		conn, err := tls.Dial("tcp", cfg.addr(), tlsConfig)
+		conn, err := tls.DialWithDialer(dialer, "tcp", cfg.addr(), tlsConfig)
 		if err != nil {
 			return nil, fmt.Errorf("ssl dial failed: %w", err)
 		}
@@ -170,9 +177,9 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 
 		return client, nil
 	case EncryptionSTARTTLS:
-		client, err := smtp.Dial(cfg.addr())
+		client, err := dialPlain(dialer, cfg)
 		if err != nil {
-			return nil, fmt.Errorf("smtp dial failed: %w", err)
+			return nil, err
 		}
 
 		if err := client.StartTLS(tlsConfig); err != nil {
@@ -183,13 +190,31 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 
 		return client, nil
 	default:
-		client, err := smtp.Dial(cfg.addr())
-		if err != nil {
-			return nil, fmt.Errorf("smtp dial failed: %w", err)
-		}
-
-		return client, nil
+		return dialPlain(dialer, cfg)
 	}
+}
+
+// dialTimeout bounds the TCP connect. Fifteen seconds is generous for
+// any mail exchanger that is up and well short of the kernel's own
+// retry schedule.
+const dialTimeout = 15 * time.Second
+
+// dialPlain opens the TCP connection with the bounded dialer and wraps
+// it in an SMTP client, which is what smtp.Dial does minus the bound.
+func dialPlain(dialer *net.Dialer, cfg ServerConfig) (*smtp.Client, error) {
+	conn, err := dialer.Dial("tcp", cfg.addr())
+	if err != nil {
+		return nil, fmt.Errorf("smtp dial failed: %w", err)
+	}
+
+	client, err := smtp.NewClient(conn, cfg.Host)
+	if err != nil {
+		_ = conn.Close()
+
+		return nil, fmt.Errorf("smtp client creation failed: %w", err)
+	}
+
+	return client, nil
 }
 
 func sendViaClient(client *smtp.Client, auth smtp.Auth, msg *Message) error {
