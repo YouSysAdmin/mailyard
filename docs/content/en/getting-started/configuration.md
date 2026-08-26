@@ -345,9 +345,10 @@ Caps applied to every send, on both the console API and the machine API.
 
 {{< callout type="warning" title="These size limits set the HTTP body limit" >}}
 Attachments travel base64-encoded, which inflates them by 4/3, so the request body cap is computed from
-`max_total_attachment_size` at startup rather than configured separately. Raising it therefore raises the body cap for
-**every** endpoint, because Fiber has no per-route body limit. Lower these values if the deployment does not send large
-files.
+`max_total_attachment_size` at startup rather than configured separately. That cap applies only to the routes that
+carry attachments (`/api/v1/emails/send`, `/send-template`, `/batch`, template attachment uploads and template import).
+Every other API route takes 8 MiB, and everything outside the API - login, webhooks, tracking - takes 1 MiB. Lower
+these values if the deployment does not send large files.
 
 Two configurations are refused at startup: a `max_attachment_size` larger than
 `max_total_attachment_size` (unreachable, and it reads as a promise the total overrides), and a total above 256 MiB.

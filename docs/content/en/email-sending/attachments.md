@@ -40,9 +40,9 @@ Exceeding a size limit is a `400` naming the offending file:
 ```
 
 {{< callout type="warning" title="The HTTP body limit is derived from these" >}}
-Base64 inflates a file by 4/3, so the request body cap is computed from
-`sending.max_total_attachment_size` at startup, not set independently. Raising the attachment limits therefore raises
-the body cap for **every** endpoint, since Fiber has no per-route limit.
+Base64 inflates a file by 4/3, so the request body cap on the send routes is computed from
+`sending.max_total_attachment_size` at startup, not set independently. It applies to the routes that carry
+attachments only - every other API route is capped at 8 MiB, whatever the attachment limits say.
 
 A request larger than that cap is rejected by the HTTP layer before any handler runs, and that response is plain text
 (`Request Entity Too Large`), not the usual JSON error shape. If you are building a client, treat a `413` as a size
