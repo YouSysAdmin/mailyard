@@ -95,8 +95,9 @@ type Export struct {
 	// export "SAYS SO instead of ending quietly" - so a project with more
 	// than exportSuppressionCap blocked addresses got a short file and no
 	// indication anywhere, which is the one truncation in this document
-	// that would matter to somebody. Nothing else here is capped: every
-	// other section is bounded by what a person made.
+	// that would matter to somebody. Contacts and subscribers are capped
+	// the same way, for the same reason - see exportRowCap. Every other
+	// section is bounded by what a person made.
 	Truncated []string `json:"truncated"`
 }
 
@@ -160,16 +161,24 @@ func (h *Handler) ExportData(c fiber.Ctx) error {
 
 	// Contacts and subscribers are paged in the API, so they are
 	// walked here rather than pulled in one unbounded query.
-	contacts, err := collectContacts(ctx, st, projID)
+	contacts, cut, err := collectContacts(ctx, st, projID)
 	if err != nil {
 		return response.Internal(c, fmt.Errorf("export contacts: %w", err))
 	}
 
+	if cut {
+		out.Truncated = append(out.Truncated, "contacts")
+	}
+
 	out.Contacts = contacts
 
-	subs, err := collectSubscribers(ctx, st, projID)
+	subs, cut, err := collectSubscribers(ctx, st, projID)
 	if err != nil {
 		return response.Internal(c, fmt.Errorf("export subscribers: %w", err))
+	}
+
+	if cut {
+		out.Truncated = append(out.Truncated, "subscribers")
 	}
 
 	out.Subscribers = subs
@@ -183,38 +192,47 @@ func (h *Handler) ExportData(c fiber.Ctx) error {
 // exportPageSize bounds one page while walking a paged store.
 const exportPageSize = 500
 
-func collectContacts(ctx context.Context, st *store.Store, projID string) ([]any, error) {
-	var out []any
-	for offset := 0; ; offset += exportPageSize {
-		page, err := st.Contact.List(ctx, projID, "", exportPageSize, offset)
-		if err != nil {
-			return nil, err
-		}
+// exportRowCap bounds the contacts and the subscribers sections, the
+// two that grow per recipient rather than per thing a person made.
+// Suppressions had a ceiling, these were walked to the end into one
+// in-memory slice and marshalled as one document - a second full copy -
+// so a project of a few million contacts was a request costing
+// gigabytes, repeatable at the api rate limit. Reported in Truncated
+// like the suppressions are, never passed over.
+const exportRowCap = 50000
 
-		for _, row := range page {
-			out = append(out, row)
-		}
-
-		if len(page) < exportPageSize {
-			return orEmpty(out), nil
-		}
-	}
+func collectContacts(ctx context.Context, st *store.Store, projID string) ([]any, bool, error) {
+	return walkPages(func(offset int) ([]any, error) {
+		return boxed(st.Contact.List(ctx, projID, "", exportPageSize, offset))
+	})
 }
 
-func collectSubscribers(ctx context.Context, st *store.Store, projID string) ([]any, error) {
+func collectSubscribers(ctx context.Context, st *store.Store, projID string) ([]any, bool, error) {
+	return walkPages(func(offset int) ([]any, error) {
+		return boxed(st.Subscriber.ListPage(ctx, projID, exportPageSize, offset))
+	})
+}
+
+// walkPages pages a store to its end or to exportRowCap, and says
+// which. A short page is the end. Reaching the cap on a full page
+// reports truncation, which at an exact multiple of the page size can
+// over-report by one page - the safe direction, as allSuppressions
+// says.
+func walkPages(page func(offset int) ([]any, error)) ([]any, bool, error) {
 	var out []any
 	for offset := 0; ; offset += exportPageSize {
-		page, err := st.Subscriber.ListPage(ctx, projID, exportPageSize, offset)
+		rows, err := page(offset)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		for _, row := range page {
-			out = append(out, row)
+		out = append(out, rows...)
+		if len(rows) < exportPageSize {
+			return orEmpty(out), false, nil
 		}
 
-		if len(page) < exportPageSize {
-			return orEmpty(out), nil
+		if len(out) >= exportRowCap {
+			return out[:exportRowCap], true, nil
 		}
 	}
 }
