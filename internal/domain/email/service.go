@@ -52,6 +52,26 @@ var protectedHeaders = map[string]struct{}{
 	"message-id": {}, "received": {}, "dkim-signature": {},
 }
 
+// validHeaderName reports whether name is an RFC 5322 field name: one
+// or more printable US-ASCII characters other than the colon. Leading
+// or trailing whitespace fails - it is not part of any name, and a
+// receiver that trims it would match a reserved header this check
+// would otherwise have missed.
+func validHeaderName(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	for i := range len(name) {
+		ch := name[i]
+		if ch < 33 || ch > 126 || ch == ':' {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Service is the send pipeline entry: validate, persist as queued or
 // scheduled, wake the worker. Handlers construct it per request from
 // the Runtime (cheap field copies).
@@ -230,6 +250,14 @@ func (s *Service) ResolveRoute(ctx context.Context, projID, serverID, groupSlug 
 // table. Returned errors are *RequestError (caller mistakes) or
 // infrastructure errors.
 func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest) error {
+	// net/mail accepts a bare CR or LF inside a trailing comment -
+	// `a@b.c (x\r\nBcc: ...)` parses, and Build writes the string
+	// verbatim - so parsing is not the whole check. Proven by running
+	// it: the comment became a second header the platform then signed.
+	if strings.ContainsAny(req.From, "\r\n") {
+		return reqErrf("from address contains a line break")
+	}
+
 	if _, err := mail.ParseAddress(req.From); err != nil {
 		return reqErrf("from address %q is invalid", req.From)
 	}
@@ -243,6 +271,10 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 	}
 
 	for _, rcpt := range req.To {
+		if strings.ContainsAny(rcpt, "\r\n") {
+			return reqErrf("recipient address contains a line break")
+		}
+
 		if _, err := mail.ParseAddress(rcpt); err != nil {
 			return reqErrf("recipient address %q is invalid", rcpt)
 		}
@@ -257,6 +289,15 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 	}
 
 	for key := range req.Headers {
+		// The name is checked BEFORE the reserved-name lookup, and
+		// against RFC 5322 ftext (printable ASCII, no colon) rather
+		// than a character blocklist: "Bcc " with a trailing space is
+		// not in protectedHeaders, and a lenient receiver folds the
+		// space away and honours it as Bcc.
+		if !validHeaderName(key) {
+			return reqErrf("header %q is not a valid header name", key)
+		}
+
 		if _, protected := protectedHeaders[strings.ToLower(key)]; protected {
 			if hint := reservedHeaderHint[strings.ToLower(key)]; hint != "" {
 				return reqErrf("header %q is reserved and cannot be overridden - %s", key, hint)
@@ -265,7 +306,7 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 			return reqErrf("header %q is reserved and cannot be overridden", key)
 		}
 
-		if strings.ContainsAny(key, "\r\n:") || strings.ContainsAny(req.Headers[key], "\r\n") {
+		if strings.ContainsAny(req.Headers[key], "\r\n") {
 			return reqErrf("header %q contains invalid characters", key)
 		}
 	}

@@ -121,14 +121,31 @@ const (
 // returns it with the rest of the original headers.
 const HeaderEmailID = "X-Mailyard-Email-Id"
 
+// headerSafe strips CR and LF from a header value so it occupies one
+// header line. The caller has already refused such input where a
+// person could see the refusal, so this only ever changes a value that
+// reached the builder some other way.
+func headerSafe(v string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(v)
+}
+
 // Build renders the RFC 5322 message bytes: headers, then
 // multipart/mixed when attachments are present, with a
 // multipart/alternative body when both HTML and text exist.
 func (m *Message) Build() []byte {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "From: %s\r\n", m.From)
-	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(m.To, ", "))
+	// Validation refuses a line break in any of these upstream. This
+	// is the last writer, so it also refuses to emit one: a value that
+	// somehow arrives with CR or LF loses them rather than becoming a
+	// second header in a message the platform then DKIM-signs.
+	fmt.Fprintf(&b, "From: %s\r\n", headerSafe(m.From))
+	to := make([]string, len(m.To))
+	for i, addr := range m.To {
+		to[i] = headerSafe(addr)
+	}
+
+	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(to, ", "))
 	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", m.Subject))
 	// Date and Message-ID are mandatory originator fields (RFC 5322
 	// section 3.6). We emitted neither, and relied on whatever the
@@ -164,7 +181,7 @@ func (m *Message) Build() []byte {
 	}
 
 	for key, value := range m.Headers {
-		fmt.Fprintf(&b, "%s: %s\r\n", key, value)
+		fmt.Fprintf(&b, "%s: %s\r\n", headerSafe(key), headerSafe(value))
 	}
 
 	if len(m.Attachments) > 0 {
