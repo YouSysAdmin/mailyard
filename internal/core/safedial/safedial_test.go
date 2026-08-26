@@ -117,3 +117,17 @@ func TestDialerRefusesLoopback(t *testing.T) {
 		t.Fatal("allowPrivate dialer still refused loopback")
 	}
 }
+
+// The translation prefixes are refused: an address here is an IPv4 one
+// wearing IPv6, and the gateway that unwraps it would land inside.
+func TestTranslatedAddressesAreBlocked(t *testing.T) {
+	for _, a := range []string{"64:ff9b::a00:5", "64:ff9b:1::a00:5", "2002:a00:5::", "2001:0:a00:5::1"} {
+		if AddrAllowed(netip.MustParseAddr(a)) {
+			t.Errorf("%s allowed, want refused", a)
+		}
+	}
+
+	if !AddrAllowed(netip.MustParseAddr("2606:4700::1111")) {
+		t.Error("an ordinary public IPv6 address was refused")
+	}
+}

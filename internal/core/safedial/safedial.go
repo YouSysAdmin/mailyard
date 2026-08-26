@@ -42,6 +42,17 @@ var blocked = []netip.Prefix{
 	netip.MustParsePrefix("::/128"),          // unspecified
 	netip.MustParsePrefix("2001:db8::/32"),   // documentation
 	netip.MustParsePrefix("fc00::/7"),        // unique local
+
+	// Transition and translation space. Each of these is an IPv6
+	// address that a gateway turns INTO an IPv4 one, so a webhook at
+	// 64:ff9b::a00:5 reaches 10.0.0.5 through a NAT64 box, past every
+	// rule written for the IPv4 form. Unmap handles the ::ffff: mapped
+	// form above, these are the rest.
+	netip.MustParsePrefix("64:ff9b::/96"),    // NAT64 well-known prefix
+	netip.MustParsePrefix("64:ff9b:1::/48"),  // NAT64 local-use
+	netip.MustParsePrefix("::ffff:0:0:0/96"), // IPv4-translated
+	netip.MustParsePrefix("2002::/16"),       // 6to4
+	netip.MustParsePrefix("2001::/32"),       // Teredo
 }
 
 // ErrBlocked is returned when a dial targets a disallowed address. It
