@@ -1209,15 +1209,24 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("database.crypto.encryption_key must be at least 32 characters (generate with `openssl rand -hex 32`)")
 	}
 
+	// The tracking signer keys on jwt_secret too, and its URLs are the
+	// one surface that is public by design. With auth disabled the
+	// secret used to be optional, and an installation that set
+	// public_url got tracking on a key derived from nothing - which
+	// anyone can derive. So the secret is required by whichever of the
+	// two features wants it, and the floor is the same either way: HKDF
+	// stretches a short secret but cannot invent entropy.
+	if c.Auth.Disabled && c.Auth.JWTSecret == "" && c.Server.PublicURL != "" {
+		return fmt.Errorf("auth.jwt_secret required when server.public_url is set: it signs the public tracking and unsubscribe links, even with auth disabled (generate with `openssl rand -hex 32`)")
+	}
+
+	if c.Auth.JWTSecret != "" && len(c.Auth.JWTSecret) < 32 {
+		return fmt.Errorf("auth.jwt_secret must be at least 32 characters (generate with `openssl rand -hex 32`)")
+	}
+
 	if !c.Auth.Disabled {
 		if c.Auth.JWTSecret == "" {
 			return fmt.Errorf("auth.jwt_secret required when auth is enabled (set auth.disabled: true to skip)")
-		}
-
-		// HS256 is keyed on the raw bytes of the secret - under 32 is
-		// brute-forceable. Fail fast on weak keys.
-		if len(c.Auth.JWTSecret) < 32 {
-			return fmt.Errorf("auth.jwt_secret must be at least 32 characters (generate with `openssl rand -hex 32`)")
 		}
 
 		if c.Auth.SessionTTL != "" {

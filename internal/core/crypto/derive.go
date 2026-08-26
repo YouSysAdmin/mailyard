@@ -30,15 +30,27 @@ const (
 // per-purpose subkey via HKDF-SHA256 and returns it hex-encoded (64
 // chars = 32 bytes) so existing string-secret APIs stay unchanged.
 // Deterministic: same secret + label always yields the same key.
+//
+// EMPTY IN, EMPTY OUT, the convention crypto.New already follows.
+// HKDF over an empty secret is a perfectly good-looking 64-character
+// key that anyone can compute from the label alone, and every
+// consumer decides "is a key configured" by testing for "". With
+// auth disabled jwt_secret is optional, and the tracking signer was
+// handed exactly that public key - so the signed view and unsubscribe
+// tokens could be minted by anyone who had read this file. Returning
+// "" is what makes the consumer report itself disabled instead.
 func DeriveKey(secret, label string) string {
+	if secret == "" {
+		return ""
+	}
+
 	r := hkdf.New(sha256.New, []byte(secret), nil, []byte(label))
 	out := make([]byte, 32)
 	if _, err := io.ReadFull(r, out); err != nil {
-		// HKDF over SHA-256 cannot fail for 32 bytes - keep a
-		// deterministic fallback anyway rather than panicking.
-		sum := sha256.Sum256([]byte(label + ":" + secret))
-
-		return hex.EncodeToString(sum[:])
+		// HKDF over SHA-256 cannot fail for 32 bytes. Were it to, no
+		// key is the right answer - a fallback hash would be a second,
+		// unrelated key, opening nothing sealed under the first.
+		return ""
 	}
 
 	return hex.EncodeToString(out)

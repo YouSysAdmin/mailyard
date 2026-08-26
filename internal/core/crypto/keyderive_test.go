@@ -55,3 +55,18 @@ func TestEncryptUsesDerivedKey(t *testing.T) {
 		t.Fatalf("round trip: got %q err %v", got, err)
 	}
 }
+
+// An empty secret derives NO key. HKDF over nothing is a perfectly
+// good-looking 64-character string that anyone can compute from the
+// label, and the tracking signer was handed exactly that when auth
+// was disabled and jwt_secret left out - so every consumer that asks
+// "is a key configured" by testing for "" has to get "".
+func TestDeriveKeyOfAnEmptySecretIsEmpty(t *testing.T) {
+	if got := DeriveKey("", KeyTracking); got != "" {
+		t.Fatalf("DeriveKey(\"\") = %q, want empty", got)
+	}
+
+	if got := DeriveKey("an-operator-secret", KeyTracking); len(got) != 64 {
+		t.Fatalf("DeriveKey(secret) = %q, want 64 hex chars", got)
+	}
+}
