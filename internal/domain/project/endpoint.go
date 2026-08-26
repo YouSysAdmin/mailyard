@@ -939,8 +939,8 @@ func (h *Handler) callerAccess(c fiber.Ctx, projID string) (access, error) {
 }
 
 // accessFailure translates the loadWithMember outcome into the right
-// error response: 500 on store error, 404 on missing project, 403 on
-// not being a member or not holding the permission.
+// error response: 500 on store error, 404 on a missing project or a
+// non-member, 403 on not holding the permission.
 func (h *Handler) accessFailure(c fiber.Ctx, w *projmodel.Project, acc access, err error) error {
 	if err != nil {
 		return response.Internal(c, err)
@@ -950,8 +950,12 @@ func (h *Handler) accessFailure(c fiber.Ctx, w *projmodel.Project, acc access, e
 		return response.NotFound(c, "project not found")
 	}
 
+	// A NON-MEMBER gets the same answer as a missing project. 403 here
+	// told a stranger that a project with this id exists, which the
+	// header-addressed routes already refuse to do - and ids travel in
+	// invitations, exports and logs.
 	if !acc.member {
-		return response.Forbidden(c, "not a project member")
+		return response.NotFound(c, "project not found")
 	}
 
 	return response.Forbidden(c, "insufficient permissions in this project")
