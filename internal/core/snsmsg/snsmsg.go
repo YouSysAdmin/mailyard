@@ -161,10 +161,13 @@ var ErrUntrusted = errors.New("snsmsg: message is not authentic")
 // Verify checks the signature against the certificate the message
 // names, having first checked that the certificate is Amazon's.
 func (v *Verifier) Verify(m *Message) error {
+	// Version 2 only, which is SHA-256. Version 1 was SHA-1, and it was
+	// accepted here until the audit: SNS has signed with v2 since 2022,
+	// a topic's version is not something a console lets anyone lower,
+	// and a receiver that still takes SHA-1 is a receiver waiting for
+	// the day a chosen-prefix collision meets a fixed canonical string.
 	var algo x509.SignatureAlgorithm
 	switch m.SignatureVersion {
-	case "1":
-		algo = x509.SHA1WithRSA
 	case "2":
 		algo = x509.SHA256WithRSA
 	default:

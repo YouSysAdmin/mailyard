@@ -159,11 +159,14 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 
 func TestVerifyRejectsAnUnknownSignatureVersion(t *testing.T) {
 	_, v := signingPair(t, goodCertURL)
-	m := notification(goodCertURL)
-	m.SignatureVersion = "3"
-
-	if err := v.Verify(m); !errors.Is(err, ErrUntrusted) {
-		t.Fatalf("accepted signature version 3, got %v", err)
+	// "1" is SHA-1 and was accepted once. It is listed with the unknown
+	// version because it is refused the same way and for good.
+	for _, version := range []string{"3", "1"} {
+		m := notification(goodCertURL)
+		m.SignatureVersion = version
+		if err := v.Verify(m); !errors.Is(err, ErrUntrusted) {
+			t.Fatalf("accepted signature version %s, got %v", version, err)
+		}
 	}
 }
 
