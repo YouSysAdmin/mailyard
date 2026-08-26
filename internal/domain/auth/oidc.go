@@ -267,17 +267,25 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 		}
 
 		if existing != nil {
-			h.linkIdentity(ctx, prov, existing, claims)
-
-			// A self-registered account that never confirmed its link
-			// just proved the mailbox through the IdP instead.
+			// An UNVERIFIED local account is not linked. It used to be,
+			// and marked verified on the spot - the IdP had proved the
+			// mailbox, after all. But the row was created by whoever
+			// typed the address at registration, with a password of
+			// their choosing: register victim@corp.com before the
+			// victim ever signs in, wait for them to arrive through
+			// SSO, and the attacker's password now opens the victim's
+			// account. The IdP proved the person owns the MAILBOX, not
+			// that they created this ROW. Refused, and the person
+			// verifies through the mail they were sent - or an admin
+			// removes the squatter.
 			if !existing.EmailVerified {
-				if err := h.Runtime.Store.User.MarkEmailVerified(ctx, existing.ID); err != nil {
-					return nil, err
-				}
+				slog.Warn("auth: refusing to link to an unverified local account",
+					"email", email, "provider", prov.Slug)
 
-				existing.EmailVerified = true
+				return nil, fmt.Errorf("an unverified account already exists for %s", email)
 			}
+
+			h.linkIdentity(ctx, prov, existing, claims)
 
 			return existing, nil
 		}
