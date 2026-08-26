@@ -137,6 +137,17 @@ type Verifier struct {
 	// request at something on the local network.
 	HTTP *http.Client
 
+	// MaxAge bounds how old a message's Timestamp may be. Zero means
+	// no bound. The signature proves Amazon SENT the message, not
+	// WHEN it was presented: a captured notification stayed
+	// replayable for as long as the signing certificate was valid,
+	// and each replay filed another bounce row. An hour is generous
+	// for SNS delivery retries and short enough that a capture is
+	// worthless by the time anyone could use it. A timestamp more
+	// than five minutes in the future is refused too, since that is
+	// not late delivery but a clock nobody should trust.
+	MaxAge time.Duration
+
 	mu    sync.RWMutex
 	certs map[string]*x509.Certificate
 }
@@ -179,8 +190,24 @@ func (v *Verifier) Verify(m *Message) error {
 		return fmt.Errorf("%w: %s", ErrUntrusted, err)
 	}
 
+	if v.MaxAge > 0 {
+		ts, err := time.Parse(time.RFC3339Nano, m.Timestamp)
+		if err != nil {
+			return fmt.Errorf("%w: timestamp is not RFC 3339", ErrUntrusted)
+		}
+
+		now := time.Now()
+		if now.Sub(ts) > v.MaxAge || ts.Sub(now) > futureSkew {
+			return fmt.Errorf("%w: timestamp %s is outside the accepted window", ErrUntrusted, m.Timestamp)
+		}
+	}
+
 	return nil
 }
+
+// futureSkew is how far ahead of our clock a Timestamp may sit before
+// it is refused as something other than late delivery.
+const futureSkew = 5 * time.Minute
 
 // withinValidity reports whether the certificate is usable at t.
 //

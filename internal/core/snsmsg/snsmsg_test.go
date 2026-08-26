@@ -205,3 +205,32 @@ func TestParseRejectsAnUnknownType(t *testing.T) {
 		t.Fatal("garbage parsed")
 	}
 }
+
+func TestVerifyRefusesAStaleOrFutureNotification(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ts   time.Time
+		ok   bool
+	}{
+		{"just now", time.Now(), true},
+		{"half an hour ago", time.Now().Add(-30 * time.Minute), true},
+		{"two hours ago", time.Now().Add(-2 * time.Hour), false},
+		{"an hour ahead", time.Now().Add(time.Hour), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key, v := signingPair(t, goodCertURL)
+			v.MaxAge = time.Hour
+			m := notification(goodCertURL)
+			m.Timestamp = tc.ts.UTC().Format("2006-01-02T15:04:05.000Z")
+			sign(t, key, m)
+			err := v.Verify(m)
+			if tc.ok && err != nil {
+				t.Fatalf("a fresh notification was refused: %v", err)
+			}
+
+			if !tc.ok && err == nil {
+				t.Fatal("a notification outside the window was accepted")
+			}
+		})
+	}
+}

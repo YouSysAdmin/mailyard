@@ -51,7 +51,8 @@ func New(rt *env.Runtime, allow *sestopics.Allowlist) *Handler {
 		Runtime:   rt,
 		Allowlist: allow,
 		verifier: &snsmsg.Verifier{
-			HTTP: safedial.Client(10*time.Second, false),
+			HTTP:   safedial.Client(10*time.Second, false),
+			MaxAge: time.Hour,
 		},
 	}
 }
