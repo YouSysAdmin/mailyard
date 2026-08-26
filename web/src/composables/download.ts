@@ -53,5 +53,5 @@ function cell(value: unknown): string {
 // and the one every spreadsheet understands: the cell reads as text and
 // the apostrophe is not part of the value.
 function defuse(raw: string): string {
-  return /^[=+\-@\t\r]/.test(raw) ? "'" + raw : raw
+  return /^[=+\-@\t\r\n|]/.test(raw) ? "'" + raw : raw
 }
