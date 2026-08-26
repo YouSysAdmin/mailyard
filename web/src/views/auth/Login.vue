@@ -218,9 +218,9 @@ function ssoLogin(p: LoginProvider) {
           v-model="totpCode"
           type="text"
           class="form-input"
-          maxlength="12"
+          maxlength="19"
           autocomplete="one-time-code"
-          placeholder="123456 or xxxxx-xxxxx"
+          placeholder="123456 or xxxx-xxxx-xxxx-xxxx"
           required
         />
       </FormField>

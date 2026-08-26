@@ -29,30 +29,60 @@ const recoveryCodeCount = 10
 // recoveryAlphabet is what a code is spelled in: lowercase without the
 // letters that read as digits and the digits that read as letters, so a
 // code copied by hand from a printout is typed as it was written. 31
-// symbols to the power of 10 is over eight hundred quadrillion.
+// symbols to the power of 16 is about 2^79.
 const recoveryAlphabet = "abcdefghjkmnpqrstuvwxyz23456789"
 
-// recoveryCodeLen is the length of a code without its dash.
-const recoveryCodeLen = 10
+// recoveryCodeLen is the length of a code without its dashes.
+//
+// Sixteen, from ten. A recovery code is a whole second factor on its
+// own and is stored under a single fast hash (see hashRecoveryCode), so
+// its strength IS its length: ten symbols was 49 bits nominal - "eight
+// hundred quadrillion" in the old comment was off by a thousand, it is
+// eight hundred TRILLION - and 48 effective after the modulo bias
+// below, which a stolen table meets with hours of GPU time. Sixteen is
+// 79 bits, out of reach of any table attack, and still a line on a
+// printout.
+const recoveryCodeLen = 16
+
+// legacyRecoveryCodeLen is the length codes were minted at before, and
+// looksLikeRecoveryCode still admits it: a set printed under the old
+// length keeps working until it is spent or regenerated, since the
+// hash does not know how long its input was.
+const legacyRecoveryCodeLen = 10
+
+// recoveryGroup is how many symbols sit between dashes.
+const recoveryGroup = 4
 
 // newRecoveryCodes mints a set and returns the codes as the person sees
-// them (xxxxx-xxxxx) beside the hashes that are stored.
+// them (xxxx-xxxx-xxxx-xxxx) beside the hashes that are stored.
 func newRecoveryCodes() (codes, hashes []string, err error) {
 	codes = make([]string, 0, recoveryCodeCount)
 	hashes = make([]string, 0, recoveryCodeCount)
 	for range recoveryCodeCount {
-		raw := make([]byte, recoveryCodeLen)
-		if _, err := rand.Read(raw); err != nil {
-			return nil, nil, err
-		}
-
 		var b strings.Builder
-		for i, r := range raw {
-			if i == recoveryCodeLen/2 {
+		n := 0
+		for n < recoveryCodeLen {
+			// One byte at a time through the sampler. Rejection rather
+			// than modulo: 256 is not a multiple of 31, so `r % 31`
+			// gave the first eight letters nine chances in 256 each and
+			// the other twenty-three eight - a bias, small, that a
+			// guesser gets for free.
+			var r [1]byte
+			if _, err := rand.Read(r[:]); err != nil {
+				return nil, nil, err
+			}
+
+			sym, ok := recoverySymbol(r[0])
+			if !ok {
+				continue
+			}
+
+			if n > 0 && n%recoveryGroup == 0 {
 				b.WriteByte('-')
 			}
 
-			b.WriteByte(recoveryAlphabet[int(r)%len(recoveryAlphabet)])
+			b.WriteByte(sym)
+			n++
 		}
 
 		codes = append(codes, b.String())
@@ -60,6 +90,19 @@ func newRecoveryCodes() (codes, hashes []string, err error) {
 	}
 
 	return codes, hashes, nil
+}
+
+// recoverySymbol maps one random byte onto the alphabet without bias,
+// rejecting the tail that would wrap unevenly. 248 is the largest
+// multiple of 31 that fits a byte, so every accepted value has exactly
+// eight preimages.
+func recoverySymbol(r byte) (byte, bool) {
+	const fair = 256 - 256%len(recoveryAlphabet)
+	if int(r) >= fair {
+		return 0, false
+	}
+
+	return recoveryAlphabet[int(r)%len(recoveryAlphabet)], true
 }
 
 // normalizeRecoveryCode folds what a person typed - case, the dash, a
@@ -71,11 +114,12 @@ func normalizeRecoveryCode(in string) string {
 }
 
 // looksLikeRecoveryCode tells a recovery code from an authenticator
-// code at sign-in, where both arrive in one field: ten symbols from the
-// alphabet, where a TOTP code is six digits.
+// code at sign-in, where both arrive in one field: sixteen symbols from
+// the alphabet, or ten for a set minted before the length grew, where a
+// TOTP code is six digits.
 func looksLikeRecoveryCode(in string) bool {
 	n := normalizeRecoveryCode(in)
-	if len(n) != recoveryCodeLen {
+	if len(n) != recoveryCodeLen && len(n) != legacyRecoveryCodeLen {
 		return false
 	}
 
@@ -89,9 +133,11 @@ func looksLikeRecoveryCode(in string) bool {
 }
 
 // hashRecoveryCode is the stored form. SHA-256 and not bcrypt, for the
-// reason API keys and reset tokens are: the input is 50 bits of
-// randomness, not a password, so there is nothing for a slow hash to
-// buy.
+// reason API keys and reset tokens are: the input is random and long
+// enough - 79 bits at recoveryCodeLen - that a slow hash buys nothing
+// against a stolen table. At the old ten symbols that was not true,
+// which is why the length grew rather than the hash slowing down: ten
+// bcrypt verifications per sign-in is a cost, sixteen symbols is not.
 func hashRecoveryCode(code string) string {
 	sum := sha256.Sum256([]byte(normalizeRecoveryCode(code)))
 

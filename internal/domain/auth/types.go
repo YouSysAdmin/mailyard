@@ -33,7 +33,7 @@ type loginInput struct {
 
 	// TOTPCode is required only for accounts with 2FA enabled: six
 	// digits from the authenticator, or a recovery code (xxxxx-xxxxx).
-	TOTPCode string `json:"totp_code" validate:"omitempty,min=6,max=12" normalize:"trim"`
+	TOTPCode string `json:"totp_code" validate:"omitempty,min=6,max=19" normalize:"trim"`
 }
 
 // registerInput is the public signup form. Same normalization rules
