@@ -3,6 +3,7 @@
 package auth
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/edition"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/memo"
 	coreoidc "github.com/yousysadmin/mailyard/internal/core/oidc"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -32,7 +34,17 @@ import (
 // key, because none of it is an operation a machine performs.
 type Handler struct {
 	Runtime *env.Runtime
+
+	// providers memoizes the login page's provider list - see Info.
+	providers *memo.Value[[]LoginProvider]
 }
+
+// infoMemo is how long the provider list stands. Five seconds keeps
+// "an operator who just enabled a provider sees the button on the next
+// refresh" true to within a breath, and makes a flood of this open
+// endpoint cost the database one query per five seconds rather than
+// one per request.
+const infoMemo = 5 * time.Second
 
 // Login validates email + password against the users table, sets the
 // session cookie, and returns the public user record.
@@ -314,27 +326,39 @@ func (h *Handler) Info(c fiber.Ctx) error {
 		return response.Success(c, AuthDisabledResponse{AuthDisabled: true, Edition: edition.Name})
 	}
 
-	// Identity providers are read from the database on every call
-	// rather than cached: this is one small query on an unauthenticated
-	// page, and an operator who just enabled a provider should see the
-	// button appear on the next refresh.
+	// Identity providers are read from the database, memoized for
+	// infoMemo. It was every call, on the grounds that this is one small
+	// query - but it is one small query on an OPEN endpoint, and a flood
+	// of it turned into pool pressure the signed-in requests queued
+	// behind.
 	//
 	// Only name, slug, and type are exposed. The list is public by
 	// necessity - the login page needs it before anyone has signed in -
 	// so it must not carry client ids, issuers, or allowlists.
-	provs, err := h.Runtime.Store.OAuthProvider.ListLoginable(c.Context())
-	if err != nil {
-		return response.Internal(c, err)
+	if h.providers == nil {
+		h.providers = memo.New[[]LoginProvider](infoMemo)
 	}
 
-	list := make([]LoginProvider, 0, len(provs))
-	for _, p := range provs {
-		list = append(list, LoginProvider{
-			Name:     p.Name,
-			Slug:     p.Slug,
-			Type:     p.Type,
-			StartURL: coreoidc.StartPath(p.Slug),
-		})
+	list, err := h.providers.Get(func() ([]LoginProvider, error) {
+		provs, err := h.Runtime.Store.OAuthProvider.ListLoginable(context.Background())
+		if err != nil {
+			return nil, err
+		}
+
+		list := make([]LoginProvider, 0, len(provs))
+		for _, p := range provs {
+			list = append(list, LoginProvider{
+				Name:     p.Name,
+				Slug:     p.Slug,
+				Type:     p.Type,
+				StartURL: coreoidc.StartPath(p.Slug),
+			})
+		}
+
+		return list, nil
+	})
+	if err != nil {
+		return response.Internal(c, err)
 	}
 
 	return response.Success(c, AuthInfoResponse{

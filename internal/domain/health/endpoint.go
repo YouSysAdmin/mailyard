@@ -17,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/memo"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 )
 
@@ -28,6 +29,28 @@ import (
 // the instance instead of restarting it.
 type Handler struct {
 	Runtime *env.Runtime
+
+	// ready memoizes the readiness verdict for readyMemo. The probe is
+	// open and pings the database, so without it a flood of probes was
+	// a flood of pool acquisitions that real requests queued behind -
+	// and readiness then failed for the reason the flood wanted.
+	ready *memo.Value[readiness]
+}
+
+// readyMemo is how long one readiness verdict stands. One second: an
+// orchestrator probes every few seconds, so it still sees a change on
+// its next probe, and a thousand probes in that second cost one ping.
+const readyMemo = time.Second
+
+// readiness is what one check produced.
+type readiness struct {
+	checks map[string]string
+	ready  bool
+}
+
+// NewHandler builds the handler with its memo.
+func NewHandler(rt *env.Runtime) *Handler {
+	return &Handler{Runtime: rt, ready: memo.New[readiness](readyMemo)}
 }
 
 // Status is the liveness probe. Deliberately checks nothing: if the
@@ -49,7 +72,33 @@ const readyTimeout = 2 * time.Second
 // unreachable, so the instance leaves the load balancer's rotation
 // without being killed.
 func (h *Handler) Ready(c fiber.Ctx) error {
-	ctx, cancel := contextWithTimeout(c, readyTimeout)
+	if h.ready == nil {
+		// A handler built as a literal rather than through NewHandler
+		// still answers, it just pays for every probe.
+		h.ready = memo.New[readiness](readyMemo)
+	}
+
+	r, _ := h.ready.Get(func() (readiness, error) { return h.check(), nil })
+
+	status := "ok"
+	code := fiber.StatusOK
+	if !r.ready {
+		status = "unavailable"
+		code = fiber.StatusServiceUnavailable
+	}
+
+	return c.Status(code).JSON(ReadyResponse{
+		Status: status,
+		Checks: r.checks,
+	})
+}
+
+// check runs the dependency check once. Off a background context with
+// its own deadline rather than the request's: the answer is shared with
+// the probes that arrive during the next second, so one client hanging
+// up must not cancel the ping they are all waiting on.
+func (h *Handler) check() readiness {
+	ctx, cancel := context.WithTimeout(context.Background(), readyTimeout)
 	defer cancel()
 
 	checks := map[string]string{}
@@ -74,21 +123,5 @@ func (h *Handler) Ready(c fiber.Ctx) error {
 		checks["database"] = "ok"
 	}
 
-	status := "ok"
-	code := fiber.StatusOK
-	if !ready {
-		status = "unavailable"
-		code = fiber.StatusServiceUnavailable
-	}
-
-	return c.Status(code).JSON(ReadyResponse{
-		Status: status,
-		Checks: checks,
-	})
-}
-
-// contextWithTimeout derives from the request context so a client
-// disconnect cancels the ping too.
-func contextWithTimeout(c fiber.Ctx, d time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(c.Context(), d)
+	return readiness{checks: checks, ready: ready}
 }

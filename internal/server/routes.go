@@ -94,7 +94,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// readiness answers "can this instance serve traffic". Keeping
 	// them separate means a database outage drains the instance
 	// instead of restarting it.
-	hh := &health.Handler{Runtime: rt}
+	hh := health.NewHandler(rt)
 	app.Get("/healthz", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
