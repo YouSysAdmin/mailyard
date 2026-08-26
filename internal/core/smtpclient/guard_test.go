@@ -3,8 +3,10 @@
 package smtpclient
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
 )
@@ -19,5 +21,16 @@ func TestAGuardedServerRefusesAPrivateHost(t *testing.T) {
 		if err := TestConnection(cfg); !errors.As(err, &blocked) {
 			t.Errorf("%s: got %v, want ErrBlocked", enc, err)
 		}
+	}
+}
+
+// The direct MX path takes the same guard: an MX record is the recipient
+// domain owner's word, and a guarded config refuses one that resolves
+// into this network before any byte is exchanged.
+func TestAGuardedDirectDialRefusesAPrivateHost(t *testing.T) {
+	cfg := DirectConfig{GuardPrivate: true, Timeout: time.Second}
+	var blocked *safedial.ErrBlocked
+	if _, err := cfg.dial(context.Background(), "127.0.0.1:25"); !errors.As(err, &blocked) {
+		t.Fatalf("got %v, want ErrBlocked", err)
 	}
 }

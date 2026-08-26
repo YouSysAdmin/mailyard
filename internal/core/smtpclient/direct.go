@@ -12,6 +12,8 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
+
+	"github.com/yousysadmin/mailyard/internal/core/safedial"
 )
 
 // Direct delivery: handing a message to the recipient's own mail
@@ -85,6 +87,14 @@ type DirectConfig struct {
 	// and the hook a future SOCKS or bound-address option needs.
 	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 
+	// GuardPrivate refuses an MX that resolves into loopback, RFC 1918
+	// or other reserved space - see safedial. The MX is whatever the
+	// recipient's domain owner published, so without the guard a
+	// domain with `MX -> 169.254.169.254` steers the sender's own
+	// connection into its network and the peer's banner into the
+	// delivery log. Ignored when DialContext is set.
+	GuardPrivate bool
+
 	// RootCAs overrides the roots used when checking a peer
 	// certificate. Nil uses the host store. Only affects whether the
 	// outcome is recorded as verified - it never refuses a delivery.
@@ -120,7 +130,7 @@ func (c DirectConfig) dial(ctx context.Context, addr string) (net.Conn, error) {
 		return c.DialContext(ctx, c.network(), addr)
 	}
 
-	d := &net.Dialer{Timeout: c.timeout()}
+	d := safedial.Dialer(c.timeout(), !c.GuardPrivate)
 
 	return d.DialContext(ctx, c.network(), addr)
 }
