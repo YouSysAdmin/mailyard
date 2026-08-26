@@ -1,6 +1,7 @@
 package render
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -126,5 +127,34 @@ func TestHTMLToText(t *testing.T) {
 
 	if HTMLToText("") != "" {
 		t.Error("empty input must stay empty")
+	}
+}
+
+// A template's output is bounded, and bounded EARLY: the render below
+// would produce 32 MiB from forty bytes of source, and the point is
+// that it stops at the cap rather than allocating all of it first.
+func TestRenderRefusesUnboundedOutput(t *testing.T) {
+	wide := make([]any, 2000)
+	for i := range wide {
+		wide[i] = i
+	}
+
+	data := map[string]any{"a": wide, "b": wide}
+	r := &Renderer{}
+	for _, in := range []*Input{
+		{Subject: "s", HTML: "{{range .a}}{{range $.b}}12345678{{end}}{{end}}"},
+		{Subject: "s", Text: "{{range .a}}{{range $.b}}12345678{{end}}{{end}}"},
+		{Subject: "{{range .a}}{{range $.b}}12345678{{end}}{{end}}"},
+	} {
+		_, err := r.Render(in, data)
+		if !errors.Is(err, ErrOutputTooLarge) {
+			t.Errorf("got %v, want ErrOutputTooLarge", err)
+		}
+	}
+
+	// And an ordinary render is untouched.
+	out, err := r.Render(&Input{Subject: "hi {{.n}}", HTML: "<p>{{.n}}</p>"}, map[string]any{"n": "x"})
+	if err != nil || out.HTML != "<p>x</p>" {
+		t.Fatalf("plain render: %q %v", out, err)
 	}
 }

@@ -18,6 +18,7 @@ package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	htmltmpl "html/template"
 	"io"
@@ -139,13 +140,47 @@ func escapingTemplate(src string, data map[string]any, onMissing string) (string
 	return execute(t, data)
 }
 
+// MaxOutputBytes bounds what one template may render to. Four times
+// the largest source a template may be, which no honest message
+// approaches.
+//
+// A bound on the SOURCE is not a bound on the OUTPUT: a kilobyte of
+// nested range actions over a few thousand-element arrays expands to
+// gigabytes, and Go's own maxExecDepth stops recursion, not breadth.
+// The buffer grew until the process died, from a request the lowest
+// template role can make - preview renders synchronously and needs no
+// send.
+const MaxOutputBytes = 4 * 1024 * 1024
+
+// ErrOutputTooLarge is the render refusing past MaxOutputBytes.
+var ErrOutputTooLarge = errors.New("rendered output exceeds the 4 MiB limit")
+
+// limitWriter is a bytes.Buffer that refuses to grow past
+// MaxOutputBytes. The template engine returns a writer's error
+// unwrapped, so the caller sees ErrOutputTooLarge itself.
+type limitWriter struct {
+	buf bytes.Buffer
+}
+
+func (w *limitWriter) Write(p []byte) (int, error) {
+	if w.buf.Len()+len(p) > MaxOutputBytes {
+		return 0, ErrOutputTooLarge
+	}
+
+	return w.buf.Write(p)
+}
+
 func execute(t runnable, data map[string]any) (string, error) {
-	var out bytes.Buffer
+	var out limitWriter
 	if err := t.Execute(&out, data); err != nil {
+		if errors.Is(err, ErrOutputTooLarge) {
+			return "", err
+		}
+
 		return "", fmt.Errorf("template execute error: %w", err)
 	}
 
-	return out.String(), nil
+	return out.buf.String(), nil
 }
 
 // InlineCSS folds a stylesheet into the markup as element attributes.
