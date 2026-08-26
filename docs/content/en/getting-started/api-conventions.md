@@ -27,8 +27,9 @@ behind the browser.
 management, the live event stream. An API key is not accepted there, and would have nothing to do with it.
 
 Accepting the cookie on `/api/v1` costs nothing in safety: the session cookie is
-`SameSite=Strict`, so a browser never sends it cross-site. It also means cookie auth works only from Mailyard's own
-origin - a third-party browser application still needs a key.
+`SameSite=Strict`, so a browser never sends it cross-site, and a mutating request carrying it from an origin that is
+not Mailyard's own is refused. It also means cookie auth works only from Mailyard's own origin - a third-party browser
+application still needs a key.
 
 {{< callout type="warning" title="Project is a header, not a path segment" >}}
 There is no `/projects/current/` path prefix. A session addresses the active project through the `X-Mailyard-Project-Id`

@@ -178,7 +178,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// It may grow routes of its own for shapes the public contract
 	// should not promise, like a per-page aggregate.
 	// TestNoRouteExistsOnBothPrefixes stops it becoming a second copy.
-	appAPI := app.Group(env.ConsolePath+"/api", noStoreCache)
+	appAPI := app.Group(env.ConsolePath+"/api", noStoreCache, refuseCrossSite(rt))
 
 	// Auth endpoints - open (login obviously can't require an
 	// existing session - logout / me are cheap enough to not gate).
@@ -319,7 +319,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// means on the console's login routes. One limiter instance, because
 	// the budget is the IP's and not the route's.
 	v1AuthFailures := iplimit.New(rt.Config.RateLimit.LoginPerMinute, time.Minute)
-	v1 := app.Group("/api/v1", noStoreCache, v1Limiter,
+	v1 := app.Group("/api/v1", noStoreCache, v1Limiter, refuseCrossSite(rt),
 		machineAuth(rt, v1AuthFailures), maintenanceMode(rt), auditWrites(rt))
 
 	// The machine surface is gated by the same two tokens as the

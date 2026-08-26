@@ -113,10 +113,12 @@ func stampAPIKey(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 // who calls it. Mounting the product twice would mean every route
 // registered twice and every response described twice.
 //
-// Accepting the cookie is safe by construction: it is SameSite=Strict
-// (buildSessionCookie), so a browser never attaches it cross-site and
-// there is no CSRF to mitigate. It also confines cookie auth to our own
-// origin, so a third-party browser app still needs a token.
+// Accepting the cookie rests on two things: it is SameSite=Strict
+// (buildSessionCookie), so a browser never attaches it CROSS-SITE, and
+// refuseCrossSite on the group refuses a mutation whose Origin is not
+// ours, which is the same-site case Strict does not cover - a sibling
+// subdomain. Together they confine cookie auth to our own origin, so a
+// third-party browser app still needs a token.
 //
 // The branches differ only in tenancy: a key names its project, a
 // session names it by header. Downstream reads rc.Permissions and

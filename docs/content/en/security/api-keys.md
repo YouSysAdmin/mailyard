@@ -285,8 +285,11 @@ key has no business there.
 
 {{< callout type="note" title="Why cookies here are not a CSRF risk" >}}
 The session cookie is `SameSite=Strict`, so a browser never attaches it to a request originating from another site.
-There is nothing to forge. It also means cookie auth works only from Mailyard's own origin - a third-party browser
-application still needs a key, which is the intent.
+Strict is a site boundary, not an origin one - a sibling subdomain is same-site - so a mutating request that carries
+the cookie is also refused (403) when its `Origin` is not Mailyard's own, the host the request arrived on, or one of
+`cors.allowed_origins`. Requests carrying an `Authorization` header are not subject to that check. Together the two
+mean cookie auth works only from Mailyard's own origin - a third-party browser application still needs a key, which
+is the intent.
 {{< /callout >}}
 
 ## Listing Keys

@@ -54,8 +54,11 @@ it is unauthenticated. Nothing in the response says so.
 {{< /callout >}}
 
 `SameSite=Strict` is load-bearing rather than a default: it is what makes accepting this cookie on `/api/v1` safe,
-because a browser never attaches it to a cross-site request. It also means cookie authentication only works from
-Mailyard's own origin, so a third-party browser app needs an [API key](/docs/security/api-keys).
+because a browser never attaches it to a cross-site request. Strict draws a site boundary, not an origin one, so a
+mutating request that carries the cookie from another origin - a sibling subdomain, say - is refused with 403 unless
+that origin is `server.public_url`, the host the request arrived on, or listed in `cors.allowed_origins`. Together the
+two mean cookie authentication only works from Mailyard's own origin, so a third-party browser app needs an
+[API key](/docs/security/api-keys).
 
 ### Safari cannot hold it on a bare IP address
 
