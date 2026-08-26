@@ -839,6 +839,10 @@ type WebhookStore interface {
 	// owner putting it back. Enable reports whether the id existed.
 	Disable(ctx context.Context, projID, id, reason string) error
 	Enable(ctx context.Context, projID, id string) (bool, error)
+
+	// RotateSecret replaces the signing secret and reports whether the
+	// id existed. The only write to the column after Put.
+	RotateSecret(ctx context.Context, projID, id, secret string) (bool, error)
 	RecordDelivery(ctx context.Context, d *webhook.Delivery) error
 	ListDeliveries(ctx context.Context, projID, webhookID string, limit int, cur keyset.Cursor) ([]*webhook.Delivery, error)
 

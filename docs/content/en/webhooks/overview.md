@@ -82,17 +82,26 @@ See [Event Types](/docs/webhooks/event-types) for the fields each event carries.
 
 ## Verifying the signature
 
-Every delivery carries an HMAC-SHA256 over the **raw request body**:
+Every delivery carries a timestamp and an HMAC-SHA256 over the timestamp and the **raw request body**:
 
 ```
+X-Mailyard-Timestamp: 1756230000
 X-Mailyard-Signature: sha256=<hex>
 ```
 
-Note the `sha256=` prefix — it is part of the header value, not a description of it.
+The signed string is `<timestamp> + "." + <body>`. Note the `sha256=` prefix — it is part of the header value, not a
+description of it.
 
 ```go
-func valid(secret string, body []byte, header string) bool {
+func valid(secret string, timestamp string, body []byte, header string) bool {
+    ts, err := strconv.ParseInt(timestamp, 10, 64)
+    if err != nil || time.Since(time.Unix(ts, 0)).Abs() > 5*time.Minute {
+        return false
+    }
+
     mac := hmac.New(sha256.New, []byte(secret))
+    mac.Write([]byte(timestamp))
+    mac.Write([]byte("."))
     mac.Write(body)
     want := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
@@ -100,14 +109,25 @@ func valid(secret string, body []byte, header string) bool {
 }
 ```
 
-Two things that matter more than they look:
+Three things that matter more than they look:
 
+- **Check the timestamp.** It is inside the signed string, so refusing one older than a few minutes refuses a replayed
+  delivery with it. Five minutes leaves room for clock drift; Mailyard's retries send a fresh timestamp each time.
 - **Compare in constant time.** `hmac.Equal`, or your language's equivalent — a plain `==` returns as soon as two bytes
   differ, which leaks how much of a forged signature was right.
 - **Sign the bytes you received**, before any JSON parsing and re-encoding. Round-tripping through a decoder reorders
   keys and changes whitespace, and the signature will not match.
 
 Reject anything that fails. A request without a valid signature is not from Mailyard.
+
+### Rotating the secret
+
+```
+POST /api/v1/webhooks/{id}/rotate-secret
+```
+
+Returns the webhook with a fresh `secret`, shown once like the original. Deliveries are signed with the new secret from
+the next one on, so have the receiver verify against both for the length of the changeover, then drop the old one.
 
 ## Retries
 
@@ -125,8 +145,8 @@ GET    /api/v1/webhooks
 DELETE /api/v1/webhooks/{id}
 ```
 
-There is no update route. Change a URL or an event list by creating a new webhook and deleting the old one, which also
-gives you a new secret rather than leaving the old one valid for an endpoint that has moved.
+There is no update route. Change a URL or an event list by creating a new webhook and deleting the old one, so the
+secret does not stay valid for an endpoint that has moved. A secret on its own is rotated in place - see above.
 
 {{< callout type="warning" title="Private network targets are refused" >}}
 By default a webhook URL cannot resolve to loopback, RFC 1918, or other reserved address space. URLs are chosen by

@@ -947,6 +947,10 @@ class API:
         "Re-enable a disabled webhook Needs webhooks:write."
         return self._t.request("POST", f"/webhooks/{_esc(id)}/enable", body=None, query=query)
 
+    def rotate_secret_webhook(self, id, **query: Any) -> Any:
+        "Rotate a webhook's signing secret Needs webhooks:write."
+        return self._t.request("POST", f"/webhooks/{_esc(id)}/rotate-secret", body=None, query=query)
+
     def bounce_webhook(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
         "Ingest a bounce report Needs bounces:write."
         return self._t.request("POST", "/webhooks/bounce", body=body, query=query)

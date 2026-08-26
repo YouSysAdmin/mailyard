@@ -1646,6 +1646,13 @@ func (c *Client) EnableWebhook(ctx context.Context, id string, opts ...RequestOp
 	return do[EnableResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/enable", escape(id)), nil, opts)
 }
 
+// RotateSecretWebhook Rotate a webhook's signing secret.
+//
+// POST /webhooks/:id/rotate-secret
+func (c *Client) RotateSecretWebhook(ctx context.Context, id string, opts ...RequestOption) (WebhookCreateResponse, error) {
+	return do[WebhookCreateResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/rotate-secret", escape(id)), nil, opts)
+}
+
 // BounceWebhook Ingest a bounce report.
 //
 // POST /webhooks/bounce

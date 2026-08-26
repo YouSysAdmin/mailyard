@@ -22,12 +22,27 @@ func APIDocs() []apidoc.Route {
 			Permission: "webhooks:write",
 			Summary:    "Create an outgoing webhook",
 			Description: "The response carries the signing secret, which appears there and " +
-				"nowhere else - only its hash is stored. Deliveries are signed with it, " +
-				"so a receiver can tell our POST from anyone else's.",
+				"on a rotation, nowhere else. Deliveries are signed with it, so a receiver " +
+				"can tell our POST from anyone else's.",
 			Request: createInput{},
 			Responses: []apidoc.Response{
 				apidoc.Created("The webhook, with its secret.", CreateResponse{}),
 				apidoc.BadRequest,
+			},
+		},
+		{
+			Method:     "POST",
+			Path:       "/webhooks/:id/rotate-secret",
+			Tag:        "webhooks",
+			Permission: "webhooks:write",
+			Summary:    "Rotate a webhook's signing secret",
+			Description: "Mints a fresh secret and returns it once, the way creating the webhook did. " +
+				"Deliveries are signed with the new secret from the next one on, so a receiver " +
+				"verifies against both old and new for the length of the changeover.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Responses: []apidoc.Response{
+				apidoc.OK("The webhook, with its new secret.", CreateResponse{}),
+				apidoc.NotFound,
 			},
 		},
 		{

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -237,10 +238,12 @@ func (d *Dispatcher) post(ctx context.Context, h *whmodel.Webhook, event string,
 		return 0, err
 	}
 
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mailyard-Webhook/1.0")
 	req.Header.Set("X-Mailyard-Event", event)
-	req.Header.Set("X-Mailyard-Signature", Signature(h.Secret, body))
+	req.Header.Set(HeaderTimestamp, timestamp)
+	req.Header.Set(HeaderSignature, Signature(h.Secret, timestamp, body))
 	resp, err := d.client.Do(req)
 	if err != nil {
 		return 0, err
@@ -251,9 +254,23 @@ func (d *Dispatcher) post(ctx context.Context, h *whmodel.Webhook, event string,
 	return resp.StatusCode, nil
 }
 
-// Signature computes the header value: sha256=hex(hmac(secret, body)).
-func Signature(secret string, body []byte) string {
+// Headers a delivery carries for the receiver to verify it with.
+const (
+	// HeaderSignature is sha256=hex(hmac(secret, timestamp + "." + body)).
+	HeaderSignature = "X-Mailyard-Signature"
+
+	// HeaderTimestamp is the unix time the delivery was signed at, in
+	// seconds. It is inside the signed string, so a receiver that
+	// refuses a stale timestamp refuses a replayed delivery with it -
+	// the body alone would verify forever.
+	HeaderTimestamp = "X-Mailyard-Timestamp"
+)
+
+// Signature computes the signature header for one delivery.
+func Signature(secret, timestamp string, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp))
+	mac.Write([]byte("."))
 	mac.Write(body)
 
 	return "sha256=" + hex.EncodeToString(mac.Sum(nil))

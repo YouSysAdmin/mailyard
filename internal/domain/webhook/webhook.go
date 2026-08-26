@@ -156,6 +156,25 @@ func (s *Store) Enable(ctx context.Context, projID, id string) (bool, error) {
 	return n > 0, err
 }
 
+// RotateSecret replaces the signing secret of one webhook within
+// projID, reporting whether the id existed. The plaintext is the
+// caller's to return once - the column holds it sealed.
+func (s *Store) RotateSecret(ctx context.Context, projID, id, secret string) (bool, error) {
+	stored, err := s.crypto.Encrypt(secret)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := s.Exec(ctx, `UPDATE webhooks SET secret = ? WHERE project_id = ? AND id = ?`, stored, projID, id)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
 // Delete removes one webhook from projID.
 func (s *Store) Delete(ctx context.Context, projID, id string) error {
 	_, err := s.Exec(ctx, `DELETE FROM webhooks WHERE project_id = ? AND id = ?`, projID, id)
@@ -318,12 +337,11 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		}
 	}
 
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
+	secret, err := newSecret()
+	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	secret := hex.EncodeToString(raw)
 	createdBy := ""
 	if rc.User != nil {
 		createdBy = rc.User.ID
@@ -347,6 +365,50 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	}
 
 	return response.Created(c, CreateResponse{Webhook: hook, Secret: secret})
+}
+
+// newSecret mints a signing secret: 256 bits, hex.
+func newSecret() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(raw), nil
+}
+
+// RotateSecret serves POST /api/v1/webhooks/:id/rotate-secret: a fresh
+// signing secret, returned once like the one Create returned. The old
+// secret stops verifying at once - a receiver switches by verifying
+// against both for the length of the changeover.
+func (h *Handler) RotateSecret(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if hook == nil {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	secret, err := newSecret()
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	ok, err := h.Runtime.Store.Webhook.RotateSecret(c.Context(), rc.Project.ID, hook.ID, secret)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !ok {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	hook.Secret = secret
+
+	return response.Success(c, CreateResponse{Webhook: hook, Secret: secret})
 }
 
 // Delete serves DELETE /api/v1/webhooks/:id.

@@ -711,6 +711,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	hooks.Post("/", permWrite, whh.Create)
 	hooks.Delete("/:id", permDelete, whh.Delete)
 	hooks.Post("/:id/enable", permWrite, whh.Enable)
+	hooks.Post("/:id/rotate-secret", permWrite, whh.RotateSecret)
 	hooks.Get("/:id/deliveries", permRead, whh.Deliveries)
 
 	// Data portability and erasure. Export is any member's read of

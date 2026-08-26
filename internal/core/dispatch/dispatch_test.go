@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -56,10 +57,11 @@ func testDispatcher(sink Sink) *Dispatcher {
 
 func TestEmitSignsAndDelivers(t *testing.T) {
 	var gotBody []byte
-	var gotSig, gotEvent string
+	var gotSig, gotTS, gotEvent string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotBody, _ = io.ReadAll(r.Body)
-		gotSig = r.Header.Get("X-Mailyard-Signature")
+		gotSig = r.Header.Get(HeaderSignature)
+		gotTS = r.Header.Get(HeaderTimestamp)
 		gotEvent = r.Header.Get("X-Mailyard-Event")
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -77,8 +79,19 @@ func TestEmitSignsAndDelivers(t *testing.T) {
 		t.Errorf("event header = %q", gotEvent)
 	}
 
-	if !hmac.Equal([]byte(gotSig), []byte(Signature("topsecret", gotBody))) {
+	// The timestamp is inside the signed string, so the signature
+	// only verifies with the one that was sent.
+	ts, err := strconv.ParseInt(gotTS, 10, 64)
+	if err != nil || time.Since(time.Unix(ts, 0)) > time.Minute {
+		t.Errorf("timestamp header %q is not a recent unix time", gotTS)
+	}
+
+	if !hmac.Equal([]byte(gotSig), []byte(Signature("topsecret", gotTS, gotBody))) {
 		t.Errorf("signature mismatch: %q", gotSig)
+	}
+
+	if hmac.Equal([]byte(gotSig), []byte(Signature("topsecret", "0", gotBody))) {
+		t.Error("the signature verifies under another timestamp, so a replay cannot be aged out")
 	}
 
 	sink.mu.Lock()

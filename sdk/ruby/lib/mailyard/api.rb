@@ -1176,6 +1176,11 @@ module Mailyard
       @t.request("POST", "/webhooks/#{esc(id)}/enable", body: nil, query: query)
     end
 
+    # Rotate a webhook's signing secret Needs webhooks:write.
+    def rotate_secret_webhook(id, **query)
+      @t.request("POST", "/webhooks/#{esc(id)}/rotate-secret", body: nil, query: query)
+    end
+
     # Ingest a bounce report Needs bounces:write.
     def bounce_webhook(body: nil, **query)
       @t.request("POST", "/webhooks/bounce", body: body, query: query)
