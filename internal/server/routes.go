@@ -252,6 +252,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	appAPI.Post("/auth/2fa/setup", requireAuth(rt), maintenanceMode(rt), ah.TOTPSetup)
 	appAPI.Post("/auth/2fa/enable", requireAuth(rt), maintenanceMode(rt), ah.TOTPEnable)
 	appAPI.Post("/auth/2fa/disable", requireAuth(rt), maintenanceMode(rt), ah.TOTPDisable)
+	appAPI.Get("/auth/2fa/recovery-codes", requireAuth(rt), ah.RecoveryCodesStatus)
+	appAPI.Post("/auth/2fa/recovery-codes", requireAuth(rt), maintenanceMode(rt), ah.RecoveryCodesRegenerate)
 
 	// SSO start + callback are open by definition (the user has no
 	// session yet) and always registered: providers live in the

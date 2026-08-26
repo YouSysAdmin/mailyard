@@ -211,18 +211,16 @@ function ssoLogin(p: LoginProvider) {
           required
         />
       </FormField>
-      <FormField v-if="requires2fa" label="Authenticator code" for="totp">
+      <FormField v-if="requires2fa" label="Authenticator or recovery code" for="totp">
         <input
           id="totp"
           ref="totpInput"
           v-model="totpCode"
           type="text"
           class="form-input"
-          inputmode="numeric"
-          pattern="[0-9]*"
-          maxlength="6"
+          maxlength="12"
           autocomplete="one-time-code"
-          placeholder="123456"
+          placeholder="123456 or xxxxx-xxxxx"
           required
         />
       </FormField>

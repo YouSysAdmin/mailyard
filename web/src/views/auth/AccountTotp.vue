@@ -5,7 +5,7 @@
 // the server hands out a secret that is NOT yet active, and only a code
 // proving the app holds it turns it on. So an abandoned setup leaves
 // the account exactly as it was.
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { authApi } from '../../api/auth'
 import { apiErrorMessage } from '../../api/client'
@@ -14,6 +14,7 @@ import { useNotificationStore } from '../../stores/notification'
 import { useConfirm } from '../../composables/useConfirm'
 import FormField from '../../components/FormField.vue'
 import CopyButton from '../../components/CopyButton.vue'
+import RecoveryCodes from './RecoveryCodes.vue'
 
 const auth = useAuthStore()
 const notify = useNotificationStore()
@@ -26,6 +27,53 @@ const on = computed(() => auth.user?.totp_enabled === true)
 const pending = ref<{ secret: string; qr: string } | null>(null)
 const code = ref('')
 const busy = ref(false)
+
+// Recovery codes: the count of unspent ones while the factor is on, a
+// fresh set shown once after enabling or regenerating, and the
+// password prompt regeneration is gated on.
+const remaining = ref<number | null>(null)
+const shownCodes = ref<string[] | null>(null)
+const regenerating = ref(false)
+const password = ref('')
+
+async function loadRemaining() {
+  if (!on.value) {
+    remaining.value = null
+    return
+  }
+
+  try {
+    const res = await authApi.recoveryCodesStatus()
+    remaining.value = res.data.remaining
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Could not read the recovery codes'))
+  }
+}
+
+async function regenerate() {
+  if (!password.value) return
+
+  busy.value = true
+  try {
+    const res = await authApi.recoveryCodesRegenerate(password.value)
+    password.value = ''
+    regenerating.value = false
+    shownCodes.value = res.data.codes
+    await loadRemaining()
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Could not generate new codes'))
+  } finally {
+    busy.value = false
+  }
+}
+
+function cancelRegenerate() {
+  regenerating.value = false
+  password.value = ''
+}
+
+onMounted(loadRemaining)
+watch(on, loadRemaining)
 
 /** Re-read the profile, since totp_enabled is what this page renders. */
 async function refresh() {
@@ -56,10 +104,13 @@ async function enable() {
 
   busy.value = true
   try {
-    await authApi.totpEnable(code.value)
+    const res = await authApi.totpEnable(code.value)
     pending.value = null
     code.value = ''
     notify.success('Two-factor authentication is on')
+    // Shown once, here. The dialog is persistent because there is no
+    // second chance to read them.
+    shownCodes.value = res.data.recovery_codes ?? null
     await refresh()
   } catch (e) {
     notify.error(apiErrorMessage(e, 'That code was not accepted'))
@@ -114,6 +165,46 @@ function cancel() {
           Signing in asks for a code from your authenticator app. To turn that off, enter a current
           code.
         </p>
+
+        <div class="recovery">
+          <p class="note">
+            Recovery codes sign you in when the authenticator is gone.
+            <template v-if="remaining !== null">
+              <strong>{{ remaining }}</strong> of 10 left.
+            </template>
+          </p>
+          <button
+            v-if="!regenerating"
+            class="btn btn-secondary btn-sm"
+            :disabled="busy"
+            @click="regenerating = true"
+          >
+            Generate new codes
+          </button>
+          <form v-else class="code-row" @submit.prevent="regenerate">
+            <FormField label="Your password" for="recovery-password">
+              <input
+                id="recovery-password"
+                v-model="password"
+                type="password"
+                class="form-input"
+                autocomplete="current-password"
+                required
+              />
+            </FormField>
+            <button class="btn btn-primary" type="submit" :disabled="busy || !password">
+              {{ busy ? 'Generating...' : 'Generate' }}
+            </button>
+            <button
+              class="btn btn-secondary"
+              type="button"
+              :disabled="busy"
+              @click="cancelRegenerate"
+            >
+              Cancel
+            </button>
+          </form>
+        </div>
 
         <form class="code-row" @submit.prevent="disable">
           <FormField label="Code from your app" for="totp-off">
@@ -181,6 +272,8 @@ function cancel() {
         <button class="btn btn-secondary btn-sm" :disabled="busy" @click="cancel">Cancel</button>
       </template>
     </div>
+
+    <RecoveryCodes v-if="shownCodes" :codes="shownCodes" @close="shownCodes = null" />
   </div>
 </template>
 
@@ -224,6 +317,14 @@ function cancel() {
   color: var(--text-primary);
   font-size: 12px;
   word-break: break-all;
+}
+
+/* The recovery block sits above the turn-off form with room between
+   them: two forms stacked tight read as one. */
+.recovery {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 /* The field and its button on one line, aligned on their bottoms so the

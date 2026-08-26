@@ -261,6 +261,10 @@ func (h *Handler) ResetTOTP(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	if err := h.Runtime.Store.User.DeleteRecoveryCodes(c.Context(), u.ID); err != nil {
+		return response.Internal(c, err)
+	}
+
 	rc := domain.GetRequestContext(c)
 	ev := &amodel.Event{
 		Type:   amodel.TypeTOTPReset,

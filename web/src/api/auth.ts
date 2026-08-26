@@ -66,8 +66,15 @@ export const authApi = {
       current_password: currentPassword,
       password,
     }),
+  // Enable answers with the recovery codes, the only time they are readable.
   totpEnable: (code: string) =>
-    appApi.post<{ totp_enabled: boolean }>('/auth/2fa/enable', { code }),
+    appApi.post<{ totp_enabled: boolean; recovery_codes?: string[] }>('/auth/2fa/enable', {
+      code,
+    }),
+  recoveryCodesStatus: () => appApi.get<{ remaining: number }>('/auth/2fa/recovery-codes'),
+  // A fresh set voids the old one. Gated on the password, not a code.
+  recoveryCodesRegenerate: (password: string) =>
+    appApi.post<{ codes: string[] }>('/auth/2fa/recovery-codes', { password }),
   totpDisable: (code: string) =>
     appApi.post<{ totp_enabled: boolean }>('/auth/2fa/disable', { code }),
   // Passkeys. The begin calls return the raw WebAuthn options and the

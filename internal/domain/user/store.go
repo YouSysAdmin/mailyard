@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/database"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
 )
@@ -264,6 +266,70 @@ func (s *Store) RecordTOTPFailure(ctx context.Context, userID string, limit int,
 // ClearTOTPFailures forgets the count and the lock after a right code.
 func (s *Store) ClearTOTPFailures(ctx context.Context, userID string) error {
 	_, err := s.Exec(ctx, `UPDATE users SET totp_failures = 0, totp_locked_until = NULL WHERE id = ?`, userID)
+
+	return err
+}
+
+// ReplaceRecoveryCodes stores a fresh set, dropping whatever the account
+// had. One transaction: a failure half way must not leave the owner
+// with some of the old set and some of the new.
+func (s *Store) ReplaceRecoveryCodes(ctx context.Context, userID string, hashes []string) error {
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if rerr := tx.Rollback(); rerr != nil && !errors.Is(rerr, sql.ErrTxDone) {
+			slog.Warn("store: rollback failed", "err", rerr)
+		}
+	}()
+	if _, err := tx.ExecContext(ctx, s.Q(`DELETE FROM user_recovery_codes WHERE user_id = ?`), userID); err != nil {
+		return err
+	}
+
+	for _, h := range hashes {
+		if _, err := tx.ExecContext(ctx, s.Q(`
+            INSERT INTO user_recovery_codes (id, user_id, code_hash) VALUES (?, ?, ?)
+        `), ids.New(), userID, h); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// ClaimRecoveryCode spends the code whose hash matches, once.
+func (s *Store) ClaimRecoveryCode(ctx context.Context, userID, hash string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE user_recovery_codes SET used_at = now()
+        WHERE user_id = ? AND code_hash = ? AND used_at IS NULL
+    `, userID, hash)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return n > 0, nil
+}
+
+// RemainingRecoveryCodes counts the unspent codes.
+func (s *Store) RemainingRecoveryCodes(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.QueryRow(ctx, `
+        SELECT count(*) FROM user_recovery_codes WHERE user_id = ? AND used_at IS NULL
+    `, userID).Scan(&n)
+
+	return n, err
+}
+
+// DeleteRecoveryCodes removes every code the account has.
+func (s *Store) DeleteRecoveryCodes(ctx context.Context, userID string) error {
+	_, err := s.Exec(ctx, `DELETE FROM user_recovery_codes WHERE user_id = ?`, userID)
 
 	return err
 }

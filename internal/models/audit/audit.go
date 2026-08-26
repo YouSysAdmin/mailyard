@@ -64,6 +64,14 @@ const (
 	// reason 2FA reset is: the trail must show which one happened.
 	TypePasskeyReset = "auth.passkey.reset"
 
+	// TypeTOTPRecoveryUsed is a sign-in that spent a recovery code in
+	// place of the authenticator. Mailed, because it is either the owner
+	// who lost their phone or somebody holding a copy of the codes.
+	// TypeTOTPRecoveryRegenerated is a fresh set being minted, which
+	// voids the old one.
+	TypeTOTPRecoveryUsed        = "auth.2fa.recovery_used"
+	TypeTOTPRecoveryRegenerated = "auth.2fa.recovery_regenerated"
+
 	// TypeWebhookDisabled is the dispatcher giving up on an endpoint
 	// after every attempt at a delivery failed. Recorded explicitly,
 	// like the security events, because no request produces it.

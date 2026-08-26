@@ -318,6 +318,18 @@ type UserStore interface {
 	RecordTOTPFailure(ctx context.Context, userID string, limit int, lock time.Duration) (bool, error)
 	ClearTOTPFailures(ctx context.Context, userID string) error
 
+	// Recovery codes stand in for the authenticator at sign-in. Replace
+	// drops every code the account had and stores the new set of
+	// hashes. Claim spends one, reporting false when no unspent code
+	// matches - a conditional UPDATE, so two nodes cannot both honour
+	// it. Remaining counts the unspent ones. DeleteRecoveryCodes goes
+	// with the second factor: a code with no factor to recover is a
+	// password bypass.
+	ReplaceRecoveryCodes(ctx context.Context, userID string, hashes []string) error
+	ClaimRecoveryCode(ctx context.Context, userID, hash string) (bool, error)
+	RemainingRecoveryCodes(ctx context.Context, userID string) (int, error)
+	DeleteRecoveryCodes(ctx context.Context, userID string) error
+
 	// MarkEmailVerified flips the signup verification flag in place,
 	// so the confirm handler cannot lose a concurrent Put.
 	MarkEmailVerified(ctx context.Context, userID string) error

@@ -94,7 +94,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 			})
 		}
 
-		if !h.consumeTOTP(c.Context(), u.ID, u.TOTPSecret, in.TOTPCode) {
+		if !h.consumeSecondFactor(c, u, in.TOTPCode) {
 			h.recordLoginFailure(c, u, in.Email, "wrong two-factor code")
 
 			return response.Unauthorized(c, "invalid credentials")

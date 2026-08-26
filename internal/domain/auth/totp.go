@@ -133,6 +133,13 @@ func (h *Handler) TOTPEnable(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	// The way back in when the phone is gone, minted with the factor
+	// and shown exactly once, here.
+	codes, err := h.issueRecoveryCodes(c.Context(), u.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
 	slog.Info("auth: totp enabled", "user_id", u.ID)
 	// Recorded here, explicitly, like every other security event: the
 	// middleware only sees the request, and what matters is that this
@@ -146,7 +153,7 @@ func (h *Handler) TOTPEnable(c fiber.Ctx) error {
 		Type: amodel.TypeTOTPEnabled, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusOK,
 	})
 
-	return response.Success(c, TOTPStateResponse{TOTPEnabled: true})
+	return response.Success(c, TOTPStateResponse{TOTPEnabled: true, RecoveryCodes: codes})
 }
 
 // TOTPDisable turns 2FA off, gated on a currently valid code so a
@@ -186,6 +193,12 @@ func (h *Handler) TOTPDisable(c fiber.Ctx) error {
 	u.TOTPEnabled = false
 	u.TOTPSecret = ""
 	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, "", false); err != nil {
+		return response.Internal(c, err)
+	}
+
+	// The codes go with the factor: one left behind is a password
+	// bypass with nothing to recover.
+	if err := h.Runtime.Store.User.DeleteRecoveryCodes(c.Context(), u.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -258,38 +271,64 @@ func (h *Handler) verifyTOTP(encSecret, code string) (step uint64, ok bool) {
 // than verifyTOTP directly - a validated-but-unclaimed code is
 // exactly the replay this exists to stop.
 func (h *Handler) consumeTOTP(ctx context.Context, userID, encSecret, code string) bool {
-	// Locked is refused BEFORE the code is looked at, so a right guess
-	// during the lockout learns nothing. Same answer as a wrong code:
-	// the caller already holds the password, and telling them the
-	// factor is locked tells them their guesses are being counted.
-	until, err := h.Runtime.Store.User.TOTPLockedUntil(ctx, userID)
-	if err != nil {
-		slog.Error("auth: totp lock read failed", "user_id", userID, "err", err)
-
-		return false
-	}
-
-	if until != nil && time.Now().Before(*until) {
-		slog.Warn("auth: totp refused, factor is locked", "user_id", userID, "until", until)
-
+	if h.factorLocked(ctx, userID) {
 		return false
 	}
 
 	step, ok := h.verifyTOTP(encSecret, code)
 	if !ok {
-		locked, rerr := h.Runtime.Store.User.RecordTOTPFailure(ctx, userID, totpMaxFailures, totpLockout)
-		if rerr != nil {
-			slog.Error("auth: totp failure count failed", "user_id", userID, "err", rerr)
-		}
-
-		if locked {
-			slog.Warn("auth: totp locked after repeated wrong codes",
-				"user_id", userID, "failures", totpMaxFailures, "for", totpLockout)
-		}
+		h.recordFactorFailure(ctx, userID)
 
 		return false
 	}
 
+	return h.claimStep(ctx, userID, step)
+}
+
+// factorLocked reports whether the second factor is in a lockout.
+// Locked is refused BEFORE the code is looked at, so a right guess
+// during the lockout learns nothing. Same answer as a wrong code: the
+// caller already holds the password, and telling them the factor is
+// locked tells them their guesses are being counted.
+func (h *Handler) factorLocked(ctx context.Context, userID string) bool {
+	until, err := h.Runtime.Store.User.TOTPLockedUntil(ctx, userID)
+	if err != nil {
+		slog.Error("auth: totp lock read failed", "user_id", userID, "err", err)
+
+		return true
+	}
+
+	if until != nil && time.Now().Before(*until) {
+		slog.Warn("auth: totp refused, factor is locked", "user_id", userID, "until", until)
+
+		return true
+	}
+
+	return false
+}
+
+// recordFactorFailure counts one wrong code, authenticator or recovery.
+func (h *Handler) recordFactorFailure(ctx context.Context, userID string) {
+	locked, err := h.Runtime.Store.User.RecordTOTPFailure(ctx, userID, totpMaxFailures, totpLockout)
+	if err != nil {
+		slog.Error("auth: totp failure count failed", "user_id", userID, "err", err)
+	}
+
+	if locked {
+		slog.Warn("auth: totp locked after repeated wrong codes",
+			"user_id", userID, "failures", totpMaxFailures, "for", totpLockout)
+	}
+}
+
+// clearFactorFailures forgets the count after a right code.
+func (h *Handler) clearFactorFailures(ctx context.Context, userID string) {
+	if err := h.Runtime.Store.User.ClearTOTPFailures(ctx, userID); err != nil {
+		slog.Error("auth: totp failure reset failed", "user_id", userID, "err", err)
+	}
+}
+
+// claimStep burns a verified step and, on success, the failure count.
+func (h *Handler) claimStep(ctx context.Context, userID string, step uint64) bool {
 	claimed, err := h.Runtime.Store.User.ClaimTOTPStep(ctx, userID, step)
 	if err != nil {
 		slog.Error("auth: totp step claim failed", "user_id", userID, "err", err)
@@ -303,9 +342,7 @@ func (h *Handler) consumeTOTP(ctx context.Context, userID, encSecret, code strin
 		return false
 	}
 
-	if err := h.Runtime.Store.User.ClearTOTPFailures(ctx, userID); err != nil {
-		slog.Error("auth: totp failure reset failed", "user_id", userID, "err", err)
-	}
+	h.clearFactorFailures(ctx, userID)
 
 	return true
 }

@@ -144,15 +144,16 @@ func securityEventTypes(t *testing.T) map[string]bool {
 	// in the source would find nothing: the handlers reference the
 	// constants, which is the point of them existing.
 	byValue := map[string]string{
-		amodel.TypePasswordChanged: "TypePasswordChanged",
-		amodel.TypePasswordResetOK: "TypePasswordResetOK",
-		amodel.TypeTOTPEnabled:     "TypeTOTPEnabled",
-		amodel.TypeTOTPDisabled:    "TypeTOTPDisabled",
-		amodel.TypeTOTPReset:       "TypeTOTPReset",
-		amodel.TypePasskeyAdded:    "TypePasskeyAdded",
-		amodel.TypePasskeyRemoved:  "TypePasskeyRemoved",
-		amodel.TypePasskeyReset:    "TypePasskeyReset",
-		amodel.TypeWebhookDisabled: "TypeWebhookDisabled",
+		amodel.TypePasswordChanged:  "TypePasswordChanged",
+		amodel.TypePasswordResetOK:  "TypePasswordResetOK",
+		amodel.TypeTOTPEnabled:      "TypeTOTPEnabled",
+		amodel.TypeTOTPDisabled:     "TypeTOTPDisabled",
+		amodel.TypeTOTPReset:        "TypeTOTPReset",
+		amodel.TypeTOTPRecoveryUsed: "TypeTOTPRecoveryUsed",
+		amodel.TypePasskeyAdded:     "TypePasskeyAdded",
+		amodel.TypePasskeyRemoved:   "TypePasskeyRemoved",
+		amodel.TypePasskeyReset:     "TypePasskeyReset",
+		amodel.TypeWebhookDisabled:  "TypeWebhookDisabled",
 	}
 	out := map[string]bool{}
 	for value, name := range byValue {

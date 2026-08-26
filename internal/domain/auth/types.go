@@ -31,8 +31,9 @@ type loginInput struct {
 	Email    string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
 	Password string `json:"password" validate:"required,min=1,max=256" normalize:"trim"`
 
-	// TOTPCode is required only for accounts with 2FA enabled.
-	TOTPCode string `json:"totp_code" validate:"omitempty,len=6,numeric" normalize:"trim"`
+	// TOTPCode is required only for accounts with 2FA enabled: six
+	// digits from the authenticator, or a recovery code (xxxxx-xxxxx).
+	TOTPCode string `json:"totp_code" validate:"omitempty,min=6,max=12" normalize:"trim"`
 }
 
 // registerInput is the public signup form. Same normalization rules
@@ -227,8 +228,21 @@ type TOTPSetupResponse struct {
 }
 
 // TOTPStateResponse reports whether the second factor is now on.
+// RecoveryCodes is set ONLY by enable, and this is the one time they
+// are readable - the store keeps hashes.
 type TOTPStateResponse struct {
-	TOTPEnabled bool `json:"totp_enabled"`
+	TOTPEnabled   bool     `json:"totp_enabled"`
+	RecoveryCodes []string `json:"recovery_codes,omitempty"`
+}
+
+// RecoveryCodesResponse is a fresh set, shown once.
+type RecoveryCodesResponse struct {
+	Codes []string `json:"codes"`
+}
+
+// RecoveryCodesStatusResponse counts the unspent codes.
+type RecoveryCodesStatusResponse struct {
+	Remaining int `json:"remaining"`
 }
 
 // PasskeyChallengeResponse is what the two WebAuthn *begin* legs answer:
