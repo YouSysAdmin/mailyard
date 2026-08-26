@@ -16,14 +16,13 @@ import (
 // refuseCrossSite refuses a mutating request that rides on the session
 // cookie from an origin that is not ours.
 //
-// SameSite=Strict was the whole CSRF story, and it is a SITE boundary,
-// not an ORIGIN one: a page on blog.example.com is same-site to
-// mail.example.com, so the browser attaches the cookie to a form it
-// posts here. Nothing checked the origin after that, and the decoder
-// does not look at Content-Type, so a text/plain form was a valid JSON
-// body for POST /api/v1/api-keys - minting a credential - or DELETE
-// /api/v1/projects/:id. A compromised sibling host, or a hosting
-// arrangement that shares the registrable domain, was enough.
+// SameSite=Strict alone is a SITE boundary, not an ORIGIN one: a page
+// on blog.example.com is same-site to mail.example.com, so the browser
+// attaches the cookie to a form it posts here. The decoder does not
+// look at Content-Type, so without an origin check a text/plain form
+// is a valid JSON body for POST /api/v1/api-keys - minting a credential
+// - or DELETE /api/v1/projects/:id. A compromised sibling host, or a
+// hosting arrangement that shares the registrable domain, is enough.
 //
 // What it checks is the browser's own word. A browser sends Origin on
 // every cross-origin POST, form or fetch, and Sec-Fetch-Site on every

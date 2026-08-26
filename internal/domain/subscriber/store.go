@@ -134,7 +134,7 @@ const (
 
 	// Same rule as every other search here - see contact.List. LOWER
 	// on the column, since the term is lowercased: without it a
-	// subscriber stored as Ann@Example.com never matched "ann".
+	// subscriber stored as Ann@Example.com never matches "ann".
 	subscriberByEmail = ` AND LOWER(email) LIKE ? ESCAPE '\'`
 )
 

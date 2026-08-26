@@ -327,10 +327,8 @@ func (h *Handler) Info(c fiber.Ctx) error {
 	}
 
 	// Identity providers are read from the database, memoized for
-	// infoMemo. It was every call, on the grounds that this is one small
-	// query - but it is one small query on an OPEN endpoint, and a flood
-	// of it turned into pool pressure the signed-in requests queued
-	// behind.
+	// infoMemo: one small query, but on an OPEN endpoint, where a flood
+	// of it is pool pressure the signed-in requests queue behind.
 	//
 	// Only name, slug, and type are exposed. The list is public by
 	// necessity - the login page needs it before anyone has signed in -

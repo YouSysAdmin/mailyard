@@ -186,8 +186,8 @@ func (m *Message) Build() []byte {
 	// RFC 2369 / 8058 List-Unsubscribe. Mailto first, then the https
 	// URL. The one-click POST header applies to the https target only.
 	// Through headerSafe like every other header here: these two are
-	// caller-supplied strings, and the one path that reached Build
-	// without normalizeUnsubscribeLinks was the sandbox.
+	// caller-supplied strings, and not every path to Build runs
+	// normalizeUnsubscribeLinks first.
 	var luParts []string
 	if m.ListUnsubscribeMailto != "" {
 		luParts = append(luParts, "<"+headerSafe(m.ListUnsubscribeMailto)+">")

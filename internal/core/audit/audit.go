@@ -269,7 +269,7 @@ func (r *Recorder) Close(timeout time.Duration) {
 // already answers with a fresh string, so the header needs the clone -
 // and so does Path, which the route middleware fills from c.Path():
 // Fiber hands that out as an unsafe view of the pooled context's path
-// buffer, and it was the one field left pointing into it.
+// buffer.
 //
 // Neither field identifies anybody. The address is where the request
 // reached us: an iCloud Private Relay user arrives from a Cloudflare,
@@ -295,9 +295,8 @@ func Stamp(e *amodel.Event, c fiber.Ctx) {
 	const maxUserAgent = 400
 	e.UserAgent = safetext.Clamp(strings.Clone(c.Get(fiber.HeaderUserAgent)), maxUserAgent)
 
-	// Whatever the caller put there is cloned here rather than at the
-	// caller, so a second producer of events cannot forget it the way
-	// the first one did. Clone of an already-owned string is a copy of
-	// a short path, which is nothing.
+	// Cloned here rather than at the caller, so no producer of events
+	// can skip it. A clone of an already-owned string is a copy of a
+	// short path, which is nothing.
 	e.Path = strings.Clone(e.Path)
 }

@@ -62,10 +62,9 @@ func TestAStampedEventOutlivesItsRequest(t *testing.T) {
 	}
 }
 
-// TestAStampedPathOutlivesItsRequest is the same failure one field over.
-// The route middleware fills Path from c.Path(), which Fiber answers as
-// an unsafe view of the pooled context's path buffer, and it was left
-// pointing there after the user agent was fixed.
+// TestAStampedPathOutlivesItsRequest is the same property one field
+// over. The route middleware fills Path from c.Path(), which Fiber
+// answers as an unsafe view of the pooled context's path buffer.
 func TestAStampedPathOutlivesItsRequest(t *testing.T) {
 	paths := []string{
 		"/api/v1/templates/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

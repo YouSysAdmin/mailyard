@@ -60,7 +60,7 @@ func TestRecoveryCodesAreDistinctAndForgivinglyHashed(t *testing.T) {
 }
 
 // Every symbol gets exactly the same share of the byte space, which is
-// what the rejection sampler is for - the modulo it replaced gave the
+// what the rejection sampler is for - a plain modulo would give the
 // first eight letters an extra chance each.
 func TestRecoverySymbolsAreUnbiased(t *testing.T) {
 	counts := map[byte]int{}

@@ -31,14 +31,12 @@ const (
 // chars = 32 bytes) so existing string-secret APIs stay unchanged.
 // Deterministic: same secret + label always yields the same key.
 //
-// EMPTY IN, EMPTY OUT, the convention crypto.New already follows.
-// HKDF over an empty secret is a perfectly good-looking 64-character
-// key that anyone can compute from the label alone, and every
-// consumer decides "is a key configured" by testing for "". With
-// auth disabled jwt_secret is optional, and the tracking signer was
-// handed exactly that public key - so the signed view and unsubscribe
-// tokens could be minted by anyone who had read this file. Returning
-// "" is what makes the consumer report itself disabled instead.
+// EMPTY IN, EMPTY OUT, the convention crypto.New follows. HKDF over an
+// empty secret is a perfectly good-looking 64-character key that anyone
+// can compute from the label alone, and every consumer decides "is a
+// key configured" by testing for "". Returning "" is what makes a
+// consumer handed no secret report itself disabled rather than sign
+// with a public key.
 func DeriveKey(secret, label string) string {
 	if secret == "" {
 		return ""

@@ -34,11 +34,9 @@ database:
     encryption_key: 0123456789abcdef0123456789abcdef
 `
 
-// The tracking signer keys on auth.jwt_secret, and with auth disabled
-// the secret used to be optional - so an installation that set
-// public_url signed its public view and unsubscribe links with a key
-// derived from nothing. Validate refuses that combination, and does
-// not refuse auth.disabled on its own, which is a supported mode.
+// The tracking signer keys on auth.jwt_secret, so public_url without a
+// secret is refused whether auth is on or off. auth.disabled on its own
+// is a supported mode and loads.
 func TestAuthDisabledWithAPublicURLNeedsAJWTSecret(t *testing.T) {
 	_, err := load(t, minimalConfig+`
 auth:

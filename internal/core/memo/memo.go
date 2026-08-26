@@ -3,12 +3,12 @@
 // Package memo holds one computed value for a short while, so a burst of
 // identical requests costs one computation instead of one each.
 //
-// It exists for the two open endpoints that touched the database on
-// every call - the readiness probe and the login page's auth posture.
-// Neither needs a credential, so a flood of either turned HTTP
-// concurrency straight into connection-pool pressure, and the requests
-// that did carry a credential queued behind it. A one-second memo makes
-// the flood cost what one request costs.
+// It exists for the open endpoints that touch the database - the
+// readiness probe and the login page's auth posture. Neither needs a
+// credential, so a flood of either turns HTTP concurrency straight into
+// connection-pool pressure, and the requests that do carry a credential
+// queue behind it. A one-second memo makes the flood cost what one
+// request costs.
 package memo
 
 import (

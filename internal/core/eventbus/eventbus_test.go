@@ -157,7 +157,7 @@ func TestConcurrentPublishAndSubscribe(t *testing.T) {
 }
 
 // A project, and the node, can hold only so many live streams - a
-// stream is a held connection, and the route had no other bound.
+// stream is a held connection.
 func TestSubscribeRefusesPastTheCeiling(t *testing.T) {
 	b := New()
 	for i := 0; i < MaxSubscribersPerProject; i++ {

@@ -31,9 +31,9 @@ type Handler struct {
 	Runtime *env.Runtime
 
 	// ready memoizes the readiness verdict for readyMemo. The probe is
-	// open and pings the database, so without it a flood of probes was
-	// a flood of pool acquisitions that real requests queued behind -
-	// and readiness then failed for the reason the flood wanted.
+	// open and pings the database, so without it a flood of probes is a
+	// flood of pool acquisitions that real requests queue behind - and
+	// readiness then fails for the reason the flood wants.
 	ready *memo.Value[readiness]
 }
 

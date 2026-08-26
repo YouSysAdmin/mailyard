@@ -248,10 +248,9 @@ func (v *Verifier) store(addr string, res Result, now time.Time) {
 // optimization, so dropping one wholesale under pressure is acceptable -
 // the next call simply re-checks.
 //
-// The MX cache had no bound at all while the result cache had this one:
-// its keys are domains, verify is a read-tier route, and a wildcard DNS
-// zone hands a caller as many resolvable domains as they care to send,
-// so it grew by one entry per request forever.
+// The MX cache needs the bound as much as the result cache: its keys
+// are domains, verify is a read-tier route, and a wildcard DNS zone
+// hands a caller as many resolvable domains as they care to send.
 const maxCacheEntries = 10000
 
 func (v *Verifier) evictLocked(now time.Time) {

@@ -377,12 +377,11 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 // and a body, header names against the reserved list, attachment
 // sizes, and the List-Unsubscribe pair.
 //
-// Separate because the sandbox returned BEFORE Validate, and so before
-// every one of these - a sandbox request with "\r\nBcc:" in
-// list_unsubscribe_url wrote a raw message carrying a forged header.
-// Nothing was sent, but "one place decides what may reach Build" was
-// not true, and the ceilings an operator configured did not apply to
-// a surface any key could reach.
+// Separate because the sandbox skips the delivery half by design and
+// still hands a message to Build. Without this half a sandbox request
+// with "\r\nBcc:" in list_unsubscribe_url writes a raw message carrying
+// a forged header, and the ceilings an operator configured do not apply
+// to a surface any key can reach.
 func (s *Service) ValidateShape(req *SendRequest) error {
 	// net/mail accepts a bare CR or LF inside a trailing comment -
 	// `a@b.c (x\r\nBcc: ...)` parses, and Build writes the string

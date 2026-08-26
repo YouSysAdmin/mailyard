@@ -42,11 +42,10 @@ type loginInput struct {
 // without leaking policy.
 type registerInput struct {
 	Email string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
-	// Twelve, the same floor reset and change carry. It was eight on
-	// this one route - the weakest floor on the one route that needs no
-	// credential to reach. The number is repeated in each tag because a
-	// struct tag cannot name a constant, and tests/passwordpolicy_test.go
-	// is what keeps the copies equal.
+	// Twelve, the same floor reset and change carry: the one route that
+	// needs no credential to reach must not have the weakest one. The
+	// number is repeated in each tag because a struct tag cannot name a
+	// constant, and tests/passwordpolicy_test.go keeps the copies equal.
 	Password string `json:"password" validate:"required,min=12,max=256,bcryptlen" normalize:"trim"`
 }
 

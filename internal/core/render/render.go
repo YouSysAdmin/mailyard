@@ -147,9 +147,9 @@ func escapingTemplate(src string, data map[string]any, onMissing string) (string
 // A bound on the SOURCE is not a bound on the OUTPUT: a kilobyte of
 // nested range actions over a few thousand-element arrays expands to
 // gigabytes, and Go's own maxExecDepth stops recursion, not breadth.
-// The buffer grew until the process died, from a request the lowest
-// template role can make - preview renders synchronously and needs no
-// send.
+// Unbounded, the buffer grows until the process dies, from a request
+// the lowest template role can make - preview renders synchronously
+// and needs no send.
 const MaxOutputBytes = 4 * 1024 * 1024
 
 // ErrOutputTooLarge is the render refusing past MaxOutputBytes.

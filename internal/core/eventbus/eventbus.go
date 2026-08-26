@@ -56,10 +56,10 @@ type Event struct {
 
 // Ceilings on live subscribers. A stream holds a fasthttp slot, a
 // goroutine and a buffered channel for up to eventstream.MaxStreamLife,
-// and the route had no cap: one signed-in account could open streams
-// until server.max_concurrent_requests was spent and the HTTP edge
-// answered nobody. Both numbers sit far below that default (4096) and
-// far above what a console genuinely opens, which is one per tab.
+// so without a cap one signed-in account can hold streams until
+// server.max_concurrent_requests is spent and the HTTP edge answers
+// nobody. Both numbers sit far below that default (4096) and far above
+// what a console genuinely opens, which is one per tab.
 const (
 	// MaxSubscribersPerProject bounds one project's listeners.
 	MaxSubscribersPerProject = 64

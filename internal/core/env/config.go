@@ -1220,12 +1220,10 @@ func (c *Config) Validate() error {
 	}
 
 	// The tracking signer keys on jwt_secret too, and its URLs are the
-	// one surface that is public by design. With auth disabled the
-	// secret used to be optional, and an installation that set
-	// public_url got tracking on a key derived from nothing - which
-	// anyone can derive. So the secret is required by whichever of the
-	// two features wants it, and the floor is the same either way: HKDF
-	// stretches a short secret but cannot invent entropy.
+	// one surface that is public by design - so the secret is required
+	// by whichever of the two features wants it, auth or a public_url,
+	// and the floor is the same either way: HKDF stretches a short
+	// secret but cannot invent entropy.
 	if c.Auth.Disabled && c.Auth.JWTSecret == "" && c.Server.PublicURL != "" {
 		return fmt.Errorf("auth.jwt_secret required when server.public_url is set: it signs the public tracking and unsubscribe links, even with auth disabled (generate with `openssl rand -hex 32`)")
 	}

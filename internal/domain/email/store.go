@@ -753,8 +753,8 @@ func (s *Store) PurgeProjectOlderThan(ctx context.Context, projID string, before
 // addressNeedles is every argument the two address statements take, in
 // order: the project, the three exempt statuses, then the four forms
 // addressMatchClause matches. Lowercased HERE, because the clause
-// compares LOWER(column) and a caller that forgot to fold got a DELETE
-// that matched nothing and reported deleted: 0 - the quiet failure the
+// compares LOWER(column): a caller that does not fold gets a DELETE
+// that matches nothing and reports deleted: 0 - the quiet failure the
 // erasure path exists to not have.
 func addressNeedles(projID, email string) []any {
 	email = strings.ToLower(email)

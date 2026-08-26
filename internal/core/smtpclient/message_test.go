@@ -17,8 +17,7 @@ func TestBuildNeverEmitsAnInjectedHeader(t *testing.T) {
 		Subject: "s",
 		Text:    "body",
 		Headers: map[string]string{"X-Custom\r\nBcc": "v\r\nReply-To: c@evil.test"},
-		// The three the builder wrote verbatim until the sandbox path
-		// was found reaching it without normalizeUnsubscribeLinks.
+		// Caller-supplied values the builder writes as headers itself.
 		ListUnsubscribeURL:    "https://x/\r\nBcc: d@evil.test",
 		ListUnsubscribeMailto: "u@x.test\r\nBcc: e@evil.test",
 		MessageID:             "id@x.test>\r\nBcc: f@evil.test",

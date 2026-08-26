@@ -73,16 +73,12 @@ func (h *Handler) ceremonySealer() *crypto.Service {
 // The Origin is what the browser signs into the client data, so
 // deriving the RP from it keeps the check equal to what the
 // authenticator actually bound. Taken on its own word, though, the
-// header made the relying party whatever the caller declared, and the
-// library's origin and rpIdHash checks compared the assertion against
-// the very value the request supplied. Nothing exploitable followed -
-// an authenticator releases a credential only for the RP it was
-// enrolled under - but a proxy rewriting Origin made every passkey
-// silently unusable, and a compromised sibling host was a valid RP
-// for stored credentials. So the host has to be public_url's, or a
-// subdomain of it: the same name under which the passkey was
-// enrolled. With no public_url configured the header stands alone,
-// which is the development case.
+// header would make the relying party whatever the caller declared,
+// and the library's origin and rpIdHash checks would compare the
+// assertion against the very value the request supplied. So the host
+// has to be public_url's, or a subdomain of it: the name under which
+// the passkey was enrolled. With no public_url configured the header
+// stands alone, which is the development case.
 func (h *Handler) webauthnService(c fiber.Ctx) (*corepasskey.Service, error) {
 	origin := c.Get(fiber.HeaderOrigin)
 	if origin == "" {

@@ -34,20 +34,17 @@ const recoveryAlphabet = "abcdefghjkmnpqrstuvwxyz23456789"
 
 // recoveryCodeLen is the length of a code without its dashes.
 //
-// Sixteen, from ten. A recovery code is a whole second factor on its
-// own and is stored under a single fast hash (see hashRecoveryCode), so
-// its strength IS its length: ten symbols was 49 bits nominal - "eight
-// hundred quadrillion" in the old comment was off by a thousand, it is
-// eight hundred TRILLION - and 48 effective after the modulo bias
-// below, which a stolen table meets with hours of GPU time. Sixteen is
-// 79 bits, out of reach of any table attack, and still a line on a
-// printout.
+// Sixteen. A recovery code is a whole second factor on its own and is
+// stored under a single fast hash (see hashRecoveryCode), so its
+// strength IS its length: 31^16 is about 2^79, out of reach of any
+// table attack, and still a line on a printout. Ten symbols would be
+// about 2^48, which a stolen table meets with hours of GPU time.
 const recoveryCodeLen = 16
 
-// legacyRecoveryCodeLen is the length codes were minted at before, and
-// looksLikeRecoveryCode still admits it: a set printed under the old
-// length keeps working until it is spent or regenerated, since the
-// hash does not know how long its input was.
+// legacyRecoveryCodeLen is the length of an older set, which
+// looksLikeRecoveryCode still admits: a printed set keeps working until
+// it is spent or regenerated, since the hash does not know how long its
+// input was.
 const legacyRecoveryCodeLen = 10
 
 // recoveryGroup is how many symbols sit between dashes.
@@ -64,9 +61,9 @@ func newRecoveryCodes() (codes, hashes []string, err error) {
 		for n < recoveryCodeLen {
 			// One byte at a time through the sampler. Rejection rather
 			// than modulo: 256 is not a multiple of 31, so `r % 31`
-			// gave the first eight letters nine chances in 256 each and
-			// the other twenty-three eight - a bias, small, that a
-			// guesser gets for free.
+			// would give the first eight letters nine chances in 256
+			// each and the other twenty-three eight - a bias, small,
+			// that a guesser gets for free.
 			var r [1]byte
 			if _, err := rand.Read(r[:]); err != nil {
 				return nil, nil, err
@@ -115,8 +112,8 @@ func normalizeRecoveryCode(in string) string {
 
 // looksLikeRecoveryCode tells a recovery code from an authenticator
 // code at sign-in, where both arrive in one field: sixteen symbols from
-// the alphabet, or ten for a set minted before the length grew, where a
-// TOTP code is six digits.
+// the alphabet, or ten for an older set, where a TOTP code is six
+// digits.
 func looksLikeRecoveryCode(in string) bool {
 	n := normalizeRecoveryCode(in)
 	if len(n) != recoveryCodeLen && len(n) != legacyRecoveryCodeLen {
@@ -135,9 +132,8 @@ func looksLikeRecoveryCode(in string) bool {
 // hashRecoveryCode is the stored form. SHA-256 and not bcrypt, for the
 // reason API keys and reset tokens are: the input is random and long
 // enough - 79 bits at recoveryCodeLen - that a slow hash buys nothing
-// against a stolen table. At the old ten symbols that was not true,
-// which is why the length grew rather than the hash slowing down: ten
-// bcrypt verifications per sign-in is a cost, sixteen symbols is not.
+// against a stolen table, and ten bcrypt verifications per sign-in is
+// a cost where sixteen symbols is not.
 func hashRecoveryCode(code string) string {
 	sum := sha256.Sum256([]byte(normalizeRecoveryCode(code)))
 

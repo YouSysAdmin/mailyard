@@ -194,11 +194,10 @@ const exportPageSize = 500
 
 // exportRowCap bounds the contacts and the subscribers sections, the
 // two that grow per recipient rather than per thing a person made.
-// Suppressions had a ceiling, these were walked to the end into one
-// in-memory slice and marshalled as one document - a second full copy -
-// so a project of a few million contacts was a request costing
-// gigabytes, repeatable at the api rate limit. Reported in Truncated
-// like the suppressions are, never passed over.
+// Walked to the end into one in-memory slice and marshalled as one
+// document - a second full copy - a project of a few million contacts
+// is a request costing gigabytes, repeatable at the api rate limit.
+// Reported in Truncated like the suppressions are, never passed over.
 const exportRowCap = 50000
 
 func collectContacts(ctx context.Context, st *store.Store, projID string) ([]any, bool, error) {

@@ -13,12 +13,11 @@ import (
 // Every route that SETS a password carries the same minimum length.
 //
 // A struct tag cannot name a constant, so the floor is a number written
-// into each tag, and they drifted: self-signup accepted eight characters
-// where reset and change required twelve, so the weakest floor sat on
-// the one route reachable without a credential. The tags that set a
-// password are the ones carrying bcryptlen - the ones that merely CHECK
-// one (login, re-auth) are min=1 on purpose, so nothing leaks the
-// policy to a guesser.
+// into each tag, and copies drift - the weakest one must not land on the
+// route reachable without a credential. The tags that set a password
+// are the ones carrying bcryptlen - the ones that merely CHECK one
+// (login, re-auth) are min=1 on purpose, so nothing leaks the policy to
+// a guesser.
 func TestEveryPasswordSettingRouteSharesOneFloor(t *testing.T) {
 	const want = "min=12,"
 	tag := regexp.MustCompile(`json:"password"\s+validate:"([^"]*bcryptlen[^"]*)"`)
