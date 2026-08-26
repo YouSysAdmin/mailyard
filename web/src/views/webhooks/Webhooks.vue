@@ -16,6 +16,7 @@ import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
+import StatusBadge from '../../components/StatusBadge.vue'
 import CopyButton from '../../components/CopyButton.vue'
 import WebhookForm from './WebhookForm.vue'
 import WebhookDeliveries from './WebhookDeliveries.vue'
@@ -47,6 +48,16 @@ async function created(minted: string) {
   showForm.value = false
   secret.value = minted
   await load()
+}
+
+async function enable(hook: Webhook) {
+  try {
+    await webhooksApi.enable(hook.id)
+    notify.success('Webhook enabled')
+    await load()
+  } catch (err) {
+    notify.error(apiErrorMessage(err))
+  }
 }
 
 async function remove(hook: Webhook) {
@@ -99,6 +110,7 @@ onMounted(load)
               <th>URL</th>
               <th>Events</th>
               <th>Sender Filters</th>
+              <th>Status</th>
               <th>Created</th>
               <th class="text-right">Actions</th>
             </tr>
@@ -121,11 +133,21 @@ onMounted(load)
                 </div>
                 <span v-else class="text-muted">All senders</span>
               </td>
+              <td :title="hook.disabled_reason">
+                <StatusBadge :status="hook.disabled_at ? 'disabled' : 'active'" scope="webhook" />
+              </td>
               <td>{{ formatDate(hook.created_at) }}</td>
               <td>
                 <div class="table-actions">
                   <button class="btn btn-secondary btn-sm" @click="deliveriesFor = hook">
                     Deliveries
+                  </button>
+                  <button
+                    v-if="hook.disabled_at && projStore.can('webhooks:write')"
+                    class="btn btn-secondary btn-sm"
+                    @click="enable(hook)"
+                  >
+                    Enable
                   </button>
                   <button
                     v-if="projStore.can('webhooks:delete')"

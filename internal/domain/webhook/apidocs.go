@@ -40,6 +40,21 @@ func APIDocs() []apidoc.Route {
 			Responses:  []apidoc.Response{apidoc.NoContent, apidoc.NotFound},
 		},
 		{
+			Method:     "POST",
+			Path:       "/webhooks/:id/enable",
+			Tag:        "webhooks",
+			Permission: "webhooks:write",
+			Summary:    "Re-enable a disabled webhook",
+			Description: "A webhook whose deliveries fail on every attempt is disabled and the " +
+				"project's owners are mailed the reason. Once the endpoint is fixed, this " +
+				"puts it back into rotation. Idempotent on a webhook that is already enabled.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Responses: []apidoc.Response{
+				apidoc.OK("The webhook.", EnableResponse{}),
+				apidoc.NotFound,
+			},
+		},
+		{
 			Method:      "GET",
 			Path:        "/webhooks/:id/deliveries",
 			Tag:         "webhooks",

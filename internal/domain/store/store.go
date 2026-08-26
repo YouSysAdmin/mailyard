@@ -808,6 +808,11 @@ type WebhookStore interface {
 	List(ctx context.Context, projID string) ([]*webhook.Webhook, error)
 	Put(ctx context.Context, h *webhook.Webhook) error
 	Delete(ctx context.Context, projID, id string) error
+
+	// Disable is the dispatcher giving up on an endpoint, Enable the
+	// owner putting it back. Enable reports whether the id existed.
+	Disable(ctx context.Context, projID, id, reason string) error
+	Enable(ctx context.Context, projID, id string) (bool, error)
 	RecordDelivery(ctx context.Context, d *webhook.Delivery) error
 	ListDeliveries(ctx context.Context, projID, webhookID string, limit int, cur keyset.Cursor) ([]*webhook.Delivery, error)
 

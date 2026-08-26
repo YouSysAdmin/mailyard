@@ -42,6 +42,14 @@ const maxConcurrent = 8
 type Sink interface {
 	List(ctx context.Context, projID string) ([]*whmodel.Webhook, error)
 	RecordDelivery(ctx context.Context, d *whmodel.Delivery) error
+
+	// Disable is called once, after the LAST attempt at a delivery
+	// failed, with the failure that ended it. The hook is out of
+	// rotation until somebody re-enables it - retrying a dead endpoint
+	// on every event forever parked a goroutine per event and held a
+	// delivery slot through every retry sleep, so eight dead hooks
+	// stalled every project's deliveries.
+	Disable(ctx context.Context, h *whmodel.Webhook, reason string) error
 }
 
 // Config tunes delivery. All values must be positive.
@@ -126,7 +134,7 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 	}
 
 	for _, h := range hooks {
-		if !h.Subscribed(event) || !matchesFilters(h.Filters, sender) {
+		if !h.Enabled() || !h.Subscribed(event) || !matchesFilters(h.Filters, sender) {
 			continue
 		}
 
@@ -171,6 +179,7 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 	defer func() { <-d.sem }()
 
 	ctx := context.Background()
+	var lastFailure string
 	for attempt := 1; attempt <= d.cfg.MaxAttempts; attempt++ {
 		status, err := d.post(ctx, h, event, body)
 		del := &whmodel.Delivery{
@@ -198,6 +207,7 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 			del.ErrorMessage = fmt.Sprintf("endpoint returned status %d", status)
 		}
 
+		lastFailure = del.ErrorMessage
 		if rerr := d.sink.RecordDelivery(ctx, del); rerr != nil {
 			d.log.Error("dispatch: record delivery", "webhook_id", h.ID, "err", rerr)
 		}
@@ -214,8 +224,11 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 		}
 	}
 
-	d.log.Warn("dispatch: delivery failed permanently",
-		"webhook_id", h.ID, "event", event, "attempts", d.cfg.MaxAttempts)
+	d.log.Warn("dispatch: delivery failed permanently, disabling the webhook",
+		"webhook_id", h.ID, "event", event, "attempts", d.cfg.MaxAttempts, "reason", lastFailure)
+	if err := d.sink.Disable(ctx, h, lastFailure); err != nil {
+		d.log.Error("dispatch: disable webhook", "webhook_id", h.ID, "err", err)
+	}
 }
 
 func (d *Dispatcher) post(ctx context.Context, h *whmodel.Webhook, event string, body []byte) (int, error) {

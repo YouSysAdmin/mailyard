@@ -1624,6 +1624,13 @@ func (c *Client) ListWebhookDeliveries(ctx context.Context, id string, opts ...R
 	return do[DeliveriesResponse](ctx, c, "GET", fmt.Sprintf("/webhooks/%s/deliveries", escape(id)), nil, opts)
 }
 
+// EnableWebhook Re-enable a disabled webhook.
+//
+// POST /webhooks/:id/enable
+func (c *Client) EnableWebhook(ctx context.Context, id string, opts ...RequestOption) (EnableResponse, error) {
+	return do[EnableResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/enable", escape(id)), nil, opts)
+}
+
 // BounceWebhook Ingest a bounce report.
 //
 // POST /webhooks/bounce

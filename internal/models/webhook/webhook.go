@@ -38,7 +38,17 @@ type Webhook struct {
 	Filters   []string  `json:"filters"`
 	Secret    string    `json:"-"`
 	CreatedAt time.Time `json:"created_at"`
+
+	// DisabledAt is set when the dispatcher gave up on the endpoint:
+	// every attempt at one delivery failed. Nothing is sent to a
+	// disabled hook until it is enabled again by hand. DisabledReason
+	// is the last failure, so the owner knows what to fix.
+	DisabledAt     *time.Time `json:"disabled_at,omitempty"`
+	DisabledReason string     `json:"disabled_reason,omitempty"`
 }
+
+// Enabled reports whether the dispatcher may deliver to this hook.
+func (w *Webhook) Enabled() bool { return w.DisabledAt == nil }
 
 // Subscribed reports whether the webhook wants this event.
 func (w *Webhook) Subscribed(event string) bool {

@@ -49,6 +49,11 @@ type CreateResponse struct {
 	Secret  string          `json:"secret"`
 }
 
+// EnableResponse is the hook after it was put back into rotation.
+type EnableResponse struct {
+	Webhook *wmodel.Webhook `json:"webhook"`
+}
+
 // DeliveriesResponse is one keyset page of delivery attempts.
 type DeliveriesResponse struct {
 	Deliveries []*wmodel.Delivery `json:"deliveries"`

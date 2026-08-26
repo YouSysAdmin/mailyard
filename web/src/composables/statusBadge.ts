@@ -11,7 +11,8 @@
 // (it is simply not its turn yet) while an email that is `pending` is a
 // warning (it should have moved). Merging them would have to pick one.
 
-export type StatusScope = 'email' | 'campaign' | 'campaignMessage' | 'subscriber' | 'inbound'
+export type StatusScope =
+  'email' | 'campaign' | 'campaignMessage' | 'subscriber' | 'inbound' | 'webhook'
 
 const scopes: Record<StatusScope, Record<string, string>> = {
   email: {
@@ -48,6 +49,10 @@ const scopes: Record<StatusScope, Record<string, string>> = {
     received: 'badge-success',
     rejected: 'badge-warning',
     failed: 'badge-danger',
+  },
+  webhook: {
+    active: 'badge-success',
+    disabled: 'badge-danger',
   },
 }
 

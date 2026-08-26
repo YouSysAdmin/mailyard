@@ -58,6 +58,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/sandbox"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	"github.com/yousysadmin/mailyard/internal/domain/submission"
+	"github.com/yousysadmin/mailyard/internal/domain/webhook"
 	campaignmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
@@ -368,7 +369,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// Webhook dispatcher: fans email lifecycle events out to
 	// subscribed endpoints. Built before the worker so the worker's
 	// finalize hook can emit through it.
-	dispatcher := dispatch.New(st.Webhook, dispatch.Config{
+	dispatcher := dispatch.New(&webhook.DispatchSink{Store: st.Webhook, Audit: rt.Audit}, dispatch.Config{
 		Timeout:             cfg.Webhook.Timeout,
 		MaxAttempts:         cfg.Webhook.MaxAttempts,
 		RetryDelay:          cfg.Webhook.RetryDelay,

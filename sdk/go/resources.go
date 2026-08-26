@@ -186,6 +186,19 @@ func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
 	return err
 }
 
+// EnableWebhook puts back a webhook the server disabled after every
+// delivery attempt to it failed. Idempotent on an enabled one.
+func (c *Client) EnableWebhook(ctx context.Context, id string) (*Webhook, error) {
+	out, err := do[struct {
+		Webhook Webhook `json:"webhook"`
+	}](ctx, c, http.MethodPost, "/webhooks/"+url.PathEscape(id)+"/enable", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &out.Webhook, nil
+}
+
 // WebhookDeliveries returns one page of delivery attempts for a
 // webhook, cursor paged.
 func (c *Client) WebhookDeliveries(ctx context.Context, id string, limit int, cursor string) ([]WebhookDelivery, string, error) {

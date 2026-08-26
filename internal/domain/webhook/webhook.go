@@ -60,7 +60,8 @@ func NewStore(db *sql.DB, cr *crypto.Service, replicas ...*sql.DB) *Store {
 }
 
 const hookSelect = `
-SELECT id, project_id, created_by, url, events, filters, secret, created_at
+SELECT id, project_id, created_by, url, events, filters, secret, created_at,
+       disabled_at, disabled_reason
 FROM webhooks`
 
 // Get returns one webhook within projID, or nil when there is no such
@@ -124,6 +125,35 @@ func (s *Store) Put(ctx context.Context, h *whmodel.Webhook) error {
 		database.MustJSON(h.Events), database.MustJSON(h.Filters), stored, h.CreatedAt)
 
 	return err
+}
+
+// Disable takes a hook out of rotation with the reason the dispatcher
+// gave up. Scoped by project like every other write, though the
+// dispatcher already holds the row - a caller handing it a foreign hook
+// must still change nothing.
+func (s *Store) Disable(ctx context.Context, projID, id, reason string) error {
+	_, err := s.Exec(ctx, `
+        UPDATE webhooks SET disabled_at = now(), disabled_reason = ?
+        WHERE project_id = ? AND id = ? AND disabled_at IS NULL
+    `, reason, projID, id)
+
+	return err
+}
+
+// Enable puts a disabled hook back. Reports whether a row changed, so
+// the handler can tell an unknown id from one already enabled.
+func (s *Store) Enable(ctx context.Context, projID, id string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE webhooks SET disabled_at = NULL, disabled_reason = ''
+        WHERE project_id = ? AND id = ?
+    `, projID, id)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // Delete removes one webhook from projID.
@@ -210,9 +240,14 @@ func (s *Store) ListDeliveries(ctx context.Context, projID, webhookID string, li
 func (s *Store) scanWebhook(r interface{ Scan(...any) error }) (*whmodel.Webhook, error) {
 	var h whmodel.Webhook
 	var events, filters string
+	var disabledAt sql.NullTime
 	if err := r.Scan(&h.ID, &h.ProjectID, &h.CreatedBy, &h.URL,
-		&events, &filters, &h.Secret, &h.CreatedAt); err != nil {
+		&events, &filters, &h.Secret, &h.CreatedAt, &disabledAt, &h.DisabledReason); err != nil {
 		return nil, err
+	}
+
+	if disabledAt.Valid {
+		h.DisabledAt = &disabledAt.Time
 	}
 
 	database.MustUnmarshalJSON(events, &h.Events)
@@ -331,6 +366,27 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	}
 
 	return response.NoContent(c)
+}
+
+// Enable serves POST /api/v1/webhooks/:id/enable: puts a hook the
+// dispatcher disabled back into rotation. Idempotent on an enabled one.
+func (h *Handler) Enable(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	ok, err := h.Runtime.Store.Webhook.Enable(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !ok {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, EnableResponse{Webhook: hook})
 }
 
 // Deliveries serves GET /api/v1/webhooks/:id/deliveries.

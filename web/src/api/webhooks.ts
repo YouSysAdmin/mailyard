@@ -13,6 +13,8 @@ export const webhooksApi = {
   create: (payload: WebhookPayload) =>
     api.post<{ webhook: Webhook; secret: string }>('/webhooks/', payload),
   remove: (id: string) => api.delete(`/webhooks/${id}`),
+  // Puts back a hook the dispatcher disabled after every attempt failed.
+  enable: (id: string) => api.post<{ webhook: Webhook }>(`/webhooks/${id}/enable`),
   // Keyset paged: a project with email.sent subscribed writes a
   // delivery row per message, plus one per retry.
   deliveries: (id: string, params: { limit?: number; cursor?: string } = {}) =>

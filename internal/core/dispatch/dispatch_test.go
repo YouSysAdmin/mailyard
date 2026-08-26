@@ -24,6 +24,15 @@ func (s *memSink) List(context.Context, string) ([]*whmodel.Webhook, error) {
 	return s.hooks, nil
 }
 
+func (s *memSink) Disable(_ context.Context, h *whmodel.Webhook, reason string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	h.DisabledAt, h.DisabledReason = &now, reason
+
+	return nil
+}
+
 func (s *memSink) RecordDelivery(_ context.Context, d *whmodel.Delivery) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

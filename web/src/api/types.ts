@@ -461,6 +461,8 @@ export interface Webhook {
   events: string[]
   filters: string[]
   created_at: string
+  disabled_at?: string
+  disabled_reason?: string
 }
 
 export interface WebhookDelivery {

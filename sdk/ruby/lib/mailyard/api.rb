@@ -1161,6 +1161,11 @@ module Mailyard
       @t.request("GET", "/webhooks/#{esc(id)}/deliveries", body: nil, query: query)
     end
 
+    # Re-enable a disabled webhook Needs webhooks:write.
+    def enable_webhook(id, **query)
+      @t.request("POST", "/webhooks/#{esc(id)}/enable", body: nil, query: query)
+    end
+
     # Ingest a bounce report Needs bounces:write.
     def bounce_webhook(body: nil, **query)
       @t.request("POST", "/webhooks/bounce", body: body, query: query)

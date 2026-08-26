@@ -195,8 +195,15 @@ func (n *Notifier) deliver(ctx context.Context, a Alert, e *amodel.Event) {
 		actor = e.ActorID
 	}
 
-	subject, html, text := Message(a.Heading, a.Note, actor,
-		strings.TrimSpace(e.Method+" "+e.Path), n.trailLink(a.Tier))
+	// The request that produced the event, or for an event nothing
+	// requested - the dispatcher disabling a webhook - the detail
+	// that says which one and why.
+	action := strings.TrimSpace(e.Method + " " + e.Path)
+	if action == "" {
+		action = e.Detail
+	}
+
+	subject, html, text := Message(a.Heading, a.Note, actor, action, n.trailLink(a.Tier))
 	n.Mail.SendAsync(to, subject, html, text)
 	n.Log.Info("alertmail: sent", "type", e.Type, "recipients", len(to))
 }

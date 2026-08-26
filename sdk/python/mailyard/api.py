@@ -935,6 +935,10 @@ class API:
         "Delivery log of one webhook Needs webhooks:read."
         return self._t.request("GET", f"/webhooks/{_esc(id)}/deliveries", body=None, query=query)
 
+    def enable_webhook(self, id, **query: Any) -> Any:
+        "Re-enable a disabled webhook Needs webhooks:write."
+        return self._t.request("POST", f"/webhooks/{_esc(id)}/enable", body=None, query=query)
+
     def bounce_webhook(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
         "Ingest a bounce report Needs bounces:write."
         return self._t.request("POST", "/webhooks/bounce", body=body, query=query)

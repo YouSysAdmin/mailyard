@@ -599,6 +599,11 @@ type EmittedResponse struct {
 	Emitted bool `json:"emitted"`
 }
 
+// EnableResponse is the response body.
+type EnableResponse struct {
+	Webhook *Webhook `json:"webhook"`
+}
+
 // Engagement is the wire body.
 type Engagement struct {
 	Opened    int64   `json:"opened"`
@@ -2275,13 +2280,15 @@ type VersionResponse struct {
 
 // Webhook is the wire body.
 type Webhook struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	CreatedBy string    `json:"created_by,omitempty"`
-	URL       string    `json:"url"`
-	Events    []string  `json:"events"`
-	Filters   []string  `json:"filters"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             string     `json:"id"`
+	ProjectID      string     `json:"project_id"`
+	CreatedBy      string     `json:"created_by,omitempty"`
+	URL            string     `json:"url"`
+	Events         []string   `json:"events"`
+	Filters        []string   `json:"filters"`
+	CreatedAt      time.Time  `json:"created_at"`
+	DisabledAt     *time.Time `json:"disabled_at,omitempty"`
+	DisabledReason string     `json:"disabled_reason,omitempty"`
 }
 
 // WebhookCreateInput is the request body.

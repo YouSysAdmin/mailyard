@@ -63,6 +63,11 @@ const (
 	// removes one and proves their password. Distinct for the same
 	// reason 2FA reset is: the trail must show which one happened.
 	TypePasskeyReset = "auth.passkey.reset"
+
+	// TypeWebhookDisabled is the dispatcher giving up on an endpoint
+	// after every attempt at a delivery failed. Recorded explicitly,
+	// like the security events, because no request produces it.
+	TypeWebhookDisabled = "webhook.disabled"
 )
 
 // Event is one recorded action.

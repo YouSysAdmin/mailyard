@@ -50,7 +50,10 @@ func TestEveryAlertNamesARealEvent(t *testing.T) {
 			continue
 		}
 
-		if !produced[typ] {
+		// A project event is normally derived from a route, but one that
+		// no request produces - the dispatcher disabling a webhook - is
+		// recorded explicitly like the security events, and counts.
+		if !produced[typ] && !recorded[typ] {
 			t.Errorf("alertmail mails %q, but no route in routes.go produces that event type - "+
 				"RouteType derives these from the router, so a plausible-looking string here "+
 				"is an alert nobody ever gets", typ)
@@ -149,6 +152,7 @@ func securityEventTypes(t *testing.T) map[string]bool {
 		amodel.TypePasskeyAdded:    "TypePasskeyAdded",
 		amodel.TypePasskeyRemoved:  "TypePasskeyRemoved",
 		amodel.TypePasskeyReset:    "TypePasskeyReset",
+		amodel.TypeWebhookDisabled: "TypeWebhookDisabled",
 	}
 	out := map[string]bool{}
 	for value, name := range byValue {
