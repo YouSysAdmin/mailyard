@@ -132,8 +132,10 @@ const (
 	subscriberScope    = ` WHERE project_id = ?`
 	subscriberByStatus = ` AND status = ?`
 
-	// Same rule as every other search here - see contact.List.
-	subscriberByEmail = ` AND email LIKE ? ESCAPE '\'`
+	// Same rule as every other search here - see contact.List. LOWER
+	// on the column, since the term is lowercased: without it a
+	// subscriber stored as Ann@Example.com never matched "ann".
+	subscriberByEmail = ` AND LOWER(email) LIKE ? ESCAPE '\'`
 )
 
 func subscriberFilterArgs(projID, status, query string) []any {
