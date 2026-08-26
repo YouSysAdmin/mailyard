@@ -1077,7 +1077,12 @@ func noStoreCache(c fiber.Ctx) error {
 // perMinute builds a fixed-window rate limiter from the operator's
 // ratelimit config. It returns a pass-through handler when limiting
 // is switched off or the individual max is zero, so the middleware
-// chain is identical either way. keyFn defaults to the client IP.
+// chain is identical either way. keyFn defaults to clientip.From -
+// NOT the limiter's own default, which is c.IP(), and with ProxyHeader
+// deliberately unset that is the TCP peer. Behind the balancer every
+// deployment is told to run, that put the whole installation in one
+// login bucket: ten failed logins a minute from anyone locked
+// everyone out of sign-in, reset and SSO.
 //
 // The window state is per process. On a multi-node deployment the
 // effective ceiling is max times the node count - see the note on
@@ -1087,10 +1092,11 @@ func perMinute(rt *env.Runtime, max int, keyFn func(fiber.Ctx) string) fiber.Han
 		return func(c fiber.Ctx) error { return c.Next() }
 	}
 
-	cfg := limiter.Config{Max: max, Expiration: time.Minute}
-	if keyFn != nil {
-		cfg.KeyGenerator = keyFn
+	if keyFn == nil {
+		keyFn = clientip.From
 	}
+
+	cfg := limiter.Config{Max: max, Expiration: time.Minute, KeyGenerator: keyFn}
 
 	return limiter.New(cfg)
 }
