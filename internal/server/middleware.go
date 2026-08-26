@@ -4,6 +4,7 @@ package server
 
 import (
 	"log/slog"
+	"mime"
 	"net/url"
 	"strings"
 	"time"
@@ -279,4 +280,27 @@ func resolveSession(c fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims,
 // response is written.
 func wantsHTML(c fiber.Ctx) bool {
 	return strings.Contains(c.Get(fiber.HeaderAccept), "text/html")
+}
+
+// requireJSONBody refuses a body that is not application/json.
+//
+// It sits on login and register, the two open routes that CREATE a
+// session or an account, and it exists for login CSRF. SameSite=Strict
+// keeps a cross-site request from carrying the victim's cookie, but a
+// top-level form POST from evil.example SETS one: the response is a
+// navigation, so the browser stores the attacker's session cookie and
+// the victim is now signed into the attacker's account, pasting SMTP
+// credentials into a project the attacker reads. An HTML form can send
+// text/plain, multipart or urlencoded and nothing else - it cannot
+// produce application/json - and the decoder never checked, so a form
+// field named `{"email":"a","password":"b","x":"` was a valid body.
+// The console, curl and every SDK say application/json, so nothing
+// legitimate is refused.
+func requireJSONBody(c fiber.Ctx) error {
+	mediaType, _, err := mime.ParseMediaType(c.Get(fiber.HeaderContentType))
+	if err != nil || mediaType != fiber.MIMEApplicationJSON {
+		return response.Coded(c, fiber.StatusUnsupportedMediaType, "the body must be application/json")
+	}
+
+	return c.Next()
 }

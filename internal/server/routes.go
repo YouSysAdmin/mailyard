@@ -187,7 +187,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// it slow, this caps the absolute throughput.
 	ah := &auth.Handler{Runtime: rt}
 	loginLimiter := perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil)
-	appAPI.Post("/auth/login", loginLimiter, ah.Login)
+	appAPI.Post("/auth/login", loginLimiter, requireJSONBody, ah.Login)
 	appAPI.Post("/auth/logout", ah.Logout)
 	// Forgot-password. Open by definition (the caller has no session).
 	// Each route gets its own bucket at the login ceiling rather than
@@ -201,7 +201,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// rate limit: the endpoint answers whether an address has an
 	// account, and the limiter is what keeps that oracle slow.
 	if rt.Config.Auth.RegistrationEnabled && rt.Config.Auth.Local.Enabled && !rt.Config.Auth.Disabled {
-		appAPI.Post("/auth/register", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), ah.Register)
+		appAPI.Post("/auth/register", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.Register)
 	}
 
 	// Signup verification. Registered even when signup itself has been
