@@ -867,7 +867,6 @@ type InboundStore interface {
 	List(ctx context.Context, projID string, f InboundFilter) ([]*inbound.Email, error)
 	Put(ctx context.Context, e *inbound.Email) error
 	Delete(ctx context.Context, projID, id string) error
-	FindByMessageID(ctx context.Context, projID, messageID string) (*inbound.Email, error)
 	FindByDedupHash(ctx context.Context, projID, hash string) (*inbound.Email, error)
 	CountByStatus(ctx context.Context, projID string) (map[string]int, error)
 

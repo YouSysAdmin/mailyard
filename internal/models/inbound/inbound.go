@@ -65,7 +65,9 @@ type Email struct {
 	// MessageID is the parsed Message-ID header without brackets.
 	MessageID string `json:"message_id,omitempty"`
 
-	// DedupHash fingerprints messages without a Message-ID.
+	// DedupHash fingerprints the message: its Message-ID together with
+	// sender, recipients, subject and size, so a reused id over other
+	// content is not a duplicate. Empty on a row stored before parsing.
 	DedupHash string `json:"-"`
 
 	// Sender and Recipients are the SMTP envelope, the source of

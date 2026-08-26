@@ -65,32 +65,27 @@ func arrived(proj, messageID, hash string) *imodel.Email {
 func TestASecondCopyOfAMessageIsRefused(t *testing.T) {
 	s, proj, ctx := dedupStore(t)
 
-	first := arrived(proj, "<abc@sender.test>", "")
-	if err := s.Put(ctx, first); err != nil {
+	hash := dedupHash("<abc@sender.test>", "sender@x.test", []string{"in@acme.test"}, "hello", 42)
+	if err := s.Put(ctx, arrived(proj, "<abc@sender.test>", hash)); err != nil {
 		t.Fatalf("first: %v", err)
 	}
 
-	second := arrived(proj, "<abc@sender.test>", "")
-	err := s.Put(ctx, second)
+	err := s.Put(ctx, arrived(proj, "<abc@sender.test>", hash))
 	if err == nil {
-		t.Fatal("a second copy of the same Message-ID was stored - " +
+		t.Fatal("a second copy of the same message was stored - " +
 			"the dedup index is not unique, so two deliveries arriving together both land")
 	}
 
-	if !database.UniqueViolation(err, "idx_inbound_message_id") {
+	if !database.UniqueViolation(err, "idx_inbound_dedup") {
 		t.Fatalf("refused for another reason: %v", err)
 	}
 
-	// Same for a message carrying no Message-ID, which dedups on a
-	// content hash instead.
-	hash := dedupHash("sender@x.test", []string{"in@acme.test"}, "hello", 42)
-	if err := s.Put(ctx, arrived(proj, "", hash)); err != nil {
-		t.Fatalf("first hashed: %v", err)
-	}
-
-	err = s.Put(ctx, arrived(proj, "", hash))
-	if !database.UniqueViolation(err, "idx_inbound_dedup") {
-		t.Fatalf("a second copy of the same content hash was stored or failed oddly: %v", err)
+	// The SAME Message-ID over DIFFERENT content is a different
+	// message, not a duplicate. The id used to be a key of its own,
+	// and a stranger who could guess it pre-empted the real message.
+	other := dedupHash("<abc@sender.test>", "sender@x.test", []string{"in@acme.test"}, "something else", 99)
+	if err := s.Put(ctx, arrived(proj, "<abc@sender.test>", other)); err != nil {
+		t.Fatalf("a different message under a reused Message-ID was refused: %v", err)
 	}
 }
 
@@ -139,11 +134,12 @@ func TestTwoProjectsMayHoldTheSameMessage(t *testing.T) {
 		t.Fatalf("seed project: %v", err)
 	}
 
-	if err := s.Put(ctx, arrived(proj, "<shared@sender.test>", "")); err != nil {
+	hash := dedupHash("<shared@sender.test>", "sender@x.test", []string{"in@acme.test"}, "hello", 42)
+	if err := s.Put(ctx, arrived(proj, "<shared@sender.test>", hash)); err != nil {
 		t.Fatalf("first project: %v", err)
 	}
 
-	if err := s.Put(ctx, arrived(other, "<shared@sender.test>", "")); err != nil {
+	if err := s.Put(ctx, arrived(other, "<shared@sender.test>", hash)); err != nil {
 		t.Errorf("second project refused a message of its own: %v", err)
 	}
 }
@@ -159,12 +155,13 @@ func TestTheRowThatWonTheRaceIsWhatTheLoserReports(t *testing.T) {
 	s, proj, ctx := dedupStore(t)
 	svc := &Service{Inbound: s, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 
-	winner := arrived(proj, "<abc@sender.test>", "")
+	hash := dedupHash("<abc@sender.test>", "sender@x.test", []string{"in@acme.test"}, "hello", 42)
+	winner := arrived(proj, "<abc@sender.test>", hash)
 	if err := s.Put(ctx, winner); err != nil {
 		t.Fatalf("winner: %v", err)
 	}
 
-	loser := arrived(proj, "<abc@sender.test>", "")
+	loser := arrived(proj, "<abc@sender.test>", hash)
 	err := s.Put(ctx, loser)
 	if err == nil {
 		t.Fatal("the second insert was allowed")

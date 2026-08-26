@@ -148,22 +148,6 @@ func (s *Store) Delete(ctx context.Context, projID, id string) error {
 	return err
 }
 
-// FindByMessageID looks a message up by its RFC 5322 header within
-// projID, which is the first of the two dedupe keys.
-func (s *Store) FindByMessageID(ctx context.Context, projID, messageID string) (*imodel.Email, error) {
-	if messageID == "" {
-		return nil, nil
-	}
-
-	row := s.QueryRow(ctx, inboundSelect+` WHERE project_id = ? AND message_id = ? LIMIT 1`, projID, messageID)
-	e, err := scanInbound(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-
-	return e, err
-}
-
 // FindByDedupHash looks a message up by content fingerprint within
 // projID, used when it carries no Message-ID.
 func (s *Store) FindByDedupHash(ctx context.Context, projID, hash string) (*imodel.Email, error) {

@@ -79,15 +79,6 @@ func (f *fakeInbound) Put(_ context.Context, e *imodel.Email) error {
 	return nil
 }
 func (f *fakeInbound) Delete(context.Context, string, string) error { return nil }
-func (f *fakeInbound) FindByMessageID(_ context.Context, _, id string) (*imodel.Email, error) {
-	for _, r := range f.rows {
-		if r.MessageID == id {
-			return r, nil
-		}
-	}
-
-	return nil, nil
-}
 func (f *fakeInbound) FindByDedupHash(_ context.Context, _, h string) (*imodel.Email, error) {
 	for _, r := range f.rows {
 		if r.DedupHash == h {

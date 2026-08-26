@@ -279,25 +279,23 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 	// then discarded the record, orphaning the objects - which turned
 	// an MTA retry loop (or anyone replaying a Message-ID at the open
 	// MX port) into unbounded disk growth.
-	if rec.MessageID != "" {
-		existing, err := s.Inbound.FindByMessageID(ctx, d.ProjectID, rec.MessageID)
-		if err != nil {
-			return nil, err
-		}
+	// ONE key, and the content is in it. The Message-ID alone used to
+	// settle a duplicate, and a Message-ID is whatever the sender typed:
+	// anyone who could guess the next one - a sequential generator, the
+	// References of a thread they were on - sent junk under it first,
+	// and the real message was then "already ingested", answered 250
+	// and dropped, while the junk was what the webhook delivered. The
+	// id is still in the key, so an MTA retry of the same message is
+	// still one row, but a different message under the same id is a
+	// different message.
+	rec.DedupHash = dedupHash(rec.MessageID, sender, envelopeTo, parsed.Subject, rec.Size)
+	existing, err := s.Inbound.FindByDedupHash(ctx, d.ProjectID, rec.DedupHash)
+	if err != nil {
+		return nil, err
+	}
 
-		if existing != nil {
-			return existing, ErrDuplicate
-		}
-	} else {
-		rec.DedupHash = dedupHash(sender, envelopeTo, parsed.Subject, rec.Size)
-		existing, err := s.Inbound.FindByDedupHash(ctx, d.ProjectID, rec.DedupHash)
-		if err != nil {
-			return nil, err
-		}
-
-		if existing != nil {
-			return existing, ErrDuplicate
-		}
+	if existing != nil {
+		return existing, ErrDuplicate
 	}
 
 	for i, a := range parsed.Attachments {
@@ -464,14 +462,11 @@ func (s *Service) duplicateOf(ctx context.Context, rec *imodel.Email, err error)
 		existing *imodel.Email
 		lerr     error
 	)
-	switch {
-	case database.UniqueViolation(err, "idx_inbound_message_id"):
-		existing, lerr = s.Inbound.FindByMessageID(ctx, rec.ProjectID, rec.MessageID)
-	case database.UniqueViolation(err, "idx_inbound_dedup"):
-		existing, lerr = s.Inbound.FindByDedupHash(ctx, rec.ProjectID, rec.DedupHash)
-	default:
+	if !database.UniqueViolation(err, "idx_inbound_dedup") {
 		return nil
 	}
+
+	existing, lerr = s.Inbound.FindByDedupHash(ctx, rec.ProjectID, rec.DedupHash)
 
 	if lerr != nil || existing == nil {
 		// It refused a duplicate and then the row was not there. Report
@@ -508,9 +503,9 @@ func (s *Service) releaseAttachments(ctx context.Context, rec *imodel.Email) {
 
 // dedupHash fingerprints messages that carry no Message-ID so MTA
 // retries do not create duplicates.
-func dedupHash(sender string, recipients []string, subject string, size int64) string {
-	h := sha256.Sum256(fmt.Appendf(nil, "%s|%s|%s|%d",
-		strings.ToLower(sender), strings.ToLower(strings.Join(recipients, ",")), subject, size))
+func dedupHash(messageID, sender string, recipients []string, subject string, size int64) string {
+	h := sha256.Sum256(fmt.Appendf(nil, "%s|%s|%s|%s|%d",
+		messageID, strings.ToLower(sender), strings.ToLower(strings.Join(recipients, ",")), subject, size))
 
 	return hex.EncodeToString(h[:])
 }
