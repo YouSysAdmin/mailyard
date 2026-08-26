@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/mail"
 	"strings"
 	"time"
@@ -50,6 +51,37 @@ var protectedHeaders = map[string]struct{}{
 	"mime-version": {}, "content-type": {}, "content-transfer-encoding": {},
 	"list-unsubscribe": {}, "list-unsubscribe-post": {}, "return-path": {},
 	"message-id": {}, "received": {}, "dkim-signature": {},
+}
+
+// HeaderDisplayTo and HeaderDisplayCc are the keys under which the
+// client's own To and Cc headers ride in Email.Headers from submission
+// to the processor, which lifts them out before building. They are in
+// protectedHeaders, so a caller cannot smuggle either in.
+const (
+	HeaderDisplayTo = "To"
+	HeaderDisplayCc = "Cc"
+)
+
+// withDisplayRecipients returns the custom headers with the client's
+// To and Cc added under the reserved keys, or the headers unchanged
+// when the request carries neither. Copies rather than mutating the
+// request's map.
+func withDisplayRecipients(req *SendRequest) map[string]string {
+	if req.HeaderTo == "" && req.Cc == "" {
+		return req.Headers
+	}
+
+	out := make(map[string]string, len(req.Headers)+2)
+	maps.Copy(out, req.Headers)
+	if req.HeaderTo != "" {
+		out[HeaderDisplayTo] = req.HeaderTo
+	}
+
+	if req.Cc != "" {
+		out[HeaderDisplayCc] = req.Cc
+	}
+
+	return out
 }
 
 // validHeaderName reports whether name is an RFC 5322 field name: one
@@ -181,9 +213,22 @@ func EventPayload(e *emailmodel.Email) map[string]any {
 // it before the row exists). The ListUnsubscribe fields stamp
 // RFC 2369 / 8058 headers.
 type SendRequest struct {
-	ID                    string
-	From                  string
-	To                    []string
+	ID   string
+	From string
+
+	// To is the envelope - who the message is delivered to.
+	To []string
+
+	// HeaderTo and Cc are the To and Cc headers as the CLIENT wrote
+	// them, when they differ from the envelope. Only submission sets
+	// them: a recipient the client put in Bcc arrives as an RCPT TO
+	// with no header naming it, and printing the envelope as To showed
+	// every Bcc address to every other recipient. Stored under the
+	// reserved keys in Email.Headers, which is why Validate refuses
+	// those keys from a caller.
+	HeaderTo string
+	Cc       string
+
 	Subject               string
 	HTML                  string
 	Text                  string
@@ -260,6 +305,10 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 
 	if _, err := mail.ParseAddress(req.From); err != nil {
 		return reqErrf("from address %q is invalid", req.From)
+	}
+
+	if strings.ContainsAny(req.HeaderTo, "\r\n") || strings.ContainsAny(req.Cc, "\r\n") {
+		return reqErrf("a recipient header contains a line break")
 	}
 
 	if len(req.To) == 0 {
@@ -538,7 +587,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		HTMLBody:              req.HTML,
 		TextBody:              req.Text,
 		Attachments:           req.Attachments,
-		Headers:               req.Headers,
+		Headers:               withDisplayRecipients(req),
 		ListUnsubscribeURL:    req.ListUnsubscribeURL,
 		ListUnsubscribeMailto: req.ListUnsubscribeMailto,
 		UnsubscribeListID:     req.UnsubscribeListID,

@@ -30,8 +30,21 @@ type Message struct {
 	// EnvelopeFrom overrides the SMTP MAIL FROM when non-empty. The
 	// From header is untouched - this is the bounce path (what
 	// receivers record as Return-Path), not the visible sender.
-	EnvelopeFrom          string
-	To                    []string
+	EnvelopeFrom string
+
+	// To is the ENVELOPE: every RCPT TO. It is also the To header
+	// unless HeaderTo says otherwise.
+	To []string
+
+	// HeaderTo and Cc are what the message DISPLAYS, when that is not
+	// the envelope. Submission sets them from the client's own headers:
+	// an SMTP client sends a Bcc recipient as an RCPT TO and leaves it
+	// out of the headers, and rebuilding To from the envelope printed
+	// every Bcc address for every other recipient to read. Empty means
+	// To is the header, which is what the API path wants.
+	HeaderTo string
+	Cc       string
+
 	Subject               string
 	HTML                  string
 	Text                  string
@@ -140,12 +153,20 @@ func (m *Message) Build() []byte {
 	// somehow arrives with CR or LF loses them rather than becoming a
 	// second header in a message the platform then DKIM-signs.
 	fmt.Fprintf(&b, "From: %s\r\n", headerSafe(m.From))
-	to := make([]string, len(m.To))
-	for i, addr := range m.To {
-		to[i] = headerSafe(addr)
+	headerTo := m.HeaderTo
+	if headerTo == "" {
+		to := make([]string, len(m.To))
+		for i, addr := range m.To {
+			to[i] = headerSafe(addr)
+		}
+
+		headerTo = strings.Join(to, ", ")
 	}
 
-	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(to, ", "))
+	fmt.Fprintf(&b, "To: %s\r\n", headerSafe(headerTo))
+	if m.Cc != "" {
+		fmt.Fprintf(&b, "Cc: %s\r\n", headerSafe(m.Cc))
+	}
 	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", m.Subject))
 	// Date and Message-ID are mandatory originator fields (RFC 5322
 	// section 3.6). We emitted neither, and relied on whatever the

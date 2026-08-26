@@ -25,3 +25,25 @@ func TestBuildNeverEmitsAnInjectedHeader(t *testing.T) {
 		}
 	}
 }
+
+// The envelope is delivery, the header is display. A Bcc recipient is
+// an RCPT TO the client left out of its headers, and rebuilding To from
+// the envelope printed it for every other recipient.
+func TestBuildKeepsTheClientsToHeaderOverTheEnvelope(t *testing.T) {
+	m := &Message{
+		From:     "you@example.com",
+		To:       []string{"a@example.com", "hidden@example.com"},
+		HeaderTo: "a@example.com",
+		Cc:       "c@example.com",
+		Subject:  "s",
+		Text:     "body",
+	}
+	raw := string(m.Build())
+	if strings.Contains(raw, "hidden@example.com") {
+		t.Fatalf("a Bcc recipient was printed in the headers:\n%s", raw)
+	}
+
+	if !strings.Contains(raw, "To: a@example.com\r\n") || !strings.Contains(raw, "Cc: c@example.com\r\n") {
+		t.Fatalf("client To/Cc headers were not written:\n%s", raw)
+	}
+}

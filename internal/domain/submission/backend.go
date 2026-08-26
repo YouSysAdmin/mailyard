@@ -468,9 +468,15 @@ func (s *session) Data(r io.Reader) (err error) {
 		})
 	}
 
+	// The envelope is who gets the message, the headers are what it
+	// says. An SMTP client's Bcc is an RCPT TO with no header naming
+	// it, so the To header is the CLIENT's, never rebuilt from the
+	// envelope - that printed every Bcc address to every recipient.
 	req := &email.SendRequest{
 		From:        s.from,
 		To:          s.to,
+		HeaderTo:    strings.Join(parsed.To, ", "),
+		Cc:          strings.Join(parsed.Cc, ", "),
 		Subject:     parsed.Subject,
 		HTML:        parsed.HTMLBody,
 		Text:        parsed.TextBody,

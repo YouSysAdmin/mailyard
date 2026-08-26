@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 
@@ -156,17 +157,30 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		text = render.HTMLToText(e.HTMLBody)
 	}
 
+	// The client's own To and Cc, if submission stored them, come out
+	// of the header map and into the fields the builder writes them
+	// from - left in the map they would be written twice.
+	headers := e.Headers
+	headerTo, cc := headers[HeaderDisplayTo], headers[HeaderDisplayCc]
+	if headerTo != "" || cc != "" {
+		headers = maps.Clone(headers)
+		delete(headers, HeaderDisplayTo)
+		delete(headers, HeaderDisplayCc)
+	}
+
 	msg := &smtpclient.Message{
 		From: e.Sender,
 		// EnvelopeFrom is filled per candidate inside the failover
 		// loop, not here - see returnPathFor.
 		EmailID:               e.ID,
 		To:                    e.Recipients,
+		HeaderTo:              headerTo,
+		Cc:                    cc,
 		Subject:               e.Subject,
 		HTML:                  e.HTMLBody,
 		Text:                  text,
 		Attachments:           toClientAttachments(attachments),
-		Headers:               e.Headers,
+		Headers:               headers,
 		ListUnsubscribeURL:    e.ListUnsubscribeURL,
 		ListUnsubscribeMailto: e.ListUnsubscribeMailto,
 		ListUnsubscribePost:   e.ListUnsubscribePost,
