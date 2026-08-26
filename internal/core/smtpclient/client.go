@@ -17,6 +17,8 @@ import (
 	"net/textproto"
 	"strings"
 	"time"
+
+	"github.com/yousysadmin/mailyard/internal/core/safedial"
 )
 
 // Encryption modes for ServerConfig.Encryption.
@@ -42,6 +44,15 @@ type ServerConfig struct {
 	// empty so no AUTH is attempted. Nil everywhere else, which keeps
 	// the ordinary dial exactly as it was.
 	TLS *tls.Config
+
+	// GuardPrivate refuses a Host that resolves to loopback, RFC 1918
+	// or other reserved space, the way safedial does for webhooks. Set
+	// for a server a PROJECT configured: host and port are a tenant's
+	// choice, and without the guard the "test connection" button is a
+	// port scanner of the deployment's own network, with the peer's
+	// banner in the answer. Zero for the shared pool and relay nodes,
+	// which an operator placed and which often ARE on this network.
+	GuardPrivate bool
 }
 
 func (c ServerConfig) addr() string { return fmt.Sprintf("%s:%d", c.Host, c.Port) }
@@ -159,8 +170,10 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 	// A bounded dial. Without one a blackholed host held the caller
 	// for the kernel's SYN timeout - over a minute - and the console's
 	// server test, which reaches this on a request, held the request
-	// with it.
-	dialer := &net.Dialer{Timeout: dialTimeout}
+	// with it. The address guard rides in the same dialer, after
+	// resolution, so a name that resolves to a private address is
+	// refused wherever it resolves - see safedial.
+	dialer := safedial.Dialer(dialTimeout, !cfg.GuardPrivate)
 	switch cfg.Encryption {
 	case EncryptionSSL:
 		conn, err := tls.DialWithDialer(dialer, "tcp", cfg.addr(), tlsConfig)

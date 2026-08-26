@@ -45,6 +45,12 @@ type Processor struct {
 	// project's address. See returnPathFor.
 	BounceAddress string
 
+	// AllowPrivateSMTP is sending.allow_private_smtp_targets: the
+	// operator saying a project's server may sit on this network. It
+	// clears the guard Server.Spec set from tenancy, and only that -
+	// the shared pool and relay nodes never had it.
+	AllowPrivateSMTP bool
+
 	// RelayClient supplies the certificate a worker presents to a
 	// relay node, and the authority to verify the node against. Nil
 	// when relay nodes are not configured, in which case a node can
@@ -261,7 +267,12 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 			continue
 		}
 
-		sendErr = p.deliver(ctx, srv.Spec(nodeTLS), msg)
+		spec := srv.Spec(nodeTLS)
+		if p.AllowPrivateSMTP {
+			spec.GuardPrivate = false
+		}
+
+		sendErr = p.deliver(ctx, spec, msg)
 		if sendErr == nil {
 			if i > 0 {
 				p.Log.Info("email: delivered after failover",

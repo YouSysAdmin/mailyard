@@ -1,6 +1,7 @@
 package safedial
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -95,5 +96,24 @@ func TestClientDoesNotFollowRedirects(t *testing.T) {
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("status = %d, want %d (the redirect itself, unfollowed)",
 			resp.StatusCode, http.StatusFound)
+	}
+}
+
+// Dialer is the guard for a protocol that is not HTTP - the SMTP client
+// dials with it. The check has to fire before the connection exists, so
+// no listener is needed here: a refused address is refused whether or
+// not anything answers on it.
+func TestDialerRefusesLoopback(t *testing.T) {
+	var blocked *ErrBlocked
+	_, err := Dialer(time.Second, false).Dial("tcp", "127.0.0.1:25")
+	if !errors.As(err, &blocked) {
+		t.Fatalf("guarded dial to loopback: got %v, want ErrBlocked", err)
+	}
+
+	// The escape hatch is a plain dialer: whatever happens, it is not
+	// the guard refusing.
+	_, err = Dialer(200*time.Millisecond, true).Dial("tcp", "127.0.0.1:1")
+	if errors.As(err, &blocked) {
+		t.Fatal("allowPrivate dialer still refused loopback")
 	}
 }

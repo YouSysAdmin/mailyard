@@ -70,6 +70,14 @@ type Spec struct {
 	// provider that speaks HTTPS to an API.
 	TLS *tls.Config
 
+	// GuardPrivate refuses a destination inside the deployment's own
+	// network - the SMTP host, or an API endpoint override. Set by
+	// smtpserver.Server.Spec for a row a project owns, because its
+	// host is a tenant's choice. Zero for the shared pool and for a
+	// relay node, both placed by an operator, and cleared by the
+	// operator's sending.allow_private_smtp_targets.
+	GuardPrivate bool
+
 	// Options are the provider's non-secret settings, from the row's
 	// provider_config column: a SES region, a configuration set name.
 	//

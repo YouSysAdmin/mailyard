@@ -342,6 +342,7 @@ Caps applied to every send, on both the console API and the machine API.
 | `MAILYARD_SENDING_MAX_RECIPIENTS`            | `50`       | Recipients per message                    |
 | `MAILYARD_SENDING_MAX_ATTACHMENT_SIZE`       | `10485760` | Bytes per attachment (10 MiB)             |
 | `MAILYARD_SENDING_MAX_TOTAL_ATTACHMENT_SIZE` | `26214400` | Bytes of attachments per message (25 MiB) |
+| `MAILYARD_SENDING_ALLOW_PRIVATE_SMTP_TARGETS` | `false`    | Let a project's SMTP server point at a private or reserved address |
 
 {{< callout type="warning" title="These size limits set the HTTP body limit" >}}
 Attachments travel base64-encoded, which inflates them by 4/3, so the request body cap is computed from

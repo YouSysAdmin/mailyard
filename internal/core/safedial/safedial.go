@@ -114,6 +114,37 @@ func HostAllowed(ctx context.Context, host string) bool {
 	return true
 }
 
+// Dialer returns a net.Dialer that refuses private destinations, for
+// a protocol that is not HTTP - the SMTP client dials with it. The same
+// guard as Client, in the same place: the Control hook, after the name
+// has resolved. allowPrivate returns a plain bounded dialer.
+func Dialer(timeout time.Duration, allowPrivate bool) *net.Dialer {
+	d := &net.Dialer{Timeout: timeout}
+	if !allowPrivate {
+		d.Control = Control
+	}
+
+	return d
+}
+
+// Control is the dialer hook that enforces AddrAllowed. Exported so a
+// caller building a dialer of its own can attach exactly this.
+func Control(_, address string, _ syscall.RawConn) error {
+	// address is host:port with the host already resolved to a
+	// literal, which is why this check cannot be rebound.
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return &ErrBlocked{Addr: address}
+	}
+
+	ip, err := netip.ParseAddr(host)
+	if err != nil || !AddrAllowed(ip) {
+		return &ErrBlocked{Addr: host}
+	}
+
+	return nil
+}
+
 // Client returns an http.Client that refuses private destinations and
 // does not follow redirects.
 //
@@ -136,25 +167,8 @@ func Client(timeout time.Duration, allowPrivate bool) *http.Client {
 		return c
 	}
 
-	d := &net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: 30 * time.Second,
-		Control: func(_, address string, _ syscall.RawConn) error {
-			// address is host:port with the host already resolved to a
-			// literal, which is why this check cannot be rebound.
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return &ErrBlocked{Addr: address}
-			}
-
-			ip, err := netip.ParseAddr(host)
-			if err != nil || !AddrAllowed(ip) {
-				return &ErrBlocked{Addr: host}
-			}
-
-			return nil
-		},
-	}
+	d := Dialer(timeout, false)
+	d.KeepAlive = 30 * time.Second
 	c.Transport = &http.Transport{
 		DialContext:           d.DialContext,
 		ForceAttemptHTTP2:     true,

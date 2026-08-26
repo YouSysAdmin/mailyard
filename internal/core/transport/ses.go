@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
+	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 )
 
@@ -49,6 +51,9 @@ const (
 	OptSESEndpoint = "endpoint"
 )
 
+// sesHTTPTimeout bounds one API call, raw message included.
+const sesHTTPTimeout = 60 * time.Second
+
 // sesMaxRawBytes is the ceiling SES puts on one raw message.
 //
 // 10 MiB, which is below sending.max_total_attachment_size (25 MiB by
@@ -81,6 +86,12 @@ func openSES(spec Spec) (Transport, error) {
 		if ep := spec.Option(OptSESEndpoint); ep != "" {
 			o.BaseEndpoint = aws.String(ep)
 		}
+
+		// The SDK's own client would follow the endpoint override
+		// anywhere, including into the metadata service. Ours refuses a
+		// private address on a tenant's row and costs nothing on the
+		// real endpoint, which is public.
+		o.HTTPClient = safedial.Client(sesHTTPTimeout, !spec.GuardPrivate)
 	}}
 
 	if spec.Username != "" {

@@ -392,6 +392,15 @@ type SendingConfig struct {
 	// permanently rejects a recipient (5xx at RCPT TO). Default true.
 	AutoSuppressOnReject bool `mapstructure:"auto_suppress_on_reject"`
 
+	// AllowPrivateSMTPTargets lets a PROJECT's smtp server point at
+	// loopback, RFC 1918 and other reserved addresses. Off by default,
+	// for the reason webhook.allow_private_targets is: host and port
+	// are a project member's choice, and the connection test returns
+	// the peer's banner, which makes it a scanner of this network.
+	// The shared pool and relay nodes are not subject to the guard at
+	// all - an operator placed those, and they often are private.
+	AllowPrivateSMTPTargets bool `mapstructure:"allow_private_smtp_targets"`
+
 	// SPFInclude is the host tenants name in their SPF record, e.g.
 	// "_spf.mail.example.com". Only this installation knows it, so the
 	// default is empty and the console asks for it rather than
@@ -800,6 +809,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("sending.max_attachment_size", 10*1024*1024)
 	v.SetDefault("sending.max_total_attachment_size", 25*1024*1024)
 	v.SetDefault("sending.auto_suppress_on_reject", true)
+	v.SetDefault("sending.allow_private_smtp_targets", false)
 	v.SetDefault("sending.spf_include", "")
 	v.SetDefault("sending.bounce_address", "")
 	v.SetDefault("webhook.timeout", "10s")

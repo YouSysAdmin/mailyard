@@ -188,16 +188,25 @@ func (s *Server) Normalize() {
 // project, no group, no status. The TLS override is resolved by the
 // caller, because for a relay node it needs a certificate this package
 // cannot reach.
+//
+// GuardPrivate is decided HERE, from tenancy, because this is the one
+// place a row becomes a dial target: a project's own server gets the
+// guard, since its host is whatever a member typed. A shared server
+// (no ProjectID - resolveShared hands back the embedded value) and a
+// relay node were placed by an operator and frequently sit on this
+// very network, so they do not. The operator's global override is
+// applied by the caller, which is where the config is.
 func (s *Server) Spec(nodeTLS *tls.Config) transport.Spec {
 	return transport.Spec{
-		Provider:   s.Provider,
-		Host:       s.Host,
-		Port:       s.Port,
-		Username:   s.Username,
-		Password:   s.Password,
-		Encryption: s.Encryption,
-		TLS:        nodeTLS,
-		Options:    s.ProviderConfig,
+		Provider:     s.Provider,
+		Host:         s.Host,
+		Port:         s.Port,
+		Username:     s.Username,
+		Password:     s.Password,
+		Encryption:   s.Encryption,
+		TLS:          nodeTLS,
+		Options:      s.ProviderConfig,
+		GuardPrivate: s.ProjectID != "" && !s.IsNode(),
 	}
 }
 

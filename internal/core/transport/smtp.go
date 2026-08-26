@@ -22,12 +22,13 @@ type smtpTransport struct {
 
 func openSMTP(spec Spec) (Transport, error) {
 	return &smtpTransport{cfg: smtpclient.ServerConfig{
-		Host:       spec.Host,
-		Port:       spec.Port,
-		Username:   spec.Username,
-		Password:   spec.Password,
-		Encryption: spec.Encryption,
-		TLS:        spec.TLS,
+		Host:         spec.Host,
+		Port:         spec.Port,
+		Username:     spec.Username,
+		Password:     spec.Password,
+		Encryption:   spec.Encryption,
+		TLS:          spec.TLS,
+		GuardPrivate: spec.GuardPrivate,
 	}}, nil
 }
 

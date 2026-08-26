@@ -234,7 +234,8 @@ func (h *SharedHandler) Test(c fiber.Ctx) error {
 	}
 
 	now := new(time.Now().UTC())
-	testErr := testTransport(c.Context(), &srv.Server, h.Runtime.RelayNodeTLS)
+	testErr := testTransport(c.Context(), &srv.Server, h.Runtime.RelayNodeTLS,
+		h.Runtime.Config.Sending.AllowPrivateSMTPTargets)
 	if testErr != nil {
 		if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
 			srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {

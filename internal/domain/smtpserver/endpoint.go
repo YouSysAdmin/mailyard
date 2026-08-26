@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -15,6 +16,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/transport"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -101,6 +103,10 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return response.BadRequest(c, err.Error())
 	}
 
+	if ok, resp := h.refusePrivateTarget(c, srv); !ok {
+		return resp
+	}
+
 	groupID, resp, ok := h.resolveGroup(c, rc.Project.ID, in.GroupID)
 	if !ok {
 		return resp
@@ -181,6 +187,10 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		if err := transport.ValidateOptions(srv.Provider, srv.ProviderConfig); err != nil {
 			return response.BadRequest(c, err.Error())
 		}
+	}
+
+	if ok, resp := h.refusePrivateTarget(c, srv); !ok {
+		return resp
 	}
 
 	if in.SESTopicARN != nil {
@@ -264,7 +274,8 @@ func (h *Handler) Test(c fiber.Ctx) error {
 	// Through the provider, so "test" means whatever proving reachability
 	// means for it: a dial and an AUTH for SMTP, an account read for an
 	// API. Neither sends anything.
-	testErr := testTransport(c.Context(), srv, h.Runtime.RelayNodeTLS)
+	testErr := testTransport(c.Context(), srv, h.Runtime.RelayNodeTLS,
+		h.Runtime.Config.Sending.AllowPrivateSMTPTargets)
 	if testErr != nil {
 		if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 			rc.Project.ID, srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {
@@ -384,8 +395,11 @@ func (h *Handler) invalidateSESTopics() {
 // delivers perfectly well, and then WROTE that verdict onto the row,
 // which is what takes a node out of the rotation. The delivery path
 // resolves the same thing in email.Processor.nodeTLS.
+//
+// allowPrivate is the operator's sending.allow_private_smtp_targets,
+// applied the way the delivery worker applies it.
 func testTransport(ctx context.Context, srv *ssmodel.Server,
-	nodeTLS func(context.Context, string) (*tls.Config, error)) error {
+	nodeTLS func(context.Context, string) (*tls.Config, error), allowPrivate bool) error {
 	var dialTLS *tls.Config
 	if srv.IsNode() {
 		if nodeTLS == nil {
@@ -403,7 +417,12 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 		dialTLS = built
 	}
 
-	t, err := transport.Open(srv.Spec(dialTLS))
+	spec := srv.Spec(dialTLS)
+	if allowPrivate {
+		spec.GuardPrivate = false
+	}
+
+	t, err := transport.Open(spec)
 	if err != nil {
 		// A row naming a provider that will not open is a configuration
 		// error, and reporting it as the test result is exactly right:
@@ -412,4 +431,36 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 	}
 
 	return t.Test(ctx)
+}
+
+// refusePrivateTarget is the courtesy half of the guard the dialer
+// enforces: a project server whose host, or whose provider endpoint
+// override, resolves to a private address is refused at the write so
+// the member finds out now rather than from a failed test. A courtesy
+// and not the control, because a name can resolve differently between
+// this moment and the dial - safedial in the transport is what holds.
+// Off with sending.allow_private_smtp_targets, like the dialer.
+func (h *Handler) refusePrivateTarget(c fiber.Ctx, srv *ssmodel.Server) (bool, error) {
+	if h.Runtime.Config.Sending.AllowPrivateSMTPTargets || !srv.Spec(nil).GuardPrivate {
+		return true, nil
+	}
+
+	const msg = "the server targets a private or reserved address, which is refused " +
+		"(the operator can set sending.allow_private_smtp_targets to permit it)"
+	if srv.Host != "" && !safedial.HostAllowed(c.Context(), srv.Host) {
+		return false, response.BadRequest(c, msg)
+	}
+
+	if ep := srv.ProviderConfig[transport.OptSESEndpoint]; ep != "" {
+		u, err := url.Parse(ep)
+		if err != nil || u.Hostname() == "" {
+			return false, response.BadRequest(c, transport.OptSESEndpoint+" is not a valid absolute url")
+		}
+
+		if !safedial.HostAllowed(c.Context(), u.Hostname()) {
+			return false, response.BadRequest(c, msg)
+		}
+	}
+
+	return true, nil
 }

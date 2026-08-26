@@ -47,6 +47,16 @@ nothing, is a legitimate configuration. The password is sealed at rest and never
 Verify SMTP credentials and connectivity before sending via `POST /api/v1/smtp-servers/{id}/test`. This validates the
 hostname, port, credentials, and encryption.
 
+{{< callout type="warning" title="Private network targets are refused" >}}
+A project's server cannot point at loopback, RFC 1918 or other reserved address space, and neither can a provider's
+`endpoint` override. The host is a project member's choice and the connection test reports what the peer answered, so
+without that guard the button is a scanner of the network Mailyard runs in. The check happens when the row is written
+and again at every dial, after the name has resolved.
+
+`sending.allow_private_smtp_targets` lifts it, for a relay that genuinely is on the same network. The shared pool and
+relay nodes are never subject to it - an operator placed those.
+{{< /callout >}}
+
 ## Sender Restrictions
 
 Use `allowed_emails` to restrict which sender addresses can use a specific SMTP server. This is useful when different

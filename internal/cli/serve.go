@@ -384,12 +384,13 @@ func runServe(cmd *cobra.Command, r role) error {
 	// places a node is dialled from: the worker, the console's Test
 	// button (see smtpserver.testTransport) and platform mail.
 	worker := queue.NewWorker(st.Email, &email.Processor{
-		Store:         st,
-		Log:           log,
-		AutoSuppress:  cfg.Sending.AutoSuppressOnReject,
-		Blob:          rt.Blob,
-		BounceAddress: strings.TrimSpace(cfg.Sending.BounceAddress),
-		RelayClient:   relayClient,
+		Store:            st,
+		Log:              log,
+		AutoSuppress:     cfg.Sending.AutoSuppressOnReject,
+		AllowPrivateSMTP: cfg.Sending.AllowPrivateSMTPTargets,
+		Blob:             rt.Blob,
+		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
+		RelayClient:      relayClient,
 	}, queue.Config{
 		Concurrency:    cfg.Worker.Concurrency,
 		PollInterval:   cfg.Worker.PollInterval,
