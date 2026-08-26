@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -205,7 +206,7 @@ func (h *Handler) Click(c fiber.Ctx) error {
 		slog.Debug("tracking: click not recorded, automated fetch",
 			"email_id", emailID, "matched", reason, "user_agent", ua)
 
-		return c.Redirect().Status(fiber.StatusFound).To(link.OriginalURL)
+		return redirectToTracked(c, link.OriginalURL)
 	}
 
 	now := time.Now().UTC()
@@ -234,7 +235,7 @@ func (h *Handler) Click(c fiber.Ctx) error {
 		slog.Debug("tracking: click counted but not recorded, the event ceiling is reached",
 			"email_id", emailID, "clicks", clicks, "ceiling", trackedEventsPerEmail)
 
-		return c.Redirect().Status(fiber.StatusFound).To(link.OriginalURL)
+		return redirectToTracked(c, link.OriginalURL)
 	}
 
 	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
@@ -245,7 +246,7 @@ func (h *Handler) Click(c fiber.Ctx) error {
 		slog.Error("tracking: record click", "email_id", emailID, "err", err)
 	}
 
-	return c.Redirect().Status(fiber.StatusFound).To(link.OriginalURL)
+	return redirectToTracked(c, link.OriginalURL)
 }
 
 // UnsubscribePage shows the confirmation page (a GET must not mutate:
@@ -266,9 +267,9 @@ func (h *Handler) UnsubscribePage(c fiber.Ctx) error {
 			"This unsubscribe link is invalid or incomplete.")
 	}
 
-	body := fmt.Sprintf(`<p>Click the button below to stop receiving %s emails.</p>
+	body := pageBody(fmt.Sprintf(`<p>Click the button below to stop receiving %s emails.</p>
 <form method="post" action="/tracking/unsubscribe/%s"><button type="submit">Unsubscribe</button></form>`,
-		html.EscapeString(scope), html.EscapeString(token))
+		html.EscapeString(scope), html.EscapeString(token)))
 
 	return pageResponse(c, fiber.StatusOK, "Unsubscribe", body)
 }
@@ -302,7 +303,7 @@ func (h *Handler) listUnsubscribe(c fiber.Ctx, listID, email string) error {
 	slog.Info("tracking: list unsubscribed", "list_id", l.ID, "project_id", l.ProjectID)
 
 	return pageResponse(c, fiber.StatusOK, "Unsubscribed",
-		"You will no longer receive "+html.EscapeString(l.Display())+" emails. Other messages are unaffected.")
+		pageBody("You will no longer receive "+html.EscapeString(l.Display())+" emails. Other messages are unaffected."))
 }
 
 // UnsubscribeConfirm performs the opt-out. RFC 8058 one-click POSTs
@@ -383,7 +384,7 @@ func (h *Handler) WebView(c fiber.Ctx) error {
 	emailID, err := h.signer().VerifyWebViewToken(c.Params("token"))
 	if err != nil {
 		status := fiber.StatusNotFound
-		msg := "This link is invalid or incomplete."
+		msg := pageBody("This link is invalid or incomplete.")
 		if strings.Contains(err.Error(), "expired") {
 			status = fiber.StatusGone
 			msg = "This message is no longer available online."
@@ -407,8 +408,34 @@ func (h *Handler) WebView(c fiber.Ctx) error {
 	return c.SendString("<pre>" + html.EscapeString(e.TextBody) + "</pre>")
 }
 
-// pageResponse renders the minimal hosted page shell.
-func pageResponse(c fiber.Ctx, status int, title, body string) error {
+// redirectToTracked sends the reader on to the link a message carried.
+//
+// The scheme is checked again here although the writer of tracked_links
+// (tracking.ProcessHTML) only ever captures http and https: this is an
+// open redirect on our own domain by design, and the one thing that
+// would turn it from "any page the sender linked" into "run this in the
+// reader's browser" is a javascript: or data: target. Two writers of
+// that table agreeing is what keeps this a formality - the check is for
+// the day there is a third.
+func redirectToTracked(c fiber.Ctx, target string) error {
+	u, err := url.Parse(target)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return pageResponse(c, fiber.StatusNotFound, "Link invalid", "This link is invalid or incomplete.")
+	}
+
+	return c.Redirect().Status(fiber.StatusFound).To(target)
+}
+
+// pageBody is markup pageResponse writes into the page UNESCAPED. A
+// distinct type rather than string so that a constant literal converts
+// on its own while a value built at runtime has to be wrapped - and the
+// wrap is where the reader looks for the html.EscapeString that has to
+// have happened. Every one of these pages is open to the world.
+type pageBody string
+
+// pageResponse renders the minimal hosted page shell. title is escaped
+// here, body is trusted - see pageBody.
+func pageResponse(c fiber.Ctx, status int, title string, body pageBody) error {
 	c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 
 	return c.Status(status).SendString(fmt.Sprintf(`<!DOCTYPE html>
