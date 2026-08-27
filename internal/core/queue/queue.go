@@ -37,6 +37,11 @@ const (
 	// KindSuppressed - every recipient is suppressed, finalize as
 	// suppressed.
 	KindSuppressed
+
+	// KindHanded - the message was handed to something else to
+	// deliver, which will report the outcome later. The row stays
+	// processing and the worker does nothing more with it.
+	KindHanded
 )
 
 // Outcome is the processor's verdict on one job.
@@ -57,6 +62,10 @@ type Outcome struct {
 // Done is the terminal success outcome: the message left and nothing
 // is retried.
 func Done() Outcome { return Outcome{Kind: KindDone} }
+
+// Handed is neither terminal nor a retry: another party holds the
+// message and will finish it through Worker.Complete.
+func Handed() Outcome { return Outcome{Kind: KindHanded} }
 
 // DoneVia is Done plus the server that carried it.
 func DoneVia(serverID string) Outcome {

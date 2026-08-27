@@ -62,7 +62,23 @@ type Processor struct {
 	// candidate names, which is what production does - the seam exists
 	// so the failover walk can be tested against scripted outcomes
 	// instead of real listeners or a real API.
+
+	// Pull hands a message to a relay node that cannot be dialled -
+	// see PullAssigner. Nil where no node pulls, which is every
+	// community installation: the candidate is then dialled as any
+	// other server is.
+	Pull PullAssigner
+
 	send func(context.Context, transport.Spec, *smtpclient.Message) error
+}
+
+// PullAssigner is the seam to relay nodes in pull mode. Target says
+// whether the candidate server is such a node and names it, Assign
+// hands it the finished bytes. After Assign the row is the node's: the
+// processor answers Handed and the node's report ends it.
+type PullAssigner interface {
+	Target(ctx context.Context, srv *ssmodel.Server) (nodeID string, ok bool, err error)
+	Assign(ctx context.Context, e *emailmodel.Email, nodeID, serverID, envelopeFrom string, raw []byte) error
 }
 
 // RelayClientSource hands out the worker's client identity. An
@@ -251,6 +267,33 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		// whichever IP connected. Carrying one server's return path
 		// onto another's IP is a guaranteed SPF failure.
 		msg.EnvelopeFrom = p.returnPathFor(ctx, e, srv)
+
+		// A relay node that PULLS is not dialled at all. The finished
+		// bytes - signed, return path set, for THIS candidate - are
+		// handed over, and the node's report is what ends the row. A
+		// failed hand-over is a failed candidate like any other and
+		// the walk goes on.
+		if p.Pull != nil && srv.IsNode() {
+			nodeID, pulls, perr := p.Pull.Target(ctx, srv)
+			if perr != nil {
+				sendErr = perr
+				continue
+			}
+
+			if pulls {
+				raw, rerr := transport.RawMessage(msg)
+				if rerr != nil {
+					return queue.Retry(rerr)
+				}
+
+				if aerr := p.Pull.Assign(ctx, e, nodeID, srv.ID, msg.EnvelopeFrom, raw); aerr != nil {
+					sendErr = aerr
+					continue
+				}
+
+				return queue.Handed()
+			}
+		}
 
 		// A relay node is dialled differently: mutual TLS with our own
 		// certificate authority and no AUTH at all. Resolved per

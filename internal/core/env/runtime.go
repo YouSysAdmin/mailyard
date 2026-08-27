@@ -3,6 +3,7 @@ package env
 import (
 	"context"
 	"crypto/tls"
+	"github.com/yousysadmin/mailyard/internal/core/bell"
 	"log/slog"
 
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
@@ -65,6 +66,12 @@ type Runtime struct {
 	// a node's certificate is signed by our own authority and can
 	// never verify against the system roots.
 	RelayNodeTLS func(ctx context.Context, host string) (*tls.Config, error)
+
+	// RelayBell wakes the long-poll a pull relay node parks on the
+	// claim route when a message is assigned to it. Always set. Rung
+	// from the LISTEN/NOTIFY relay so an assignment made on a worker
+	// node reaches a poll parked on an api node.
+	RelayBell *bell.Bell
 
 	// Tracking signs the public /t/ URLs. Always set in serve.go,
 	// disabled (Enabled() false) when server.public_url is empty.

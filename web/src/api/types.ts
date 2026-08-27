@@ -150,6 +150,9 @@ export interface RelayNode {
   inbound_enabled: boolean
   inbound_queued: number
   last_inbound_at?: string
+  // How mail reaches the node: dialled by the worker, or claimed by the
+  // node over the control channel because it cannot be dialled.
+  mode: 'listen' | 'pull'
 }
 
 // SharedSMTPServer is a platform-owned server, the fallback for

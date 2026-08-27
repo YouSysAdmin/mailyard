@@ -22,6 +22,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
 	coreaudit "github.com/yousysadmin/mailyard/internal/core/audit"
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
+	"github.com/yousysadmin/mailyard/internal/core/bell"
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/certexpiry"
 	"github.com/yousysadmin/mailyard/internal/core/cron"
@@ -383,7 +384,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// was resolved beside SystemMail above - one identity for the three
 	// places a node is dialled from: the worker, the console's Test
 	// button (see smtpserver.testTransport) and platform mail.
-	worker := queue.NewWorker(st.Email, &email.Processor{
+	processor := &email.Processor{
 		Store:            st,
 		Log:              log,
 		AutoSuppress:     cfg.Sending.AutoSuppressOnReject,
@@ -391,7 +392,8 @@ func runServe(cmd *cobra.Command, r role) error {
 		Blob:             rt.Blob,
 		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
 		RelayClient:      relayClient,
-	}, queue.Config{
+	}
+	worker := queue.NewWorker(st.Email, processor, queue.Config{
 		Concurrency:    cfg.Worker.Concurrency,
 		PollInterval:   cfg.Worker.PollInterval,
 		MaxAttempts:    cfg.Worker.MaxAttempts,
@@ -507,6 +509,13 @@ func runServe(cmd *cobra.Command, r role) error {
 		listener.Subscribe(postgres.ChannelCampaign, runner.WakeLocal)
 	}
 
+	// The relay bell is rung from the same relay, on every role: the
+	// claim long-poll parks on an api node and the assignment is made
+	// on a worker node.
+	rt.RelayBell = &bell.Bell{}
+	listener.Subscribe(postgres.ChannelRelayAssign, rt.RelayBell.Ring)
+	editionQueueWiring(rt, listener, processor)
+
 	listener.Start(workerCtx)
 
 	// TLS: one builder for every listener so identical blocks share a
@@ -562,6 +571,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// concurrently on several nodes - they are all delete-by-age
 	// sweeps - so no leader election is needed.
 	rt.Cron = cron.New(log)
+	editionJobs(rt, r.worker)
 
 	// Alerts: an in-app notification that means something is WRONG also
 	// goes out as mail. The raiser calls it rather than alertmail

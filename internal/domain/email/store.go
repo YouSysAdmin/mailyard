@@ -112,10 +112,21 @@ RETURNING ` + emailColumns
 //
 // Typed out and covered by TestTheClaimNamesTheStatusesItMeans, for the
 // reason on claimDueSQL above.
+//
+// A row handed to a PULL relay node is processing for the life of its
+// assignment, which is longer than a claim - the node is delivering
+// it, and taking it back while the node still holds it delivers it
+// twice. So a live assignment excludes the row here, and the
+// assignment sweep (relaynode) is what returns it when the node stops
+// saying it has it.
 const recoverStuckSQL = `
 UPDATE emails
 SET status = ?, claimed_at = NULL, next_attempt_at = ?
-WHERE status = 'processing' AND claimed_at < ?`
+WHERE status = 'processing' AND claimed_at < ?
+  AND NOT EXISTS (
+      SELECT 1 FROM relay_assignments ra
+      WHERE ra.email_id = emails.id AND ra.expires_at > ?
+  )`
 
 // addressMatchClause is the predicate that decides whether a stored
 // message involves one address.
@@ -448,8 +459,9 @@ func (s *Store) Finalize(ctx context.Context, id string, createdAt time.Time, st
 // RecoverStuck returns messages abandoned mid-flight - a node that
 // died holding a claim - to the queue.
 func (s *Store) RecoverStuck(ctx context.Context, olderThan time.Time) (int, error) {
+	now := time.Now().UTC()
 	res, err := s.Exec(ctx, recoverStuckSQL,
-		emailmodel.StatusQueued, time.Now().UTC(), olderThan)
+		emailmodel.StatusQueued, now, olderThan, now)
 	if err != nil {
 		return 0, err
 	}

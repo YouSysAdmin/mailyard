@@ -74,7 +74,10 @@ function mayApprove(node: RelayNode): boolean {
         <tr v-for="node in nodes" :key="node.id">
           <td>
             <strong>{{ node.name }}</strong>
-            <div class="text-sm text-muted">{{ node.host }}:{{ node.port }}</div>
+            <!-- A pull node has no port anybody dials, so the address
+                 line would name one that answers nothing. -->
+            <div v-if="node.mode === 'pull'" class="text-sm text-muted">{{ node.host }}</div>
+            <div v-else class="text-sm text-muted">{{ node.host }}:{{ node.port }}</div>
             <div v-if="showsOtherProjects && node.project_id" class="text-sm text-muted">
               belongs to a project
             </div>
@@ -104,6 +107,16 @@ function mayApprove(node: RelayNode): boolean {
                  so a row saying only "enabled" would be lying. -->
             <span v-if="node.status === 'enabled' && !node.alive" class="badge badge-danger">
               not reporting
+            </span>
+            <!-- Said where the state is read: a pull node that is alive
+                 and enabled is fetching its mail, and an operator
+                 checking why nothing dials it needs to see that here. -->
+            <span
+              v-if="node.mode === 'pull'"
+              class="badge badge-info"
+              title="This node cannot be dialled and claims assigned mail over the control channel"
+            >
+              pull
             </span>
             <!-- Mail this node took and cannot hand back. It is the only
                  visible symptom of a broken link in that direction, so

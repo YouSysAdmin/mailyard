@@ -51,6 +51,43 @@ type Node struct {
 	InboundEnabled bool       `json:"inbound_enabled"`
 	InboundQueued  int        `json:"inbound_queued"`
 	LastInboundAt  *time.Time `json:"last_inbound_at,omitempty"`
+
+	// Mode is how mail reaches this node: ModeListen, the worker dials
+	// its SMTP listener, or ModePull, the node fetches what it is
+	// assigned over the control channel. Reported by the node, because
+	// only the node knows whether it can be reached.
+	Mode string `json:"mode"`
+}
+
+// Node modes.
+const (
+	// ModeListen is the default: the delivery worker dials the node.
+	ModeListen = "listen"
+
+	// ModePull is a node that cannot be dialled - behind NAT, or one
+	// that may only egress through a proxy - and claims assigned mail
+	// over the control channel instead.
+	ModePull = "pull"
+)
+
+// Pulls reports whether mail is assigned to this node rather than
+// dialled into it.
+func (n *Node) Pulls() bool { return n.Mode == ModePull }
+
+// Assignment is one message handed to a pull node: the finished bytes
+// and the envelope, held until the node reports every recipient or
+// the assignment expires.
+type Assignment struct {
+	EmailID        string
+	NodeID         string
+	ServerID       string
+	EmailCreatedAt time.Time
+	EnvelopeFrom   string
+	Recipients     []string
+	Raw            []byte
+	Delivered      int
+	CreatedAt      time.Time
+	ExpiresAt      time.Time
 }
 
 // Platform reports whether this node serves the shared pool rather
@@ -92,4 +129,8 @@ type Beat struct {
 	// back here is not.
 	InboundEnabled bool
 	InboundQueued  int
+
+	// Mode is the node's Mode. Empty leaves the stored value alone, so
+	// an older node that does not report one stays a listener.
+	Mode string
 }

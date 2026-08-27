@@ -298,6 +298,11 @@ func Dials(provider string) bool {
 	return false
 }
 
+// RawMessage renders the bytes a provider transmits - Build then Sign.
+// Exported for the one caller outside this package that hands finished
+// bytes to something else to transmit: a relay node that pulls.
+func RawMessage(msg *smtpclient.Message) ([]byte, error) { return rawMessage(msg) }
+
 // rawMessage renders the bytes a provider transmits.
 //
 // Build then Sign, in that order and nothing between, because that is

@@ -25,6 +25,10 @@ const (
 
 	// ChannelCampaign says a campaign started, resumed or was scheduled.
 	ChannelCampaign = "mailyard_campaign"
+
+	// ChannelRelayAssign says a message was assigned to a pull relay
+	// node, so a long-poll waiting for that node can answer.
+	ChannelRelayAssign = "mailyard_relay_assign"
 )
 
 const (

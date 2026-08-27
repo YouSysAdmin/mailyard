@@ -1099,6 +1099,7 @@ type NodeView struct {
 	InboundEnabled bool       `json:"inbound_enabled"`
 	InboundQueued  int64      `json:"inbound_queued"`
 	LastInboundAt  *time.Time `json:"last_inbound_at,omitempty"`
+	Mode           string     `json:"mode"`
 	Host           string     `json:"host"`
 	Port           int64      `json:"port"`
 	Status         string     `json:"status"`

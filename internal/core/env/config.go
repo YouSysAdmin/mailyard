@@ -92,6 +92,20 @@ type RelayNodesConfig struct {
 	// CACommonName names the authority in its own certificate. Cosmetic,
 	// but it is what an operator sees when inspecting a node.
 	CACommonName string `mapstructure:"ca_common_name"`
+
+	// The PULL side. A node in pull mode claims assigned mail over the
+	// control channel instead of being dialled.
+	//
+	// AssignmentTTL is how long an assignment stands without the node
+	// saying it still holds the message. A node extends it on every
+	// claim, so this is the time between a node vanishing and its mail
+	// going to the next candidate - not a delivery deadline.
+	AssignmentTTL time.Duration `mapstructure:"assignment_ttl"`
+
+	// ClaimMax caps the messages one claim hands over. ClaimWaitMax caps
+	// how long a claim may be parked waiting for one.
+	ClaimMax     int           `mapstructure:"claim_max"`
+	ClaimWaitMax time.Duration `mapstructure:"claim_wait_max"`
 }
 
 // EmailVerifyConfig tunes address verification. Off by default: the
@@ -798,6 +812,9 @@ func Load(path string) (*Config, error) {
 
 	v.SetDefault("relay_nodes.enabled", false)
 	v.SetDefault("relay_nodes.ca_common_name", "Mailyard Relay CA")
+	v.SetDefault("relay_nodes.assignment_ttl", "5m")
+	v.SetDefault("relay_nodes.claim_max", 20)
+	v.SetDefault("relay_nodes.claim_wait_max", "30s")
 	relayNodeDefaults(v)
 	v.SetDefault("worker.concurrency", 4)
 	v.SetDefault("worker.poll_interval", "2s")
@@ -1198,6 +1215,10 @@ func (c *Config) Validate() error {
 
 	if c.RelayNodes.Enabled && c.RelayNodes.AutoRegisterToken == "" {
 		return fmt.Errorf("relay_nodes.auto_register_token required when relay_nodes.enabled is set, otherwise any caller can enrol a node (generate with `openssl rand -hex 32`)")
+	}
+
+	if c.RelayNodes.AssignmentTTL <= 0 || c.RelayNodes.ClaimMax < 1 || c.RelayNodes.ClaimWaitMax <= 0 {
+		return fmt.Errorf("relay_nodes.assignment_ttl and claim_wait_max must be positive and claim_max at least 1")
 	}
 
 	if c.RelayNodes.Enabled && len(c.RelayNodes.AutoRegisterToken) < 32 {

@@ -234,6 +234,14 @@ func (w *Worker) process(ctx context.Context, job *emailmodel.Email) (out Outcom
 	return w.proc.Process(ctx, job)
 }
 
+// Complete writes the terminal state for a job that was HANDED to
+// another deliverer and runs every hook a worker-delivered job runs -
+// the same finish, from outside the loop. The caller holds the row the
+// deliverer reported on.
+func (w *Worker) Complete(ctx context.Context, job *emailmodel.Email, out Outcome) {
+	w.finish(ctx, job, out)
+}
+
 func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome) {
 	errMsg := ""
 	if out.Err != nil {
@@ -241,6 +249,10 @@ func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome)
 	}
 
 	switch out.Kind {
+	case KindHanded:
+		// Nothing to write. The row is processing, the assignment
+		// that holds it says who has it, and Complete is how it ends.
+		w.log.Info("queue: handed to a relay node", "email_id", job.ID, "project_id", job.ProjectID)
 	case KindDone:
 		now := time.Now().UTC()
 		if err := w.src.Finalize(ctx, job.ID, job.CreatedAt, emailmodel.StatusSent, "", out.ServerID, &now); err != nil {

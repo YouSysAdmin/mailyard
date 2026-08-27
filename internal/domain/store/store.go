@@ -525,6 +525,22 @@ type RelayNodeStore interface {
 	// Heartbeat because this one is OBSERVED - the node does not get
 	// to say when it last succeeded.
 	TouchInbound(ctx context.Context, id string, at time.Time) error
+
+	// Assignments are messages handed to a PULL node. Assign hands one
+	// over (replacing an earlier assignment of the same message),
+	// ListAssigned is what the node claims, GetAssignment answers a
+	// report, UpdateAssignment narrows the outstanding recipients,
+	// ExtendAssignments is the node saying it still holds them,
+	// ExpiredAssignments is what the sweep takes back, and
+	// DeleteAssignment ends one. The email row stays processing for
+	// the life of the assignment.
+	Assign(ctx context.Context, a *relaynode.Assignment) error
+	ListAssigned(ctx context.Context, nodeID string, limit int, holding []string) ([]*relaynode.Assignment, error)
+	GetAssignment(ctx context.Context, nodeID, emailID string) (*relaynode.Assignment, error)
+	UpdateAssignment(ctx context.Context, nodeID, emailID string, recipients []string, delivered int, expires time.Time) error
+	ExtendAssignments(ctx context.Context, nodeID string, emailIDs []string, expires time.Time) error
+	ExpiredAssignments(ctx context.Context, now time.Time, limit int) ([]*relaynode.Assignment, error)
+	DeleteAssignment(ctx context.Context, nodeID, emailID string) (bool, error)
 	Delete(ctx context.Context, id string) error
 }
 
