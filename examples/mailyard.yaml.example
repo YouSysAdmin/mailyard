@@ -287,6 +287,19 @@ relay_nodes:
   # what an operator sees inspecting a node's certificate.
   ca_common_name: "Mailyard Relay CA"
 
+  # The PULL side: a node with relay_node.mode: pull claims assigned
+  # mail over the control channel instead of being dialled.
+  #
+  # assignment_ttl is how long an assignment stands without the node
+  # saying it still holds the message - a live node extends it on every
+  # claim, so this is the time between a node vanishing and its mail
+  # going to the next server in the group, not a delivery deadline.
+  assignment_ttl: 5m
+  # Messages handed over per claim, and how long a claim may park
+  # waiting for one.
+  claim_max: 20
+  claim_wait_max: 30s
+
 webhook:
   timeout: 10s
   # A webhook that fails every attempt is DISABLED and the project's
