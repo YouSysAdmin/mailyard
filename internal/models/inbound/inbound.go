@@ -10,8 +10,10 @@ const (
 	// StatusReceived is a stored, parsed message.
 	StatusReceived = "received"
 
-	// StatusRejected is a message refused at ingest time (suppressed
-	// sender, duplicate) kept for the audit trail.
+	// StatusRejected is a message refused at ingest time - a suppressed
+	// sender, or a DMARC p=reject the operator opted to honour - kept
+	// as envelope and reason for the audit trail. A duplicate writes no
+	// row of its own.
 	StatusRejected = "rejected"
 
 	// StatusFailed is a message whose MIME tree could not be parsed -
