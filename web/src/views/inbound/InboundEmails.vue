@@ -24,7 +24,6 @@ import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PageHeader from '../../components/PageHeader.vue'
-import StatCard from '../../components/StatCard.vue'
 import MessageListRow from '../../components/MessageListRow.vue'
 import InboundReader from './InboundReader.vue'
 
@@ -49,12 +48,25 @@ const hasMore = ref(false)
 const pagedBack = ref(false)
 const deletingId = ref<string | null>(null)
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
+// The counts ride on the filter that selects them. Three stat tiles
+// carried the same three numbers above the split and took a fixed slice
+// off a page whose only growing part is the message being read - on a
+// 13-inch screen the body was a few lines tall.
+const STATUSES = [
   { value: 'received', label: 'Received' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'failed', label: 'Failed' },
 ]
+
+const statusOptions = computed(() => {
+  const n = (k: string) => counts.value[k] ?? 0
+  const total = STATUSES.reduce((sum, o) => sum + n(o.value), 0)
+
+  return [
+    { value: '', label: `All statuses (${total})` },
+    ...STATUSES.map((o) => ({ value: o.value, label: `${o.label} (${n(o.value)})` })),
+  ]
+})
 
 // The selection lives in the URL, not in a ref. One source of truth, so
 // a deep link, the back button and a click in the list all arrive the
@@ -227,12 +239,6 @@ onMounted(() => loadAll())
       />
     </PageHeader>
 
-    <div class="stats-grid inbound-stats">
-      <StatCard label="Received" icon="received" :value="String(counts.received ?? 0)" />
-      <StatCard label="Rejected" icon="rejected" :value="String(counts.rejected ?? 0)" />
-      <StatCard label="Failed" icon="failed" :value="String(counts.failed ?? 0)" />
-    </div>
-
     <LoadingBlock v-if="loading" />
 
     <!-- The split renders whether or not there is anything in it. It
@@ -253,7 +259,7 @@ onMounted(() => loadAll())
              thing being read. -->
         <div class="list-filter">
           <select v-model="status" class="form-select" aria-label="Status">
-            <option v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value">
+            <option v-for="o in statusOptions" :key="o.value" :value="o.value">
               {{ o.label }}
             </option>
           </select>
@@ -300,9 +306,3 @@ onMounted(() => loadAll())
     </div>
   </div>
 </template>
-
-<style scoped>
-.inbound-stats {
-  margin-bottom: 16px;
-}
-</style>
