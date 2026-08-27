@@ -50,7 +50,7 @@ var consoleOwnPaths = []string{"/auth/", "/events/", "/health", "/security-log"}
 var enrolPaths = []string{
 	"/relay-nodes/register", "/relay-nodes/heartbeat",
 	"/relay-nodes/renew", "/relay-nodes/report",
-	"/relay-nodes/inbound",
+	"/relay-nodes/inbound", "/relay-nodes/claim",
 }
 
 // adminPaths are platform administration.
