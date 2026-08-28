@@ -43,7 +43,8 @@ type Processor struct {
 	// mail leaving through the SHARED POOL only - the one case where
 	// the sending IPs belong to the platform, so a platform domain can
 	// honestly authorize them. A project's own servers use the
-	// project's address. See returnPathFor.
+	// project's address, and empty on either side means the From
+	// address. See returnPathFor.
 	BounceAddress string
 
 	// AllowPrivateSMTP is sending.allow_private_smtp_targets: the
@@ -413,14 +414,20 @@ func (p *Processor) pickServer(ctx context.Context, e *emailmodel.Email) (*ssmod
 // that connected, so the address only works on a domain that
 // authorizes that IP - which is whoever owns the server. A shared-pool
 // row (no ProjectID) takes sending.bounce_address, a project's own
-// server takes the project's, and neither set leaves MAIL FROM as the
-// From address.
+// server takes the project's, and neither borrows the other's.
+//
+// NEVER EMPTY for a message somebody sent. Where the owner configured
+// no address the From address is the envelope, which is the aligned
+// default a receiver expects. An empty string means a NULL sender to
+// every transport downstream, and a pull node honours that literally
+// - it has no From to fall back on, so the message left as
+// MAIL FROM:<> and no report on it could ever come back.
 //
 // SES owns the envelope and discards this. Nothing here detects that,
 // because the value is simply unused on that path.
 func (p *Processor) returnPathFor(ctx context.Context, e *emailmodel.Email, srv *ssmodel.Server) string {
 	if srv != nil && srv.ProjectID == "" {
-		return p.BounceAddress
+		return orSender(p.BounceAddress, e)
 	}
 
 	w, err := p.Store.Project.Get(ctx, e.ProjectID)
@@ -430,14 +437,24 @@ func (p *Processor) returnPathFor(ctx context.Context, e *emailmodel.Email, srv 
 		// costs the message.
 		p.Log.Warn("email: return path lookup failed", "project_id", e.ProjectID, "err", err)
 
-		return ""
+		return orSender("", e)
 	}
 
 	if w == nil {
-		return ""
+		return orSender("", e)
 	}
 
-	return w.BounceAddress
+	return orSender(w.BounceAddress, e)
+}
+
+// orSender is the configured return path, or the From address when
+// there is none.
+func orSender(configured string, e *emailmodel.Email) string {
+	if configured != "" {
+		return configured
+	}
+
+	return smtpclient.EnvelopeAddress(e.Sender)
 }
 
 // signerFor returns the DKIM signer for the sender domain, or nil when

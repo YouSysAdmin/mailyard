@@ -64,12 +64,24 @@ func TestReturnPathFollowsTheServer(t *testing.T) {
 			want:     "bounces@bounce.user.com",
 		},
 		{
-			// The aligned default, and it has to stay the default.
+			// The aligned default, and it has to stay the default. As
+			// the ADDRESS, not as an empty string: a pull node takes an
+			// empty envelope literally and sends MAIL FROM:<>.
 			name:     "neither configured leaves MAIL FROM as the From address",
 			platform: "",
 			proj:     &projmodel.Project{ID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181"},
 			srv:      &ssmodel.Server{ID: "e225ddc5-d236-4b3d-8892-08db6fdc9696", ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181"},
-			want:     "",
+			want:     "noreply@user.com",
+		},
+		{
+			// The platform's own relay with nothing configured is the
+			// case found live: every message it carried left as a
+			// null sender and no bounce could name it.
+			name:     "a platform server with no address takes the From address",
+			platform: "",
+			proj:     tenant,
+			srv:      &ssmodel.Server{ID: "e225ddc5-d236-4b3d-8892-08db6fdc9696"},
+			want:     "noreply@user.com",
 		},
 		{
 			// The platform address must not leak onto a tenant's relay:
@@ -78,7 +90,7 @@ func TestReturnPathFollowsTheServer(t *testing.T) {
 			platform: "bounces@mail.example.com",
 			proj:     &projmodel.Project{ID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181"},
 			srv:      &ssmodel.Server{ID: "e225ddc5-d236-4b3d-8892-08db6fdc9696", ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181"},
-			want:     "",
+			want:     "noreply@user.com",
 		},
 		{
 			// And the reverse: the shared pool must not borrow the
@@ -88,13 +100,14 @@ func TestReturnPathFollowsTheServer(t *testing.T) {
 			platform: "",
 			proj:     tenant,
 			srv:      &ssmodel.Server{ID: "e225ddc5-d236-4b3d-8892-08db6fdc9696"},
-			want:     "",
+			want:     "noreply@user.com",
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := returnPathProcessor(tc.platform, tc.proj)
-			got := p.returnPathFor(t.Context(), &emailmodel.Email{ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181"}, tc.srv)
+			e := &emailmodel.Email{ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181", Sender: "Noreply <noreply@user.com>"}
+			got := p.returnPathFor(t.Context(), e, tc.srv)
 			if got != tc.want {
 				t.Errorf("return path is %q, want %q", got, tc.want)
 			}
