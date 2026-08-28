@@ -26,8 +26,17 @@ before:
     - sh -c 'cd web && npm ci && npm run build && touch dist/.gitkeep'
     - sh -c 'cd docs && hugo --minify --cleanDestinationDir && touch dist/.gitkeep'
 
+# A tag carrying a semver pre-release part (v1.4.0-rc.1, cut from devel or
+# any other branch) is a PRE-RELEASE: GitHub marks it so, and the moving
+# image tags below stay where they are. Without this the last image
+# built, whatever its tag said, became :latest.
 release:
-  prerelease: "false"
+  prerelease: auto
+
+# So the changelog of a stable release runs from the previous STABLE tag,
+# not from the last rc between them.
+git:
+  tag_sort: smartsemver
 
 env:
   - CGO_ENABLED=0
@@ -98,11 +107,13 @@ dockers_v2:
       - ghcr.io/yousysadmin/mailyard
     # Moving tags so `docker pull mailyard` and a minor-series pin both
     # resolve. goreleaser leaves them alone on a snapshot, so a local dry
-    # run cannot move :latest.
+    # run cannot move :latest. A PRE-RELEASE moves neither: the template
+    # renders empty and goreleaser drops an empty tag, so an rc is
+    # pullable by its version only.
     tags:
       - "{{ .Version }}"
-      - "v{{ .Major }}.{{ .Minor }}"
-      - latest
+      - "{{ if not .Prerelease }}v{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
     platforms:
       - linux/amd64
       - linux/arm64

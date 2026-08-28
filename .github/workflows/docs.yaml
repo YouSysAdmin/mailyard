@@ -21,9 +21,10 @@ jobs:
   # PUBLIC REPOSITORY ONLY, guarded by name the way release.yaml is. This
   # file is shared with the private overlay, which has no Pages site and
   # whose token cannot deploy one, so a release there ran this and failed.
-  # deploy follows through needs: a skipped build skips it.
+  # deploy follows through needs: a skipped build skips it. A PRE-RELEASE
+  # does not publish either: the site describes the stable binary.
   build:
-    if: github.repository == 'YouSysAdmin/mailyard'
+    if: github.repository == 'YouSysAdmin/mailyard' && github.event.release.prerelease != true
     runs-on: ubuntu-latest
     env:
       HUGO_VERSION: 0.163.3
