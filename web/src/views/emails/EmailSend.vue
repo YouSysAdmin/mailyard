@@ -355,7 +355,15 @@ function handleSubmit() {
             <FormField label="Subject" for="send-subject" :error="fieldErrors.subject">
               <input id="send-subject" v-model="subject" type="text" class="form-input" />
             </FormField>
-            <FormField label="HTML Body" for="send-html" :error="fieldErrors.html">
+            <FormField label="Text Body" for="send-text" :error="fieldErrors.text">
+              <textarea id="send-text" v-model="text" class="form-textarea" rows="6"></textarea>
+            </FormField>
+            <FormField
+              label="HTML Body"
+              for="send-html"
+              :error="fieldErrors.html"
+              hint="At least one of HTML or text body is required."
+            >
               <textarea
                 id="send-html"
                 v-model="html"
@@ -363,14 +371,6 @@ function handleSubmit() {
                 rows="10"
                 placeholder="<html>...</html>"
               ></textarea>
-            </FormField>
-            <FormField
-              label="Text Body"
-              for="send-text"
-              :error="fieldErrors.text"
-              hint="At least one of HTML or text body is required."
-            >
-              <textarea id="send-text" v-model="text" class="form-textarea" rows="6"></textarea>
             </FormField>
           </template>
 
