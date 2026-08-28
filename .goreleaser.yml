@@ -33,11 +33,6 @@ before:
 release:
   prerelease: auto
 
-# So the changelog of a stable release runs from the previous STABLE tag,
-# not from the last rc between them.
-git:
-  tag_sort: smartsemver
-
 env:
   - CGO_ENABLED=0
 
