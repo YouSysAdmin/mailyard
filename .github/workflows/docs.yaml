@@ -18,7 +18,12 @@ defaults:
   run:
     shell: bash
 jobs:
+  # PUBLIC REPOSITORY ONLY, guarded by name the way release.yaml is. This
+  # file is shared with the private overlay, which has no Pages site and
+  # whose token cannot deploy one, so a release there ran this and failed.
+  # deploy follows through needs: a skipped build skips it.
   build:
+    if: github.repository == 'YouSysAdmin/mailyard'
     runs-on: ubuntu-latest
     env:
       HUGO_VERSION: 0.163.3
