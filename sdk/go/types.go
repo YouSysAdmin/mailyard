@@ -32,6 +32,7 @@ type Attachment struct {
 // because the direction of the override differs.
 type SendRequest struct {
 	From    string   `json:"from"`
+	ReplyTo string   `json:"reply_to,omitempty"`
 	To      []string `json:"to"`
 	Subject string   `json:"subject"`
 	HTML    string   `json:"html,omitempty"`
@@ -87,6 +88,7 @@ type SendRequest struct {
 // result. Name the template by ID or Name, not both.
 type TemplateSendRequest struct {
 	From         string         `json:"from"`
+	ReplyTo      string         `json:"reply_to,omitempty"`
 	To           []string       `json:"to"`
 	TemplateID   string         `json:"template_id,omitempty"`
 	TemplateName string         `json:"template_name,omitempty"`
@@ -116,6 +118,7 @@ type TemplateSendRequest struct {
 // each item carries its own subject and body.
 type BatchRequest struct {
 	From         string      `json:"from"`
+	ReplyTo      string      `json:"reply_to,omitempty"`
 	TemplateID   string      `json:"template_id,omitempty"`
 	TemplateName string      `json:"template_name,omitempty"`
 	Language     string      `json:"language,omitempty"`

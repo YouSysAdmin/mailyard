@@ -424,6 +424,7 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 
 	req := &email.SendRequest{
 		From:    sender,
+		ReplyTo: c.ReplyTo,
 		To:      []string{sub.Email},
 		Subject: out.Subject,
 		HTML:    out.HTML,

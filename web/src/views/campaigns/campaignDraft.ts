@@ -19,6 +19,7 @@ export interface CampaignDraft {
   subject: string
   from_email: string
   from_name: string
+  reply_to: string
   template_id: string
   language: string
   list_id: string
@@ -38,6 +39,7 @@ export function blankDraft(): CampaignDraft {
     subject: '',
     from_email: '',
     from_name: '',
+    reply_to: '',
     template_id: '',
     language: '',
     list_id: '',
@@ -62,6 +64,7 @@ export function fromCampaign(c: Campaign): CampaignDraft {
     subject: c.subject ?? '',
     from_email: c.from_email,
     from_name: c.from_name ?? '',
+    reply_to: c.reply_to ?? '',
     template_id: c.template_id,
     language: c.language ?? '',
     list_id: c.list_id,
@@ -85,6 +88,7 @@ export function toPayload(d: CampaignDraft, variants: CampaignVariant[]): Campai
     subject: d.subject.trim(),
     from_email: d.from_email.trim(),
     from_name: d.from_name.trim(),
+    reply_to: d.reply_to.trim(),
     template_id: d.template_id,
     language: d.language.trim() || undefined,
     template_data: d.template_data.trim() ? JSON.parse(d.template_data) : undefined,

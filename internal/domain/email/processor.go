@@ -181,15 +181,16 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		text = render.HTMLToText(e.HTMLBody)
 	}
 
-	// The client's own To and Cc, if submission stored them, come out
-	// of the header map and into the fields the builder writes them
-	// from - left in the map they would be written twice.
+	// The client's own To, Cc and Reply-To, if the request stored
+	// them, come out of the header map and into the fields the builder
+	// writes them from - left in the map they would be written twice.
 	headers := e.Headers
-	headerTo, cc := headers[HeaderDisplayTo], headers[HeaderDisplayCc]
-	if headerTo != "" || cc != "" {
+	headerTo, cc, replyTo := headers[HeaderDisplayTo], headers[HeaderDisplayCc], headers[HeaderReplyTo]
+	if headerTo != "" || cc != "" || replyTo != "" {
 		headers = maps.Clone(headers)
 		delete(headers, HeaderDisplayTo)
 		delete(headers, HeaderDisplayCc)
+		delete(headers, HeaderReplyTo)
 	}
 
 	msg := &smtpclient.Message{
@@ -200,6 +201,7 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		To:                    e.Recipients,
 		HeaderTo:              headerTo,
 		Cc:                    cc,
+		ReplyTo:               replyTo,
 		Subject:               e.Subject,
 		HTML:                  e.HTMLBody,
 		Text:                  text,

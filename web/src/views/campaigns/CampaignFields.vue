@@ -171,6 +171,19 @@ void loadSenders()
       <input v-model="draft.from_name" class="form-input" />
     </FormField>
 
+    <FormField
+      label="Reply-To"
+      :error="errors.reply_to"
+      hint="Where a reader's answer lands when the From address is a no-reply mailbox."
+    >
+      <input
+        v-model="draft.reply_to"
+        type="email"
+        class="form-input"
+        placeholder="support@example.com"
+      />
+    </FormField>
+
     <FormField label="Template" required :error="errors.template_id">
       <select v-model="draft.template_id" class="form-select">
         <option value="" disabled>Pick a template</option>

@@ -45,6 +45,11 @@ type Message struct {
 	HeaderTo string
 	Cc       string
 
+	// ReplyTo is the Reply-To header, empty for none. It is the one
+	// address a caller may set that the platform never verifies: it
+	// names where a human answer should go, not who sent the mail.
+	ReplyTo string
+
 	Subject               string
 	HTML                  string
 	Text                  string
@@ -167,6 +172,10 @@ func (m *Message) Build() []byte {
 	if m.Cc != "" {
 		fmt.Fprintf(&b, "Cc: %s\r\n", headerSafe(m.Cc))
 	}
+	if m.ReplyTo != "" {
+		fmt.Fprintf(&b, "Reply-To: %s\r\n", headerSafe(m.ReplyTo))
+	}
+
 	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", m.Subject))
 	// Date and Message-ID are mandatory originator fields (RFC 5322
 	// section 3.6). We emitted neither, and relied on whatever the

@@ -314,6 +314,7 @@ func (h *Handler) Retry(c fiber.Ctx) error {
 func (in *sendInput) toRequest() (*SendRequest, error) {
 	req := &SendRequest{
 		From:        in.From,
+		ReplyTo:     in.ReplyTo,
 		To:          in.To,
 		Subject:     in.Subject,
 		HTML:        in.HTML,

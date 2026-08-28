@@ -22,6 +22,7 @@ const maxUnsubscribeLinkLen = 1000
 var reservedHeaderHint = map[string]string{
 	"list-unsubscribe":      "use list_unsubscribe_url and list_unsubscribe_mailto",
 	"list-unsubscribe-post": "use list_unsubscribe_post",
+	"reply-to":              "use reply_to",
 }
 
 // normalizeUnsubscribeLinks checks the caller-supplied RFC 2369

@@ -296,6 +296,10 @@ void start()
               <div class="summary-label">From</div>
               <div>{{ formatMailbox(campaign.from_email, campaign.from_name) }}</div>
             </div>
+            <div v-if="campaign.reply_to">
+              <div class="summary-label">Reply-To</div>
+              <div>{{ campaign.reply_to }}</div>
+            </div>
             <div>
               <div class="summary-label">Language</div>
               <div>{{ campaign.language || '-' }}</div>

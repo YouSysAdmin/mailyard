@@ -164,6 +164,7 @@ func submitAs(addr, username, password, from string, to []string, msg string) er
 
 const testMsg = "From: Ann <ann@example.com>\r\n" +
 	"To: bob@example.com\r\n" +
+	"Reply-To: Support <help@example.com>\r\n" +
 	"Subject: submission test\r\n" +
 	"Content-Type: text/plain; charset=UTF-8\r\n" +
 	"\r\n" +
@@ -194,6 +195,12 @@ func TestRelayAcceptsValidKey(t *testing.T) {
 
 	if req.Subject != "submission test" || !strings.Contains(req.Text, "hello over smtp") {
 		t.Errorf("parsed subject %q text %q", req.Subject, req.Text)
+	}
+
+	// The client's Reply-To travels as the field the builder writes
+	// it from, not as a header it would refuse.
+	if req.ReplyTo != "Support <help@example.com>" {
+		t.Errorf("reply_to = %q, want the client's Reply-To header", req.ReplyTo)
 	}
 }
 

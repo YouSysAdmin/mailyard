@@ -27,6 +27,7 @@ import (
 // DryRun runs every validation without persisting anything.
 type sendInput struct {
 	From        string                  `json:"from"        validate:"required,max=320"           normalize:"trim"`
+	ReplyTo     string                  `json:"reply_to"    validate:"omitempty,max=320"          normalize:"trim"`
 	To          []string                `json:"to"          validate:"required,min=1,dive,max=320"`
 	Subject     string                  `json:"subject"     validate:"required,max=1000"`
 	HTML        string                  `json:"html"        validate:"omitempty,max=1048576"`
@@ -92,6 +93,7 @@ type sendInput struct {
 // templateSendInput is the POST /api/emails/send-template body.
 type templateSendInput struct {
 	From            string                  `json:"from"          validate:"required,max=320" normalize:"trim"`
+	ReplyTo         string                  `json:"reply_to"      validate:"omitempty,max=320" normalize:"trim"`
 	To              []string                `json:"to"            validate:"required,min=1,dive,max=320"`
 	TemplateID      string                  `json:"template_id"   validate:"omitempty,uuid"`
 	TemplateName    string                  `json:"template_name" validate:"omitempty,max=100"`
@@ -129,6 +131,7 @@ type templateSendInput struct {
 // carries its own subject and body.
 type batchInput struct {
 	From         string           `json:"from"          validate:"required,max=320" normalize:"trim"`
+	ReplyTo      string           `json:"reply_to"      validate:"omitempty,max=320" normalize:"trim"`
 	TemplateID   string           `json:"template_id"   validate:"omitempty,uuid"`
 	TemplateName string           `json:"template_name" validate:"omitempty,max=100"`
 	Language     string           `json:"language"      validate:"omitempty,min=2,max=10" normalize:"normalize"`

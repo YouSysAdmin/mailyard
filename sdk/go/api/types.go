@@ -161,6 +161,7 @@ type AuthMessageResponse struct {
 // BatchInput is the request body.
 type BatchInput struct {
 	From         string           `json:"from"`
+	ReplyTo      string           `json:"reply_to"`
 	TemplateID   string           `json:"template_id"`
 	TemplateName string           `json:"template_name"`
 	Language     string           `json:"language"`
@@ -222,6 +223,7 @@ type Campaign struct {
 	Subject         string         `json:"subject,omitempty"`
 	FromEmail       string         `json:"from_email"`
 	FromName        string         `json:"from_name,omitempty"`
+	ReplyTo         string         `json:"reply_to,omitempty"`
 	TemplateID      string         `json:"template_id"`
 	Language        string         `json:"language,omitempty"`
 	TemplateData    map[string]any `json:"template_data,omitempty"`
@@ -263,6 +265,7 @@ type CampaignUpsertInput struct {
 	Subject         string         `json:"subject"`
 	FromEmail       string         `json:"from_email"`
 	FromName        string         `json:"from_name"`
+	ReplyTo         string         `json:"reply_to"`
 	TemplateID      string         `json:"template_id"`
 	Language        string         `json:"language"`
 	TemplateData    map[string]any `json:"template_data"`
@@ -567,6 +570,7 @@ type EmailResponse struct {
 // EmailSendInput is the request body.
 type EmailSendInput struct {
 	From                  string            `json:"from"`
+	ReplyTo               string            `json:"reply_to"`
 	To                    []string          `json:"to"`
 	Subject               string            `json:"subject"`
 	HTML                  string            `json:"html"`
@@ -2027,6 +2031,7 @@ type TemplateResponse struct {
 // TemplateSendInput is the request body.
 type TemplateSendInput struct {
 	From                  string            `json:"from"`
+	ReplyTo               string            `json:"reply_to"`
 	To                    []string          `json:"to"`
 	TemplateID            string            `json:"template_id"`
 	TemplateName          string            `json:"template_name"`

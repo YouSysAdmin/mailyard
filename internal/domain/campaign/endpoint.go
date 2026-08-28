@@ -531,6 +531,7 @@ func (in *upsertInput) toModel(projID string) *cmodel.Campaign {
 		Subject:         in.Subject,
 		FromEmail:       in.FromEmail,
 		FromName:        in.FromName,
+		ReplyTo:         in.ReplyTo,
 		TemplateID:      in.TemplateID,
 		Language:        in.Language,
 		TemplateData:    in.TemplateData,

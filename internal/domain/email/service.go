@@ -50,28 +50,30 @@ var protectedHeaders = map[string]struct{}{
 	"from": {}, "to": {}, "cc": {}, "bcc": {}, "subject": {}, "date": {},
 	"mime-version": {}, "content-type": {}, "content-transfer-encoding": {},
 	"list-unsubscribe": {}, "list-unsubscribe-post": {}, "return-path": {},
-	"message-id": {}, "received": {}, "dkim-signature": {},
+	"message-id": {}, "received": {}, "dkim-signature": {}, "reply-to": {},
 }
 
-// HeaderDisplayTo and HeaderDisplayCc are the keys under which the
-// client's own To and Cc headers ride in Email.Headers from submission
-// to the processor, which lifts them out before building. They are in
-// protectedHeaders, so a caller cannot smuggle either in.
+// HeaderDisplayTo, HeaderDisplayCc and HeaderReplyTo are the keys
+// under which the client's own To and Cc headers and the reply address
+// ride in Email.Headers from the request to the processor, which lifts
+// them out before building. They are in protectedHeaders, so a caller
+// cannot smuggle any of them in through the header map.
 const (
 	HeaderDisplayTo = "To"
 	HeaderDisplayCc = "Cc"
+	HeaderReplyTo   = "Reply-To"
 )
 
 // withDisplayRecipients returns the custom headers with the client's
-// To and Cc added under the reserved keys, or the headers unchanged
-// when the request carries neither. Copies rather than mutating the
-// request's map.
+// To, Cc and Reply-To added under the reserved keys, or the headers
+// unchanged when the request carries none. Copies rather than
+// mutating the request's map.
 func withDisplayRecipients(req *SendRequest) map[string]string {
-	if req.HeaderTo == "" && req.Cc == "" {
+	if req.HeaderTo == "" && req.Cc == "" && req.ReplyTo == "" {
 		return req.Headers
 	}
 
-	out := make(map[string]string, len(req.Headers)+2)
+	out := make(map[string]string, len(req.Headers)+3)
 	maps.Copy(out, req.Headers)
 	if req.HeaderTo != "" {
 		out[HeaderDisplayTo] = req.HeaderTo
@@ -79,6 +81,10 @@ func withDisplayRecipients(req *SendRequest) map[string]string {
 
 	if req.Cc != "" {
 		out[HeaderDisplayCc] = req.Cc
+	}
+
+	if req.ReplyTo != "" {
+		out[HeaderReplyTo] = req.ReplyTo
 	}
 
 	return out
@@ -228,6 +234,12 @@ type SendRequest struct {
 	// those keys from a caller.
 	HeaderTo string
 	Cc       string
+
+	// ReplyTo is the Reply-To header, where a human answer to this
+	// message should go. Not gated on sender verification and not
+	// given a registered sender's name: it is a destination the caller
+	// names, not an identity the platform vouches for.
+	ReplyTo string
 
 	Subject               string
 	HTML                  string
@@ -397,6 +409,16 @@ func (s *Service) ValidateShape(req *SendRequest) error {
 
 	if strings.ContainsAny(req.HeaderTo, "\r\n") || strings.ContainsAny(req.Cc, "\r\n") {
 		return reqErrf("a recipient header contains a line break")
+	}
+
+	if req.ReplyTo != "" {
+		if strings.ContainsAny(req.ReplyTo, "\r\n") {
+			return reqErrf("reply_to address contains a line break")
+		}
+
+		if _, err := mail.ParseAddress(req.ReplyTo); err != nil {
+			return reqErrf("reply_to address %q is invalid", req.ReplyTo)
+		}
 	}
 
 	if len(req.To) == 0 {

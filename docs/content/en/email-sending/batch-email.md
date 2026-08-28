@@ -71,7 +71,7 @@ Leave the template ref out and each item carries its own content:
 The opt-out fields are per item deliberately. A batch is where an application sends its bulk mail, and one link shared
 across a hundred items would unsubscribe whoever clicked it from nothing in particular.
 
-`from` belongs to the batch, not the item. `headers`, `attachments` and `send_at` are not available here — use
+`from` and `reply_to` belong to the batch, not the item. `headers`, `attachments` and `send_at` are not available here — use
 individual sends when you need them.
 
 ## What comes back

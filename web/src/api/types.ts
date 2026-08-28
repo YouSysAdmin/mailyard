@@ -534,6 +534,7 @@ export interface Campaign {
   subject?: string
   from_email: string
   from_name?: string
+  reply_to?: string
   template_id: string
   language?: string
   template_data?: Record<string, unknown>

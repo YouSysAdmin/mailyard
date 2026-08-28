@@ -36,7 +36,8 @@ or a client generator.
 ## The body
 
 `from` and `to` are required, as on any send, and the `from` domain must be
-[verified by this project](/docs/smtp-domains/domain-verification).
+[verified by this project](/docs/smtp-domains/domain-verification). `reply_to` is optional and is not: it names where
+an answer goes, not who sent the mail.
 
 Address the template with **`template_name` or `template_id`** — one of the two. The name is unique within the project
 and is usually the better choice: it survives an export and import into another install, where the id does not.

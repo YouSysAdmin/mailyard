@@ -32,6 +32,7 @@ const sending = ref(false)
 
 // Shared fields
 const from = ref('')
+const replyTo = ref('')
 const recipientsText = ref('')
 const sendAt = ref('')
 // Which SMTP pool to send through. Empty means the project's default
@@ -224,6 +225,7 @@ async function sendRaw() {
     to,
     subject: subject.value,
   }
+  if (replyTo.value.trim()) payload.reply_to = replyTo.value.trim()
   if (html.value) payload.html = html.value
   if (text.value) payload.text = text.value
   const files = attachmentPayload()
@@ -260,6 +262,7 @@ async function sendTemplate() {
     to,
     template_id: templateId.value,
   }
+  if (replyTo.value.trim()) payload.reply_to = replyTo.value.trim()
   if (language.value) payload.language = language.value
   if (data) payload.data = data
   // Template attachments configured on the template itself are added
@@ -321,6 +324,21 @@ function handleSubmit() {
         <form @submit.prevent="handleSubmit">
           <FormField label="From" for="send-from" :error="fieldErrors.from">
             <SenderSelect id="send-from" v-model="from" :senders="senders" />
+          </FormField>
+
+          <FormField
+            label="Reply-To"
+            for="send-reply-to"
+            :error="fieldErrors.reply_to"
+            hint="Where a reply lands when it should not go back to the From address."
+          >
+            <input
+              id="send-reply-to"
+              v-model="replyTo"
+              type="email"
+              class="form-input"
+              placeholder="support@example.com"
+            />
           </FormField>
 
           <FormField label="Recipients" for="send-to">

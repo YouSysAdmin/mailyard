@@ -86,6 +86,7 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 	msg := &smtpclient.Message{
 		From:                  req.From,
 		To:                    req.To,
+		ReplyTo:               req.ReplyTo,
 		Subject:               req.Subject,
 		HTML:                  req.HTML,
 		Text:                  req.Text,

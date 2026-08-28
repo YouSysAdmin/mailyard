@@ -18,7 +18,7 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		return resp
 	}
 
-	base := &sendInput{From: in.From, To: in.To, Headers: in.Headers,
+	base := &sendInput{From: in.From, ReplyTo: in.ReplyTo, To: in.To, Headers: in.Headers,
 		Attachments: in.Attachments, SendAt: in.SendAt,
 		UnsubscribeListID:     in.UnsubscribeListID,
 		ListUnsubscribeURL:    in.ListUnsubscribeURL,
@@ -154,7 +154,7 @@ func (h *Handler) Batch(c fiber.Ctx) error {
 	}
 
 	svc := NewService(h.Runtime)
-	results := svc.SendBatch(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), in.From, ref, items)
+	results := svc.SendBatch(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), in.From, in.ReplyTo, ref, items)
 	accepted := 0
 	for _, r := range results {
 		if r.Error == "" {

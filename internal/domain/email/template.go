@@ -197,12 +197,13 @@ type BatchResult struct {
 // SendBatch processes items independently: one bad item does not sink
 // the rest, the report carries per-item outcomes. ref is nil for raw
 // batches.
-func (s *Service) SendBatch(ctx context.Context, projID, createdBy, apiKeyID, from string, ref *TemplateRef, items []BatchItem) []BatchResult {
+func (s *Service) SendBatch(ctx context.Context, projID, createdBy, apiKeyID, from, replyTo string, ref *TemplateRef, items []BatchItem) []BatchResult {
 	results := make([]BatchResult, len(items))
 	for i, item := range items {
 		results[i] = BatchResult{Index: i}
 		req := &SendRequest{
 			From:                  from,
+			ReplyTo:               replyTo,
 			To:                    item.To,
 			Subject:               item.Subject,
 			HTML:                  item.HTML,

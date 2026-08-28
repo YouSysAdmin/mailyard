@@ -6,6 +6,7 @@ import type { Email, EmailAttachment } from './types'
 // endpoint_template.go (templateSendInput): from / to / html / text.
 export interface SendEmailPayload {
   from: string
+  reply_to?: string
   to: string[]
   subject: string
   html?: string
@@ -24,6 +25,7 @@ export interface SendEmailPayload {
 
 export interface SendTemplatePayload {
   from: string
+  reply_to?: string
   to: string[]
   template_id?: string
   template_name?: string

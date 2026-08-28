@@ -34,7 +34,7 @@ func NewStore(db *sql.DB) *Store {
 }
 
 const campaignSelect = `
-SELECT id, project_id, created_by, name, subject, from_email, from_name,
+SELECT id, project_id, created_by, name, subject, from_email, from_name, reply_to,
        template_id, language, template_data, status, list_id, smtp_group_id, send_rate,
        send_at_local_time, ab_test_enabled, ab_variants,
        scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at
@@ -101,16 +101,17 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
 
 	_, err := s.Exec(ctx, `
         INSERT INTO campaigns (
-            id, project_id, created_by, name, subject, from_email, from_name,
+            id, project_id, created_by, name, subject, from_email, from_name, reply_to,
             template_id, language, template_data, status, list_id, smtp_group_id, send_rate,
             send_at_local_time, ab_test_enabled, ab_variants,
             scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name               = excluded.name,
             subject            = excluded.subject,
             from_email         = excluded.from_email,
             from_name          = excluded.from_name,
+            reply_to           = excluded.reply_to,
             template_id        = excluded.template_id,
             language           = excluded.language,
             template_data      = excluded.template_data,
@@ -122,7 +123,7 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
             ab_variants        = excluded.ab_variants,
             updated_at         = excluded.updated_at
     `,
-		c.ID, c.ProjectID, c.CreatedBy, c.Name, c.Subject, c.FromEmail, c.FromName,
+		c.ID, c.ProjectID, c.CreatedBy, c.Name, c.Subject, c.FromEmail, c.FromName, c.ReplyTo,
 		c.TemplateID, c.Language, database.MustJSON(c.TemplateData), c.Status, c.ListID, database.NullStr(c.SMTPGroupID),
 		c.SendRate, c.SendAtLocalTime, c.ABTestEnabled, database.MustJSON(c.ABVariants),
 		database.NullTime(c.ScheduledAt), database.NullTime(c.StartedAt),
@@ -559,7 +560,7 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	var data, variants string
 	var scheduledAt, startedAt, completedAt, nextBatchAt, updatedAt sql.NullTime
 	if err := r.Scan(&c.ID, &c.ProjectID, &c.CreatedBy, &c.Name, &c.Subject,
-		&c.FromEmail, &c.FromName, &c.TemplateID, &c.Language, &data, &c.Status,
+		&c.FromEmail, &c.FromName, &c.ReplyTo, &c.TemplateID, &c.Language, &data, &c.Status,
 		&c.ListID, database.Str(&c.SMTPGroupID), &c.SendRate, &c.SendAtLocalTime, &c.ABTestEnabled, &variants,
 		&scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt); err != nil {
 		return nil, err

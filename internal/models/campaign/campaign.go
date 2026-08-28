@@ -37,9 +37,14 @@ type Campaign struct {
 
 	// Subject is the fallback when the template localization renders
 	// an empty subject.
-	Subject    string `json:"subject,omitempty"`
-	FromEmail  string `json:"from_email"`
-	FromName   string `json:"from_name,omitempty"`
+	Subject   string `json:"subject,omitempty"`
+	FromEmail string `json:"from_email"`
+	FromName  string `json:"from_name,omitempty"`
+
+	// ReplyTo is the Reply-To address, empty for none. A newsletter
+	// sent from a no-reply mailbox names where a reader's answer goes.
+	ReplyTo string `json:"reply_to,omitempty"`
+
 	TemplateID string `json:"template_id"`
 	Language   string `json:"language,omitempty"`
 

@@ -496,6 +496,10 @@ func (s *session) Data(r io.Reader) (err error) {
 	req.ListUnsubscribeURL, req.ListUnsubscribeMailto, req.ListUnsubscribePost =
 		email.TakeUnsubscribeHeaders(parsed.Headers)
 
+	// The client's Reply-To is carried the same way: the builder owns
+	// the header, so the value travels as a field and is written once.
+	req.ReplyTo = strings.TrimSpace(parsed.Headers[email.HeaderReplyTo])
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

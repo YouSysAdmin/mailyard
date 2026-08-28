@@ -67,6 +67,7 @@ with no text alternative scores worse with spam filters than one that has it.
 
 | Field | Does |
 |---|---|
+| `reply_to` | Where a reply lands when it should not go back to `from`. Any parseable address, verified or not |
 | `headers` | Up to 20 custom headers |
 | `attachments` | Base64 files — see [Attachments](/docs/email-sending/attachments) |
 | `send_at` | Hold until an RFC 3339 time — see [Scheduled Email](/docs/email-sending/scheduled-email) |
@@ -80,14 +81,14 @@ with no text alternative scores worse with spam filters than one that has it.
 `dry_run` is the cheapest way to check an integration: it validates the sender, the recipients, the headers, the
 attachment sizes and the routing, then returns without writing a row or spending quota.
 
-{{< callout type="warning" title="Fifteen headers are reserved" >}}
+{{< callout type="warning" title="Sixteen headers are reserved" >}}
 Anything the message builder owns is refused rather than merged, so a caller cannot forge the envelope or break the
-MIME structure: `From`, `To`, `Cc`, `Bcc`, `Subject`, `Date`, `MIME-Version`, `Content-Type`,
+MIME structure: `From`, `To`, `Cc`, `Bcc`, `Reply-To`, `Subject`, `Date`, `MIME-Version`, `Content-Type`,
 `Content-Transfer-Encoding`, `List-Unsubscribe`, `List-Unsubscribe-Post`, `Return-Path`, `Message-ID`, `Received` and
 `DKIM-Signature`.
 
 The refusal names the header and, where there is one, the field to use instead — `List-Unsubscribe` points you at
-`list_unsubscribe_url`. Matching is case-insensitive, and a header name or value containing a newline is refused
+`list_unsubscribe_url`, `Reply-To` at `reply_to`. Matching is case-insensitive, and a header name or value containing a newline is refused
 outright, which is what stops header injection through a value you interpolated.
 {{< /callout >}}
 

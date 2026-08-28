@@ -52,3 +52,28 @@ func TestBuildKeepsTheClientsToHeaderOverTheEnvelope(t *testing.T) {
 		t.Fatalf("client To/Cc headers were not written:\n%s", raw)
 	}
 }
+
+// Reply-To is a field, not a custom header, so it is written by the
+// builder once and passes through headerSafe like every other address.
+func TestBuildWritesReplyToOnceAndSafely(t *testing.T) {
+	m := &Message{
+		From:    "noreply@example.com",
+		To:      []string{"a@example.com"},
+		ReplyTo: "Support <help@example.com>\r\nBcc: e@evil.test",
+		Subject: "s",
+		Text:    "body",
+	}
+	raw := string(m.Build())
+	if strings.Count(raw, "Reply-To:") != 1 {
+		t.Fatalf("Reply-To written %d times:\n%s", strings.Count(raw, "Reply-To:"), raw)
+	}
+
+	if strings.Contains(raw, "\r\nBcc:") {
+		t.Fatalf("a line break in Reply-To became a header:\n%s", raw)
+	}
+
+	m.ReplyTo = ""
+	if strings.Contains(string(m.Build()), "Reply-To") {
+		t.Fatal("an empty ReplyTo wrote a header")
+	}
+}

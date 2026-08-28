@@ -53,6 +53,7 @@ copy where the copy lives.
 | Field | Default | Does |
 |---|---|---|
 | `from_name` | — | Display name on the From header |
+| `reply_to` | — | Reply-To address, for a campaign sent from a no-reply mailbox. Not required to be verified |
 | `subject` | — | Fallback subject, as above |
 | `language` | — | Localization to render. Falls through the [usual four steps](/docs/templates/localization#choosing-one-at-send-time) per subscriber |
 | `template_data` | — | Campaign-wide render values, up to 100 keys |
