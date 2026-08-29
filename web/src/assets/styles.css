@@ -150,6 +150,7 @@
 
   --checkmark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m4.5 12.75 6 6 9-13.5' /%3E%3C/svg%3E");
   --checkmark-color: #0a0a0a;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='none'%3E%3Cpath d='M4.5 6.75L9 11.25l4.5-4.5' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 /* --------- Dark Theme --------- */
@@ -559,6 +560,7 @@ a:not([class]):hover {
 .form-select {
   background-color: var(--bg-input);
   cursor: pointer;
+  align-items: center;
 }
 .form-select::picker(select) {
   background-color: var(--bg-popover);
@@ -570,6 +572,23 @@ a:not([class]):hover {
   margin-top: 4px;
   scrollbar-width: thin;
   scrollbar-color: var(--ring-neutral) transparent;
+}
+/* The default icon under base-select is a filled triangle, not the
+   chevron the native control drew. Feather chevron-down through a mask,
+   the same way the checkmark below is drawn, so it follows the text
+   colour in both themes. */
+.form-select::picker-icon {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  align-self: center;
+  flex: none;
+  background-color: currentColor;
+  mask-image: var(--select-chevron);
+  mask-repeat: no-repeat;
+  mask-size: contain;
 }
 .form-select option {
   padding: 8px 12px;
