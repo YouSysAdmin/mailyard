@@ -48,7 +48,8 @@
 {{ $fuse     := resources.Get "js/vendor/fuse.min.js" }}
 {{ $searchjs := resources.Get "js/search.js" }}
 {{ $themejs  := resources.Get "js/theme.js" }}
-{{ $js       := slice $fuse $searchjs $themejs | resources.Concat "js/app.js" | minify | fingerprint }}
+{{ $refjs    := resources.Get "js/reference.js" }}
+{{ $js       := slice $fuse $searchjs $themejs $refjs | resources.Concat "js/app.js" | minify | fingerprint }}
 <script defer src="{{ $js.RelPermalink }}"></script>
 
 <link rel="canonical" href="{{ .Permalink }}"/>

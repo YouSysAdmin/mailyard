@@ -12,9 +12,9 @@ holding a cookie jar and re-authenticating.
 
 ## OpenAPI Description
 
-The binary writes its own description. There is no endpoint to fetch it from: the document is generated from the Go
-types this build returns, so it changes only when the binary does, and holding it in memory for a request that arrives
-once a year is not worth doing.
+The binary writes its own description, generated from the Go types this build returns, so it changes only when the
+binary does. Browse it rendered at [API Reference](/docs/reference/api), served from the same instance and always
+describing the one you are signed in to. As a file, for a generator:
 
 ```bash
 mailyard export-api-spec --out openapi.yaml

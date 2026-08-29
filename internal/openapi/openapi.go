@@ -10,12 +10,16 @@
 // nothing about its bodies.
 //
 // It sits beside internal/sdkgen rather than under internal/server. The
-// server does not serve these documents: `mailyard export-api-spec`
-// writes them and sdkgen reads the same metadata. Both aggregate across
-// every domain, which is the opposite of what internal/core is for.
+// YAML documents are written by `mailyard export-api-spec` and read by
+// sdkgen from the same metadata. MachineSpecJSON is what the embedded
+// documentation's reference page fetches, from a route under the docs
+// session gate - built once per process, since the types it describes
+// cannot change while it runs. Both aggregate across every domain, which
+// is the opposite of what internal/core is for.
 package openapi
 
 import (
+	"encoding/json/v2"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -102,11 +106,31 @@ func handWrittenDocs() []apidoc.Route {
 
 // MachineSpec builds the /api/v1 document as YAML.
 //
-// Not cached and not served: the document is derived from types that
-// cannot change at runtime, so there is nothing to keep warm. It is
-// produced on demand by `mailyard export-api-spec` and the running
-// server never holds it.
+// Not cached here: the document is derived from types that cannot change
+// at runtime, so a caller that serves it holds one copy and there is
+// nothing to keep warm. The CLI writes this YAML form, the docs route
+// serves MachineSpecJSON.
 func MachineSpec() ([]byte, error) {
+	doc, err := machineDoc()
+	if err != nil {
+		return nil, err
+	}
+
+	return yaml.Marshal(doc)
+}
+
+// MachineSpecJSON is MachineSpec as JSON, which is what a browser-side
+// reference viewer takes.
+func MachineSpecJSON() ([]byte, error) {
+	doc, err := machineDoc()
+	if err != nil {
+		return nil, err
+	}
+
+	return marshalJSON(doc)
+}
+
+func machineDoc() (map[string]any, error) {
 	doc, err := apidoc.Build(apidoc.Info{
 		Title:       "Mailyard API",
 		Description: description,
@@ -117,5 +141,13 @@ func MachineSpec() ([]byte, error) {
 		return nil, fmt.Errorf("building the openapi document: %w", err)
 	}
 
-	return yaml.Marshal(doc)
+	return doc, nil
+}
+
+// marshalJSON renders a document deterministically, so two nodes serve
+// byte-identical bytes and an etag or a diff of them means something.
+// Not response.Marshal: that is the policy for API bodies, and this is a
+// file.
+func marshalJSON(doc map[string]any) ([]byte, error) {
+	return json.Marshal(doc, json.Deterministic(true))
 }

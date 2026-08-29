@@ -60,8 +60,8 @@ The binary writes its own OpenAPI description:
 mailyard export-api-spec --out openapi.yaml
 ```
 
-Feed it to Swagger UI, Postman, or a client generator. These docs are served at `/docs`
-on the same instance.
+Feed it to Postman or a client generator, or browse it rendered at [API Reference](/docs/reference/api). These docs
+are served at `/docs` on the same instance.
 
 ## Architecture
 

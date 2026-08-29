@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -62,6 +63,7 @@ import (
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
+	"github.com/yousysadmin/mailyard/internal/openapi"
 	"github.com/yousysadmin/mailyard/web"
 )
 
@@ -945,6 +947,15 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 // TestADocumentationPageAnswersWithAndWithoutATrailingSlash pins it.
 func mountDocs(app *fiber.App, site fs.FS, gate fiber.Handler) {
 	docs := app.Group("/docs", gate)
+
+	// The /api/v1 OpenAPI document, as JSON, for the reference page in the
+	// site. Under the same gate as the page that embeds it, and registered
+	// before static so it is answered here rather than looked up in the
+	// site. Built once: it describes types that cannot change while the
+	// process runs, and a failure to build is a bug in the metadata that
+	// every request should report the same way.
+	docs.Get("/openapi/api.json", specHandler(sync.OnceValues(openapi.MachineSpecJSON)))
+
 	docs.Use("/", static.New("", static.Config{
 		FS:         site,
 		IndexNames: []string{"index.html"},
@@ -980,6 +991,20 @@ func mountDocs(app *fiber.App, site fs.FS, gate fiber.Handler) {
 
 		return c.Status(fiber.StatusNotFound).Send(page)
 	})
+}
+
+// specHandler serves one built OpenAPI document.
+func specHandler(build func() ([]byte, error)) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		body, err := build()
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+
+		return c.Send(body)
+	}
 }
 
 // apiNotFound answers the JSON envelope for a request UNDER prefix that

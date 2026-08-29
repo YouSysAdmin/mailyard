@@ -160,8 +160,8 @@ The machine surface describes itself:
 mailyard export-api-spec --out openapi.yaml
 ```
 
-No endpoint and no credentials: the document is generated from the types the binary was built with. Feed the document to
-Swagger UI, Postman, or a client generator.
+The document is generated from the types the binary was built with. Feed the file to Postman or a client generator,
+or read it rendered at [API Reference](/docs/reference/api), which the same instance serves behind the docs sign-in.
 
 `--surface` selects which one it describes: `api` for `/api/v1` (the default, and the one a client generator wants),
 `app` for the console's own routes, `all` for both.

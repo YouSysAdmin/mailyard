@@ -10,6 +10,8 @@ import (
 	"testing/fstest"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/yousysadmin/mailyard/internal/openapi"
 )
 
 // hugoFS is the built documentation stripped to its shape: a page is a
@@ -67,6 +69,10 @@ func TestADocumentationPageAnswersWithAndWithoutATrailingSlash(t *testing.T) {
 		// A moved or misspelled page.
 		{"/docs/email-sending/no-such-page", 404, "<h1>Page not found</h1>"},
 		{"/docs/nope/", 404, "<h1>Page not found</h1>"},
+
+		// The OpenAPI document the reference page fetches, answered by
+		// the server rather than found in the site, under the same gate.
+		{"/docs/openapi/api.json", 200, `"openapi":"3.0.3"`},
 	} {
 		req := httptest.NewRequest("GET", tc.path, nil)
 		res, err := app.Test(req)
@@ -85,5 +91,33 @@ func TestADocumentationPageAnswersWithAndWithoutATrailingSlash(t *testing.T) {
 		if !strings.Contains(string(body), tc.body) {
 			t.Errorf("%s answered %q, want it to contain %q", tc.path, body, tc.body)
 		}
+	}
+}
+
+// The served document IS the exported one, byte for byte, so a reader of
+// the reference page and a generator fed the CLI's output see the same
+// API - and the route cannot drift into a summary of it.
+func TestTheServedOpenAPIDocumentIsTheExportedOne(t *testing.T) {
+	app := fiber.New()
+	mountDocs(app, hugoFS(), func(c fiber.Ctx) error { return c.Next() })
+
+	want, err := openapi.MachineSpecJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := app.Test(httptest.NewRequest("GET", "/docs/openapi/api.json", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if ct := res.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Errorf("content type %q, want application/json", ct)
+	}
+
+	if string(got) != string(want) {
+		t.Errorf("served document differs from MachineSpecJSON (%d vs %d bytes)", len(got), len(want))
 	}
 }

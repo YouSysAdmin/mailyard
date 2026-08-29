@@ -1,0 +1,32 @@
+{{ define "main" }}
+  <article class="cs-article cs-article-reference">
+    <header class="cs-article-head">
+      {{ with .Parent }}
+        <div class="cs-eyebrow">{{ .Title }}</div>
+      {{ end }}
+      <h1>{{ .Title }}</h1>
+      {{ with .Description }}<p class="cs-lead">{{ . }}</p>{{ end }}
+    </header>
+    <div class="cs-prose">
+      {{ .Content }}
+    </div>
+    {{- /* The viewer needs the document, and only the embedded build has a
+        server behind it to answer /docs/openapi/<surface>.json. The pages
+        environment (params.landing) is a static host, so it stops at the
+        prose above, which already says how to get the file. Init happens in
+        assets/js/reference.js, part of the site bundle - no inline script,
+        so no new CSP hash, and the configuration is code rather than an
+        HTML-escaped JSON attribute. reference.js mounts on DOMContentLoaded,
+        after every deferred script including this one has run.
+
+        NOT id="api-reference": the standalone bundle mounts ITSELF on an
+        element by that id, with its defaults - fonts from its CDN, the
+        registry, telemetry - and the configured instance then lands on top
+        of it. The id here is deliberately one the bundle does not look
+        for. */ -}}
+    {{ if not site.Params.landing }}
+      <div id="openapi-reference" class="cs-reference" data-url="{{ printf "/docs/openapi/%s.json" .Params.openapi }}"></div>
+      <script defer src="{{ "vendor/scalar/standalone.js" | relURL }}"></script>
+    {{ end }}
+  </article>
+{{ end }}

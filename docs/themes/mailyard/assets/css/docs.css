@@ -1499,3 +1499,82 @@ details.cs-side-collapsible[open] > ul {
   display: block;
   border: 1px solid var(--line-2);
 }
+
+/* --------- API reference (Scalar) --------- */
+/* Only tokens are mapped, never Scalar's layout: the viewer keeps its own
+   sidebar and columns and takes the article width. The values are the
+   site's, so the page reads as this site in both themes - the dark-first
+   block below is overridden by the light one exactly as tokens.css does. */
+.cs-article-reference .cs-article-head {
+  margin-bottom: 24px;
+}
+/* The viewer brings a sidebar of its own, so the page gives it the TOC
+   column (toc: false in front matter) and lifts the article's max width.
+   The site sidebar stays: it is how the reader leaves this page. */
+.cs-shell:has(.cs-article-reference) {
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+}
+.cs-shell:has(.cs-article-reference) .cs-main {
+  max-width: none;
+}
+.cs-reference {
+  margin-top: 32px;
+  border-top: 1px solid var(--line-1);
+  --scalar-font: var(--font-sans);
+  --scalar-font-code: var(--font-mono);
+  --scalar-background-1: var(--bg-0);
+  --scalar-background-2: var(--bg-1);
+  --scalar-background-3: var(--bg-2);
+  --scalar-background-accent: var(--bg-3);
+  --scalar-color-1: var(--fg-0);
+  --scalar-color-2: var(--fg-2);
+  --scalar-color-3: var(--fg-3);
+  --scalar-color-accent: var(--brand-300);
+  --scalar-border-color: var(--line-1);
+  --scalar-color-green: var(--ok);
+  --scalar-color-red: var(--crit);
+  --scalar-color-yellow: var(--warn);
+  --scalar-color-blue: var(--info);
+  --scalar-link-color: var(--link);
+  --scalar-link-color-hover: var(--link-hover);
+  --scalar-radius: 6px;
+  --scalar-radius-lg: 8px;
+  /* The sidebar reads its own family of tokens, not the page's. */
+  --scalar-sidebar-background-1: var(--bg-0);
+  --scalar-sidebar-color-1: var(--fg-0);
+  --scalar-sidebar-color-2: var(--fg-2);
+  --scalar-sidebar-color-active: var(--fg-0);
+  --scalar-sidebar-border-color: var(--line-1);
+  --scalar-sidebar-item-hover-background: var(--bg-2);
+  --scalar-sidebar-item-hover-color: var(--fg-0);
+  --scalar-sidebar-item-active-background: var(--bg-3);
+  --scalar-sidebar-indent-border: var(--line-1);
+  --scalar-sidebar-indent-border-hover: var(--line-2);
+  --scalar-sidebar-indent-border-active: var(--line-3);
+  --scalar-sidebar-search-background: var(--bg-1);
+  --scalar-sidebar-search-border-color: var(--line-1);
+  --scalar-sidebar-search-color: var(--fg-2);
+}
+[data-theme='light'] .cs-reference {
+  --scalar-color-accent: var(--brand-800);
+}
+/* tokens.css styles bare pre, code and kbd for the prose, and Scalar's
+   markup is made of the same elements: its pre is deliberately w-fit
+   inside a block that paints the background, so our background on the
+   pre itself read as a code block two thirds wide, and our code colour
+   painted its syntax tokens over its own. Hand every one of those
+   properties back. The :root form is there for specificity: the light
+   theme keeps the prose's code blocks dark through
+   `:root[data-theme="light"] pre`, which outranks a plain class. */
+.cs-reference :is(pre, code, kbd),
+:root[data-theme='light'] .cs-reference :is(pre, code, kbd) {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+}
