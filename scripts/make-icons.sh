@@ -11,14 +11,15 @@
 # It was DELETED once, in e868ea5, while the notes went on describing
 # it. What came back had to be rewritten anyway: it still wrote
 # docs/static/img/, which the Hugo migration replaced with
-# docs/static/assets/logo/, so it would have failed on its third
-# command.
+# docs/themes/mailyard/static/assets/logo/, so it would have failed on
+# its third command.
 set -eu
 
 cd "$(dirname "$0")/.."
 
 SMALL=web/public/favicon.svg              # solid letter, heavier stroke, for <= 20px
-FULL=docs/static/assets/logo/logo.svg     # stroked envelope, for larger use
+# The stroked envelope, for larger use.
+FULL=docs/themes/mailyard/static/assets/logo/logo.svg
 
 # ONE TONE, and a mid grey rather than either end of the accent.
 #
@@ -54,16 +55,16 @@ rsvg-convert -w 48 -h 48 "$tmp/small.svg" -o "$tmp/48.png"
 magick "$tmp/16.png" "$tmp/32.png" "$tmp/48.png" web/public/favicon.ico
 
 # Docs. The theme's head links all four - the SVG, the two PNG sizes and
-# the touch icon - out of docs/static/assets/logo/.
-rsvg-convert -w 16 -h 16 "$tmp/small.svg" -o docs/static/assets/logo/favicon-16.png
-rsvg-convert -w 32 -h 32 "$tmp/small.svg" -o docs/static/assets/logo/favicon-32.png
+# the touch icon - out of docs/themes/mailyard/static/assets/logo/.
+rsvg-convert -w 16 -h 16 "$tmp/small.svg" -o docs/themes/mailyard/static/assets/logo/favicon-16.png
+rsvg-convert -w 32 -h 32 "$tmp/small.svg" -o docs/themes/mailyard/static/assets/logo/favicon-32.png
 # 180px is well past the size the small variant exists for, so the touch
 # icon takes the full mark. Transparent, like the one it replaces.
-rsvg-convert -w 180 -h 180 "$tmp/full.svg" -o docs/static/assets/logo/apple-touch-icon.png
+rsvg-convert -w 180 -h 180 "$tmp/full.svg" -o docs/themes/mailyard/static/assets/logo/apple-touch-icon.png
 
 echo "regenerated:"
 ls -l web/public/favicon.png web/public/favicon.ico \
-      docs/static/assets/logo/favicon-16.png \
-      docs/static/assets/logo/favicon-32.png \
-      docs/static/assets/logo/apple-touch-icon.png |
+      docs/themes/mailyard/static/assets/logo/favicon-16.png \
+      docs/themes/mailyard/static/assets/logo/favicon-32.png \
+      docs/themes/mailyard/static/assets/logo/apple-touch-icon.png |
   awk '{printf "  %-48s %7s bytes\n", $NF, $5}'

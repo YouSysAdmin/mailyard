@@ -4,7 +4,9 @@
 
     Small optical variant: solid letter and a heavier enclosure, because
     below ~20px a stroked envelope's flap crease turns to noise inside the
-    rectangle. The full mark lives in docs/static/img/logo.svg.
+    rectangle. The full mark lives in
+    docs/themes/mailyard/static/assets/logo/logo.svg, and the console
+    draws both variants out of web/src/assets/brand-mark.svg.
 
     A favicon renders outside the page, so currentColor is unavailable and
     the colours are stated. The neutral holds on both a light and a dark

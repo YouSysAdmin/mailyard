@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!--
+    The Yard mark: a bounded plot with a gate broken into its top edge,
+    holding a letter. Enclosure plus intake plus contents - receive, hold,
+    dispatch, which is what the product does.
+
+    Referenced from BrandMark.vue through an external <use>, never
+    inlined into a page. The enclosure is drawn in currentColor so the
+    mark takes the colour of whatever it sits in, and the letter reads
+    the accent from the page - both cross the <use> boundary because
+    they are inherited properties - falling back to currentColor when no
+    accent is in scope, so the mark still works in one colour.
+
+    Two symbols, one silhouette. Below about 20px the stroked envelope's
+    flap crease turns to noise inside the rectangle, so mark-small swaps
+    it for a solid letter and thickens the enclosure.
+  -->
+  <style>
+    .plot { fill: none; stroke: currentColor; stroke-linecap: round; }
+    .letter-line { fill: none; stroke: var(--accent-fg, currentColor); stroke-linecap: round; stroke-linejoin: round; }
+    .letter-solid { fill: var(--accent-fg, currentColor); stroke: none; }
+  </style>
+  <symbol id="mark" viewBox="0 0 32 32">
+    <path class="plot" stroke-width="2.1" d="M11.5 4.6H7.2a3 3 0 0 0-3 3v17.2a3 3 0 0 0 3 3h17.6a3 3 0 0 0 3-3V7.6a3 3 0 0 0-3-3h-4.3"/>
+    <rect class="letter-line" stroke-width="2.1" x="9" y="14.6" width="14" height="9.6" rx="1.6"/>
+    <path class="letter-line" stroke-width="2.1" d="M9.6 16.4 16 21.1l6.4-4.7"/>
+  </symbol>
+  <symbol id="mark-small" viewBox="0 0 32 32">
+    <path class="plot" stroke-width="2.6" d="M11.5 4.6H7.2a3 3 0 0 0-3 3v17.2a3 3 0 0 0 3 3h17.6a3 3 0 0 0 3-3V7.6a3 3 0 0 0-3-3h-4.3"/>
+    <rect class="letter-solid" x="9.2" y="15" width="13.6" height="9" rx="2"/>
+  </symbol>
+</svg>
