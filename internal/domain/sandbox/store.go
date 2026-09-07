@@ -11,6 +11,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/database"
 	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
+	scmodel "github.com/yousysadmin/mailyard/internal/models/smtpcredential"
 )
 
 // Store persists mail captured instead of delivered. Project scoped: a
@@ -34,18 +35,29 @@ func NewStore(db *sql.DB, replicas ...*sql.DB) *Store {
 // deliberately does not read raw: a page of fifty messages would drag
 // fifty full MIME trees through the driver to render a table of
 // subjects.
-const sandboxColumns = `id, project_id, source, credential_id, api_key_id,
-       sender, recipients, subject, text_body, html_body, headers, attachments,
-       size, client_ip, expires_at, received_at, created_at`
+//
+// The two names beside the credential ids are resolved here rather
+// than by the console, because the console cannot: a capture may
+// carry an ordinary credential that opted in per message, which the
+// sandbox credential list does not return, and a sandbox-only caller
+// holds no permission to read api keys at all. A revoked credential
+// keeps its row, so its name survives. A deleted key does not, and
+// the LEFT JOIN answers an empty name for it.
+const sandboxColumns = `e.id, e.project_id, e.source, e.credential_id, e.api_key_id,
+       COALESCE(c.name, ''), COALESCE(c.username, ''), COALESCE(k.name, ''),
+       e.sender, e.recipients, e.subject, e.text_body, e.html_body, e.headers, e.attachments,
+       e.size, e.client_ip, e.expires_at, e.received_at, e.created_at`
 
-const sandboxSelect = `SELECT ` + sandboxColumns + ` FROM sandbox_emails`
+const sandboxSelect = `SELECT ` + sandboxColumns + ` FROM sandbox_emails e
+       LEFT JOIN smtp_credentials c ON c.id = e.credential_id AND c.project_id = e.project_id
+       LEFT JOIN api_keys k ON k.id = e.api_key_id AND k.project_id = e.project_id`
 
 const sandboxSelectRaw = `SELECT raw FROM sandbox_emails WHERE project_id = ? AND id = ?`
 
 // Get returns one captured message within projID, or nil when there is
 // no such row.
 func (s *Store) Get(ctx context.Context, projID, id string) (*sbmodel.Email, error) {
-	row := s.QueryRow(ctx, sandboxSelect+` WHERE project_id = ? AND id = ?`, projID, id)
+	row := s.QueryRow(ctx, sandboxSelect+` WHERE e.project_id = ? AND e.id = ?`, projID, id)
 	e, err := scanSandbox(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -73,7 +85,7 @@ func (s *Store) List(ctx context.Context, projID string, limit, offset int) ([]*
 	}
 
 	rows, err := s.ReadQuery(ctx,
-		sandboxSelect+` WHERE project_id = ? ORDER BY received_at DESC LIMIT ? OFFSET ?`,
+		sandboxSelect+` WHERE e.project_id = ? ORDER BY e.received_at DESC LIMIT ? OFFSET ?`,
 		projID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -199,19 +211,28 @@ type scanner interface {
 
 func scanSandbox(sc scanner) (*sbmodel.Email, error) {
 	var (
-		e           sbmodel.Email
-		recipients  string
-		headers     string
-		attachments string
-		expires     sql.NullTime
+		e            sbmodel.Email
+		credName     string
+		credUsername string
+		recipients   string
+		headers      string
+		attachments  string
+		expires      sql.NullTime
 	)
 	err := sc.Scan(&e.ID, &e.ProjectID, &e.Source, database.Str(&e.CredentialID), database.Str(&e.APIKeyID),
+		&credName, &credUsername, &e.APIKeyName,
 		&e.Sender, &recipients, &e.Subject, &e.TextBody, &e.HTMLBody,
 		&headers, &attachments, &e.Size, &e.ClientIP, &expires,
 		&e.ReceivedAt, &e.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+
+	// Which of the two to show is one decision and it lives on the
+	// model, so the sandbox and the email log cannot answer it
+	// differently.
+	cred := scmodel.Credential{Name: credName, Username: credUsername}
+	e.CredentialName = cred.Label()
 
 	if err := json.Unmarshal([]byte(recipients), &e.Recipients); err != nil {
 		e.Recipients = nil

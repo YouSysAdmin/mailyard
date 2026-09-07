@@ -527,6 +527,7 @@ type Email struct {
 	ProjectID             string            `json:"project_id"`
 	CreatedBy             string            `json:"created_by,omitempty"`
 	APIKeyID              string            `json:"api_key_id,omitempty"`
+	CredentialID          string            `json:"credential_id,omitempty"`
 	SMTPServerID          string            `json:"smtp_server_id,omitempty"`
 	DeliveredVia          string            `json:"delivered_via,omitempty"`
 	SMTPGroupID           string            `json:"smtp_group_id,omitempty"`
@@ -564,7 +565,8 @@ type EmailListResponse struct {
 
 // EmailResponse is the response body.
 type EmailResponse struct {
-	Email *Email `json:"email"`
+	Email   *Email   `json:"email"`
+	SentVia *SentVia `json:"sent_via,omitempty"`
 }
 
 // EmailSendInput is the request body.
@@ -1434,23 +1436,25 @@ type SandboxDeletedResponse struct {
 
 // SandboxEmail is the wire body.
 type SandboxEmail struct {
-	ID           string              `json:"id"`
-	ProjectID    string              `json:"project_id"`
-	Source       string              `json:"source"`
-	CredentialID string              `json:"credential_id,omitempty"`
-	APIKeyID     string              `json:"api_key_id,omitempty"`
-	Sender       string              `json:"sender"`
-	Recipients   []string            `json:"recipients"`
-	Subject      string              `json:"subject,omitempty"`
-	TextBody     string              `json:"text_body,omitempty"`
-	HTMLBody     string              `json:"html_body,omitempty"`
-	Headers      map[string]string   `json:"headers,omitempty"`
-	Attachments  []SandboxAttachment `json:"attachments,omitempty"`
-	Size         int64               `json:"size"`
-	ClientIP     string              `json:"client_ip,omitempty"`
-	ExpiresAt    *time.Time          `json:"expires_at,omitempty"`
-	ReceivedAt   time.Time           `json:"received_at"`
-	CreatedAt    time.Time           `json:"created_at"`
+	ID             string              `json:"id"`
+	ProjectID      string              `json:"project_id"`
+	Source         string              `json:"source"`
+	CredentialID   string              `json:"credential_id,omitempty"`
+	APIKeyID       string              `json:"api_key_id,omitempty"`
+	CredentialName string              `json:"credential_name,omitempty"`
+	APIKeyName     string              `json:"api_key_name,omitempty"`
+	Sender         string              `json:"sender"`
+	Recipients     []string            `json:"recipients"`
+	Subject        string              `json:"subject,omitempty"`
+	TextBody       string              `json:"text_body,omitempty"`
+	HTMLBody       string              `json:"html_body,omitempty"`
+	Headers        map[string]string   `json:"headers,omitempty"`
+	Attachments    []SandboxAttachment `json:"attachments,omitempty"`
+	Size           int64               `json:"size"`
+	ClientIP       string              `json:"client_ip,omitempty"`
+	ExpiresAt      *time.Time          `json:"expires_at,omitempty"`
+	ReceivedAt     time.Time           `json:"received_at"`
+	CreatedAt      time.Time           `json:"created_at"`
 }
 
 // SandboxEmailResponse is the response body.
@@ -1522,6 +1526,13 @@ type SendingLimits struct {
 	MaxAttachments         int64 `json:"max_attachments"`
 	MaxAttachmentSize      int64 `json:"max_attachment_size"`
 	MaxTotalAttachmentSize int64 `json:"max_total_attachment_size"`
+}
+
+// SentVia is the wire body.
+type SentVia struct {
+	Kind       string `json:"kind"`
+	Name       string `json:"name,omitempty"`
+	CampaignID string `json:"campaign_id,omitempty"`
 }
 
 // Server is the wire body.

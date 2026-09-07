@@ -46,6 +46,16 @@ type Email struct {
 	CredentialID string `json:"credential_id,omitempty"`
 	APIKeyID     string `json:"api_key_id,omitempty"`
 
+	// CredentialName and APIKeyName are what the console calls that
+	// credential, resolved at read time and never stored. Nobody has
+	// seen the id: a person names a credential when they mint it and
+	// reads the username off the connection page, so those are the two
+	// things they can recognise. The credential's name, or its username
+	// when the name is empty, and the key's name. Empty when the row is
+	// gone, which leaves the id as the only thing left to show.
+	CredentialName string `json:"credential_name,omitempty"`
+	APIKeyName     string `json:"api_key_name,omitempty"`
+
 	// Sender and Recipients are the SMTP envelope, which is what a
 	// receiver would actually have routed on. They are kept separate
 	// from the From and To headers, and a developer chasing a Bcc or a

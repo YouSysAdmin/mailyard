@@ -199,7 +199,7 @@ func (h *Handler) Get(c fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	return response.Success(c, EmailResponse{Email: e})
+	return response.Success(c, EmailResponse{Email: e, SentVia: resolveSentVia(c.Context(), h.Runtime, e)})
 }
 
 // clickHashRE pulls the link hash out of a click-redirect URL in a
@@ -307,7 +307,7 @@ func (h *Handler) Retry(c fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	return response.Success(c, EmailResponse{Email: e})
+	return response.Success(c, EmailResponse{Email: e, SentVia: resolveSentVia(c.Context(), h.Runtime, e)})
 }
 
 // toRequest converts the bound input into the service request, parsing send_at.

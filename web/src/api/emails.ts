@@ -1,6 +1,17 @@
 import api from './client'
 import type { Email, EmailAttachment } from './types'
 
+// SentVia mirrors internal/domain/email.SentVia - how a message was
+// submitted, resolved server side because the row holds only ids and
+// an id is the one thing no screen shows. `name` is a credential's
+// name or username, a key's name, a campaign's name or a person's
+// address, and is empty when the row it came from is gone.
+export interface SentVia {
+  kind: 'submission' | 'api_key' | 'campaign' | 'console'
+  name?: string
+  campaign_id?: string
+}
+
 // Field names mirror the Go input DTOs in
 // internal/domain/email/endpoint.go (sendInput) and
 // endpoint_template.go (templateSendInput): from / to / html / text.
@@ -72,7 +83,7 @@ export const emailsApi = {
   list: (params: EmailListParams = {}) => api.get<{ emails: Email[] }>('/emails/', { params }),
   stats: () => api.get<{ counts: Record<string, number> }>('/emails/stats'),
   limits: () => api.get<{ limits: SendLimits }>('/emails/limits'),
-  get: (id: string) => api.get<{ email: Email }>(`/emails/${id}`),
+  get: (id: string) => api.get<{ email: Email; sent_via?: SentVia }>(`/emails/${id}`),
 
   // The original destinations behind the click redirects in this
   // message's body, keyed by link hash. The preview strips our
@@ -93,5 +104,5 @@ export const emailsApi = {
     api.post<{ email: Email; suppressed_recipients: string[] }>('/emails/send-template', payload),
   batch: (payload: { emails: unknown[] }) => api.post('/emails/batch', payload),
   preview: (payload: Record<string, unknown>) => api.post('/emails/preview', payload),
-  retry: (id: string) => api.post<{ email: Email }>(`/emails/${id}/retry`),
+  retry: (id: string) => api.post<{ email: Email; sent_via?: SentVia }>(`/emails/${id}/retry`),
 }

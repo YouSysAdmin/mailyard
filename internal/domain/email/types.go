@@ -248,6 +248,48 @@ type StatsResponse struct {
 // EmailResponse is one message with its full delivery record.
 type EmailResponse struct {
 	Email *emailmodel.Email `json:"email"`
+
+	// SentVia is how the message was submitted, resolved for this
+	// read. Absent when nothing on the row says.
+	SentVia *SentVia `json:"sent_via,omitempty"`
+}
+
+// The values SentVia.Kind takes.
+const (
+	// SentViaSubmission is the SMTP submission listener, authenticated
+	// with a submission credential.
+	SentViaSubmission = "submission"
+
+	// SentViaAPIKey is a machine credential, over HTTP or as an SMTP
+	// login.
+	SentViaAPIKey = "api_key"
+
+	// SentViaCampaign is the campaign runner.
+	SentViaCampaign = "campaign"
+
+	// SentViaConsole is a person sending from the console.
+	SentViaConsole = "console"
+)
+
+// SentVia says HOW a message was submitted, in the terms the person
+// reading it has actually seen.
+//
+// Resolved on the read and never stored. The row keeps ids, and an id
+// is the one thing no screen has ever shown: a credential is known by
+// the name it was given, a person by their address, a campaign by its
+// own page.
+type SentVia struct {
+	// Kind is which of the four paths accepted the message.
+	Kind string `json:"kind"`
+
+	// Name is the credential's name or username, the key's name, the
+	// campaign's name, or the person's email address. Empty when the
+	// row it comes from is gone, which leaves the kind on its own.
+	Name string `json:"name,omitempty"`
+
+	// CampaignID is set on a campaign send only, so a console can link
+	// to the campaign rather than name it.
+	CampaignID string `json:"campaign_id,omitempty"`
 }
 
 // TrackedLinksResponse maps a message's link hashes to the original

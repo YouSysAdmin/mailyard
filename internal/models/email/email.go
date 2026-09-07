@@ -54,10 +54,18 @@ type Attachment struct {
 
 // Email is one outbound message and its delivery state.
 type Email struct {
-	ID           string `json:"id"`
-	ProjectID    string `json:"project_id"`
-	CreatedBy    string `json:"created_by,omitempty"`
-	APIKeyID     string `json:"api_key_id,omitempty"`
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	CreatedBy string `json:"created_by,omitempty"`
+	APIKeyID  string `json:"api_key_id,omitempty"`
+
+	// CredentialID names the SMTP submission credential a message
+	// arrived with, empty on every other path. CreatedBy is whoever
+	// MINTED that credential rather than whoever sent this, so the
+	// two answer different questions and a screen wanting the second
+	// has to read this one.
+	CredentialID string `json:"credential_id,omitempty"`
+
 	SMTPServerID string `json:"smtp_server_id,omitempty"`
 
 	// DeliveredVia is the server that actually CARRIED the message,

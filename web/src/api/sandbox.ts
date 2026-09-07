@@ -22,6 +22,10 @@ export interface SandboxEmail {
   source: SandboxSource
   credential_id?: string
   api_key_id?: string
+  // The name a person gave the credential, or its username when it has
+  // none, resolved server side. Absent when the credential row is gone.
+  credential_name?: string
+  api_key_name?: string
   sender: string
   recipients: string[]
   subject?: string

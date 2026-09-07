@@ -32,6 +32,19 @@ const email = ref<SandboxEmail | null>(null)
 const raw = ref('')
 const rawLoading = ref(false)
 
+// What the message was sent WITH, as the person knows it: the name they
+// gave the credential, or its username. The id is what the row carries
+// and nobody has ever seen it, so it is shown only when the credential
+// row is gone and there is nothing else left to say.
+const credentialName = computed(() => {
+  const e = email.value
+  if (!e) return ''
+
+  return e.credential_name || e.api_key_name || ''
+})
+
+const credentialID = computed(() => email.value?.credential_id || email.value?.api_key_id || '')
+
 // The download URLs only this caller can build - see ViewerAttachment.
 const viewerAttachments = computed<ViewerAttachment[]>(() => {
   const e = email.value
@@ -121,8 +134,9 @@ watch(() => props.id, load, { immediate: true })
       </div>
       <div>
         <dt>Credential</dt>
-        <dd>
-          <code>{{ email.credential_id || email.api_key_id || '-' }}</code>
+        <dd v-if="credentialName">{{ credentialName }}</dd>
+        <dd v-else>
+          <code>{{ credentialID || '-' }}</code>
         </dd>
       </div>
       <div>

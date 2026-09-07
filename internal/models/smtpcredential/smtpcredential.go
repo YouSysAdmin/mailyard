@@ -62,6 +62,17 @@ type Credential struct {
 	CreatedAt  time.Time  `json:"created_at"`
 }
 
+// Label is what to call this credential where a person can see it:
+// the name they gave it, or its username when they gave none. Never
+// the id, which no screen shows.
+func (c *Credential) Label() string {
+	if c.Name != "" {
+		return c.Name
+	}
+
+	return c.Username
+}
+
 // IsValid reports whether the credential is usable.
 func (c *Credential) IsValid() bool { return !c.Revoked }
 

@@ -38,7 +38,7 @@ func NewStore(db *sql.DB, replicas ...*sql.DB) *Store {
 // emailColumns is split out of emailSelect because the claim below
 // returns the same shape from a RETURNING clause, and scanEmail reads
 // them positionally - two hand-maintained lists would drift.
-const emailColumns = `id, project_id, created_by, api_key_id, smtp_server_id, smtp_group_id, sender, recipients,
+const emailColumns = `id, project_id, created_by, api_key_id, credential_id, smtp_server_id, smtp_group_id, sender, recipients,
        subject, template_name, html_body, text_body, attachments_json, headers_json,
        list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
        status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
@@ -322,12 +322,12 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
 	_, err := s.Exec(ctx, `
         WITH mail AS (
         INSERT INTO emails (
-            id, project_id, created_by, api_key_id, smtp_server_id, smtp_group_id, sender, recipients,
+            id, project_id, created_by, api_key_id, credential_id, smtp_server_id, smtp_group_id, sender, recipients,
             subject, template_name, html_body, text_body, attachments_json, headers_json,
             list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
             status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
             created_at, scheduled_at, sent_at, tracked
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING project_id, created_at
         )
         INSERT INTO email_volume (project_id, minute, accepted)
@@ -336,7 +336,7 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
             SET accepted = email_volume.accepted + 1
     `,
 		e.ID, e.ProjectID, e.CreatedBy, database.NullStr(e.APIKeyID),
-		database.NullStr(e.SMTPServerID), database.NullStr(e.SMTPGroupID), e.Sender,
+		database.NullStr(e.CredentialID), database.NullStr(e.SMTPServerID), database.NullStr(e.SMTPGroupID), e.Sender,
 		database.MustJSON(e.Recipients), e.Subject, e.TemplateName, e.HTMLBody, e.TextBody,
 		database.MustJSON(e.Attachments), database.MustJSON(e.Headers),
 		e.ListUnsubscribeURL, e.ListUnsubscribeMailto, e.ListUnsubscribePost,
@@ -477,7 +477,7 @@ func scanEmail(r interface{ Scan(...any) error }) (*emailmodel.Email, error) {
 	var nextAt, claimedAt, scheduledAt, sentAt sql.NullTime
 	var openedAt, clickedAt sql.NullTime
 	if err := r.Scan(&e.ID, &e.ProjectID, &e.CreatedBy, database.Str(&e.APIKeyID),
-		database.Str(&e.SMTPServerID), database.Str(&e.SMTPGroupID),
+		database.Str(&e.CredentialID), database.Str(&e.SMTPServerID), database.Str(&e.SMTPGroupID),
 		&e.Sender, &recipients, &e.Subject, &e.TemplateName, &e.HTMLBody, &e.TextBody,
 		&attachments, &headers,
 		&e.ListUnsubscribeURL, &e.ListUnsubscribeMailto, &e.ListUnsubscribePost,

@@ -222,6 +222,13 @@ type SendRequest struct {
 	ID   string
 	From string
 
+	// CredentialID names the SMTP submission credential the message
+	// authenticated with, and lands on the email row. Set by the
+	// submission listener from the session it already authenticated -
+	// the HTTP handlers build this struct field by field and no wire
+	// type carries it, so a caller cannot claim to be a credential.
+	CredentialID string
+
 	// To is the envelope - who the message is delivered to.
 	To []string
 
@@ -621,6 +628,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		ProjectID:             projID,
 		CreatedBy:             createdBy,
 		APIKeyID:              apiKeyID,
+		CredentialID:          req.CredentialID,
 		SMTPServerID:          req.Route.ServerID,
 		SMTPGroupID:           req.Route.GroupID,
 		Sender:                from,

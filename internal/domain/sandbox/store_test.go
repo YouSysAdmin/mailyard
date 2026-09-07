@@ -104,6 +104,67 @@ func TestAMessageSurvivesARoundTrip(t *testing.T) {
 	}
 }
 
+// A capture names the credential it arrived with by id, and nobody
+// has ever seen that id: the person named the credential when they
+// minted it and read its username off the connection page. So a read
+// resolves the name, the username when the name is empty, and a
+// revoked credential still answers, because its row is kept.
+func TestACaptureNamesItsCredential(t *testing.T) {
+	s := testStore(t)
+	proj := newProject(t, s)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	named := newCredential(t, s, proj, "CI runner", "smtp_named", true)
+	unnamed := newCredential(t, s, proj, "", "smtp_unnamed", false)
+
+	withName := put(t, s, proj, now, "named", nil)
+	withName.CredentialID = named
+	withUsername := put(t, s, proj, now, "unnamed", nil)
+	withUsername.CredentialID = unnamed
+	orphan := put(t, s, proj, now, "orphan", nil)
+	orphan.CredentialID = ids.New()
+	for _, e := range []*sbmodel.Email{withName, withUsername, orphan} {
+		if _, err := s.Exec(t.Context(), `UPDATE sandbox_emails SET credential_id = ? WHERE id = ?`, e.CredentialID, e.ID); err != nil {
+			t.Fatalf("set credential: %v", err)
+		}
+	}
+
+	want := map[string]string{withName.ID: "CI runner", withUsername.ID: "smtp_unnamed", orphan.ID: ""}
+	for id, name := range want {
+		got, err := s.Get(t.Context(), proj, id)
+		if err != nil || got == nil {
+			t.Fatalf("get %s: %v, %v", id, got, err)
+		}
+
+		if got.CredentialName != name {
+			t.Errorf("credential name came back as %q, want %q", got.CredentialName, name)
+		}
+	}
+
+	list, err := s.List(t.Context(), proj, 10, 0)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	for _, e := range list {
+		if e.CredentialName != want[e.ID] {
+			t.Errorf("list named %s as %q, want %q", e.ID, e.CredentialName, want[e.ID])
+		}
+	}
+}
+
+func newCredential(t *testing.T, s *Store, projID, name, username string, revoked bool) string {
+	t.Helper()
+	id := ids.New()
+	if _, err := s.Exec(t.Context(), `
+		INSERT INTO smtp_credentials (id, project_id, name, username, password_hash, revoked)
+		VALUES (?, ?, ?, ?, '', ?)`, id, projID, name, username, revoked); err != nil {
+		t.Fatalf("insert credential: %v", err)
+	}
+
+	return id
+}
+
 // Every store query scopes on project first, and a cross-project read
 // has to look like a missing resource rather than a refusal.
 func TestAnotherProjectSeesNothing(t *testing.T) {

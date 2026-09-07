@@ -326,6 +326,9 @@ export interface Email {
   project_id: string
   created_by?: string
   api_key_id?: string
+  // The submission credential the message arrived with. created_by on
+  // that path is whoever minted the credential, not whoever sent this.
+  credential_id?: string
   smtp_server_id?: string
   // The server that actually carried it, which after a failover walk is
   // NOT necessarily smtp_server_id - that one is what the sender asked

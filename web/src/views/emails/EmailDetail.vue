@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { emailsApi } from '../../api/emails'
+import { emailsApi, type SentVia } from '../../api/emails'
 import { apiErrorMessage, browserURL } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
@@ -23,6 +23,36 @@ const projStore = useProjectStore()
 const loading = ref(true)
 const retrying = ref(false)
 const email = ref<Email | null>(null)
+const sentVia = ref<SentVia | null>(null)
+
+// How the message was submitted, in the words the reader knows. The
+// server resolves the name, because the row holds an id and a person
+// has only ever seen the name they gave the credential.
+const VIA_KIND: Record<SentVia['kind'], string> = {
+  submission: 'SMTP submission',
+  api_key: 'API key',
+  campaign: 'campaign',
+  console: 'Send mail',
+}
+
+// The campaign case is the one that renders a link rather than text,
+// so it is the one branch the template keeps. Gated on the permission
+// the campaign page itself needs: a reader without it gets the name as
+// text rather than a link to a page that answers 403.
+const viaCampaign = computed(() =>
+  sentVia.value?.kind === 'campaign' && sentVia.value.campaign_id && projStore.can('campaigns:read')
+    ? { name: 'campaign-detail', params: { id: sentVia.value.campaign_id } }
+    : null,
+)
+
+const viaText = computed(() => {
+  const via = sentVia.value
+  if (!via) return ''
+
+  const kind = VIA_KIND[via.kind] ?? via.kind
+
+  return via.name ? `via ${kind}, ${via.name}` : `via ${kind}`
+})
 
 // The backend streams attachment bytes (inline or blob-store backed)
 // from a download endpoint - the URL is the one thing the viewer
@@ -61,6 +91,7 @@ async function load(quiet = false) {
   try {
     const res = await emailsApi.get(route.params.id as string)
     email.value = res.data.email
+    sentVia.value = res.data.sent_via ?? null
     if (email.value) await loadTrackedLinks(email.value)
   } catch (e) {
     // The manual path says so. It used to go to the browser console
@@ -115,6 +146,7 @@ async function retryEmail() {
   try {
     const res = await emailsApi.retry(email.value.id)
     email.value = res.data.email
+    sentVia.value = res.data.sent_via ?? null
     // Back under the poll: the message is in flight again, and the count
     // that stopped watching the last attempt should not stop this one.
     polls = 0
@@ -183,9 +215,24 @@ async function retryEmail() {
                 <td class="meta-label">Template</td>
                 <td>{{ email.template_name || '-' }}</td>
               </tr>
+              <!-- The origin rides on the accept time rather than
+                   taking a row of its own, and on THIS date because it
+                   is the one always there: how a message was submitted
+                   is true from the moment it was taken in, where a sent
+                   time may never arrive at all. -->
               <tr>
                 <td class="meta-label">Created At</td>
-                <td>{{ formatDate(email.created_at) }}</td>
+                <td>
+                  {{ formatDate(email.created_at) }}
+                  <span v-if="sentVia" class="text-muted text-sm">
+                    <template v-if="viaCampaign">
+                      (via campaign
+                      <router-link :to="viaCampaign">{{ sentVia.name || 'open' }}</router-link
+                      >)
+                    </template>
+                    <template v-else>({{ viaText }})</template>
+                  </span>
+                </td>
               </tr>
               <tr v-if="email.scheduled_at">
                 <td class="meta-label">Scheduled At</td>

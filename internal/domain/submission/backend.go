@@ -500,6 +500,11 @@ func (s *session) Data(r io.Reader) (err error) {
 	// the header, so the value travels as a field and is written once.
 	req.ReplyTo = strings.TrimSpace(parsed.Headers[email.HeaderReplyTo])
 
+	// Which credential carried it, so the log can name what the
+	// message was sent WITH. The person it also records is whoever
+	// minted that credential, which is a different question.
+	req.CredentialID = s.auth.credentialID
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
