@@ -17,19 +17,12 @@ import (
 // This file is the mechanical guarantee that no SQL statement in this
 // repository is built out of runtime data.
 //
-// Placeholders are what stop injection, and every store here uses
-// them - but nothing enforced that. It rested on reviewers noticing,
-// which is exactly the thing that erodes. The obvious answer, gosec's
-// G201/G202, was tried first and does not work: on a textbook
-// `db.Query(fmt.Sprintf("... Where email = '%s'", e))` it reports zero
-// issues, both through golangci-lint and as a standalone binary. A
-// linter that stays silent on the canonical case is worse than none,
-// because the green report is taken for proof.
-//
-// So the check lives here, in the gate that already runs
-// (`go test ./...`), written against the standard library only, and
-// TestGuardCatchesInjection below proves it fires on the cases gosec
-// missed.
+// Placeholders are what stop injection, and this is what enforces
+// them. Not gosec: its G201/G202 report zero issues on a textbook
+// `db.Query(fmt.Sprintf("... Where email = '%s'", e))`, and a linter
+// silent on the canonical case is worse than none, because the green
+// report is taken for proof. TestGuardCatchesInjection proves this one
+// fires.
 //
 // The rule: every SQL string reaching Q/Exec/Query/QueryRow (and the
 // database/sql *Context methods) must be a compile-time constant, or
@@ -44,16 +37,15 @@ import (
 // it over-matches: stmt.ExecContext(ctx, bindValue) on a prepared
 // statement looks identical to db.ExecContext(ctx, query). That
 // direction is chosen deliberately. A false positive is one visible
-// line needing an allow marker; a false negative is an injection this
+// line needing an allow marker. A false negative is an injection this
 // test swears does not exist. Narrowing the match to known receiver
 // names would silently stop guarding the day somebody introduces a
 // new handle.
 //
 // Every helper on Base has to be listed. Each one carries a
 // //sqlconst:allow inside base.go whose stated reason is "the query is
-// checked at each call site" - leave it out of this map and those call
-// sites are not checked at all, so the marker becomes a false claim and
-// a textbook `s.Query(ctx, "... WHERE email = '"+email+"'")` passes.
+// checked at each call site" - leave it out of this map and the marker
+// becomes a false claim.
 var sqlSinks = map[string]int{
 	"Q":                 0, // Base.Q, the Rebind wrapper every store uses
 	"Exec":              1, // Base.Exec(ctx, query, ...)
@@ -193,22 +185,14 @@ func sqlSinkArg(call *ast.CallExpr) (int, bool) {
 	// the table above records. On *sql.DB and *sql.Tx the same three
 	// names take the query first.
 	//
-	// The table's index was applied to both, so `db.Exec(query)` was
-	// looked up at index 1, found nothing there, and the caller's
-	// `idx >= len(call.Args)` skipped the call entirely. One such call
-	// already existed (dbtest's schema cleanup) and any future
-	// `db.Exec("... " + userValue)` would have been invisible to this
-	// test - which is the failure mode it exists to prevent.
+	// Applying the table's index to both would look `db.Exec(query)` up
+	// at index 1, find nothing, and skip the call - the one shape this
+	// test exists to catch.
 	//
 	// A context never looks like a string, so shifting to index 0 when
-	// the first argument is stringy adds no false positive.
-	//
-	// Being stringy is the whole test, and "the call has one argument"
-	// is not a usable substitute for it. Tried, and it reported two
-	// calls that have nothing to do with SQL: c.count(t.Context())
-	// in the metrics collector, and Fiber's own c.Query(param) reading a
-	// query-string value. That is the over-matching this table's comment
-	// warns about, arriving through the back door.
+	// the first argument is stringy adds no false positive. "The call
+	// has one argument" is not a substitute: c.count(t.Context()) and
+	// Fiber's c.Query(param) both have one and neither is SQL.
 	if idx > 0 && len(call.Args) > 0 && looksStringy(call.Args[0]) {
 		return 0, true
 	}
@@ -417,10 +401,8 @@ func packageConsts(pkg *ast.Package) map[string]bool {
 //
 // That last one is not decoration. Two markers stack on the same
 // statement wherever a call is both safe to interpolate and safe on a
-// replica, and with a plain marker+1 rule the upper one covered the
-// LOWER COMMENT instead of the call - so the analytics helpers were
-// reported despite carrying a reason, and the fix somebody reaches for
-// under that pressure is to delete the marker that "does not work".
+// replica, and with a plain marker+1 rule the upper one would cover
+// the LOWER COMMENT instead of the call.
 func allowedLines(fset *token.FileSet, file *ast.File) map[int]bool {
 	out := map[int]bool{}
 	for _, group := range file.Comments {
@@ -500,10 +482,9 @@ func render(e ast.Expr) string {
 	return "expression"
 }
 
-// The guard is only worth its place if it fires. gosec's G201/G202
-// reported zero on every one of these, which is why this test exists
-// at all - it runs the same checker over source that is deliberately
-// wrong and asserts each case is caught.
+// The guard is only worth its place if it fires: this runs the same
+// checker over source that is deliberately wrong and asserts each case
+// is caught.
 //
 // Parsed from a string rather than a file so the vulnerable code
 // never sits in the tree, where somebody might copy it.
@@ -595,7 +576,7 @@ func cleanBuilder(db *sql.DB, status string, args []any) (*sql.Rows, error) {
 	consts := map[string]bool{"safeSelect": true}
 	found := map[string]bool{}
 	for _, f := range checkFile(fset, file, consts, map[int]bool{}, "victim.go") {
-		// Findings read "victim.go:<line> <expr>"; map them back to the
+		// Findings read "victim.go:<line> <expr>". Map them back to the
 		// enclosing function so the assertions read by intent.
 		line := 0
 		if _, err := sscanLine(f, &line); err == nil {
@@ -606,9 +587,8 @@ func cleanBuilder(db *sql.DB, status string, args []any) (*sql.Rows, error) {
 	mustCatch := []string{
 		"sprintfInline", "sprintfViaVar", "concatInline", "concatOntoConst",
 		"interpolatedTable", "taintedBuilder", "throughQ",
-		// The three Base helpers that were missing from sqlSinks. Each
-		// carries an allow marker in base.go claiming its call sites are
-		// checked, so their absence made that claim false.
+		// The Base helpers whose allow marker in base.go claims their
+		// call sites are checked.
 		"throughQuery", "throughReadQuery", "throughReadQueryRow",
 	}
 	for _, name := range mustCatch {
@@ -666,11 +646,8 @@ func funcAtLine(fset *token.FileSet, file *ast.File, line int) string {
 }
 
 // A marker must still cover its call when a second marker sits below
-// it. Both markers are legitimate on one statement - "cannot carry
-// injection" and "a follower may serve this" are different claims -
-// and the analytics count helpers carry both. With a marker+1 rule the
-// upper one covered the lower COMMENT, so a correctly-excused call was
-// reported and the obvious fix was to delete the marker.
+// it. Both are legitimate on one statement - "cannot carry injection"
+// and "a follower may serve this" are different claims.
 func TestAStackedAllowMarkerStillCoversTheCall(t *testing.T) {
 	const src = `package victim
 

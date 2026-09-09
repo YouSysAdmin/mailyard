@@ -86,8 +86,8 @@ func (f *fakeSender) Send(_ context.Context, projID, _, apiKeyID string, req *em
 // canSend is the permission list a submission credential needs.
 //
 // Spelled out in every test that expects a successful AUTH, because
-// an empty list used to mean send and now means nothing - a test
-// passing nil here would fail at AUTH rather than where it looks.
+// an empty list means nothing - a test passing nil here would fail
+// at AUTH rather than where it looks.
 var canSend = []string{"emails:write"}
 
 // startServer boots the listener on a random loopback port and returns

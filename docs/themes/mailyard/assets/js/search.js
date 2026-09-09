@@ -42,7 +42,7 @@
           minMatchCharLength: 2
         });
       })
-      .catch(function () { /* leave fuse null; query() then no-ops */ })
+      .catch(function () { /* leave fuse null, query() then no-ops */ })
       .finally(function () { loading = false; });
   }
 
@@ -153,7 +153,7 @@
     else if (e.key === 'Enter') { e.preventDefault(); go(); }
   });
 
-  // Global shortcuts: Cmd/Ctrl-K toggles; "/" opens (unless already typing);
+  // Global shortcuts: Cmd/Ctrl-K toggles, "/" opens (unless already typing),
   // Esc closes.
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {

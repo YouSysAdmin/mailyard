@@ -13,10 +13,10 @@ import (
 // anything else.
 //
 // The refusal is the point. StringList answers nil on a decode error, so
-// before this a malformed value stored happily and read back as "nothing
-// configured" - which for the ACME host list means the certificate stops
-// being offered for those names, with the settings page showing the value
-// the operator typed and nothing anywhere disagreeing.
+// a malformed value that stored would read back as "nothing configured" -
+// which for the ACME host list means the certificate stops being offered
+// for those names, with the settings page showing the value the operator
+// typed and nothing anywhere disagreeing.
 func TestAListSettingMustBeAJSONArray(t *testing.T) {
 	const key = smodel.KeyACMEHosts
 	canonical := `["mail.example.com","mx.example.com"]`
@@ -45,8 +45,7 @@ func TestAListSettingMustBeAJSONArray(t *testing.T) {
 	}
 
 	// One value with no punctuation is the shape somebody reaches for
-	// with curl, and it is exactly the shape that used to store fine and
-	// mean nothing.
+	// with curl.
 	for _, bad := range []string{"mail.example.com", `["mail.example.com"`, `{"a":1}`, `[1,2]`} {
 		if got, err := settings.Validate(key, bad); err == nil {
 			t.Errorf("Validate(%q) was accepted as %q - a value that is not an array "+

@@ -265,11 +265,6 @@ offered at all. Status and a connection test live at `GET`/`POST /api/v1/admin/s
 
 ## Relay nodes
 
-{{< callout type="warning" title="Enterprise edition" >}}
-Neither block below applies to the community edition, and a community binary
-refuses to start with `relay_nodes.enabled` set.
-{{< /callout >}}
-
 A relay node is a machine somewhere else — often another provider, often another continent — that delivers straight to
 recipient mail exchangers from its own address, and can run an MX of its own. Two config blocks, and they point in
 opposite directions.

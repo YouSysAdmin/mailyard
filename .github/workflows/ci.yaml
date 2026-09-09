@@ -1,14 +1,4 @@
 # Mailyard, Copyright (c) 2021-2026 YouSysAdmin
-#
-# The COMMUNITY build, which is what this repository contains.
-#
-# It runs in both repositories on purpose. In the public one it compiles
-# a tree that physically lacks the enterprise files, which is the
-# strongest proof available that the community edition stands on its
-# own. In the private overlay it compiles the same program from a tree
-# that HAS those files and excludes every one of them by tag - and that
-# is the run which catches the real failure mode, a change made to a
-# shared file that only compiles with the tag.
 name: CI
 on:
   push:
@@ -42,17 +32,12 @@ jobs:
 
       # install-only, so the gate stays `task check` and CI cannot
       # drift from what a developer runs - the action just puts the
-      # PREBUILT release binary on the PATH. It was `go install`, which
-      # compiled the linter from source for about two minutes on every
-      # run. Pinned, because a linter that changes its mind between
-      # runs fails builds nobody broke.
+      # PREBUILT release binary on the PATH. Pinned, because a linter
+      # that changes its mind between runs fails builds nobody broke.
       #
       # THE PIN MOVES WITH THE GO VERSION IN go.mod. A golangci-lint
-      # binary refuses a target newer than the Go it was built with, so
-      # the 1.27 bump broke CI while the same tree passed locally -
-      # v2.13.1 is the first release built with go1.27 (checked with
-      # `go version -m` on the release binary, not assumed from its
-      # own version number).
+      # binary refuses a target newer than the Go it was built with, and
+      # `go version -m` on the release binary says which that is.
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13.1
@@ -96,39 +81,3 @@ jobs:
       # dependency graph is large and this is the one check that reads
       # it against a database rather than against our own rules.
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-
-  # Public repository only: nothing enterprise may land here.
-  #
-  # A Go test cannot express this - it would have to fail in the
-  # repository that legitimately HAS those files - so it is a job, and
-  # it is guarded by name rather than by a branch or an environment,
-  # because the thing being asserted is which repository this is.
-  no-enterprise-source:
-    if: github.repository == 'YouSysAdmin/mailyard'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Refuse enterprise source in the community repository
-        run: |
-          fail=0
-          if [ -d internal/ee ]; then
-            echo "internal/ee exists in the community repository"
-            fail=1
-          fi
-          if git ls-files '*_ee.go' '*_ee_test.go' | grep -q .; then
-            echo "enterprise files present:"
-            git ls-files '*_ee.go' '*_ee_test.go'
-            fail=1
-          fi
-          # The POSITIVE constraint, anchored and exact. A bare search
-          # for the word matches the community halves too, whose
-          # constraint is `!enterprise`, and matches this file and the
-          # guards in tests/ that merely NAME the tag in a comment - so
-          # the first cut of this job failed on its own source.
-          if git grep -lE '^//go:build enterprise$' -- '*.go' | grep -q .; then
-            echo "files carrying the enterprise tag:"
-            git grep -lE '^//go:build enterprise$' -- '*.go'
-            fail=1
-          fi
-          exit $fail

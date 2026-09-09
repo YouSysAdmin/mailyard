@@ -1,15 +1,9 @@
 // The shape a campaign form holds, and the one way it becomes a request.
 //
-// Creating and editing a campaign are the same eleven fields, and they
-// were two copies: two form objects, two field lists, two payload
-// builders. The copies drifted exactly the way copies do - the create
-// dialog offered a Server group and the edit form did not, and because
-// the endpoint REBUILDS the record from the body, saving an edit cleared
-// the pool the campaign was routed to. Silently.
-//
-// So `toPayload` is the only place a draft becomes a request. A field
-// added to the form and forgotten in one of two submits is no longer a
-// thing that can happen.
+// Creating and editing a campaign are the same eleven fields, and the
+// endpoint REBUILDS the record from the body, so a field one form sends
+// and the other forgets is silently cleared on save. `toPayload` is the
+// only place a draft becomes a request.
 import type { CampaignPayload } from '../../api/campaigns'
 import type { Campaign, CampaignVariant } from '../../api/types'
 

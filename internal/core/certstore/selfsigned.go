@@ -43,9 +43,7 @@ func SelfSigned(ctx context.Context, store Store, hosts []string, alg string) (t
 
 	certPEM, keyPEM, err := certgen.MintLeaf(certgen.LeafRequest{
 		Hosts: hosts,
-		// Empty stays RSA-2048 for 180 days, which is what the library
-		// this replaced defaulted to, so the listener's own self-signed
-		// pair is unchanged apart from the Subject.
+		// Empty stays RSA-2048 for 180 days.
 		Algorithm: alg,
 		Validity:  selfSignedValidity,
 	}, nil)
@@ -84,9 +82,8 @@ func SelfSigned(ctx context.Context, store Store, hosts []string, alg string) (t
 	return tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
 }
 
-// selfSignedValidity is what go-tlsutils used before this called
-// certgen, kept exactly so that replacing the generator does not
-// silently shorten or lengthen what an existing installation serves.
+// selfSignedValidity is how long a self-signed listener pair lives.
+// Changing it changes what every existing installation serves.
 const selfSignedValidity = 180 * 24 * time.Hour
 
 // Replace overwrites the stored self-signed pair, so an operator can

@@ -2,8 +2,7 @@
 // A stack of labelled figures, divided.
 //
 // Two cards on the settings page show one: what the project has used
-// against what its plan allows, and what an export just wrote out. They
-// are the same shape and were the same twenty lines of CSS twice.
+// against what its plan allows, and what an export just wrote out.
 //
 // The value is a STRING, formatted by the caller. Usage says "12 / 500"
 // where a ceiling applies and "12" where none does, and an export says a

@@ -111,9 +111,7 @@ export function useNotificationFeed() {
    */
   function start(onIncoming: () => void) {
     // The badge follows the rule every refreshing surface follows: a
-    // minute apart, and not at all in a background tab. It had a bare
-    // setInterval once, which polled every open tab forever whether or
-    // not anybody could see the number.
+    // minute apart, and not at all in a background tab.
     useAutoRefresh(refreshBadge, { intervalMs: POLL_MS })
 
     watch(

@@ -13,13 +13,13 @@ import "github.com/yousysadmin/mailyard/internal/core/apidoc"
 // Edit the summaries and descriptions freely - they are the half a
 // generator cannot know.
 //
-// The nine entries here are the console-facing routes, which both
-// editions register. The node-facing five are appended by enrolDocs,
-// which is empty in the community build - a document describing a route
-// the binary does not serve is worse than no document, since three
-// clients are generated from it.
+// The first nine entries are the console-facing routes, the last six
+// are what a NODE calls under /api/relay-nodes. The node-facing routes
+// are mounted only when relay_nodes.enabled is set, so a document from
+// an installation with it off describes six routes that answer 404 -
+// which is what the description of that group says.
 func ConsoleDocs() []apidoc.Route {
-	return append([]apidoc.Route{
+	return []apidoc.Route{
 		{
 			Method:      "GET",
 			Path:        "/my/relay-nodes/",
@@ -110,5 +110,61 @@ func ConsoleDocs() []apidoc.Route {
 			PathParams:  []apidoc.Param{{Name: "id"}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatusResponse{})},
 		},
-	}, enrolDocs()...)
+		{
+			Method:      "POST",
+			Path:        "/relay-nodes/heartbeat",
+			Tag:         "relaynode",
+			Summary:     "Heartbeat",
+			Description: "Authenticated by the node id and control token from enrolment.",
+			Request:     heartbeatInput{},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", heartbeatOutput{})},
+		},
+		{
+			Method:  "POST",
+			Path:    "/relay-nodes/inbound",
+			Tag:     "relaynode",
+			Summary: "Forward a message a node's own MX received",
+			Description: "Authenticated by the node id and control token from enrolment. " +
+				"Platform nodes only. The status field says what happened to the mail " +
+				"- accepted, duplicate or refused - and all three are final.",
+			Request:   inboundInput{},
+			Responses: []apidoc.Response{apidoc.OK("The result.", inboundOutput{})},
+		},
+		{
+			Method:      "POST",
+			Path:        "/relay-nodes/register",
+			Tag:         "relaynode",
+			Summary:     "Register",
+			Description: "Public. Authenticated by the shared enrolment token or a project API key holding relay:write.",
+			Request:     registerInput{},
+			Responses:   []apidoc.Response{apidoc.Created("The result.", registerOutput{})},
+		},
+		{
+			Method:      "POST",
+			Path:        "/relay-nodes/renew",
+			Tag:         "relaynode",
+			Summary:     "Renew",
+			Description: "Authenticated by the node id and control token from enrolment.",
+			Request:     renewInput{},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", renewOutput{})},
+		},
+		{
+			Method:      "POST",
+			Path:        "/relay-nodes/claim",
+			Tag:         "relaynode",
+			Summary:     "Claim",
+			Description: "Authenticated by the node id and control token from enrolment. A pull node fetching the messages assigned to it - parks until one is or the wait runs out.",
+			Request:     claimInput{},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", claimOutput{})},
+		},
+		{
+			Method:      "POST",
+			Path:        "/relay-nodes/report",
+			Tag:         "relaynode",
+			Summary:     "Report",
+			Description: "Authenticated by the node id and control token from enrolment.",
+			Request:     reportInput{},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", reportOutput{})},
+		},
+	}
 }

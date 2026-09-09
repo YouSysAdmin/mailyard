@@ -2,11 +2,9 @@
 // What the server made of a template: the subject line, and the HTML or
 // text part behind a switch.
 //
-// ONE component because there were three. The editor's preview pane, the
-// preview dialog on the template page and the standalone preview route
-// each built their own tab strip, their own "no HTML part" sentence and
-// their own monospace block - so the same rendered message looked like
-// three different features depending on which door you came in by.
+// ONE component for the editor's preview pane, the preview dialog on
+// the template page and the standalone preview route, so the same
+// rendered message looks the same whichever door you came in by.
 //
 // It renders and nothing else. WHICH message this is, and when to ask
 // for it again, belong to the caller: one previews an unsaved draft,
@@ -26,7 +24,7 @@ const props = withDefaults(
     /**
      * Stretch to the height of the container instead of sitting at the
      * height of the content. The editor's pane is a column of a fixed
-     * split; a dialog is not.
+     * split, a dialog is not.
      */
     fill?: boolean
   }>(),

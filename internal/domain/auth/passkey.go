@@ -190,10 +190,9 @@ func (h *Handler) passkeySelf(c fiber.Ctx) (*usermodel.User, error, bool) {
 		return nil, response.Unauthorized(c, "not authenticated"), false
 	}
 
-	// One question, one answer. Testing PasswordHash == "" directly is
-	// the derivation account_type replaced, and it disagrees with the
-	// other two gates the moment a row has both a hash and an identity
-	// provider.
+	// One question, one answer. Testing PasswordHash == "" directly
+	// disagrees with the other gates the moment a row has both a hash
+	// and an identity provider.
 	if !u.ManagesOwnCredentials() {
 		return nil, response.Forbidden(c,
 			"passkeys are available on local accounts only, this account signs in through an identity provider"), false

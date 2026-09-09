@@ -94,12 +94,11 @@ async function load(quiet = false) {
     sentVia.value = res.data.sent_via ?? null
     if (email.value) await loadTrackedLinks(email.value)
   } catch (e) {
-    // The manual path says so. It used to go to the browser console
-    // alone, so a message that failed to load was a page that stayed on
-    // "Not found" with nothing to say whether it had been deleted or the
-    // request had simply failed. The quiet path stays silent: the row on
-    // screen is still the last good answer and this one polls every
-    // three seconds while a send is in flight.
+    // The manual path says so, or a message that failed to load is a
+    // page stuck on "Not found" with nothing to say whether it was
+    // deleted or the request failed. The quiet path stays silent: the
+    // row on screen is still the last good answer and this one polls
+    // every three seconds while a send is in flight.
     if (!quiet) notify.error(apiErrorMessage(e, 'Failed to load the message'))
   } finally {
     if (!quiet) loading.value = false
@@ -114,10 +113,8 @@ async function load(quiet = false) {
 const IN_FLIGHT = ['pending', 'queued', 'processing']
 const inFlight = computed(() => !!email.value && IN_FLIGHT.includes(email.value.status))
 
-// Sending from the console lands on this page, and the status was
-// whatever it was at that instant - `queued`, almost always - and stayed
-// there until somebody reloaded the browser. So the page follows the
-// message until it settles.
+// Sending from the console lands on this page while the status is
+// still `queued`, so the page follows the message until it settles.
 //
 // Three seconds rather than ten: this is one row by id, the reader is
 // watching it, and the whole window is usually shorter than one ten
@@ -256,12 +253,7 @@ async function retryEmail() {
                   </div>
                 </td>
               </tr>
-              <!-- Opens and clicks. Recorded since tracking existed and
-                   shown nowhere until now, so a project with tracking on
-                   had a pixel in every message and no page that admitted
-                   it had ever fired.
-
-                   `tracked` is what separates "nobody opened it" from
+              <!-- Opens and clicks. `tracked` is what separates "nobody opened it" from
                    "we never asked" - the email row keeps the flag for
                    exactly this, and showing a bare 0 for an untracked
                    message reads as the first when it means the second. -->

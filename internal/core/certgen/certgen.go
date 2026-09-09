@@ -9,7 +9,7 @@
 // generated carried. Every version in the module cache is the same.
 //
 // POLICY-FREE on purpose: the caller says what the certificate should
-// be. That is why it does not replace internal/ee/relayca, which is
+// be. That is why it does not replace internal/core/relayca, which is
 // the opposite - fixed lifetimes, key usages and Subject, so "a node
 // certificate that is also a CA" cannot be asked for. They share the
 // mechanics below, which existed two and three times over.
@@ -337,8 +337,7 @@ func GenerateKey(alg string, rsaBits int) (crypto.Signer, error) {
 // KeyUsageFor returns the bits appropriate to the key type.
 //
 // RSA key exchange needs KeyEncipherment. A signing-only key does
-// not, and asserting it anyway is meaningless - which is what relayca
-// did for its ECDSA leaves before this was shared.
+// not, and asserting it anyway is meaningless.
 func KeyUsageFor(key crypto.Signer) x509.KeyUsage {
 	return KeyUsageForPublic(key.Public())
 }

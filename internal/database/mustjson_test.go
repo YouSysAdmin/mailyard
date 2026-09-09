@@ -6,19 +6,17 @@ import "testing"
 
 // "None" has to be spelled the way the column's own default spells it.
 //
-// encoding/json writes `null` for a nil slice and a nil map, and every
-// column MustJSON feeds is NOT NULL DEFAULT '[]' or '{}'. So a message
-// with no attachments stored the string `null`, and nothing complained:
-// `null` reads back as a nil slice, so the round trip was clean and the
-// wire response identical.
+// A plain encoder writes `null` for a nil slice and a nil map, and every
+// column MustJSON feeds is NOT NULL DEFAULT '[]' or '{}'. A message with
+// no attachments would store the string `null` and nothing would
+// complain: `null` reads back as a nil slice, so the round trip is clean
+// and the wire response identical.
 //
-// The predicates written against the sentinel are what broke. The
+// The predicates written against the sentinel are what break. The
 // retention sweeps ask for an attachments_json that is neither the empty
-// array nor the empty string, and `null` satisfies both - so the content pass rewrote every
-// settled row in its window on the first run, attachment or not, and the
-// key-collecting queries scanned and parsed all of them looking for
-// storage keys that were never there. On the biggest table in the
-// installation.
+// array nor the empty string, and `null` satisfies both - so the content
+// pass would rewrite every settled row in its window, attachment or not,
+// on the biggest table in the installation.
 func TestNoneIsSpelledTheWayTheColumnDefaultsIt(t *testing.T) {
 	var (
 		nilSlice   []string

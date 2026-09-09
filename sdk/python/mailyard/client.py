@@ -113,10 +113,9 @@ class Client:
         """Perform one request.
 
         raw=True returns the response BYTES undecoded, for the routes
-        that answer a raw message or a decoded attachment. Those used to
-        be parsed as JSON like everything else, so json.loads raised a
-        bare ValueError on an RFC 5322 message - an exception type a
-        caller catching MailyardError never sees.
+        that answer a raw message or a decoded attachment. Parsed as
+        JSON, an RFC 5322 message would raise a bare ValueError, an
+        exception type a caller catching MailyardError never sees.
         """
         url = self.base_url + "/api/v1" + path
         clean = {k: v for k, v in (query or {}).items() if v is not None}

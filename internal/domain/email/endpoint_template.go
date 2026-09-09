@@ -145,9 +145,8 @@ func (h *Handler) Batch(c fiber.Ctx) error {
 	// A conversion, not a field-by-field literal. The two types are
 	// structurally identical by design (DTO with tags, domain type
 	// without), and the conversion is what keeps them that way: add a
-	// field to one and this stops compiling. The literal it replaced
-	// would instead have silently dropped the new field, which for a
-	// per-item send option is a bug nobody would see.
+	// field to one and this stops compiling, where a literal would
+	// silently drop the new field.
 	items := make([]BatchItem, len(in.Items))
 	for i, it := range in.Items {
 		items[i] = BatchItem(it)

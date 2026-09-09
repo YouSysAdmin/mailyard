@@ -24,20 +24,16 @@ import (
 // from the real migrations, and asked one question: do the tables,
 // columns and functions you name exist?
 //
-// Nothing else asks it. TestNoDynamicSQL proves a query is a constant,
-// the store tests exercise the queries they happen to call, and the
-// OpenAPI guards pin declarations to each other. None of them reads a
-// query against the schema, so a SELECT can name a column that has
-// never existed and the tree stays green until somebody opens the page
-// and gets a 500.
+// Nothing else asks it: the store tests exercise only the queries they
+// happen to call, so a SELECT can name a column that has never existed
+// and the tree stays green until somebody opens the page.
 //
-// The technique is only available because of the constant rule: if
-// every query is a compile-time constant, every query can be computed
-// without running the program. This walks the same sinks
-// TestNoDynamicSQL walks, evaluates the string rather than merely
-// judging it, and prepares the result. Prepare parses, resolves every
-// name and infers the parameter types without executing anything, so it
-// costs nothing and cannot touch a row.
+// Possible only because of the constant rule: if every query is a
+// compile-time constant, every query can be computed without running
+// the program. This walks the same sinks TestNoDynamicSQL walks,
+// evaluates the string, and prepares the result. Prepare parses,
+// resolves every name and infers the parameter types without executing
+// anything, so it cannot touch a row.
 //
 // Skips without MAILYARD_TEST_DSN, like every other store test. Run it
 // with `task test-db`.
@@ -376,8 +372,7 @@ func evalString(e ast.Expr, consts, locals map[string]string) (string, bool) {
 	case *ast.SelectorExpr:
 		// A constant from another package - relaynode.FreshJoin is
 		// folded into the smtp server SELECTs, which are the delivery
-		// path, so leaving these uncomputed would have exempted the
-		// queries that matter most.
+		// path.
 		if id, ok := v.X.(*ast.Ident); ok {
 			s, ok := consts[id.Name+"."+v.Sel.Name]
 
@@ -408,9 +403,7 @@ func evalString(e ast.Expr, consts, locals map[string]string) (string, bool) {
 // Global rather than per-package because the constants that matter
 // most cross a package boundary: serverSelect folds in
 // relaynode.FreshJoin, and groupServerSelect folds in
-// relaynode.FreshClause. Resolving only within a package left the four
-// smtp-server reads - the delivery path - uncomputed, which is exactly
-// backwards from where the checking is worth having.
+// relaynode.FreshClause.
 //
 // Repeated to a fixpoint, so a constant built out of other constants
 // comes out whole however deep the chain.

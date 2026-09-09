@@ -91,13 +91,10 @@ func consoleMutations(t *testing.T) []consoleMutation {
 // An authenticated mutation on the console prefix carries
 // maintenanceMode, or parking the platform does not park it.
 //
-// The mode gated /api/v1 and nothing else, so an operator who switched
-// it on to run a migration still had the console writing to `users`,
-// `sessions` and `user_passkeys` through the credential routes - a
-// password change, a passkey enrolment, a session revocation. Those are
-// exactly the racing writes the mode exists to stop, and the platform
-// notes described it as refusing mutating requests, which was true of
-// one surface out of two.
+// The console writes to `users`, `sessions` and `user_passkeys` through
+// the credential routes - a password change, a passkey enrolment, a
+// session revocation - and those are exactly the racing writes the mode
+// exists to stop while a migration runs.
 //
 // requireAuth is the discriminator, and it is the honest one rather than
 // a path list. The OPEN ceremonies on this prefix must stay open: an

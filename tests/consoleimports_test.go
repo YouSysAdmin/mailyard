@@ -17,14 +17,6 @@ import (
 // file's script and template are two halves that neither tool checks
 // against each other for this.
 //
-// Sixteen had accumulated. Fourteen were mine, left behind by pulling
-// dialogs and cards out of two campaign pages - Campaigns.vue still
-// imported four api modules, four types and two components for a form
-// that had moved to its own file. The other two were older: authApi and
-// LoginProvider on the project settings page, left when project-level
-// single sign-on was removed, along with the paragraph of comments that
-// described the card they belonged to.
-//
 // The cost is not bundle size, which the build strips. It is that
 // somebody reading the imports learns what a file depends on, and every
 // one of those said the page still talks to a subsystem it does not.

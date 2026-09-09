@@ -25,9 +25,8 @@ import (
 //	Key: 'updateInput.sample_data' Error:Field validation for
 //	'sample_data' failed on the 'json' tag
 //
-// - it names a Go type the caller cannot see, describes the failure in
-// library terms, and is what an operator got for a malformed sample
-// payload, a bad URL and a bad hostname.
+// - it names a Go type the caller cannot see and describes the failure
+// in library terms.
 // On a POINTER field, omitempty does not mean what it reads as.
 //
 // It asks hasValue, and hasValue for a dereferenced pointer returns
@@ -35,10 +34,9 @@ import (
 // never consulted. So every rule after it runs against the empty
 // string, and `omitempty,email` rejects "" as not an address.
 //
-// That is not theoretical. A project could not be saved at all without
-// a bounce address, because the console sends "" to clear one and the
-// field is a pointer precisely so that "" can mean clear. Clearing a
-// template's sample_data hit the same wall through `json`.
+// The console sends "" to clear a value, and the field is a pointer
+// precisely so that "" can mean clear - so `omitempty,email` refuses
+// the clear.
 //
 // omitzero is the one that reads the value: nil skips, and so does a
 // pointer to the zero value.

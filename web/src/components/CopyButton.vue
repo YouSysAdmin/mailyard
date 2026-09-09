@@ -1,11 +1,6 @@
 <script setup lang="ts">
 // Copy a value to the clipboard and say so.
 //
-// Fourteen views wrote this out: writeText, a `copied` ref, a two second
-// setTimeout to put the label back. Some of them raised a toast as well
-// and some did not, so the same act reported itself differently
-// depending on which page you were on.
-//
 // The button reports in its own label, because it is the thing that was
 // clicked. A toast is available through `announce` for the cases that
 // earned one: an operator copying an SPF fragment out of a page holding

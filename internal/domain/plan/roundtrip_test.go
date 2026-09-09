@@ -105,13 +105,11 @@ func TestEveryLimitSurvivesTheRoundTrip(t *testing.T) {
 
 // A PATCH that names only some fields must leave the rest alone.
 //
-// The limits were plain ints, so an absent field arrived as 0 - and 0 is
-// not "unset" here, it MEANS unlimited. So `PATCH {"name":"Starter"}`,
-// which validation accepts because only name is required, removed every
-// limit on the plan: quota.CheckSend and CheckResource both return nil at
-// 0. is_default went false with it, and if that had been the default plan
-// then every project with no explicit assignment became unlimited too.
-// Nothing in the response said so.
+// 0 is not "unset" here, it MEANS unlimited, so an absent limit read
+// as 0 would remove every limit on the plan: quota.CheckSend and
+// CheckResource both return nil at 0. An absent is_default read as
+// false would make every project with no explicit assignment
+// unlimited too.
 func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {
 	stored := &pmodel.Plan{
 		ID:                      ids.New(),
@@ -159,8 +157,8 @@ func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {
 			"with no explicit plan unlimited")
 	}
 
-	// And a field that IS named still changes, or the fix would have
-	// replaced a wipe with a no-op.
+	// And a field that IS named still changes, or leaving fields alone
+	// would be a no-op.
 	zero, hundred := 0, 100
 	apply(stored, upsertInput{Name: "Starter plan", HourlyEmailLimit: &zero, MaxAPIKeys: &hundred})
 	if stored.HourlyEmailLimit != 0 || stored.MaxAPIKeys != 100 {

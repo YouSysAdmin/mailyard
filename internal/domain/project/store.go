@@ -126,13 +126,9 @@ func (s *Store) List(ctx context.Context) ([]*projmodel.Project, error) {
 
 // ListForUser returns the projects the user is a member of.
 //
-// A subquery rather than a JOIN so it can reuse wsSelect. It carried
-// its own copy of the column list, aliased, and that copy went stale
-// the moment projects gained a column - fourteen destinations for a
-// fifteen-column scan, which no test caught because nothing listed a
-// project by user. Two hand-kept column lists feeding one scanner is
-// the emails-table trap, and the fix is to have one list rather than
-// a guard over two.
+// A subquery rather than a JOIN so it can reuse wsSelect: two
+// hand-kept column lists feeding one scanner go stale the moment
+// projects gain a column.
 func (s *Store) ListForUser(ctx context.Context, userID string) ([]*projmodel.Project, error) {
 	rows, err := s.Query(ctx, wsSelect+`
 WHERE id IN (SELECT project_id FROM project_members WHERE user_id = ?)
@@ -150,11 +146,9 @@ ORDER BY created_at ASC`, userID)
 // effective role resolved, in one query.
 //
 // It exists so the project LIST can ship each row's access the way
-// GET /projects/:id ships one project's. The console was gating the
-// buttons on a row by the ACTIVE project's permissions, which is a
-// different project whenever more than one is listed - so a member with
-// no members:read was offered a Members button that answered 403, and a
-// member who did hold it elsewhere was refused a page they could read.
+// GET /projects/:id ships one project's. Gating a row's buttons on the
+// ACTIVE project's permissions is wrong whenever more than one is
+// listed.
 //
 // One query, not one per project: this is the same join GetMember does,
 // with the user rather than the pair as the predicate.
@@ -500,7 +494,7 @@ func (s *Store) PutRole(ctx context.Context, role *projmodel.Role) error {
 
 // DeleteRole removes a role nobody carries and the project does not
 // name as its default. Deleting one members carry would drop them all
-// to the project default; deleting the default would leave the project
+// to the project default. Deleting the default would leave the project
 // naming a row that is gone, which the member join reads as "no role".
 //
 // Both guards are inside the one statement, and the projects row is

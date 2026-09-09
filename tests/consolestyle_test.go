@@ -1,9 +1,6 @@
 // Mailyard, Copyright (c) 2021-2026 YouSysAdmin
 
-// A rule about the console, checked by reading web/src - which is why it
-// lives beside it. These sat in internal/server and
-// internal/domain/trackingpage, packages that have nothing to do with
-// what they check and were simply where somebody was working at the time.
+// A rule about the console, checked by reading web/src.
 
 package tests
 
@@ -22,17 +19,10 @@ import (
 // whole value is that a page gets its look by using them rather than
 // by tuning each element.
 //
-// It had drifted badly: 186 static style attributes across 37 views.
-// Thirty-one were vertical margins on stacked cards, in three
-// different values, so two cards sat 24px apart on one page and 20px
-// on another. The rest re-invented flex rows, text weights, filter
-// widths (320, 300, 280 for the same search box) and even colours -
-// two views coloured text with --primary-600, which the top of
-// styles.css forbids because it does not reach 4.5:1.
-//
-// So: no static style attribute in a view. A DYNAMIC :style is
-// untouched - a bar chart's height and a computed offset are data,
-// not design.
+// A static style attribute in a view is a tuned element: a margin in
+// its own value, a flex row of its own, a colour the stylesheet
+// forbids. So there are none. A DYNAMIC :style is untouched - a bar
+// chart's height and a computed offset are data, not design.
 var staticStyleAttr = regexp.MustCompile(`(^|[^:\w-])style="`)
 
 func TestTheConsoleKeepsItsStylingInTheStylesheet(t *testing.T) {
@@ -71,9 +61,8 @@ func TestTheConsoleKeepsItsStylingInTheStylesheet(t *testing.T) {
 	}
 }
 
-// Three more ways the console had of doing one thing twice. Each was
-// visible to an operator, which is why they are worth a test rather
-// than a style note.
+// Three more things the console does one way, each visible to an
+// operator when done twice.
 func TestTheConsoleDoesOneThingOneWay(t *testing.T) {
 	root := consoleSrc(t)
 
@@ -124,9 +113,8 @@ func TestTheConsoleDoesOneThingOneWay(t *testing.T) {
 
 	var findings []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		// .ts as well as .vue: the api client and the stores are where two
-		// of these rules were broken, and a rule that stops at the template
-		// is a rule with a hole the size of src/api.
+		// .ts as well as .vue: the api client and the stores can break
+		// these rules too.
 		if err != nil || info.IsDir() ||
 			(!strings.HasSuffix(path, ".vue") && !strings.HasSuffix(path, ".ts")) {
 			return err
@@ -169,9 +157,8 @@ func TestTheConsoleDoesOneThingOneWay(t *testing.T) {
 // 150px box in whatever font the surface inherited.
 //
 // It does not look like a missing class. It looks like a broken form:
-// the shared SMTP dialog had "SES topic ARN" sitting on the same line
-// as a stub of an input, on a screen where every other field was fine,
-// and the markup around it was correct.
+// a label on the same line as a stub of an input, on a screen where
+// every other field is fine.
 //
 // A checkbox or radio is deliberately unclassed - .checkbox-label
 // styles the pair from the outside.
@@ -363,20 +350,11 @@ func TestEveryNavIconExists(t *testing.T) {
 
 // A class in the markup has to be a class something styles.
 //
-// This is the rule the Refresh control broke, visibly: `page-actions`
-// existed in the stylesheet nowhere, so on Campaigns the button dropped
-// onto a second line on top of the control, and on the sandbox the
-// control sat between the title and Empty sandbox. It was not new -
-// SandboxMessage.vue had been asking for that same class since the
-// sandbox shipped, with its two buttons stacked the whole time.
-//
-// Thirteen more were found the day this was written, and the pattern
-// behind most of them is one rule copied into three or four scoped
-// blocks: whoever wrote the fifth page copied the markup and not the
-// style, so `.alert` was a bare sentence on two auth pages, `.btn-block`
-// was a narrow button, `.load-more` sat against the edge of the sandbox
-// and a PEM was rendered in the body font. All five now have one
-// definition in styles.css.
+// An unstyled class is invisible in the file and visible on screen: a
+// button drops onto a second line, a control sits between the title
+// and the empty state. The usual cause is markup copied from another
+// view without the scoped rule that styled it, and the fix is one
+// definition in styles.css, not a scoped copy per view.
 //
 // Bound classes (:class) are not checked - those are computed, and this
 // is about the static markup where a typo is invisible.
@@ -539,14 +517,9 @@ func classNames(css string) map[string]bool {
 // a build failure, and not a broken page - the rule is simply absent
 // and the element renders with whatever else applies.
 //
-// It cost the console its navigation on a phone. Splitting the shell
-// into AppSidebar and AppTopbar left the layout holding
-// `@media (max-width: 1024px) { .mobile-menu-btn { display: flex } }`
-// for a button that had moved into the topbar. Below 1024px the rail
-// hides itself and that button is the only way to the drawer, so the
-// whole menu was unreachable: no rail, no button, no way to leave the
-// page you were on. Found by measuring a computed style, not by looking
-// at the screen, because a missing control looks like a design.
+// A missing control looks like a design: a layout holding a media rule
+// for a button that lives in a child component hides that button on
+// every phone, and nothing on screen says the rule never applied.
 func TestNoComponentStylesAnotherOnesInsides(t *testing.T) {
 	root := consoleSrc(t)
 
@@ -593,13 +566,11 @@ func TestNoComponentStylesAnotherOnesInsides(t *testing.T) {
 				continue
 			}
 
-			// :deep() is EXCLUDED, and that is the whole difference
-			// this test is about. A plain scoped selector reaching a
+			// :deep() is EXCLUDED. A plain scoped selector reaching a
 			// child's insides compiles to a selector that matches
 			// nothing, silently. :deep() is Vue's one mechanism for
 			// styling markup a caller put in your slot, and writing it
-			// is somebody saying so on purpose - MessageReader styles
-			// the facts the two readers hand it that way.
+			// is somebody saying so on purpose.
 			css := deepSelector.ReplaceAllString(cssComment.ReplaceAllString(m[2], " "), " ")
 			for c := range classNames(css) {
 				f.scoped[c] = true

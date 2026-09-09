@@ -404,8 +404,8 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 func (s *Service) ValidateShape(req *SendRequest) error {
 	// net/mail accepts a bare CR or LF inside a trailing comment -
 	// `a@b.c (x\r\nBcc: ...)` parses, and Build writes the string
-	// verbatim - so parsing is not the whole check. Proven by running
-	// it: the comment became a second header the platform then signed.
+	// verbatim - so parsing is not the whole check, and the comment
+	// would become a second header the platform then signs.
 	if strings.ContainsAny(req.From, "\r\n") {
 		return reqErrf("from address contains a line break")
 	}

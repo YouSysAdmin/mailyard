@@ -266,9 +266,8 @@ function cancel() {
           </button>
         </form>
 
-        <!-- Nothing is on yet, so leaving costs nothing. Without a way
-             out the only exit from a half-finished setup was to leave
-             the page. -->
+        <!-- Nothing is on yet, so leaving costs nothing, and a
+             half-finished setup needs a way out. -->
         <button class="btn btn-secondary btn-sm" :disabled="busy" @click="cancel">Cancel</button>
       </template>
     </div>

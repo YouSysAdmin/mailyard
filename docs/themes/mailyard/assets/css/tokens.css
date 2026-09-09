@@ -1,14 +1,13 @@
 /* Mailyard documentation - design tokens (dark first, ink accent).
  *
- * Forked from youstsadmin-hugo-docs, whose accent is an amber ramp. Here the
- * accent is INK rather than a hue, so colour on these pages means status and
- * nothing else - --ok / --warn / --crit / --info are the only tokens left
+ * The accent is INK rather than a hue, so colour on these pages means
+ * status and nothing else - --ok / --warn / --crit / --info are the only tokens left
  * carrying one. The ramp values are the CONSOLE's --primary-50..900 from
  * web/src/assets/styles.css, taken across unchanged: one palette for the
  * product and its documentation. */
 
 /* Self-hosted fonts (no external CDN). Files live in the theme's
-   static/fonts/; url() is relative to the bundled /css/app.css. Latin subset
+   static/fonts/, and url() is relative to the bundled /css/app.css. Latin subset
    only - other scripts fall back to the system stack in --font-sans/--font-mono.
    font-display:swap shows the fallback immediately, then swaps. */
 @font-face{font-family:'Inter Tight';font-style:normal;font-weight:400;font-display:swap;src:url('../fonts/inter-tight-400.woff2') format('woff2')}
@@ -35,7 +34,7 @@
   --brand-400:#e5e5e5; --brand-500:#d4d4d4; --brand-600:#a1a1a1; --brand-700:#737373;
   --brand-800:#525252; --brand-900:#404040;
 
-  /* Content link color (theme-aware). Only base `a` uses these; structural
+  /* Content link color (theme-aware). Only base `a` uses these. Structural
      links (nav/sidebar/toc/footer) and buttons set their own color. */
   --link:var(--brand-400); --link-hover:var(--brand-300);
 

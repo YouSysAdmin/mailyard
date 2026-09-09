@@ -22,16 +22,10 @@ import (
 var consoleCall = regexp.MustCompile(
 	"\\b(api|appApi)\\.(get|post|put|patch|delete)\\s*(?:<[^()]*>)?\\s*\\(\\s*([`'\"])([^`'\"]+)[`'\"]")
 
-// TestTheConsoleCallsRoutesThatExist is the guard the console did not
-// have, and the bug that produced it says why it was needed.
-//
-// The SDK has one (TestSDKCoversEveryV1Route) and the documentation
-// has one for request bodies. The console had neither, so when the
-// product surface moved to /api/v1 a sweep prefixed the whole of
-// plans.ts with /admin - correct for the four plan-CRUD routes in it,
-// wrong for the fifth, which is a tenant usage report. Nothing failed:
-// TypeScript type-checks a string, the build succeeds, and the defect
-// surfaces as a 404 popup on the project settings page.
+// TestTheConsoleCallsRoutesThatExist checks every path the console
+// names against the router, the way TestSDKCoversEveryV1Route does for
+// the client. TypeScript type-checks a string, the build succeeds, and
+// a wrong path surfaces as a 404 popup on some page.
 //
 // Only one direction is checked. A route the console never calls is
 // not a defect - most of the machine surface exists for integrations -

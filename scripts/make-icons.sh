@@ -5,14 +5,8 @@
 #   brew install librsvg imagemagick
 #
 # Referenced by nothing on purpose - it is run by hand - and it is the
-# only record of how the committed rasters were produced: which SVG
+# only record of how the committed rasters are produced: which SVG
 # feeds which output, at what size, and what the flattening is.
-#
-# It was DELETED once, in e868ea5, while the notes went on describing
-# it. What came back had to be rewritten anyway: it still wrote
-# docs/static/img/, which the Hugo migration replaced with
-# docs/themes/mailyard/static/assets/logo/, so it would have failed on
-# its third command.
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -28,11 +22,10 @@ FULL=docs/themes/mailyard/static/assets/logo/logo.svg
 # can do neither: one file is served to a light tab bar and a dark one
 # alike. Near-black would vanish on the second, near-white on the first.
 #
-# So the raster tone is the same band the docs header logo is pinned to,
-# for the same reason - measured, not picked: #818181 is 3.9:1 on white,
-# 4.2:1 on a typical dark tab bar and 5.2:1 on the docs' near-black.
-# Flattened to a single value because at 16px the two-colour distinction
-# was never legible anyway.
+# So the raster tone is the same band the docs header logo is pinned to:
+# #818181 is 3.9:1 on white, 4.2:1 on a typical dark tab bar and 5.2:1 on
+# the docs' near-black. One value, because at 16px a two-colour mark is
+# not legible.
 FLAT='#818181'
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

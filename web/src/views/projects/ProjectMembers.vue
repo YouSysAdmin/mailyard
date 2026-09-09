@@ -3,7 +3,7 @@
 //
 // Members and invitations are two resources with two sets of routes and
 // two sets of writes, and they shared one file with the project fetch,
-// the permission resolution and the tab state. Each is its own card now;
+// the permission resolution and the tab state. Each is its own card,
 // this holds what they both depend on.
 //
 // PERMISSIONS COME FROM THIS PAGE'S OWN REQUEST, not the project store.

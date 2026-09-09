@@ -3,12 +3,10 @@
 // between where the project switcher goes.
 //
 // ONE component for both places it appears - the fixed rail on a wide
-// screen and the drawer that slides in on a narrow one. It used to be
-// two copies of the same 130 lines in the layout, differing only in
-// whether labels were hidden, whether the header button collapsed or
-// closed, and whether following a link dismissed anything. Those three
-// are props and events now, which is what stops the copies drifting -
-// and they had: a change to one was regularly a change to one.
+// screen and the drawer that slides in on a narrow one. The three
+// differences - whether labels are hidden, whether the header button
+// collapses or closes, and whether following a link dismisses
+// anything - are props and events.
 //
 // The switcher is not navigation - it does not link anywhere, it changes
 // what every link here MEANS - so it is its own component and this file
@@ -276,9 +274,8 @@ function goHome() {
   border: none;
   border-radius: var(--radius-sm);
   background: none;
-  /* Was dimmed to 0.55, which was legible against the old dark rail but
-     not against a light one. The muted token carries the de-emphasis
-     now, at a readable contrast in both themes. */
+  /* The muted token carries the de-emphasis, at a readable contrast in
+     both themes. An opacity would not be. */
   color: var(--text-muted);
   font-family: inherit;
   font-size: 11px;

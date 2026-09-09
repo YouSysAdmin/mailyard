@@ -19,9 +19,8 @@ import (
 // column holds an empty array. So the view adds them back, from a
 // constant in ApiKeyDetail.vue, and this pins that constant to ForKey.
 //
-// Without it the two drift silently in the direction that already
-// caused trouble once: a key whose real access the console understates
-// is exactly what made the flag look like it did nothing.
+// Without it the two drift silently, and a key whose real access the
+// console understates is a flag that looks like it does nothing.
 func TestTheConsoleNamesWhatTheSandboxFlagGrants(t *testing.T) {
 	view := filepath.Join(consoleSrc(t), "views", "apikeys", "ApiKeyDetail.vue")
 

@@ -3,9 +3,7 @@
 //
 // TWO of them exist - the sandbox and the inbound log - and they are the
 // same shell: a subject with the actions beside it, From and To, an
-// envelope behind a toggle, and the body taking everything left. The
-// second was written by mirroring the first and 157 lines came across
-// with it, most of them CSS.
+// envelope behind a toggle, and the body taking everything left.
 //
 // It fills the height it is given and NOTHING here scrolls except the
 // two regions that are meant to: the address block, which is capped, and
@@ -271,7 +269,7 @@ watch(
 
 /* Slotted content, so these reach one level deeper than a scoped rule
    normally would - :deep is what makes that legal rather than accidental.
-   The facts themselves belong to the caller; how a fact LOOKS belongs
+   The facts themselves belong to the caller. How a fact LOOKS belongs
    here, or the two readers drift again. */
 .reader-details :deep(dt) {
   font-size: 11px;

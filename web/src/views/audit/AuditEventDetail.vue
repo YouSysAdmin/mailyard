@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One recorded event, in full.
 //
-// The table shows what a person scans by; this shows what they came to
+// The table shows what a person scans by. This shows what they came to
 // check. The long fields are here rather than in a cell because a user
 // agent and a request path are read once, and putting them in the table
 // pushed the columns that ARE scanned off the side.

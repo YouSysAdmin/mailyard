@@ -10,10 +10,7 @@ RUN npm run build
 # not invalidate the SPA layer cache, and vice versa.
 #
 # The theme is vendored under docs/themes/mailyard, so COPY brings it in
-# with everything else. It used to be a submodule, and a build context is
-# a directory rather than a checkout: if it had never been fetched,
-# docs/themes was empty and Hugo built a site of blank pages without
-# complaining, so this stage had to test for theme.toml first.
+# with everything else.
 FROM ghcr.io/gohugoio/hugo:v0.164.0 AS docs
 USER root
 WORKDIR /src/docs

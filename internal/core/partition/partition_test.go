@@ -55,11 +55,9 @@ func partitionCount(t *testing.T, db *sql.DB) int {
 	var n int
 	// Scoped to this test's schema. pg_class holds every schema's
 	// tables, so matching on relname alone counted the partitions of
-	// every other store test running at the same time - and the count
-	// then moved between two calls in this test for reasons that had
-	// nothing to do with the maintainer. It failed once in a full
-	// parallel run and passed every time the package was run alone,
-	// which is the worst shape a test failure can have.
+	// every other store test running at the same time, and the count
+	// would move between two calls for reasons that have nothing to do
+	// with the maintainer.
 	err := db.QueryRowContext(t.Context(), `
 		SELECT count(*) FROM pg_inherits i
 		JOIN pg_class p ON p.oid = i.inhparent
@@ -76,10 +74,6 @@ func partitionCount(t *testing.T, db *sql.DB) int {
 // partition bounds are DATEs and the job compares against them. Disagree
 // and it creates ranges that overlap the existing ones, and every CREATE
 // fails.
-//
-// This replaced a weekStart that had to match date_trunc('week') - a
-// harder thing to get right, since Go numbers Sunday 0 and Postgres
-// starts its week on Monday. Cutting on days removes that trap entirely.
 func TestDayStartMatchesPostgres(t *testing.T) {
 	_, db := testMaintainer(t)
 	for _, day := range []string{"2026-08-02", "2026-08-03", "2026-08-06", "2026-01-01"} {
@@ -103,11 +97,9 @@ func TestDayStartMatchesPostgres(t *testing.T) {
 }
 
 // A second run creates nothing. That is the property worth having: the
-// job fires hourly and almost every run has to be a no-op.
-//
-// The first run is no longer a no-op, and that is the changeover: the
-// migration lays down weekly partitions, so the first daily pass fills in
-// whatever days those weeks do not already cover.
+// job fires hourly and almost every run has to be a no-op. The first
+// run is not one: the migration lays down weekly partitions, and the
+// first daily pass fills in whatever days those weeks do not cover.
 func TestEnsureAheadIsIdempotent(t *testing.T) {
 	m, db := testMaintainer(t)
 
@@ -354,10 +346,9 @@ func TestOnlyGeneratedNamesReachAStatement(t *testing.T) {
 // it must do is say so loudly enough to be acted on, and keep working.
 //
 // Why it matters at all: daily partitions with nothing dropping them grow
-// by 365 a year, and at 730 the queue claim takes 2194 relation locks. The
-// lock table is shared and holds about 6400 on a default install, so
-// sixteen concurrent claims failed with "out of shared memory" - measured,
-// against 105 weekly partitions where the same sixteen failed none.
+// by 365 a year, and at 730 the queue claim takes a relation lock per
+// partition against a lock table shared by the whole database, so
+// sixteen concurrent claims fail with "out of shared memory".
 func TestTheCeilingWarnsAndDoesNotDropAnything(t *testing.T) {
 	m, db := testMaintainer(t)
 	var logged strings.Builder

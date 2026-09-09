@@ -4,9 +4,9 @@
 // Pinia store. Two of those hold the signed-in person's world: the
 // project list, the active project, and the permissions it was resolved
 // for. Sign out as an administrator and back in as somebody else and you
-// get the administrator's projects, can() answering out of their
+// would get the administrator's projects, can() answering out of their
 // permissions, and requests for a project the new account is not a
-// member of - which arrives as a screen full of failed loads.
+// member of.
 //
 // The project store also clears itself when the account id changes, and
 // both are deliberate. That one keeps the state model honest. This one
@@ -25,10 +25,8 @@ const consoleBase = import.meta.env.BASE_URL || '/app/'
 // Clearing the cookie server-side makes every request already in flight
 // answer 401, and the response interceptor turns a 401 into "Your session
 // has expired" on the login page. On a deliberate sign-out that is a lie
-// dressed as an error: the dashboard's six requests and the unread badge
-// were enough to land on `?error=authentication%20required` every time.
-// Fixed here rather than in the interceptor, because
-// what the interceptor lacks is the INTENTION.
+// dressed as an error. Decided here rather than in the interceptor,
+// because what the interceptor lacks is the INTENTION.
 let leaving = false
 
 export function isLeaving(): boolean {
@@ -39,12 +37,11 @@ export function isLeaving(): boolean {
 // this origin, which is how a gated page outside the SPA (/docs) sends a
 // reader back where they were going.
 //
-// The check is safeReturnPath and not a leading-slash test, because a
-// leading-slash test is exactly what that file documents as insufficient:
-// a browser normalises "/\evil.example" into "//evil.example" while
-// parsing and leaves the origin. Every caller sanitises today, so this is
-// the guard being in the function that NAVIGATES rather than in each of
-// its callers - one of which will eventually pass a raw query parameter.
+// The check is safeReturnPath and not a leading-slash test: a browser
+// normalises "/\evil.example" into "//evil.example" while parsing and
+// leaves the origin. The guard sits in the function that NAVIGATES
+// rather than in each of its callers, one of which will eventually pass
+// a raw query parameter.
 export function enterConsole(next?: string | null) {
   window.location.href = safeReturnPath(next) ?? consoleBase
 }

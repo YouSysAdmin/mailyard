@@ -295,9 +295,7 @@ func sendViaClient(client *smtp.Client, auth smtp.Auth, msg *Message) error {
 //     either rejected or read as mail from somebody called Faria.
 //   - a name with a quote or a backslash needs escaping inside the quotes.
 //   - a non-ASCII name needs RFC 2047 encoding, and a raw UTF-8 byte in a
-//     header is not something a receiver has to accept. Subject has been
-//     encoded here since the beginning - the From name was not, in the
-//     two places that composed one by hand.
+//     header is not something a receiver has to accept.
 //
 // An empty name returns the bare address, which is what a From header
 // with nothing to say looks like.

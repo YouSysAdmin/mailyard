@@ -23,14 +23,11 @@ import (
 // upsertInput is the create and update body.
 //
 // Every LIMIT is a pointer, and that is load-bearing on the update route.
-// They were plain ints, so the body could not express "leave this alone"
-// while the route is a PATCH - and 0 does not mean "no change" here, it
-// means UNLIMITED. So `PATCH /admin/plans/:id {"name":"Starter"}`, which
-// validation accepts because only name is required, silently removed
-// every limit on the plan: quota.CheckSend and CheckResource both return
-// nil at 0. is_default went false with it, and if that was the default
-// plan then every project with no explicit assignment became unlimited
-// too. Nothing in the response or the audit trail said so.
+// Pointers, because the route is a PATCH and 0 does not mean "no change"
+// here, it means UNLIMITED: a plain int would read an absent limit as 0
+// and `PATCH /admin/plans/:id {"name":"Starter"}` would silently remove
+// every limit on the plan, since quota.CheckSend and CheckResource both
+// return nil at 0.
 //
 // Same shape and same reason as oauthprovider's admission lists.
 type upsertInput struct {

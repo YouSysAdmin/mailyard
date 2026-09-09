@@ -4,10 +4,8 @@
 // listeners.
 //
 // It lives in core because three listeners on two different sides of the
-// deployment need it: submission, the MX, and the MX a relay node runs.
-// The node one is why it moved here - relayagent must not import a
-// domain package, and a private copy would be the same algorithm
-// maintained twice.
+// deployment need it: submission, the MX, and the MX a relay node runs,
+// and relayagent must not import a domain package.
 //
 // IN PROCESS, so a deployment running several nodes multiplies every
 // budget by the node count. That is the accepted cost of a control with

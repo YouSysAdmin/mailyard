@@ -122,14 +122,9 @@ func (h *Handler) Attachment(c fiber.Ctx) error {
 
 	a := parsed.Attachments[idx]
 
-	// response.Attachment, not a local copy of it. This endpoint had its
-	// own: the same content type, the same disposition, and its own
-	// filename sanitizer that only stripped the four characters a quoted
-	// header cares about - where the shared one is an allowlist with a
-	// length cap. No exploit was found in the difference, and that is not
-	// the point: one rule with two implementations is one that has
-	// already drifted, and the shared function's own comment claims to be
-	// the only place this is decided.
+	// response.Attachment, not a local copy of it: one rule with two
+	// implementations is one that has already drifted, and the shared
+	// function is the only place the filename is decided.
 	//
 	// What it decides matters most here, of all three callers: a sandbox
 	// attachment was composed by whatever application is under test, so

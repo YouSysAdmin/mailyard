@@ -274,19 +274,19 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 
 	rec.Headers["Authentication-Results"] = mailauth.AuthenticationResults(s.Hostname, auth)
 
-	// Idempotency before attachment offload. The other order wrote a
+	// Idempotency before attachment offload. The other order writes a
 	// duplicate's attachments into the blob store under a fresh id and
-	// then discarded the record, orphaning the objects - which turned
-	// an MTA retry loop (or anyone replaying a Message-ID at the open
-	// MX port) into unbounded disk growth.
-	// ONE key, and the content is in it. The Message-ID alone used to
-	// settle a duplicate, and a Message-ID is whatever the sender typed:
-	// anyone who could guess the next one - a sequential generator, the
-	// References of a thread they were on - sent junk under it first,
-	// and the real message was then "already ingested", answered 250
-	// and dropped, while the junk was what the webhook delivered. The
-	// id is still in the key, so an MTA retry of the same message is
-	// still one row, but a different message under the same id is a
+	// then discards the record, orphaning the objects - an MTA retry
+	// loop (or anyone replaying a Message-ID at the open MX port) then
+	// grows the disk without bound.
+	//
+	// ONE key, and the content is in it. A Message-ID is whatever the
+	// sender typed, so the id alone must not settle a duplicate: anyone
+	// who can guess the next one - a sequential generator, the
+	// References of a thread they were on - could send junk under it
+	// first and have the real message dropped as "already ingested".
+	// The id is still in the key, so an MTA retry of the same message
+	// is one row, but a different message under the same id is a
 	// different message.
 	rec.DedupHash = dedupHash(rec.MessageID, sender, envelopeTo, parsed.Subject, rec.Size)
 	existing, err := s.Inbound.FindByDedupHash(ctx, d.ProjectID, rec.DedupHash)
@@ -384,8 +384,7 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 // not from where the report landed. A provider that owns the return
 // path forwards its bounce copy to a mailbox on the platform's
 // domain, so attributing by the receiving project would file every
-// tenant's bounces against the operator - which is what the version
-// before this did, and why they were silently discarded.
+// tenant's bounces against the operator.
 func (s *Service) processReport(ctx context.Context, rec *imodel.Email, raw []byte, scope string) {
 	if s.Bounces == nil || s.Emails == nil {
 		return

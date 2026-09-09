@@ -12,20 +12,11 @@ import (
 
 // A 2xx says what it answers: a Go type, or a content type.
 //
-// `apidoc.OK("The result.", nil)` renders as "200, no body", and 17
-// routes carried it while answering something real. Three ways it hurt,
-// all of them silent:
-//
-//   - The generated clients believed it. Six byte-stream routes became
-//     methods that json-parse an RFC 5322 message or an attachment, so
-//     Go answered a decode error, Python raised a bare ValueError, and
-//     Ruby returned nil - discarding the payload the call exists to
-//     fetch, in the one language that swallowed the failure.
-//   - The others published no schema at all, so an integrator generating
-//     models from the document got an untyped object for a campaign, a
-//     settings list, an import result.
-//   - Two OAuth legs were described as 200s when they answer 302, so a
-//     client following the document waits for a body that never comes.
+// `apidoc.OK("The result.", nil)` renders as "200, no body". On a route
+// that answers something real the generated clients believe it: a
+// byte-stream route becomes a method that json-parses an RFC 5322
+// message, a typed body publishes no schema, and a redirect described
+// as a 200 has a client waiting for a body that never comes.
 //
 // A body of nil is still correct for 204 and for a 3xx, which is why the
 // rule is scoped to 2xx-with-content rather than to "every response".

@@ -13,11 +13,9 @@ import (
 // Every node runs every job, so two of them recompute at once.
 //
 // Each run DELETEs the window and INSERTs the aggregate. A DELETE takes
-// its snapshot when the statement starts, so the second run removed rows
-// the first had already replaced and then hit the primary key putting
-// them back: the job logged an error, the transaction rolled back, and
-// two nodes could deadlock on the same rows. Nothing about the chart said
-// so - it was simply not being rebuilt.
+// its snapshot when the statement starts, so an unguarded second run
+// removes rows the first has already replaced and then hits the
+// primary key putting them back, or the two deadlock on the same rows.
 //
 // A transaction-scoped advisory lock decides it, and the loser SKIPS
 // rather than waiting: it would recompute the same numbers from the same

@@ -294,8 +294,7 @@ func TestEveryAlgorithmLoadsAsAPair(t *testing.T) {
 }
 
 // RSA key exchange needs KeyEncipherment and a signing-only key does
-// not. Asserting it anyway is meaningless, which is what relayca did
-// for its ECDSA leaves before this was shared.
+// not. Asserting it anyway is meaningless.
 func TestKeyUsageFollowsTheKeyType(t *testing.T) {
 	for alg, wantEncipherment := range map[string]bool{AlgRSA: true, AlgECDSA: false, AlgEd25519: false} {
 		certPEM, _, err := MintLeaf(LeafRequest{

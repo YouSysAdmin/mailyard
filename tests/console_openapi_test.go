@@ -27,12 +27,8 @@ var undocumentedConsoleRoutes = map[string]string{
 }
 
 // An exemption that matches no route is a failure, exactly as an
-// unmatched entry in crossProjectByDesign is.
-//
-// Without this the map only ever grew: an entry kept excusing a route
-// that had been renamed, moved or deleted, and the next reader took the
-// list as a description of the current gaps. Five of its six entries
-// were in that state.
+// unmatched entry in crossProjectByDesign is. Without it the map only
+// grows, and the next reader takes stale excuses for current gaps.
 func TestEveryUndocumentedConsoleRouteStillExists(t *testing.T) {
 	registered := consoleRoutes(t)
 	for r, why := range undocumentedConsoleRoutes {
@@ -114,14 +110,12 @@ func TestConsoleSpecBuilds(t *testing.T) {
 // stripped.
 //
 // Two prefixes because the console spans two: the browser ceremonies
-// moved to /app/api while the product surface is still on /api and on
-// its way to /api/v1. Keeping the full path is what lets one map hold
-// both without /health from one shadowing /health from the other.
+// under /app/api and the product surface under /api/v1. Keeping the
+// full path is what lets one map hold both without /health from one
+// shadowing /health from the other.
 //
 // It shares groupPrefixes/routesUnder with the machine checker rather
-// than keeping its own walk: the two had already drifted once, when
-// the machine surface grew route groups and its copy still recognised
-// exactly one receiver name.
+// than keeping its own walk, so the two cannot drift.
 func consoleRoutes(t *testing.T) map[string]bool {
 	t.Helper()
 	out := routesUnder(t, "", func(full string) bool {

@@ -3,12 +3,9 @@
 // Package mailyard is the Go client for the Mailyard machine API
 // (/api/v1), the surface authenticated with an API key.
 //
-// It is written by hand even though the server generates an OpenAPI
-// document a generator could read. A generated client for 36
-// operations reads worse than one somebody wrote, and this is the
-// language the product is written in, so the cost of maintaining it is
-// the cost of reading the code beside it. For any OTHER language,
-// generate from the document rather than waiting for us.
+// This half is written by hand: the calls most integrations make, with
+// signatures somebody chose. The rest of the surface is generated into
+// sdk/go/api from the same metadata the OpenAPI document is built from.
 //
 // What keeps this honest is TestSDKCoversEveryV1Route in the server
 // module, which parses these files and routes.go and fails when either

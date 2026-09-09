@@ -8,8 +8,7 @@
 // The fields are CampaignFields, shared with the create dialog, and the
 // body is built by toPayload. Both are shared on purpose: the endpoint
 // rebuilds the whole record from what it is sent, so a field one form
-// has and the other lacks is a field that editing silently clears -
-// which is what used to happen to the server group.
+// has and the other lacks is a field that editing silently clears.
 import { ref } from 'vue'
 import { campaignsApi } from '../../api/campaigns'
 import { apiErrorMessage } from '../../api/client'

@@ -32,10 +32,8 @@ import (
 //   - the account tier is recorded EXPLICITLY by a handler, so those keys
 //     are constants from internal/models/audit and the compiler has
 //     already checked them - what this adds is that the constant is
-//     actually USED by a recorder somewhere. It was not, twice over:
-//     auth.2fa.enabled and auth.2fa.disabled existed as constants and
-//     nothing wrote either, so turning off a second factor left no trace
-//     in the security log at all.
+//     actually USED by a recorder somewhere. A constant nothing writes
+//     is an event that leaves no trace in the security log.
 func TestEveryAlertNamesARealEvent(t *testing.T) {
 	produced := routeEventTypes(t)
 	recorded := securityEventTypes(t)
@@ -90,9 +88,7 @@ func routeEventTypes(t *testing.T) map[string]bool {
 		// A registered path carries :params. The audit trail sees them
 		// RESOLVED, and RouteType decides what a segment is by whether it
 		// looks like an identifier - so they have to be substituted here or
-		// every /:id route reports the wrong type. Which is what the first
-		// cut of this test did: it looked for {id}, matched nothing, and
-		// blamed the alert list.
+		// every /:id route reports the wrong type.
 		out[coreaudit.RouteType(method, param.ReplaceAllString(path, id))] = true
 		n++
 	}
@@ -109,9 +105,7 @@ func routeEventTypes(t *testing.T) map[string]bool {
 // actually records.
 //
 // Every domain, not just auth: an administrator resetting somebody's
-// second factor or passkeys is recorded by domain/user, and narrowing
-// this to one directory reported those as unproduced. Which the first cut
-// did.
+// second factor or passkeys is recorded by domain/user.
 func securityEventTypes(t *testing.T) map[string]bool {
 	t.Helper()
 	root := filepath.Join(repoRoot(t), "internal", "domain")

@@ -53,7 +53,7 @@ func TestRecoveryCodesAreDistinctAndForgivinglyHashed(t *testing.T) {
 		}
 	}
 
-	// A set printed under the old length still signs in.
+	// A ten-symbol code from a printed set still signs in.
 	if !looksLikeRecoveryCode("abcde-fghjk") {
 		t.Error("a ten-symbol code from an older set was not recognised")
 	}

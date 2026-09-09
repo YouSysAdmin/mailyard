@@ -92,7 +92,6 @@ func (h *Handler) List(c fiber.Ctx) error {
 			Unit:        d.Unit,
 			ManagedAt:   d.ManagedAt,
 			ManagedIn:   d.ManagedIn,
-			Edition:     d.Edition,
 		}
 
 		if row, ok := overridden[d.Key]; ok {

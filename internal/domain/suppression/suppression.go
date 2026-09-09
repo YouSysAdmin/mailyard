@@ -169,10 +169,9 @@ func (s *Store) Delete(ctx context.Context, projID, email string) (bool, error) 
 }
 
 // PurgeForAddress removes every suppression row for an address, in
-// every scope. This is the erasure path and the one caller that wants
-// the old behaviour of Delete: erasing a person removes what we hold
-// about them, and a list opt-out is a record about them like any
-// other.
+// every scope. This is the erasure path: erasing a person removes
+// what we hold about them, and a list opt-out is a record about them
+// like any other.
 func (s *Store) PurgeForAddress(ctx context.Context, projID, email string) (int64, error) {
 	res, err := s.Exec(ctx, `DELETE FROM suppressions WHERE project_id = ? AND email = ?`,
 		projID, strings.ToLower(strings.TrimSpace(email)))
@@ -230,7 +229,7 @@ func (s *Store) CountForList(ctx context.Context, projID, listID string) (int, e
 // leaving any global block in place.
 //
 // NullStr, so an empty listID means the global row rather than failing:
-// the column is a uuid and `”::uuid` is 22P02, which MalformedID turns
+// the column is a uuid and an empty string cast to one is 22P02, which MalformedID turns
 // into a 404 - the caller would read "no such opt-out" for a request
 // that never reached the table.
 func (s *Store) DeleteForList(ctx context.Context, projID, email, listID string) (bool, error) {

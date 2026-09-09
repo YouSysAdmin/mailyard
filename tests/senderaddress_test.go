@@ -12,9 +12,8 @@ import (
 
 // A mailbox is composed by smtpclient.FormatAddress, never by hand.
 //
-// `fmt.Sprintf("%s <%s>", name, addr)` was written twice - the campaign
-// runner and platform mail - and it is wrong for any name that is not a
-// plain ASCII word: `Faria, Inc.` becomes two addresses because the comma
+// `fmt.Sprintf("%s <%s>", name, addr)` is wrong for any name that is
+// not a plain ASCII word: `Faria, Inc.` becomes two addresses because the comma
 // is the list separator, a quote needs escaping, and a non-ASCII name
 // needs RFC 2047 encoding that Sprintf does not do. mail.Address.String()
 // does all three.

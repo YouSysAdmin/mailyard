@@ -111,8 +111,7 @@ func (s *Store) GetVerifiedCovering(ctx context.Context, name string) (*dmodel.D
 // It answers one question, and only for a relay node running an MX of
 // its own: which recipient domains may that node accept mail for. A
 // node holds no database, so the alternative is a lookup per RCPT
-// over the very link whose unreliability is why the MX was moved out
-// there in the first place.
+// over the very link whose unreliability is why the MX sits out there.
 //
 // NAMES ONLY, deliberately. A node learns what it may accept and
 // nothing about who owns it - the project is resolved here, when the
@@ -433,9 +432,9 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 		return response.NotFound(c, "domain not found")
 	}
 
-	// Four lookups, so a longer budget than the single-record check
-	// this replaced. Still bounded: an unreachable resolver must fail
-	// the request, not hold a console connection open.
+	// Four lookups, so a longer budget than a single-record check.
+	// Still bounded: an unreachable resolver must fail the request,
+	// not hold a console connection open.
 	ctx, cancel := context.WithTimeout(c.Context(), 20*time.Second)
 	defer cancel()
 
@@ -506,11 +505,6 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 
 // domainPayload is the response shape for a single domain: the row plus
 // every DNS record the operator needs, each with its current state.
-//
-// dns_records replaces the old single dns_record, which only ever
-// carried the ownership TXT. The docs have described the plural shape
-// with spf/dkim/dmarc entries since before the rewrite - this is the
-// API catching up rather than a new invention.
 func (h *Handler) domainPayload(d *dmodel.Domain) DetailResponse {
 	return DetailResponse{
 		Domain:     d,

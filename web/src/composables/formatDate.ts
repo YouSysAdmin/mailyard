@@ -1,10 +1,5 @@
-// One date formatter for the whole console.
-//
-// Thirty-three views carried their own copy in ten slightly different
-// shapes, and the differences were visible: a missing date rendered as
-// "-" on one page, "Never" on another and "never" on a third, and one
-// helper dropped the time entirely. The formatting was never the point
-// of any of them.
+// One date formatter for the whole console, so a missing date and a
+// timestamp read the same on every page.
 //
 // The placeholder is a parameter because the two readings are both
 // right - a column that may simply have no value wants "-", one that
@@ -28,12 +23,9 @@ export function formatDate(value?: string | null, empty = '-'): string {
 const clock24: Intl.DateTimeFormatOptions = { hourCycle: 'h23' }
 
 // formatTimeParts is the same clock for a caller that wants its own
-// components - a short "11 Aug, 14:05" rather than the full stamp.
-//
-// It exists because seven views had their own toLocaleString call, and
-// every one of them was still 12-hour after this composable changed.
-// Passing the option back through here is what keeps that from happening
-// again the next time somebody needs a shorter date.
+// components - a short "11 Aug, 14:05" rather than the full stamp. A
+// view never calls toLocaleString itself, so the clock cannot drift
+// between pages.
 export function formatTimeParts(
   value: string | null | undefined,
   parts: Intl.DateTimeFormatOptions,
@@ -46,19 +38,10 @@ export function formatTimeParts(
 /**
  * How long ago, in words. '' or undefined gives `empty`.
  *
- * Three copies of this existed and all three worded it differently: the
- * notification bell said `5m ago` and fell back to a bare date after a
- * day, and the two relay-node pages said `5 min ago` and `3 h ago` and
- * went on counting days forever. A node last seen six weeks back read as
- * "42 d ago", which is a number nobody converts.
- *
- * The clock guard could not see any of them - it looks for a locale call
- * and these are arithmetic - which is why it now looks for the
- * arithmetic too.
- *
  * PAST A WEEK it stops counting and gives the date. "just now" through
- * "6d ago" is an interval a reader holds in their head; beyond that the
- * date is the more useful answer and the shorter one to read.
+ * "6d ago" is an interval a reader holds in their head. Beyond that the
+ * date is the more useful answer and the shorter one to read, where
+ * "42d ago" is a number nobody converts.
  */
 export function timeAgo(value?: string | null, empty = 'never'): string {
   if (!value) return empty

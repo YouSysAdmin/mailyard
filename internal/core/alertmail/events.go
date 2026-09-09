@@ -115,9 +115,7 @@ var alerts = map[string]Alert{
 		"Their access ended immediately."},
 	// Ownership comes through here too: it is a field on the membership,
 	// not a route of its own, and an owner holds everything a role can
-	// grant plus deleting the project. There is no project.owner event -
-	// the first cut of this list invented one, and it would have mailed
-	// nobody, ever.
+	// grant plus deleting the project. There is no project.owner event.
 	"project.member.updated": {TierProject,
 		"A member's role or ownership changed in your project",
 		"Roles decide what a member may reach, and an owner holds everything a role can grant plus deleting the project. Review it under Project -> Members."},

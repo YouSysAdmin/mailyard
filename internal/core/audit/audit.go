@@ -255,21 +255,16 @@ func (r *Recorder) Close(timeout time.Duration) {
 // Stamp records where a request came from, on its way into the trail.
 //
 // Called by Project and Security rather than by their callers, so an
-// event cannot be recorded without it. There were twenty-five copies of
-// `ClientIP: clientip.From(c)` and the next event type to be added would
-// have been the twenty-sixth or, more likely, the first without one.
+// event cannot be recorded without it.
 //
 // BOTH FIELDS ARE COPIES, and that is the whole reason this function is
 // worth reading twice. The event is queued here and written on the
 // writer goroutine, long after fasthttp has returned the request to its
 // pool and reused the buffers - so a string that merely POINTS at a
-// header reads as whatever arrived later. Reproduced before fixing:
-// three requests kept their user agent, and the first event read the
-// third request's, while all three read one address. clientip.From
-// already answers with a fresh string, so the header needs the clone -
-// and so does Path, which the route middleware fills from c.Path():
-// Fiber hands that out as an unsafe view of the pooled context's path
-// buffer.
+// header reads as whatever arrived later. clientip.From already answers
+// with a fresh string, so the header needs the clone - and so does Path,
+// which the route middleware fills from c.Path(): Fiber hands that out
+// as an unsafe view of the pooled context's path buffer.
 //
 // Neither field identifies anybody. The address is where the request
 // reached us: an iCloud Private Relay user arrives from a Cloudflare,

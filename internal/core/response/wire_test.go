@@ -32,9 +32,8 @@ func marshal(t *testing.T, v any) string {
 	return string(b)
 }
 
-// The whole point: a list nobody filled is [] on the wire. This used to
-// be a reflective walk over the body - now it is the encoder's default,
-// and this pins that the encoder the server installs actually has it.
+// A list nobody filled is [] on the wire. This pins that the encoder
+// the server installs actually formats a nil slice that way.
 func TestAnEmptyListIsNotNull(t *testing.T) {
 	got := marshal(t, listBody{})
 
@@ -55,9 +54,8 @@ func TestAnOmittedListStaysOmitted(t *testing.T) {
 	}
 }
 
-// A nil map stays null - the shape the document was proven against.
-// The v2 default would move it to {}, which FormatNilMapAsNull holds
-// back.
+// A nil map stays null - the shape the document promises. The v2
+// default would move it to {}, which FormatNilMapAsNull holds back.
 func TestANilMapStaysNull(t *testing.T) {
 	got := marshal(t, listBody{})
 	if !strings.Contains(got, `"lookup":null`) {
@@ -71,7 +69,7 @@ func TestANilMapStaysNull(t *testing.T) {
 
 // Response strings come from received mail, and one latin-1 byte in a
 // subject must not turn the whole response into a 500. The bad byte is
-// coerced to U+FFFD, which is what v1 always did.
+// coerced to U+FFFD.
 func TestABadByteDoesNotFailTheResponse(t *testing.T) {
 	got := marshal(t, map[string]string{"subject": "caf\xe9"})
 	if !strings.Contains(got, "caf�") {

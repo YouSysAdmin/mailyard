@@ -56,10 +56,10 @@ var safeChannel = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 // It exists because a wake is process-local. When an API node accepts
 // an email, the worker on that node learns immediately and every
 // other node waits out its poll interval - so a two-second tick, set
-// to keep an idle cluster quiet, became two seconds of latency on
-// every send once the roles were split across machines. NOTIFY closes
-// that gap without adding a broker: the delivery queue is already in
-// this database and the nudge travels the same connection.
+// to keep an idle cluster quiet, is two seconds of latency on every
+// send from another node. NOTIFY closes that gap without adding a
+// broker: the delivery queue is already in this database and the nudge
+// travels the same connection.
 //
 // Nothing depends on it. Notifications are not durable, a node that
 // is reconnecting misses whatever fires meanwhile, and none of that

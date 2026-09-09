@@ -268,11 +268,8 @@ sending:
 #
 # This block is the CONTROL PLANE half. A node's own settings
 # (relay_node, singular) live in a file on that machine - see
-# /docs/smtp-domains/relay-nodes.
-#
-# ENTERPRISE EDITION. The block stays here in both, so the same file
-# moves between them unedited - but a community binary REFUSES TO START
-# with enabled: true.
+# mailyard-relay.yaml.example beside this file and
+# /docs/smtp-domains/relay-nodes-operations.
 # -----------------------------------------------------------------------------
 relay_nodes:
   enabled: false

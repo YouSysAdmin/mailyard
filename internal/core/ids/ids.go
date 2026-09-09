@@ -16,11 +16,10 @@ import (
 //
 // v7 and not v4: the leading 48 bits are a timestamp, so inserts land
 // at the right-hand edge of the index instead of dirtying a random
-// page. It only shows once the index outgrows memory - at 2M rows,
-// 16.2s for v4 against 9.1s for v7. It also gives the (created_at, id)
-// keyset cursor a tiebreaker in insertion order - the stdlib generator
-// documents that guarantee ("always returns UUIDs which sort in
-// increasing order"), where google/uuid merely happened to provide it.
+// page, which shows once the index outgrows memory. It also gives the
+// (created_at, id) keyset cursor a tiebreaker in insertion order - the
+// stdlib generator documents that guarantee ("always returns UUIDs
+// which sort in increasing order").
 func New() string {
 	return uuid.NewV7().String()
 }

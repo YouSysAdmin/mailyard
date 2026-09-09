@@ -3,8 +3,7 @@
 //
 // Assembly. Each way in owns its own card - password, authenticator,
 // passkeys, sessions - because each has its own loading, its own dialog
-// and its own failure modes, and holding all four here was 780 lines
-// where the only thing they shared was the grid they sit in.
+// and its own failure modes. The only thing they share is the grid.
 //
 // The one edge between them is real and stays: changing a password
 // signs every other session out, so the session card is told to reload.

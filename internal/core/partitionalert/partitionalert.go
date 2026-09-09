@@ -6,9 +6,9 @@
 // The condition is slow and quiet and then sudden. Partition count only
 // ever grows on an installation with retention_days = 0 - the operator
 // saying keep everything - and it grows by 365 a year with nothing to
-// notice. What it ends in is not a slow page: measured at 730
-// partitions, sixteen concurrent queue claims failed outright with "out
-// of shared memory", which is the delivery queue stopping.
+// notice. What it ends in is not a slow page: at 730 partitions sixteen
+// concurrent queue claims fail with "out of shared memory", which is
+// the delivery queue stopping.
 //
 // The maintainer already logs both levels. This exists because nobody
 // reads a log for a condition that takes a year to arrive, and because

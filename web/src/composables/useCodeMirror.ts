@@ -1,10 +1,10 @@
-// One CodeMirror editor, wrapped so a view can declare four of them
-// without four copies of the same twenty lines.
+// One CodeMirror editor, wrapped so a view can declare several of them
+// without repeating the lifecycle.
 //
 // What it owns is the LIFECYCLE - the element to mount into, the view
 // itself, the current text, and tearing it down. CodeMirror keeps its
 // document in its own state rather than in a Vue ref, so the two have
-// to be reconciled somewhere; doing it once here is the reason this
+// to be reconciled somewhere. Doing it once here is the reason this
 // exists.
 import { onBeforeUnmount, ref, shallowRef } from 'vue'
 import { EditorState } from '@codemirror/state'

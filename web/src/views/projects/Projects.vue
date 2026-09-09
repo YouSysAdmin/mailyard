@@ -159,8 +159,8 @@ watch(
                   </button>
                   <!-- The same permissions the two routes declare, asked
                        of THIS row's project rather than the active one.
-                       Both pages refuse without them, so offering the
-                       button was offering a 403. -->
+                       Both pages refuse without them, so the button
+                       would only offer a 403. -->
                   <button
                     v-if="projStore.canIn(proj.id, 'settings:read')"
                     class="btn btn-secondary btn-sm"

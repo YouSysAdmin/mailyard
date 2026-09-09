@@ -34,7 +34,7 @@
       {{ .Content }}
     </div>
 
-    {{- /* Prev/next within the changelog, ordered by date (oldest → newest). */ -}}
+    {{- /* Prev/next within the changelog, ordered by date (oldest to newest). */ -}}
     {{- $pages := .CurrentSection.RegularPagesRecursive.ByDate -}}
     {{- $older := false -}}
     {{- $newer := false -}}

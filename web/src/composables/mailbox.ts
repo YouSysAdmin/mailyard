@@ -1,15 +1,12 @@
 // Writing an address with the name attached to it.
 //
 // The server holds itself to this already: a display name is composed in
-// ONE place, smtpclient.FormatAddress, never a Sprintf at the call site,
-// with a guard behind it. The console had
-// drifted the way that rule exists to stop: three renderings of the same
-// pair in two different shapes, `Name <email>` in the sender picker and
-// on the campaign summary, `email (Name)` in the subscriber picker. Two
-// pickers of an address, two forms of the same answer.
+// ONE place, smtpclient.FormatAddress, never a Sprintf at the call site.
+// The console composes it in one place too, so two pickers of an address
+// cannot show two forms of the same answer.
 //
-// `Name <email>` is the one kept: it is what mail itself looks like, and
-// it is the form somebody can paste straight into a To field.
+// `Name <email>` is the form: it is what mail itself looks like, and it
+// is what somebody can paste straight into a To field.
 
 /**
  * The address, with the name in front of it when there is one.

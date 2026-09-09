@@ -6,10 +6,9 @@
 // credential whose reach can be widened later is a credential nobody
 // can reason about from its audit trail.
 //
-// Its own component, and not the detail view wearing `:disabled`. That
-// is what it was - one form with nine `viewing !== null` conditionals
-// deciding whether each control was live - and the form stayed armed
-// with a create action while it was showing an existing key.
+// Its own component, and not the detail view wearing `:disabled`: a
+// form that shows an existing key must not stay armed with a create
+// action.
 import { computed, ref, watch } from 'vue'
 import { apiKeysApi, type CreateKeyPayload } from '../../api/apikeys'
 import { apiErrorMessage } from '../../api/client'

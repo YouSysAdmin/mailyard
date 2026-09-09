@@ -29,9 +29,8 @@ const projStore = useProjectStore()
 const campaigns = ref<Campaign[]>([])
 const loading = ref(true)
 const statusFilter = ref<CampaignStatus | ''>('')
-// Every act a campaign offers, shared with the detail page - which
-// carries the same six, and used to word three of the confirmations a
-// second time.
+// Every act a campaign offers, shared with the detail page, which
+// carries the same six.
 const {
   busy: actionBusy,
   send,

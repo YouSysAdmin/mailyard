@@ -11,7 +11,7 @@
 -- cannot drift. This counts OUTCOMES - queued becomes sent, a retry
 -- turns failed back into sent - and a counter would need a decrement at
 -- every one of those transitions. A recomputation runs the same GROUP
--- BY the chart used to, so it cannot come to mean something else.
+-- BY the chart runs, so it cannot come to mean something else.
 CREATE TABLE email_daily (
     project_id UUID   NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     day        DATE   NOT NULL,

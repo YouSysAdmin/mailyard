@@ -119,10 +119,9 @@ type Managed struct {
 	// Dormant names listeners assigned to it that do not terminate TLS,
 	// so the assignment is recorded and nothing presents it.
 	//
-	// Separate from UsedBy because merging them was a lie the console
-	// repeated: it showed a certificate as in use while openssl showed
-	// the listener speaking plaintext, and the delete was refused on the
-	// strength of it.
+	// Separate from UsedBy: merged, the console shows a certificate as
+	// in use while the listener speaks plaintext, and the delete is
+	// refused on the strength of it.
 	Dormant   []string `json:"dormant,omitempty"`
 	CreatedAt string   `json:"created_at"`
 	UpdatedAt string   `json:"updated_at"`
@@ -210,10 +209,8 @@ type ListenerState struct {
 type ListResponse struct {
 	Certificates []Managed `json:"certificates"`
 
-	// Listeners replaced an assignments map plus a list of the listeners
-	// with TLS off. Three fields describing one row, of which the two
-	// that were there could not answer what the row was actually
-	// serving.
+	// Listeners is one entry per listener, saying what it actually
+	// serves - not an assignments map, which cannot answer that.
 	Listeners []ListenerState `json:"listeners"`
 }
 

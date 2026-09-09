@@ -2,10 +2,8 @@
 // The fields of a campaign, wherever they are being filled in.
 //
 // ONE component because creating and editing a campaign ask the same
-// eleven questions, and they were two copies of the markup with two sets
-// of pickers behind them. The copies had already drifted - the create
-// dialog offered a Server group and the edit form did not, so saving an
-// edit dropped the pool the campaign sent through.
+// eleven questions, and a field one form offers and the other lacks is
+// dropped on save.
 //
 // It also owns the four fetches the fields need. Nothing outside a
 // campaign form wants the sender list, the template list, the subscriber

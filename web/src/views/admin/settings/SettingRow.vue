@@ -3,12 +3,10 @@
 //
 // The control has five shapes and choosing between them is the whole
 // difficulty of this page - a switch, a number with a unit, a list edited
-// as lines, plain text, and the two cases with NO control at all. Inline
-// it was a hundred lines of nested v-else-if in the middle of a view
-// whose real job is staging edits.
+// as lines, plain text, and the case with NO control at all. Its own
+// component, so the view's job stays staging edits.
 import { computed } from 'vue'
 import type { PlatformSetting } from '../../../api/settings'
-import { useAuthStore } from '../../../stores/auth'
 import { formatDate } from '../../../composables/formatDate'
 import { displayValue, isBool, isInt, isList } from './settingValue'
 
@@ -16,21 +14,6 @@ const props = defineProps<{ setting: PlatformSetting }>()
 
 /** The staged value, in the shape the control edits. */
 const staged = defineModel<string | number>({ required: true })
-
-const auth = useAuthStore()
-
-/**
- * A key this build does not read.
- *
- * Compared against what the SERVER reports, never a build-time constant:
- * this bundle is the same bundle in both editions. Unknown edition means
- * active, because the answer arrives asynchronously and greying out a
- * working control while it loads is worse than showing a live one for a
- * moment.
- */
-const inactiveEdition = computed(
-  () => !!props.setting.edition && !!auth.edition && props.setting.edition !== auth.edition,
-)
 
 /**
  * Whether the control goes full width UNDER the description rather than
@@ -45,7 +28,7 @@ const inactiveEdition = computed(
 const wide = computed(() => {
   // No control, just a value and a link, so it stays compact. Full width
   // pushed those two to opposite ends of the row.
-  if (props.setting.managed_at || inactiveEdition.value) return false
+  if (props.setting.managed_at) return false
 
   return !isBool(props.setting) && !isInt(props.setting)
 })
@@ -75,15 +58,6 @@ function setBool(checked: boolean) {
       <router-link :to="`/${setting.managed_at}`" class="setting-managed-link">
         Managed in {{ setting.managed_in }}
       </router-link>
-    </div>
-
-    <!-- A key this build does not read. It stays listed and stays
-         stored - an edition change must not lose the operator's
-         answer - but offering a switch that governs nothing is the lie
-         the registry exists to avoid. -->
-    <div v-else-if="inactiveEdition" class="setting-control">
-      <span class="setting-managed">{{ displayValue(setting) }}</span>
-      <span class="setting-edition">Enterprise edition</span>
     </div>
 
     <div v-else class="setting-control">
@@ -194,14 +168,6 @@ function setBool(checked: boolean) {
 
 .setting-managed-link:hover {
   color: var(--primary-500);
-}
-
-/* Reads like the managed-elsewhere link beside it, because it answers
-   the same question: why is there no control here. */
-.setting-edition {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
 }
 
 /* Stacked: the label and description on one line, the control on its own

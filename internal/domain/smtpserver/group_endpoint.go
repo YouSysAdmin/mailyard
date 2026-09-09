@@ -170,8 +170,8 @@ func (h *GroupHandler) Update(c fiber.Ctx) error {
 	// inside a transaction.
 	//
 	// After Put, so a failed promotion still leaves the rename applied
-	// rather than pretending nothing happened, and Put no longer carries
-	// is_default at all.
+	// rather than pretending nothing happened. Put does not carry
+	// is_default.
 	if in.MakeDefault && !g.Default {
 		promoted, err := h.Runtime.Store.SMTPGroup.SetDefault(c.Context(), rc.Project.ID, g.ID)
 		if err != nil {

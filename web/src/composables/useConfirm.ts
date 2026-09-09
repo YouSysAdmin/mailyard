@@ -51,7 +51,7 @@ const fallback = {
  * useConfirm gives callers `confirm`, and the dialog component the
  * three things it needs to render and answer.
  *
- * Views destructure `{ confirm }` and await it; ConfirmDialog takes
+ * Views destructure `{ confirm }` and await it, ConfirmDialog takes
  * `open`, `shown`, `accept` and `dismiss`.
  */
 export function useConfirm() {

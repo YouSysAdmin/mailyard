@@ -2,9 +2,8 @@
 // Where to point a client, and what to authenticate with.
 //
 // A DIALOG, not part of the page. Everything in it is read once, when
-// somebody wires a staging application up - and on a page people leave
-// open while a suite runs it was three hundred pixels of permanent
-// furniture above the thing they came to read.
+// somebody wires a staging application up, and the page behind it is
+// left open while a suite runs.
 //
 // It owns the credentials because they are the only writes here, and
 // because the page behind it has no use for them: the message list does
@@ -95,9 +94,8 @@ async function revoke(cred: SMTPCredential) {
   <div>
     <BaseModal title="Connection" size="modal-w860" @close="emit('close')">
       <!-- The listener warning belongs here rather than on the page: it
-           is about the same thing, and as a banner it was permanent
-           furniture for a condition an operator either already knows or
-           is about to read below. -->
+           is about the same thing, and an operator either already knows
+           the condition or is about to read it below. -->
       <Notice
         v-if="info && !info.submission.enabled"
         kind="warning"
@@ -219,12 +217,10 @@ async function revoke(cred: SMTPCredential) {
     </BaseModal>
 
     <!-- The password gets a row of its own, in the same .code-block the
-         other four show-once dialogs use.
-         It was a cell in the two-column facts grid beside the username,
-         and a generated password is 64 unbreakable characters: measured
-         at 539px of text in a 235px cell, spilling 287px past the right
-         edge of a 520px dialog. .code-block scrolls INSIDE itself, so a
-         secret too long for the box never pushes anything sideways. -->
+         other show-once dialogs use. A generated password is 64
+         unbreakable characters, and .code-block scrolls INSIDE itself,
+         so a secret too long for the box never pushes anything
+         sideways. -->
     <BaseModal v-if="mintedPassword" title="Credential created" persistent>
       <Notice kind="warning" title="Save this password now" class="mb-4">
         <p>It is shown once and stored hashed, so nothing can read it back.</p>

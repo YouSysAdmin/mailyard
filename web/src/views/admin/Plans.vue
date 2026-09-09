@@ -60,7 +60,7 @@ async function remove(p: Plan) {
   try {
     await plansApi.remove(p.id)
     notify.success('Plan deleted')
-    // Both lists moved: every project that was on it is now on the
+    // Both lists change: every project that was on it falls back to the
     // default, and the card below is showing the plan that just went.
     await Promise.all([load(), assignments.value?.reload()])
   } catch (err) {

@@ -271,7 +271,7 @@ func TestAnErrorReachingTheTopIsTheEnvelope(t *testing.T) {
 		// A status Fiber chose, repeated in our envelope.
 		{"/fiber-error", fiber.StatusConflict, `{"error":"conflict"}`},
 
-		// Fiber's own 404, which used to read "Cannot GET /nope".
+		// Fiber's own 404, in the envelope rather than as text.
 		{"/nope", fiber.StatusNotFound, `{"error":"not found"}`},
 	} {
 		res, err := app.Test(httptest.NewRequest(fiber.MethodGet, tc.path, nil))

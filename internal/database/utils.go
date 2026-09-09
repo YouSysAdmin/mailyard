@@ -122,10 +122,9 @@ func EscapeLike(s string) string {
 // retention sweeps look for an attachments_json that is neither the
 // empty array nor the empty string, and `null` matches that, so they
 // rewrite every settled row in the window whether it had an attachment
-// or not. MustJSON used to normalize the top level by hand - the v2
-// default reaches NESTED nils too, which the hand pass never did.
+// or not. The encoder default reaches NESTED nils too.
 //
-// Deterministic, because v1 sorted map keys and v2 does not: two writes
+// Deterministic, because v2 does not sort map keys: two writes
 // of the same headers map must produce the same column bytes, or
 // anything computed over them - a diff, a test expectation, an etag -
 // flaps between runs.

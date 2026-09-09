@@ -12,20 +12,20 @@ import (
 )
 
 // Marking a message failed or skipped carries no email id, and that is
-// the path that broke.
+// the path this covers.
 //
 // The empty path, taken deliberately - the rule tests/nulluuid_test.go
 // settled on, because nothing static reaches this. email_id is a uuid
 // column, the parameter feeding it is typed uuid, and a parameter is
-// bound before the CASE picks a branch, so an empty string was refused
-// whichever way the CASE would have gone. The statement PREPAREs, which is exactly why
+// bound before the CASE picks a branch, so an empty string is refused
+// whichever way the CASE would go. The statement PREPAREs, which is why
 // TestEveryQueryMatchesTheSchema cannot see it: that guard prepares and
 // never binds.
 //
-// What it cost: the row stayed pending, CountPending never reached zero,
-// complete() never ran, and the campaign redelivered the same failing
-// message every batch forever. One recipient unsubscribing between
-// fan-out and delivery was enough to start it.
+// A refusal here leaves the row pending, CountPending never reaches
+// zero, complete() never runs, and the campaign redelivers the same
+// failing message every batch forever. One recipient unsubscribing
+// between fan-out and delivery is enough to start it.
 func TestMarkingAMessageWithNoEmailIDSucceeds(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)

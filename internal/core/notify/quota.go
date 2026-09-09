@@ -34,12 +34,8 @@ func QuotaWorthRaising(used, limit int) bool {
 	return limit > 0 && used*100/limit >= warnAt
 }
 
-// QuotaObserver turns what a volume check saw into a notification.
-//
-// nmodel.TypeQuota was DECLARED AND NEVER RAISED: the plan refused the
-// send with a 429 or a 452 and nobody was told anything. An operator
-// found out from their own integration's logs, or by opening the project
-// settings page and reading the usage card - if they thought to.
+// QuotaObserver turns what a volume check saw into a notification, so
+// a plan refusing a send with a 429 or a 452 tells the operator too.
 //
 // Two notifications, not one, because they mean different things and
 // want different urgency:

@@ -17,7 +17,5 @@ A node can be anywhere - another provider, another continent. It holds no databa
 credentials and nothing reaches into it except your delivery workers, over mutual
 TLS.
 
-{{< callout type="warning" title="Enterprise edition" >}}
-Relay nodes are not available in the community edition, which delivers through
-the SMTP servers a project configures and through the shared pool.
-{{< /callout >}}
+Enrolling, approving and operating one is on
+[Running Relay Nodes](/docs/smtp-domains/relay-nodes-operations).

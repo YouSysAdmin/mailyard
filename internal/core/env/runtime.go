@@ -60,8 +60,8 @@ type Runtime struct {
 	// CampaignWake above - env cannot import the email domain, which
 	// imports env.
 	//
-	// Nil where relay nodes are not configured, which is every
-	// community installation. A caller holding a node row and no
+	// Nil where relay nodes are not configured. A caller holding a
+	// node row and no
 	// builder must REFUSE rather than dial with the default config:
 	// a node's certificate is signed by our own authority and can
 	// never verify against the system roots.

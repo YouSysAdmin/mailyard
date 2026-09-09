@@ -19,9 +19,8 @@ import (
 // route it never learned about. This test lives here, in the module
 // that owns the routes, and reads those files from disk.
 
-// sdkGenDir(t) is the generated half. Covering every route by hand stopped
-// being sensible at two hundred of them, so cmd/sdkgen writes this one
-// from the same metadata the OpenAPI document is built from.
+// sdkGenDir(t) is the generated half, written by cmd/sdkgen from the
+// same metadata the OpenAPI document is built from.
 
 // TestSDKCoversEveryV1Route pins the client to the surface.
 //
@@ -42,11 +41,7 @@ func TestSDKCoversEveryV1Route(t *testing.T) {
 	//
 	// Empty, and it should stay that way: the generated half covers
 	// every route by construction, so an entry here would mean somebody
-	// excluded one by hand. It briefly held 181 entries, while the
-	// product surface had moved to /api/v1 and the client had not - and
-	// enumerating them was the point, because loosening the assertion
-	// instead would have read ever after as "the client covers
-	// everything".
+	// excluded one by hand.
 	notInTheSDK := map[string]string{}
 
 	var missing, extra []string
@@ -108,11 +103,9 @@ func normalizeParams(route string) string {
 // anything that is not a string literal into the "*" a path parameter
 // becomes.
 //
-// doRaw is a plain identifier call, so it matches none of the shapes the
-// other two do. Adding it was not optional: the moment the attachment
-// and raw-message routes started returning bytes, six real methods
-// became invisible here and this test reported them as MISSING from a
-// client that had just gained them.
+// doRaw is a plain identifier call, so it matches none of the shapes
+// the other two do and is read separately - without it every
+// byte-stream method is reported as missing.
 func sdkCalls(t *testing.T) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}

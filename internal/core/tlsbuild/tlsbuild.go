@@ -12,7 +12,7 @@
 // self-signed pair is generated once, stored in the database and
 // shared by every node.
 //
-// Whether a listener terminates TLS is a boolean in config; WHICH
+// Whether a listener terminates TLS is a boolean in config. WHICH
 // certificate it serves is never a config key, only this chain.
 package tlsbuild
 
@@ -407,8 +407,8 @@ func acmeHello(host string) *tls.ClientHelloInfo {
 	}
 }
 
-// onShutdown records a cleanup. Guarded because build() no longer runs
-// under the mutex, so an append here can race a Shutdown.
+// onShutdown records a cleanup. Guarded because build() runs outside
+// the mutex, so an append here can race a Shutdown.
 func (b *Builder) onShutdown(fn func(context.Context) error) {
 	b.mu.Lock()
 	b.shutdowns = append(b.shutdowns, fn)

@@ -5,8 +5,7 @@ import type { DNSRecord } from '../api/domains'
 // Renders every DNS record a domain needs, with its current state.
 //
 // A component rather than markup repeated in each modal: the add-domain
-// flow and the manage-records flow show the same thing, and they had
-// already been copy-pasted once when there was a single record to show.
+// flow and the manage-records flow show the same thing.
 defineProps<{ records: DNSRecord[] }>()
 
 const LABELS: Record<string, string> = {

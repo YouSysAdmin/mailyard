@@ -34,14 +34,9 @@ const LISTENERS = [
 ]
 
 /**
- * The label on the unassigned option, which is the whole fix: it names
- * what falls out of the chain instead of describing the chain.
- *
- * "Nothing assigned (ACME, then self-signed)" was mechanically true and
- * mentioned no certificate, so a Let's Encrypt certificate that had been
- * ordered, issued, cached and put on the wire appeared in no selector on
- * this page. The operator's reading - that it was not being used - was
- * the only one the page supported.
+ * The label on the unassigned option. It names the certificate that
+ * falls out of the chain instead of describing the chain, so an ACME
+ * certificate that is on the wire appears in the selector.
  */
 function automatic(key: string): string {
   const st = props.listeners[key]
@@ -129,9 +124,8 @@ async function assign(setting: string, name: string) {
                  different offset on every row. -->
             <th class="col-tls">TLS</th>
             <th>Certificate</th>
-            <!-- The column the page was missing. Everything else here
-                 describes an INTENTION, and the one thing an operator
-                 came to check is which certificate a client gets. -->
+            <!-- Everything else here describes an INTENTION. This is
+                 which certificate a client actually gets. -->
             <th>Serving</th>
           </tr>
         </thead>

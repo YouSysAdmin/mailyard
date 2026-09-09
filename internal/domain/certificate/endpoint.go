@@ -29,10 +29,9 @@ type Handler struct {
 
 // The listeners a certificate can be assigned to.
 //
-// Exported because tlsbuild now asks for an assignment BY LISTENER, so
-// the string that names one has to come from here rather than being
-// spelled again in serve.go - which is where the four-way drift would
-// start.
+// Exported because tlsbuild asks for an assignment BY LISTENER, so the
+// string that names one has to come from here rather than being
+// spelled again in serve.go.
 const (
 	ListenerServer     = "server"
 	ListenerSubmission = "submission"
@@ -475,10 +474,9 @@ func (h *Handler) clearAssignment(c fiber.Ctx, listener string) error {
 // TerminatesTLS reports whether a listener does a handshake at all.
 //
 // A listener that does not is serving nothing, however its assignment
-// reads. This is the one place that question is asked - the listing, the
-// delete check and `mailyard tls` all come here - because the four-way
-// disagreement is what the whole thing started from: the page said in
-// use, openssl showed plaintext, and the delete was refused.
+// reads. This is the one place that question is asked - the listing,
+// the delete check and `mailyard tls` all come here - so the page,
+// the handshake and the delete check cannot disagree.
 //
 // Exported for the CLI, which answers it with no Handler to hand.
 func TerminatesTLS(cfg *env.Config, listener string) bool {
@@ -644,10 +642,10 @@ func (h *Handler) managed(r *certmodel.Certificate, assignments map[string]strin
 		UpdatedAt: r.UpdatedAt.Format(time.RFC3339),
 	}
 
-	// two lists, because they are two different facts and merging them
-	// is what let the page claim a plaintext listener was serving a
-	// certificate. UsedBy is what is on the wire, Dormant is a recorded
-	// intention with no handshake behind it.
+	// Two lists, because they are two different facts: UsedBy is what
+	// is on the wire, Dormant is a recorded intention with no
+	// handshake behind it. Merged, a plaintext listener reads as
+	// serving a certificate.
 	for listener, assigned := range assignments {
 		if assigned != r.Name {
 			continue

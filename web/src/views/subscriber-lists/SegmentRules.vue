@@ -1,12 +1,8 @@
 <script setup lang="ts">
 // The rule builder behind a dynamic list, and the count it matches.
 //
-// ONE component because there were two copies: the create dialog and
-// the detail page each carried the RuleRow type, both option tables,
-// rowsToRules, addRule, removeRule, previewSegment and thirty-five
-// lines of identical markup. Only one of them had rulesToRows, which is
-// the tell - the dialog never had to read an existing rule back, so the
-// two halves of the same translation lived in different files.
+// ONE component for the create dialog and the detail page, so both
+// halves of the rule translation live in one file.
 //
 // It speaks FilterRule to its caller and RuleRow to itself. A rule
 // stores `custom_fields.<key>` as one string where the form needs two

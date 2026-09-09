@@ -15,11 +15,10 @@ import (
 
 // The signing secret is SEALED in the column and plaintext to callers.
 //
-// It used to be written verbatim, so a database dump handed over every
-// project's HMAC key - and the wire type's comment claimed a hash was
-// stored, which is impossible for a value the dispatcher has to sign
-// with. This checks both halves at once: what comes back out is usable,
-// and what sits in the column is not.
+// It cannot be hashed, since the dispatcher has to sign with it, and
+// written verbatim a database dump would hand over every project's
+// HMAC key. This checks both halves at once: what comes back out is
+// usable, and what sits in the column is not.
 func TestTheSigningSecretIsSealedAtRest(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)

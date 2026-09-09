@@ -13,10 +13,9 @@ import (
 // Which surface a documented route belongs to.
 //
 // The generated ConsoleDocs metadata records a path RELATIVE to its
-// mount, because it was written when there was one console mount.
-// Something now has to say which mount - and this is that something,
-// in one place, checked in both directions by
-// TestEveryConsoleRouteIsDocumented and TestEveryV1RouteIsDocumented.
+// mount, and this is the one place that says which mount, checked in
+// both directions by TestEveryConsoleRouteIsDocumented and
+// TestEveryV1RouteIsDocumented.
 //
 // It is a bridge, not a fixture. The metadata is generated from
 // routes.go, so regenerating it with full paths removes this file.

@@ -189,14 +189,11 @@ func (h *Handler) Click(c fiber.Ctx) error {
 
 	// The REDIRECT is unconditional, the RECORDING is not.
 	//
-	// Opens were defended against automated fetches and clicks were not,
-	// though the same appliances cause both: a security gateway
-	// (Proofpoint, Barracuda, Safe Links) fetches every URL in a message
-	// on arrival, and every wrapped link in our own mail is one of them.
-	// So a message nobody had seen scored a click on every link in it -
-	// and because MarkClicked backfills opened_at, an open too. Bot
-	// filtering the pixel while leaving this open meant click rates were
-	// systematically higher than open rates for the same audience.
+	// The same appliances that fetch the pixel fetch every link: a
+	// security gateway (Proofpoint, Barracuda, Safe Links) opens every
+	// URL in a message on arrival. Unfiltered, a message nobody has
+	// seen scores a click on every link in it - and because MarkClicked
+	// backfills opened_at, an open too.
 	//
 	// A bot still gets the redirect. Answering it with anything else
 	// makes a scanner report our links as broken, and a person behind

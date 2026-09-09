@@ -62,12 +62,10 @@ const daysAhead = 14
 // any, and the cost lands on the claim query, which carries no date
 // predicate and so can never be pruned.
 //
-// At 730 partitions against 105, on 2M rows: planning 94-420ms rather
-// than 2ms, and 2194 relation locks per claim rather than 319. The locks
-// are what breaks rather than slows - the lock table is shared across
-// the database, and 730 partitions fail at 16 concurrent claims where
-// 380 survive 24. The failure is "out of shared memory" on the claim,
-// so the delivery queue stops.
+// The claim takes a relation lock per partition, the lock table is
+// shared across the database, and 730 partitions fail at 16 concurrent
+// claims where 380 survive 24. The failure is "out of shared memory" on
+// the claim, so the delivery queue stops.
 //
 // 400 sits just above the largest legitimate setting: a year of
 // retention settles near 380. Only retention_days = 0 climbs past it.
@@ -175,7 +173,7 @@ func (m *Maintainer) EnsureAhead(ctx context.Context) (created int, err error) {
 	// asked. So it is an alarm with the remedy in it.
 	//
 	// At error, because the failure it predicts is the delivery queue
-	// stopping - see maxPartitions for the measurements - and because the
+	// stopping - see maxPartitions - and because the
 	// gap between noticing and breaking is months, which is plenty of
 	// warning if anybody reads it.
 	//
@@ -316,9 +314,8 @@ func (m *Maintainer) DropSpent(ctx context.Context, before time.Time) ([]string,
 // One transaction, because as two independent statements a row could
 // return to the queue between the check and the DROP - a console Reset
 // of an old failed message, an insert carrying a caller-set old
-// created_at - and the DROP took it along, silently cancelling a send.
-// The row-by-row DELETE this path replaced evaluated its status
-// predicate atomically, and the lock buys that property back.
+// created_at - and the DROP would take it along, silently cancelling a
+// send. The lock is what makes the check and the drop one decision.
 func (m *Maintainer) dropOne(ctx context.Context, name string) (bool, error) {
 	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -496,13 +493,10 @@ func coveredBy(existing []rangePartition, day time.Time) bool {
 // partitionName names a DAILY partition, and the prefix says which kind
 // it is.
 //
-// `d` for day, where the weekly partitions this replaced used `w`. That
-// is not decoration: the two live in one table through the changeover,
-// both are named after the date their range STARTS, and with one prefix
-// they were indistinguishable in a table listing. The first real run of
-// this produced emails_w2026_08_10 - a week - sitting directly above
-// emails_w2026_08_17 - a day - and nothing on the screen said so. Whoever
-// next reasons about what a DROP takes away needs to know which it is.
+// `d` for day, `w` for the weekly partitions that age out beside them.
+// Both are named after the date their range STARTS, so under one prefix
+// a week and a day are indistinguishable in a table listing, and whoever
+// reasons about what a DROP takes away needs to know which it is.
 func partitionName(from time.Time) string {
 	return "emails_d" + from.UTC().Format("2006_01_02")
 }
@@ -515,7 +509,7 @@ func partitionName(from time.Time) string {
 // weekly partitions laid down before the changeover, which DropSpent has
 // to be able to name in order to remove them. It also holds any
 // emails_wYYYY_MM_DD that a DAY was created under before the prefix
-// changed; those work unchanged, since every decision about a partition
+// changed. Those work unchanged, since every decision about a partition
 // is made from its bounds and never from its name.
 var safeName = regexp.MustCompile(`^emails_[dw][0-9]{4}_[0-9]{2}_[0-9]{2}$`)
 

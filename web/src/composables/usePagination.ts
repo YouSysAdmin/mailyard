@@ -41,8 +41,8 @@ export function useClientPager<T>(items: Ref<T[]>, size = 20) {
 // useClientPager above fetches everything and slices it in the
 // browser. That is right for templates or api keys, where a project
 // has dozens of rows, and wrong for a table that gains a row per
-// message - it was hiding a hard LIMIT 500 on the server behind a
-// pager that looked complete.
+// message - it would hide the server's hard LIMIT behind a pager that
+// looks complete.
 //
 // The server hands back an opaque cursor rather than a page number,
 // so this only goes forward. That is what reading a log looks like,

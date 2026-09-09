@@ -12,15 +12,6 @@ export interface LoginProvider {
 }
 
 export interface AuthInfo {
-  // Which build the server is: 'community' or 'enterprise'. The one
-  // place the console learns it, and it comes from the server because
-  // this bundle is the same bundle in both - the source is public
-  // either way, so nothing here can be compiled out.
-  //
-  // Nothing is gated on it. A page reads it only to explain an empty
-  // table honestly, which is the difference between "your operator has
-  // not switched this on" and "this build does not have it".
-  edition?: string
   auth_disabled?: boolean
   local_enabled?: boolean
   // True when at least one provider is offered. Kept as a convenience

@@ -17,14 +17,10 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/env"
 )
 
-// newSetPasswordCmd builds `mailyard set-password`.
-//
-// Until this existed there was no supported way back into an installation
-// whose bootstrap password had been lost. That password is printed
-// exactly once, at first start, and everything else assumed you still
-// had it: the forgot-password flow needs system_mail, which is off by
-// default, and there was no other operator entry point. Losing one
-// line of terminal scrollback meant losing the installation.
+// newSetPasswordCmd builds `mailyard set-password`, the way back into
+// an installation whose bootstrap password is lost. That password is
+// printed exactly once, at first start, and the forgot-password flow
+// needs system_mail, which is off by default.
 //
 // It runs offline, against the database the config names, so it works
 // whether the server is up.

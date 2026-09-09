@@ -208,24 +208,7 @@ type Definition struct {
 	// links there instead of offering a second control.
 	ManagedAt string `json:"managed_at,omitempty"`
 	ManagedIn string `json:"managed_in,omitempty"`
-
-	// Edition names a build this setting only does anything in. Empty
-	// means both, which is nearly every key.
-	//
-	// The key stays REGISTERED either way. It is a stored value, and
-	// dropping it from the registry would refuse writes to a row that
-	// already exists and lose an operator's answer across an edition
-	// change. What this field buys is the registry's own rule - a
-	// setting nothing reads is a lie to the operator - so the console
-	// renders it as a control that says which build it belongs to
-	// rather than one that silently governs nothing.
-	Edition string `json:"edition,omitempty"`
 }
-
-// EditionEnterprise marks a setting that only does something in the
-// enterprise build. It is the string internal/core/edition reports, not
-// a second vocabulary - the console compares the two directly.
-const EditionEnterprise = "enterprise"
 
 // The certificates page has the host list, the Order button and the
 // listener selectors, so it owns every setting they touch.
@@ -341,7 +324,6 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyRelayNodesAutoApprove, Type: TypeBool, Default: "false",
-		Edition:     EditionEnterprise,
 		Description: "Let a relay node start delivering as soon as it enrols, without an admin approving it. A node in the pool receives the content of real messages, and the enrolment token is shared by every node - leave this off unless nodes are created and destroyed automatically.",
 	},
 }

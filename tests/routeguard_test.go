@@ -38,10 +38,9 @@ var httpVerbs = map[string]bool{
 // the only thing that catches them, so it is deliberately strict: it
 // walks the real routes.go, not a list somebody maintains.
 //
-// It replaces TestOnlySandboxSkipsTheViewerFloor, which guarded the
-// single allowlisted prefix permitted to skip the old viewer floor.
-// There is no floor now - the permission IS the floor, and it differs
-// per resource, which is the point.
+// There is no viewer floor - the permission IS the floor, and it
+// differs per resource.
+
 // handlerEnforcedGroups are the v1 groups and receivers that decide
 // authorization inside the handler, and why.
 //
@@ -102,12 +101,9 @@ func projectGroupsIn(t *testing.T, fset *token.FileSet, file *ast.File) (map[str
 
 	// Pass one: find every group that governs a project.
 	//
-	// Identified by sitting under /api/v1 rather than by calling
-	// requireProject, which these groups no longer do - machineAuth
-	// resolves the project once, for the whole surface, from either
-	// credential. Everything on that prefix is tenant surface by
-	// construction, which is what makes "declares no permOn" a
-	// buildable error rather than a convention.
+	// Identified by sitting under /api/v1: machineAuth resolves the
+	// project once, for the whole surface, from either credential, so
+	// everything on that prefix is tenant surface by construction.
 	prefix := groupPrefixes(file)
 	ast.Inspect(file, func(n ast.Node) bool {
 		as, ok := n.(*ast.AssignStmt)
@@ -255,11 +251,8 @@ func TestRouteResourcesExistInTheCatalogue(t *testing.T) {
 	// Constant name (ResourceEmails) -> resource value, read out of
 	// the permission package's own source.
 	//
-	// Derived, not guessed. Title-casing the resource string to recover
-	// the constant name gets ResourceEmails right and ResourceSMTP,
-	// ResourceAPIKeys and ResourceData wrong -
-	// and a guard that mis-resolves a name reports a drift that is not
-	// there, which is worse than not checking.
+	// Derived, not guessed: title-casing the resource string gets
+	// ResourceEmails right and ResourceSMTP or ResourceAPIKeys wrong.
 	byConst := resourceConstants(t)
 
 	used := map[permission.Resource]bool{}
@@ -450,16 +443,12 @@ func firstStringArg(call *ast.CallExpr) string {
 	return s
 }
 
-// TestBothSurfacesResolveAccessOneWay pins the shape phase 2 exists to
-// create: the machine surface must not grow its own authentication or
-// tenancy resolution.
+// TestBothSurfacesResolveAccessOneWay keeps the machine surface from
+// growing its own authentication or tenancy resolution.
 //
 // The two surfaces answer the same questions - who is this, which
-// project, what may they do - and they answered them in two places
-// before, which is how /api/v1 ended up resolving every caller to the
-// owner preset while /api resolved a real membership. The guard is
-// structural because the drift is structural: a second resolver
-// compiles, serves 200, and differs only in what it permits.
+// project, what may they do - and a second resolver compiles, serves
+// 200, and differs only in what it permits.
 func TestBothSurfacesResolveAccessOneWay(t *testing.T) {
 	fset := token.NewFileSet()
 	//nolint:staticcheck // deprecated for build-tag handling these guards do not want

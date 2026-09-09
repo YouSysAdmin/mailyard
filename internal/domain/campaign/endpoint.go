@@ -313,9 +313,9 @@ func (h *Handler) Send(c fiber.Ctx) error {
 	//
 	// The hosted unsubscribe link is absolute and signed, so it cannot
 	// be built without server.public_url. Refusing to start is the
-	// only honest option: the alternative is what happened before this
-	// check, which was sending the whole audience with no
-	// List-Unsubscribe header and no indication anything was wrong.
+	// only honest option: the alternative is sending the whole
+	// audience with no List-Unsubscribe header and no indication
+	// anything is wrong.
 	if h.Runtime.Tracking == nil || !h.Runtime.Tracking.Enabled() {
 		return response.BadRequest(c,
 			"campaigns need a public URL to mint unsubscribe links - set server.public_url "+

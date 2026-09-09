@@ -1,8 +1,7 @@
 -- The role a project gives to members who carry none of their own.
 --
--- Every path that creates a membership can leave role_id empty, which
--- used to fall back to a built-in preset. There are none, so the
--- project names one.
+-- Every path that creates a membership can leave role_id empty, and
+-- there is no built-in preset to fall back to, so the project names one.
 --
 -- Empty means those members reach NOTHING, which is deliberate: a
 -- project that has not said what its members may do admits them to no

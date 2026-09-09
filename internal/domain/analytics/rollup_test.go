@@ -13,8 +13,8 @@ import (
 // The rollup has to say what counting the rows says.
 //
 // This is the guard the whole design rests on. A rollup is only worth
-// having if it cannot come to mean something different from the query it
-// replaced - so this counts the rows directly, recomputes, reads the
+// having if it cannot come to mean something different from counting
+// the rows - so this counts the rows directly, recomputes, reads the
 // rollup, and compares. Anything that changes one and not the other
 // (bucketing, the timezone the day is cut on, a status filter) fails here
 // rather than as a chart that quietly disagrees with the email log.
@@ -52,7 +52,7 @@ func TestTheRollupAgreesWithCountingTheRows(t *testing.T) {
 	plant("sent", 1, 3)
 	plant("queued", 2, 4)
 
-	// live counts the rows the way the chart used to.
+	// live counts the rows directly.
 	live := func(status string) map[string]int {
 		q := `
             SELECT to_char((created_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD'), COUNT(*)

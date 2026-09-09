@@ -390,7 +390,7 @@ router.beforeEach(async (to) => {
 
   // With a cached one, ask ANYWAY - once per document, and without
   // waiting. The cache exists so a reload renders before /auth/me
-  // resolves, which it still does; what it must not do is decide what
+  // resolves, which it still does. What it must not do is decide what
   // the console looks like for the rest of the session. A profile only
   // ever refilled when absent goes stale on anything the server changes
   // under it - a revoked administrator keeps the Admin section, and a
@@ -423,12 +423,6 @@ router.beforeEach(async (to) => {
     if (proj.projects.length === 0) {
       await proj.fetchProjects()
     }
-
-    // Which build the server is, asked once per document. Not awaited:
-    // it decides how a page EXPLAINS itself, never whether it renders,
-    // so blocking every navigation on it would trade a badge for a
-    // pause on an install where /auth/info is slow.
-    auth.ensureEdition()
 
     // And then refuse a page this member has no permission for.
     //

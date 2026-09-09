@@ -2,16 +2,10 @@
 // The signed-out shell: a centred card on an empty page, with the mark
 // and a heading above whatever the page is asking for.
 //
-// ONE component because there were five copies - sign in, register,
-// forgot, reset and confirm - and they had drifted in exactly the way
-// five copies do. The mark was 48px on two pages and 52px on three,
-// because two of them pinned a width in CSS while all five ASKED the
-// component for 52; and it took the card's text colour on three and was
-// left to inherit on the other two. Nobody decided any of that.
-//
-// The size lives here and nowhere else now. A width in CSS beats the
-// svg's own width attribute, which is why the number the pages passed
-// was quietly losing.
+// ONE component for sign in, register, forgot, reset and confirm, so
+// the mark is one size and one colour on all of them. The size lives
+// here and nowhere else: a width in CSS beats the svg's own width
+// attribute, so a page pinning one would quietly win.
 import BrandMark from './BrandMark.vue'
 
 defineProps<{ title: string }>()

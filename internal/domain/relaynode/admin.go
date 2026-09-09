@@ -8,7 +8,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/yousysadmin/mailyard/internal/core/edition"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	nodemodel "github.com/yousysadmin/mailyard/internal/models/relaynode"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
@@ -30,7 +29,6 @@ func (h *Handler) List(c fiber.Ctx) error {
 		MXHosts:     []string{},
 		AutoApprove: h.autoApprove(),
 		Enabled:     h.Runtime.Config.RelayNodes.Enabled,
-		Available:   edition.RelayNodes,
 	}
 	var ips []string
 
@@ -182,14 +180,6 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // clear its spool.
 func (h *Handler) ResetAuthority(c fiber.Ctx) error {
 	if h.CA == nil {
-		// Two ways to have no authority, and they are not the same
-		// thing to be told. A switch is the operator's to turn on, an
-		// edition is not - and pointing them at relay_nodes.enabled on
-		// a build that refuses to boot with it set wastes their evening.
-		if !edition.RelayNodes {
-			return response.BadRequest(c, "relay nodes are part of the enterprise edition")
-		}
-
 		return response.BadRequest(c, "relay nodes are not enabled on this installation")
 	}
 
@@ -263,11 +253,11 @@ func (h *Handler) setStatus(c fiber.Ctx, node *nodemodel.Node, serverID, status,
 // adminNode resolves :id into a node and its delivery row.
 //
 // OK is a BOOL beside the response: false means the refusal is
-// already written and resp carries it, true means BOTH pointers are set. It used to be an error,
-// and since response.* writes the status and returns nil, the refusal
-// path returned nil and every caller dereferenced a nil node - a 500
-// on any unknown id, found by the live permission audit. See
-// verifySession for the same trap and projectNode for the same fix.
+// already written and resp carries it, true means BOTH pointers are
+// set. Not an error alone, because response.* writes the status and
+// returns nil, so a caller testing only the error would fall through
+// the refusal and dereference a nil node. verifySession and
+// projectNode carry the same contract.
 func (h *Handler) adminNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Shared, error, bool) {
 	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
 	if err != nil {

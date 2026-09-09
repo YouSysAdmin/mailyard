@@ -14,25 +14,17 @@ const USER_KEY = 'mailyard_user'
 
 // A corrupt cache is not a reason to lose the console.
 //
-// This ran unguarded during store setup, so a half-written value (an
-// interrupted write, another tab, an extension) threw inside Pinia
-// initialisation and blanked the whole app on every load until storage
-// was cleared by hand. It is a cache of a profile - the cookie is the
-// session - so the right answer to unreadable is to drop it and let the
-// next request refill it.
+// A half-written value (an interrupted write, another tab, an
+// extension) would throw inside Pinia initialisation and blank the
+// whole app on every load. It is a cache of a profile - the cookie is
+// the session - so the right answer to unreadable is to drop it and
+// let the next request refill it.
 //
-// A cache written by an OLDER BUILD is the same problem wearing a
-// different hat, and it does not throw. `admin` replaced `role` plus
-// `super_user`, so a profile cached before that upgrade parses cleanly
-// and answers `undefined` to the one question that decides whether the
-// platform-admin half of the console exists. Found on a browser holding
-// a profile from a build two weeks older: the account was an
-// administrator, the server said so on every request, and the console
-// showed no Admin section at all - permanently, because the profile is
-// re-fetched only when there is NONE.
-//
-// So the shape is checked rather than assumed. An object that does not
-// carry what this build reads is not a profile this build can use.
+// A cache written by an OLDER BUILD does not throw, it parses cleanly
+// and answers `undefined` to whatever field that build did not have.
+// The profile is re-fetched only when there is NONE, so the shape is
+// checked rather than assumed: an object that does not carry what this
+// build reads is not a profile this build can use.
 function cachedUser(): User | null {
   let parsed: unknown
   try {
@@ -59,47 +51,8 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(cachedUser())
   const authDisabled = ref(false)
 
-  // Which build the server is. Empty until ensureEdition has answered,
-  // and the pages that read it treat empty as "do not claim anything
-  // yet" rather than as community - guessing wrong here means telling
-  // an operator their feature is missing while it loads.
-  const edition = ref('')
-  // Only ever asked as "should an enterprise-only item say so". Written
-  // this way round on purpose: unknown is not community, so a slow or
-  // failed /auth/info leaves the nav plain rather than labelling
-  // features as missing on an install that has them.
-  const isCommunity = computed(() => edition.value === 'community')
-
   const isAuthenticated = computed(() => authDisabled.value || !!user.value)
   const isAdmin = computed(() => authDisabled.value || user.value?.admin === true)
-
-  // Fetched once per document. The answer cannot change under a running
-  // console - it is compiled into the binary being talked to - so a
-  // second call would be a request per navigation for a constant.
-  //
-  // Not cached in localStorage either: the one thing that does change it
-  // is the operator swapping the binary, and a stale value there would
-  // outlive the upgrade and be read as the product lying.
-  let editionPending: Promise<void> | null = null
-
-  function ensureEdition(): Promise<void> {
-    if (edition.value) return Promise.resolve()
-
-    if (!editionPending) {
-      editionPending = authApi
-        .info()
-        .then((res) => {
-          edition.value = res.data.edition || ''
-        })
-        .catch(() => {
-          // Unreachable info is not a verdict about the edition. Leave
-          // it empty and let the next navigation ask again.
-          editionPending = null
-        })
-    }
-
-    return editionPending
-  }
 
   async function login(email: string, password: string, totpCode?: string) {
     const res = await authApi.login(email, password, totpCode)
@@ -152,9 +105,9 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Once per document, like ensureEdition beside it. A profile refresh
-  // per navigation would be a request for something that changes about
-  // as often as the person signs in.
+  // Once per document. A profile refresh per navigation would be a
+  // request for something that changes about as often as the person
+  // signs in.
   let refreshPending: Promise<void> | null = null
 
   /**
@@ -181,9 +134,6 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     authDisabled,
-    edition,
-    isCommunity,
-    ensureEdition,
     isAuthenticated,
     isAdmin,
     login,

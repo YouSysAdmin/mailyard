@@ -2,10 +2,9 @@
 // One subscriber: who they are, and everything the templates can read
 // about them.
 //
-// The custom fields are an editor and NOT also a table. The page used to
-// show both - a JSON textarea, then the same data again as key/value
-// rows underneath - which is two things to read and one of them going
-// stale the moment you typed.
+// The custom fields are an editor and NOT also a table: two views of the
+// same data are two things to read, and one goes stale the moment you
+// type.
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscribersApi } from '../../api/subscribers'
@@ -209,9 +208,7 @@ void load()
         </div>
 
         <!-- A definition list rather than a table, and one class for
-             every label: the four rows used to carry two different
-             ones, so the first column was 160px wide and the other
-             three were as wide as their text. -->
+             every label so the columns line up. -->
         <dl class="history">
           <template v-for="r in recorded" :key="r.label">
             <dt>{{ r.label }}</dt>

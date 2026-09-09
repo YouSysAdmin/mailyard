@@ -27,9 +27,8 @@
   transform: scale(0.98);
 }
 /* Ink on paper, inverted with the theme: fg-0 is near-black on the light
-   theme and near-white on the dark one, bg-0 the opposite. The mid-ramp
-   brand-500 sat here and on the light theme was a grey button, the one
-   grey thing on a black-and-white page. */
+   theme and near-white on the dark one, bg-0 the opposite. Not the
+   mid-ramp brand-500, which is a grey button on a black-and-white page. */
 .cs-btn-primary {
   background: var(--fg-0);
   color: var(--bg-0);
@@ -258,7 +257,7 @@
 
 /* ========== Mobile menu (hamburger + drawer) ========== */
 .cs-burger {
-  display: none; /* revealed ≤780px */
+  display: none; /* revealed at 780px and below */
   margin-left: auto;
   align-items: center;
   justify-content: center;
@@ -314,7 +313,7 @@
 }
 
 .cs-mobile-menu {
-  display: none; /* revealed ≤780px */
+  display: none; /* revealed at 780px and below */
   position: fixed;
   inset: var(--nav-h) 0 0 0;
   z-index: 39;
@@ -465,15 +464,11 @@ body.cs-menu-open {
 .cs-side-group {
   margin-bottom: 28px;
 }
-/* A SECTION LABEL IS NOT DIMMER THAN THE PAGES UNDER IT. It was --fg-3
-   against their --fg-2, which put the quieter colour on the heading and read
-   as an inverted hierarchy - the pages looked like the important thing and
-   the section like a caption. Size cannot carry the difference instead: 11px
-   is the CEILING here, not a choice. Measured against the real labels at the
-   real column width, CONTACTS AND SUPPRESSION is 183px inside a 183px budget
-   and four to six labels overflow at 12px, at every letter-spacing tried. So
-   weight, case and colour do the work, and 600 plus uppercase plus --fg-2
-   reads as a heading at a size the column can hold. */
+/* A SECTION LABEL IS NOT DIMMER THAN THE PAGES UNDER IT, or the pages read
+   as the important thing and the section as a caption. Size cannot carry
+   the difference: 11px is the CEILING here, since the longest label fills
+   the column at that size and overflows at 12px. So weight, case and
+   colour do the work. */
 .cs-side-h {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -492,18 +487,14 @@ body.cs-menu-open {
   margin: 0;
 }
 /* A PAGE LINES UP WITH ITS SECTION'S TITLE, NOT WITH ITS ICON. The header is
-   12px in and is a flex row of an 11px icon (1em at its own font size) and an
-   8px gap, so its title starts at 31px - and a page row indented to 12px
-   started at the same left edge as the whole header block, which read as one
-   flat list rather than a section and its pages. The 2px transparent
-   border-left every row carries is part of the measure, which is why this is
-   29 and not 31: the border is where the active marker appears, and it stays
-   at the row's own left edge. */
+   12px in and is a flex row of an 11px icon (1em at its own font size) and
+   an 8px gap, so its title starts at 31px. The 2px transparent border-left
+   every row carries is part of the measure, which is why this is 29 and not
+   31: the border is where the active marker appears, at the row's own left
+   edge. */
 /* 13px, which is the TOC's size for the same thing - a list of page links
-   down a rail. The sidebar was the odd one out at 14px, so the two rails
-   flanking the article disagreed on the same element, and 14px next to an
-   11px section label was the widest part of the inverted hierarchy above.
-   The two rails are one scale now: 11px label, 13px link. */
+   down a rail. The two rails flanking the article are one scale: 11px
+   label, 13px link. */
 .cs-side li a {
   display: block;
   padding: 6px 12px 6px 29px;
@@ -731,15 +722,12 @@ details.cs-side-collapsible[open] > ul {
 .cs-prose > * + * {
   margin-top: 18px;
 }
-/* A LINK IN THE PROSE CANNOT BE TOLD BY ITS COLOUR. Every `a` carries a 1px
-   --line-2 border-bottom and the COLOUR is what used to carry it - which
-   worked while a link was amber against a grey sentence. On an ink accent a
-   link is the same ink as the text around it and that border is the only cue
-   left, at 1.3:1 against the page, so the documentation index reads as text
-   that happens to sit on a rule. --fg-3 is a mid grey in BOTH themes
-   (#6b7280 / #6b7480), so one declaration is enough, and it is the same
-   answer the console reached for its own bare links. Structural links - nav,
-   sidebar, toc, footer - are outside .cs-prose and keep the quieter rule. */
+/* A LINK IN THE PROSE CANNOT BE TOLD BY ITS COLOUR. On an ink accent a link
+   is the same ink as the text around it, so the border-bottom is the only
+   cue, and the 1px --line-2 rule every `a` carries is 1.3:1 against the
+   page. --fg-3 is a mid grey in BOTH themes (#6b7280 / #6b7480), so one
+   declaration is enough. Structural links - nav, sidebar, toc, footer - are
+   outside .cs-prose and keep the quieter rule. */
 .cs-prose a {
   border-bottom-color: var(--fg-3);
 }
@@ -826,11 +814,11 @@ details.cs-side-collapsible[open] > ul {
 }
 
 /* ========== ASCII diagrams (```ascii fenced blocks, via the codeblock hook) ========== */
-/* Reuses the base <pre> frame (bg/border/padding); overrides the prose
-   line-height and the Space Mono webfont, whose box-drawing/▲▼ glyphs don't
+/* Reuses the base <pre> frame (bg/border/padding) and overrides the prose
+   line-height and the Space Mono webfont, whose box-drawing and triangle glyphs do not
    fill the cell. A system monospace stack + tight line-height makes the
    connectors line up. */
-/* The frame stays full-width (the base <pre>); the art is centred inside it. */
+/* The frame stays full-width (the base <pre>), the art is centred inside it. */
 .cs-ascii {
   text-align: center;
   line-height: 1.25;
@@ -838,7 +826,7 @@ details.cs-side-collapsible[open] > ul {
 /* The art is an inline-block so text-align:center centres it as one rigid unit,
    while its own text stays left-aligned to preserve column alignment. The hook
    dedents/trims so this centres the art, not stray whitespace. Overrides the
-   Space Mono webfont, whose box-drawing/▲▼ glyphs don't fill the cell. */
+   Space Mono webfont, whose box-drawing and triangle glyphs do not fill the cell. */
 .cs-ascii-art {
   display: inline-block;
   text-align: left;
@@ -1561,9 +1549,9 @@ details.cs-side-collapsible[open] > ul {
 /* tokens.css styles bare pre, code and kbd for the prose, and Scalar's
    markup is made of the same elements: its pre is deliberately w-fit
    inside a block that paints the background, so our background on the
-   pre itself read as a code block two thirds wide, and our code colour
-   painted its syntax tokens over its own. Hand every one of those
-   properties back. The :root form is there for specificity: the light
+   pre itself reads as a code block two thirds wide, and our code colour
+   paints over its syntax tokens. Hand every one of those properties
+   back. The :root form is there for specificity: the light
    theme keeps the prose's code blocks dark through
    `:root[data-theme="light"] pre`, which outranks a plain class. */
 .cs-reference :is(pre, code, kbd),

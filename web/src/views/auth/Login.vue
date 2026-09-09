@@ -156,9 +156,8 @@ async function resendVerification() {
 
 // An invitation ridden in on ?invite= is handed to the start leg, which
 // keeps it in the signed state cookie and lands the callback back on the
-// invitation. Without it a person with no account had to return to their
-// email and click the link a second time - and since a project is
-// reached only by invitation, that was the whole first run.
+// invitation, so a person with no account does not have to return to
+// their email and click the link a second time.
 //
 // The server accepts a 64-hex token and nothing else, so passing this
 // through cannot steer where the sign-in ends up.

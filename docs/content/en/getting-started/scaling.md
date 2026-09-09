@@ -6,7 +6,8 @@ weight: 60
 
 One `mailyard serve` process is the whole system, and for most installations it stays that way. When it stops being
 enough, **run more of them**. Several `serve` nodes against one database share the queue with no leader, no
-registration and no partitioning to configure - PostgreSQL stays the only piece of infrastructure.
+registration and no partitioning to configure - PostgreSQL stays the only piece of infrastructure. To run the HTTP
+half and the delivery half on separate machines, see [Splitting the roles](/docs/getting-started/scaling-roles).
 
 ```yaml
 services:

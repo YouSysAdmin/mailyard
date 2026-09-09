@@ -16,14 +16,6 @@ import (
 // TestReplicasGoExactlyToTheStoresThatReadThem pins the two halves of
 // follower reads together.
 //
-// They drifted apart once already, silently and in both directions at
-// the same time. Eight stores were handed replicas while NOT ONE
-// query in the process called ReadQuery, so the followers held open
-// connections and served nothing - and the comment above the list
-// asserted the opposite, which is worse than no comment, because the
-// next person greps for a Read* call, finds none, and cannot tell
-// whether the code or the comment is wrong.
-//
 // The failure is invisible from the outside in both directions. A
 // store given replicas it never reads costs a connection and a lie. A
 // store with a Read* call and no replicas quietly serves that query

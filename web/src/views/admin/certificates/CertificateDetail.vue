@@ -2,8 +2,8 @@
 // Everything about one stored certificate that is read ONCE.
 //
 // The fingerprint, the serial, the exact dates and the key identifiers
-// used to sit in table cells and pushed the columns that are scanned off
-// the side of the page. They are here instead, and the row opens it.
+// are what you look at once, not what you scan, so they are here rather
+// than in table cells and the row opens it.
 //
 // It owns the two acts that can only be done to a certificate you are
 // looking at - download it, delete it - and says `changed` when the

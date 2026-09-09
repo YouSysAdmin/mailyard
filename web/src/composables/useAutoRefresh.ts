@@ -6,8 +6,7 @@ import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 // out, mail arriving, what a test suite captured, what somebody changed -
 // so without this the only way to see the current state is reloading the
 // whole console. One composable rather than a setInterval in each view:
-// the rules below are all easy to get subtly wrong, and six copies means
-// six chances to.
+// the rules below are all easy to get subtly wrong.
 
 export interface AutoRefreshOptions {
   // How often to refresh. Ten seconds for a list.
@@ -41,9 +40,8 @@ export interface AutoRefresh {
   //
   // RETURNED rather than passed to the control by the view, because a
   // number a view has to remember to forward is a number that goes
-  // wrong: `everySeconds` was declared on RefreshControl for exactly
-  // this and NOTHING passed it, so the tooltip said ten seconds
-  // regardless - and the email detail page polls every three.
+  // wrong, and the tooltip would claim one cadence while the page polls
+  // at another.
   everySeconds: number
 }
 

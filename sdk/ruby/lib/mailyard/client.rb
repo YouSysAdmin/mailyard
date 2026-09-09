@@ -69,10 +69,9 @@ module Mailyard
     # Perform one request.
     #
     # raw: true returns the response BODY as a String, undecoded, for the
-    # routes that answer a raw message or a decoded attachment. Those
-    # used to be parsed as JSON like everything else, and the rescue
-    # below turned the ParserError into nil - so an attachment fetch
-    # returned nil and lost the bytes without raising anything.
+    # routes that answer a raw message or a decoded attachment. Parsed as
+    # JSON, the rescue below would turn the ParserError into nil and lose
+    # the bytes without raising anything.
     def request(method, path, body: nil, query: {}, raw: false)
       uri = URI.parse("#{@base_url}/api/v1#{path}")
       clean = (query || {}).reject { |_, v| v.nil? }

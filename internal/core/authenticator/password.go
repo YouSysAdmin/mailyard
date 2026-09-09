@@ -17,7 +17,7 @@ import (
 
 const (
 	passwordCost       = 12
-	generatedPasswordN = 16 // base64-url chars; ~96 bits of entropy
+	generatedPasswordN = 16 // base64-url chars, ~96 bits of entropy
 )
 
 // Username brute force protection.

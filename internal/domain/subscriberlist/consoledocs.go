@@ -47,10 +47,7 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "Get",
 			Description: "Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
-			// nil until the handler stopped returning a fiber.Map. The
-			// sibling PATCH on this same path always declared the shape,
-			// which is what made the gap visible.
-			Responses: []apidoc.Response{apidoc.OK("The result.", ListDetailResponse{})},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", ListDetailResponse{})},
 		},
 		{
 			Method:      "PATCH",

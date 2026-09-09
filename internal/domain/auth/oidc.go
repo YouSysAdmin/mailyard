@@ -171,7 +171,7 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	}
 
 	// no project is created or joined here, and that is the whole
-	// model. Signing in proves who somebody is; it never decides what
+	// model. Signing in proves who somebody is. It never decides what
 	// they may reach.
 	//
 	// A provider admits a person. An invitation admits them to a project,
@@ -268,17 +268,15 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 		}
 
 		if existing != nil {
-			// An UNVERIFIED local account is not linked. It used to be,
-			// and marked verified on the spot - the IdP had proved the
-			// mailbox, after all. But the row was created by whoever
-			// typed the address at registration, with a password of
-			// their choosing: register victim@corp.com before the
-			// victim ever signs in, wait for them to arrive through
-			// SSO, and the attacker's password now opens the victim's
-			// account. The IdP proved the person owns the MAILBOX, not
-			// that they created this ROW. Refused, and the person
-			// verifies through the mail they were sent - or an admin
-			// removes the squatter.
+			// An UNVERIFIED local account is not linked. The row was
+			// created by whoever typed the address at registration,
+			// with a password of their choosing: register
+			// victim@corp.com first, wait for the victim to arrive
+			// through SSO, and that password opens their account. The
+			// IdP proved the person owns the MAILBOX, not that they
+			// created this ROW. Refused, and the person verifies
+			// through the mail they were sent - or an admin removes
+			// the squatter.
 			if !existing.EmailVerified {
 				slog.Warn("auth: refusing to link to an unverified local account",
 					"email", email, "provider", prov.Slug)

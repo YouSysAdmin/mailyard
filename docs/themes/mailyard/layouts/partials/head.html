@@ -1,6 +1,6 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-{{- /* Resolve the theme before first paint (no flash). Stored preference wins;
+{{- /* Resolve the theme before first paint (no flash). Stored preference wins,
        otherwise follow the OS. Dark-first fallback. Kept inline + blocking so
        the data-theme attribute is set before the stylesheet applies. */ -}}
 <script>
@@ -44,7 +44,7 @@
 {{- /* App JS: Fuse.js + the search controller + theme behavior (nav drawer,
        dark/light toggle, TOC scrollspy) concatenated into one deferred,
        fingerprinted bundle (same Pipes pattern as the CSS above). The no-flash
-       theme resolver above stays inline and blocking; everything else defers. */ -}}
+       theme resolver above stays inline and blocking, everything else defers. */ -}}
 {{ $fuse     := resources.Get "js/vendor/fuse.min.js" }}
 {{ $searchjs := resources.Get "js/search.js" }}
 {{ $themejs  := resources.Get "js/theme.js" }}

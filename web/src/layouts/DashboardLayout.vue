@@ -170,9 +170,7 @@ function createProject() {
 }
 
 /* Width and placement only. What is INSIDE is .empty-state, the same
-   block every list uses when it has nothing - this card had its own
-   headings, colours and no padding at all, which is why it read as
-   cramped next to every other empty screen in the console. */
+   block every list uses when it has nothing. */
 .no-project {
   max-width: 34rem;
   margin: 48px auto;

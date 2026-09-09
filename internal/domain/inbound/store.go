@@ -273,11 +273,10 @@ func (s *Store) StorageKeysOlderThan(ctx context.Context, before time.Time) ([]s
 // received mail owns.
 //
 // For project DELETION, where the rows go by cascade rather than by a
-// statement of ours. It was missing: the project delete handler collected
-// keys from `emails` only, and the comment there claimed a blob is named
-// only by that table - which is not true of this one or of template
-// attachments. Every inbound attachment a deleted project had offloaded
-// stayed in the object store with nothing left naming it.
+// statement of ours. A blob is named by this table as well as by
+// `emails` and by template attachments, and the delete handler has to
+// collect all three or the objects stay in the store with nothing left
+// naming them.
 func (s *Store) StorageKeysForProject(ctx context.Context, projID string) ([]string, error) {
 	rows, err := s.Query(ctx, `
         SELECT attachments FROM inbound_emails

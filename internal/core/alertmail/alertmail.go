@@ -1,13 +1,7 @@
 // Mailyard, Copyright (c) 2021-2026 YouSysAdmin
 
-// Package alertmail turns audit events and project alerts into mail.
-//
-// It exists because everything this installation knew about a problem
-// stayed on a screen. The bounce-rate job raised an in-app notification
-// and nothing else - every security event - a key created, a second factor
-// turned off, a platform credential minted - went to the audit trail and
-// no further. The only thing that ever mailed anybody about a problem was
-// the certificate expiry sweep.
+// Package alertmail turns audit events and project alerts into mail, so
+// a problem this installation knows about does not stay on a screen.
 //
 // One consumer of the audit stream (see audit.Recorder.Watch), because
 // both trails already meet in its writer goroutine: Project and Security

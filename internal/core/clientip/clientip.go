@@ -15,8 +15,8 @@
 //
 //   - With EnableIPValidation off - the default - it returns the WHOLE
 //     header. Behind two hops that is "203.0.113.9, 10.0.0.7", which
-//     net.ParseIP refuses, so every api key carrying an ip allowlist was
-//     refused and every per-ip rate bucket got a key the caller chose.
+//     net.ParseIP refuses, so every api key carrying an ip allowlist is
+//     refused and every per-ip rate bucket gets a key the caller chose.
 //   - With it on, it returns the first VALID entry, which a caller can set
 //     to an allowlisted address by sending the header itself. That turns a
 //     broken allowlist into a bypassed one.

@@ -4,8 +4,8 @@
 // Each answers a different question and each is gated differently - the
 // form on settings:write, the default role on members:write, the usage
 // figures on analytics:read, the export on nothing at all, and deleting
-// on OWNERSHIP, which is not a permission. They were one file, and the
-// only thing that file really shared between them was the project.
+// on OWNERSHIP, which is not a permission. The only thing they share is
+// the project.
 //
 // PERMISSIONS COME FROM THIS PAGE'S OWN REQUEST, not the project store:
 // the path id may name a project other than the store's current one, so

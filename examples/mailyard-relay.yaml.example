@@ -1,0 +1,176 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+#
+# A RELAY NODE's own configuration, for the machine the node runs on.
+#
+# Start it with `mailyard relay`. This is the singular relay_node block:
+# what one node knows about ITSELF. The plural relay_nodes block is the
+# control plane's view of the fleet and lives in the platform's config,
+# not here.
+#
+# A node holds no database credentials and no encryption key. It knows a
+# URL, an enrolment token for its first run, and afterwards a
+# certificate - so this file is the whole of it.
+# -----------------------------------------------------------------------------
+relay_node:
+  # Where the platform is. The node only ever connects OUT to it, so
+  # HTTPS_PROXY and ALL_PROXY (socks5 included) work with no extra
+  # configuration - which is the point on a network the platform cannot
+  # be reached from directly.
+  control_url: "https://mail.example.com"
+
+  # The shared secret from relay_nodes.auto_register_token, needed for
+  # the FIRST RUN ONLY. After enrolment the node holds a certificate and
+  # its own control token, and this can be removed from the file.
+  #
+  # A node enrolling into a PROJECT presents an API key holding
+  # relay:write here instead.
+  enroll_token: ""
+
+  # What this node calls itself: the certificate name delivery workers
+  # dial AND the HELO it announces to the internet. One field for both,
+  # because large receivers check HELO against the connecting address's
+  # PTR - letting the two disagree makes two problems out of one.
+  #
+  # THIS MUST MATCH THIS HOST'S PTR RECORD. Gmail and Outlook refuse on a
+  # missing or mismatched PTR before they look at the message.
+  hostname: "node1.mail.example.com"
+
+  # How mail reaches this node.
+  #
+  # listen (the default) binds addr below and delivery workers dial in
+  # over mutual TLS - the platform must be able to open a connection to
+  # this machine.
+  #
+  # pull binds nothing for delivery: the node claims assigned mail over
+  # the same outbound HTTPS control channel it heartbeats on, so it
+  # works behind NAT or an egress proxy with no inbound port at all.
+  # Everything after that - the spool, retries, reporting, max_lifetime -
+  # is identical in both modes.
+  mode: "listen"
+
+  # Where delivery workers connect. Implicit TLS, client certificate
+  # required. Not 587: that is submission, this is a private transport
+  # between our own processes. LISTEN MODE ONLY - a pull node binds
+  # nothing here.
+  addr: ":2587"
+
+  # THE SCOPE OF THIS NODE: which sender domains it may carry outbound,
+  # and which recipient domains its MX accepts. Empty is unrestricted,
+  # which is what a single-tenant node wants.
+  #
+  # Read at enrolment, where it becomes allowed_domains on the server
+  # row this node creates - so a fleet declares its split here, in the
+  # same file the operator sets SPF from, instead of one console visit
+  # per node. It can only NARROW: enrolment is already authorized by the
+  # platform token or a project key, and nothing here widens that.
+  #
+  # THE TWO DIRECTIONS MATCH DIFFERENTLY, on purpose. Outbound is EXACT,
+  # because SPF is written per name and a relay authorized for
+  # example.com is not authorized for mail.example.com - list the
+  # subdomain to send as it. Inbound COVERS subdomains, because that is
+  # the rule the platform's own accept list applies and a node must not
+  # refuse mail the platform would have taken.
+  domains: []
+
+  # The slug of the PROJECT server group this node joins. Empty means
+  # the project's default group.
+  #
+  # Read at enrolment only. A PLATFORM node ignores it - the shared pool
+  # has no groups - and enrolment says so rather than dropping the value
+  # quietly.
+  server_group: ""
+
+  # The queue. Metadata in bbolt, message bytes as files beside it.
+  # Written down BEFORE the node answers 250, deleted only after the
+  # platform has taken the outcome.
+  spool_dir: "/var/lib/mailyard/relay"
+
+  # How long a message may keep failing before it is given up on. Three
+  # days is the ordinary MTA convention.
+  max_lifetime: 72h
+  # How often the node reports in. Well under the platform's stale
+  # window, which the node is told at enrolment.
+  heartbeat_interval: 2m
+  # Simultaneous outbound sessions.
+  delivery_concurrency: 8
+  # The destination port for delivery. 25 in production, configurable
+  # only so a test can point it somewhere else.
+  smtp_port: 25
+  # Delivery over IPv6. OFF by default: a box with a AAAA record will
+  # prefer v6, where receivers want a PTR and SPF coverage a v4-only
+  # setup does not have, and the refusals look nothing like the cause.
+  ipv6: false
+
+  # The node as an MX as well as an egress. For a network the platform
+  # cannot be reached from: mail sent into a region behind a firewall,
+  # whose bounces cannot cross back. The node takes it on 25 and forwards
+  # it over the control channel it already has.
+  #
+  # OFF by default - an open port 25 is a decision.
+  inbound:
+    enabled: false
+
+    # WHICH DOMAINS THIS NODE ACCEPTS IS NOT SET HERE, and there is no
+    # key for it. The platform PUSHES the list on every heartbeat with
+    # an etag the node keys its cache on, so verifying a domain in the
+    # console reaches the node without touching this file. Before any
+    # list has arrived RCPT answers 451, not 550 - and an enrolled node
+    # that has not been APPROVED is handed no list at all.
+
+    # An MX record carries no port, so remote senders always try 25.
+    # Bind :2526 and map it where the process cannot take a privileged
+    # port.
+    addr: ":25"
+    # One received message, in bytes. Above the platform's
+    # inbound.max_message_size the node accepts mail the platform then
+    # refuses, paying the bandwidth twice and bouncing nothing.
+    max_message_size: 26214400
+    # The per-IP session budget. This is the one listener on a node whose
+    # rate is set by strangers.
+    rate_per_minute: 120
+
+    # Read the real client address from a balancer in front of this port.
+    #
+    # The node ASSERTS client_ip to the platform and SPF is computed from
+    # it, so without this a node behind a balancer reports our own hop as
+    # the sender for every message - and puts every sender on earth in
+    # one rate bucket.
+    #
+    # trusted MAY NOT BE EMPTY when this is on, and an empty list fails
+    # the boot: a PROXY header is an unauthenticated claim, so honouring
+    # one from a stranger forges an SPF pass as whoever they name.
+    proxy_protocol:
+      enabled: false
+      trusted: []
+
+    # STARTTLS. Empty means a self-signed pair generated on this node and
+    # kept in the spool, which is not a compromise here: inbound mail is
+    # opportunistic TLS, so senders prefer it and almost none verify.
+    tls:
+      cert: ""
+      key: ""
+
+# -----------------------------------------------------------------------------
+# THE TWO SECTIONS OUTSIDE relay_node THAT A NODE STILL READS. Everything
+# else in the platform's file is ignored here - a node has no database,
+# no encryption key and no session secret, which is why ValidateNode is a
+# separate check rather than a subset of Validate.
+# -----------------------------------------------------------------------------
+submission:
+  # The cap on one message arriving on the WORKER-facing transport
+  # (relay_node.addr above). A node runs no submission listener - it
+  # reads this key because the limit is the same question, and keeping
+  # one name for it stops a node quietly refusing what the platform
+  # accepted.
+  #
+  # relay_node.inbound.max_message_size is the OTHER direction, mail
+  # from strangers.
+  max_message_size: 26214400
+
+logging:
+  level: info
+  # json or text. json is the default and is what a log collector wants.
+  format: json
+  output: stdout
+  # Text output on a terminal only.
+  color: true

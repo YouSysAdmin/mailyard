@@ -37,8 +37,8 @@ document.addEventListener('DOMContentLoaded', function () {
   // The site's toggle flips data-theme on <html>. Scalar keeps its own
   // notion, so mirror it rather than let the two drift apart. The WHOLE
   // configuration goes back each time: updateConfiguration replaces
-  // rather than merges, and a call carrying only darkMode dropped the
-  // url and every switch above - the fonts and the registry came back.
+  // rather than merges, so a call carrying only darkMode drops the url
+  // and every switch above.
   new MutationObserver(function () {
     if (app && typeof app.updateConfiguration === 'function') {
       config.darkMode = dark();

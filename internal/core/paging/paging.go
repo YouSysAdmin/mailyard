@@ -108,9 +108,9 @@ const MaxSearchTerm = 200
 // Cut on a RUNE boundary, through safetext. term[:200] splits whatever
 // multi-byte character straddles byte 200, and the invalid UTF-8 that
 // results is refused by Postgres with 22021 - not the 22P02 that
-// response.Internal softens into a 404, so the search box answers 500.
-// The same hazard was then found on every other header reaching a TEXT
-// column, which is why the mechanics live in safetext rather than here.
+// response.Internal softens into a 404, so the search box would answer
+// 500. The mechanics live in safetext because every header reaching a
+// TEXT column has the same hazard.
 func Search(c fiber.Ctx, param string) string {
 	return safetext.Clamp(strings.TrimSpace(c.Query(param)), MaxSearchTerm)
 }

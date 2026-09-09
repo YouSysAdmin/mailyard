@@ -11,8 +11,7 @@ export interface User {
   id: string
   email: string
   account_type: AccountType
-  // The whole of platform administration. It replaced role plus
-  // super_user, which nothing anywhere told apart.
+  // The whole of platform administration, one flag.
   admin: boolean
   disabled: boolean
   email_verified?: boolean
@@ -230,8 +229,7 @@ export interface SMTPServer {
   project_id: string
   created_by?: string
   name: string
-  // provider is how the row is reached. Absent means smtp, which is what
-  // every row was before providers existed.
+  // provider is how the row is reached. Absent means smtp.
   provider?: string
   provider_config?: Record<string, string>
   host: string
@@ -544,9 +542,8 @@ export interface Campaign {
   status: CampaignStatus
   list_id: string
   // Which SMTP pool the whole campaign sends through, resolved from the
-  // slug the payload takes. It was missing here while the server has
-  // always answered with it, so the edit form had nothing to read the
-  // current group back from - and a save that omits it CLEARS it.
+  // slug the payload takes. The edit form reads the current group back
+  // from it, and a save that omits it CLEARS it.
   smtp_group_id?: string
   send_rate: number
   send_at_local_time: boolean

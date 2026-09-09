@@ -103,15 +103,12 @@ function onInput() {
   if (nativeError.value) check()
 }
 
-// TYING THE LABEL TO ITS CONTROL, which is what `for` is for and what
-// 159 of the 229 fields in the console did not do. Clicking "Bounce
-// Address" put the caret nowhere, and a screen reader read the input as
-// unlabelled - on two thirds of every form in the product.
+// TYING THE LABEL TO ITS CONTROL, which is what `for` is for: clicking
+// the label puts the caret in the field, and a screen reader reads the
+// input as labelled.
 //
-// Done here rather than by adding an id to 159 pairs of lines, because
-// the id exists only to join two elements this component already owns
-// both of: nobody writing a view has a reason to name it, and the 70
-// that were wired had invented seven different naming schemes.
+// Done here rather than by an id in every view, because the id exists
+// only to join two elements this component already owns both of.
 //
 // It never overrides. A `for` prop, a `for` already on the label, or an
 // id already on the control all win - so the field that genuinely has
@@ -166,12 +163,9 @@ const shown = computed(() => props.error || nativeError.value)
          lines of guidance where one of them says the value is wrong
          reads as if both are still true.
 
-         Which is why a hint belongs HERE and not in the slot above. The
-         prop was written for this and had no callers at all: all 73 of
-         them wrote their own <p class="form-hint"> into the default
-         slot, where this component cannot reach it, so every one went on
-         sitting under the error it was meant to be replaced by. The slot
-         is for the three that carry markup. -->
+         Which is why a hint belongs HERE and not in the default slot,
+         where this component cannot reach it to replace it. The slot is
+         for the hints that carry markup. -->
     <p v-if="shown" class="form-error">{{ shown }}</p>
     <p v-else-if="hint || $slots.hint" class="form-hint">
       <slot name="hint">{{ hint }}</slot>

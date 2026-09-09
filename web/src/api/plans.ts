@@ -63,8 +63,6 @@ export const plansApi = {
   // Usage for the active project (X-Mailyard-Project-Id header).
   // Not /admin/usage. This one reports on the project named by the
   // header - it is a tenant read gated on analytics:read, unlike the
-  // plan CRUD above it. A sweep that moved this file onto /api/v1
-  // prefixed every path in it, and a 404 popup on the project
-  // settings page was the only symptom.
+  // plan CRUD above it.
   usage: () => api.get<UsageReport>('/usage'),
 }

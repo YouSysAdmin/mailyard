@@ -39,9 +39,9 @@ export interface ManagedCertificate {
   details?: CertificateDetails
   used_by?: string[]
   // Listeners assigned to it that do not terminate TLS. The assignment
-  // is recorded and nothing presents it - separate from used_by
-  // because merging them had this page reporting a certificate as in
-  // use while the listener spoke plaintext.
+  // is recorded and nothing presents it - separate from used_by, or
+  // the page would report a certificate as in use while the listener
+  // speaks plaintext.
   dormant?: string[]
   created_at: string
   updated_at: string
@@ -82,9 +82,7 @@ export interface ACMEStatus {
 //
 // Not reassembled here. An assignment map plus a list of listeners with
 // TLS off cannot say what a listener with no assignment is actually
-// serving, so an operator whose Let's Encrypt order had just succeeded
-// would read "Nothing assigned" three times while that certificate was
-// on the wire.
+// serving.
 export interface ListenerState {
   listener: string
   tls: boolean

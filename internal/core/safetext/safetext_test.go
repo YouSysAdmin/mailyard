@@ -9,8 +9,8 @@ import (
 )
 
 // TestClampAlwaysYieldsStorableText covers the two ways a bounded
-// header used to poison an INSERT: a multi-byte rune straddling the
-// cap, and bytes that were never UTF-8 to begin with.
+// header can poison an INSERT: a multi-byte rune straddling the cap,
+// and bytes that were never UTF-8 to begin with.
 func TestClampAlwaysYieldsStorableText(t *testing.T) {
 	cases := []struct {
 		name string

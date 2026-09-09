@@ -1,12 +1,9 @@
 <script lang="ts">
 // ESCAPE BELONGS TO THE TOP DIALOG, and only to it.
 //
-// Every open modal listens on `document`, so one press used to reach all
-// of them: opening Connection, then New credential, then pressing Escape
-// closed BOTH - and on Certificates, dismissing a delete confirmation
-// took the detail dialog underneath it with it. Nothing ever reported
-// this, because closing two dialogs when you meant to close one looks
-// like having pressed the key twice.
+// Every open modal listens on `document`, so without this one press
+// would reach all of them and dismissing a confirmation would take the
+// dialog underneath it too.
 //
 // A stack in mount order, so the newest wins. It cannot be a z-index or
 // a DOM query: two dialogs from different components sit in different
@@ -15,8 +12,7 @@
 // IT HAS TO BE THIS BLOCK, not the one below. A `const` at the top of
 // <script setup> is compiled INTO setup(), so every dialog would get a
 // stack of its own holding only itself - indistinguishable from no check
-// at all, and exactly what the first attempt did. Proven by pressing
-// Escape with two dialogs open and watching both close.
+// at all.
 const openModals: symbol[] = []
 </script>
 
@@ -49,9 +45,7 @@ const props = withDefaults(
     form?: boolean
     // Neither the overlay nor Escape closes it - only whatever the
     // footer offers. For the dialogs that show a secret exactly once: a
-    // stray Escape there costs the reader the only copy of a token, and
-    // those four were written without any dismiss handling at all,
-    // deliberately.
+    // stray Escape there costs the reader the only copy of a token.
     persistent?: boolean
   }>(),
   { title: '', size: '', form: false, persistent: false },

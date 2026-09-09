@@ -49,8 +49,7 @@ function go(path: string) {
 async function signOut() {
   // Before the request, not after: clearing the cookie makes every
   // in-flight call answer 401, and the interceptor turns a 401 into
-  // "your session has expired" - which is how pressing Logout used to
-  // land on an error page. What the interceptor lacks is the INTENT.
+  // "your session has expired". What the interceptor lacks is the INTENT.
   beginLeaving()
   await auth.logout()
   leaveConsole()
@@ -337,8 +336,8 @@ defineExpose({ close: () => (open.value = false), closeIfOutside })
   display: flex;
   gap: 2px;
   padding: 2px;
-  /* Same carve-out as .tabs - the chosen chip was distinguished only by
-     a shadow, which is now none. */
+  /* Same carve-out as .tabs: with no shadow, a border is what tells the
+     chosen chip apart. */
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-sm);
   background: var(--bg-tertiary);

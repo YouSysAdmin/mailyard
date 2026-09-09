@@ -102,11 +102,10 @@ func TestParseRejectsRubbish(t *testing.T) {
 
 // TestTouchesAsksTheResourceWhichActionsExist.
 //
-// Touches is the group gate's early refusal, and it used to try read
-// then write. A resource whose only action is neither - relay, which
-// is write-only, or anything that later gains delete alone - would be
-// answered "you may not reach this group" for a permission the caller
-// actually holds.
+// Touches is the group gate's early refusal. Trying only read and
+// write there would answer "you may not reach this group" to a caller
+// holding a resource's one other action - relay, which is write-only,
+// or anything that gains delete alone.
 func TestTouchesAsksTheResourceWhichActionsExist(t *testing.T) {
 	if !NewSet(Of(ResourceRelay, ActionWrite)).Touches(ResourceRelay) {
 		t.Error("a relay:write holder does not touch relay, so the group gate would refuse them")

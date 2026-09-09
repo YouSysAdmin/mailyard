@@ -111,10 +111,8 @@ def routes_from_spec(path):
 fails = []
 probes = 0
 # A 5xx anywhere. The permission checks read a refusal or the absence
-# of one, so a handler that panics or sends broken SQL counts as
-# "the gate let it through" and passes silently - which is exactly how
-# a campaign analytics query naming a column that never existed
-# answered 500 from the day it was written without failing anything.
+# of one, so a handler that panics or sends broken SQL would count as
+# "the gate let it through" and pass silently.
 server_errors = {}
 
 
@@ -244,11 +242,6 @@ ADMIN_ROUTES = [
     ("GET", "/api/v1/admin/plans"), ("GET", "/api/v1/admin/api-keys"),
     ("GET", "/api/v1/admin/shared-smtp-servers"), ("GET", "/api/v1/admin/relay-nodes"),
     ("GET", "/api/v1/admin/oauth-providers"),
-    # /api/v1/projects/empty-personal was here and is gone with personal
-    # projects themselves. It stopped naming a route and started matching
-    # GET /projects/:id with a garbage id, so the audit was measuring an
-    # id that cannot be a uuid rather than an admin route - which is how
-    # the 500 that used to answer that was found.
 ]
 for method, path in ADMIN_ROUTES:
     body = {} if method in ("POST", "PUT") else None

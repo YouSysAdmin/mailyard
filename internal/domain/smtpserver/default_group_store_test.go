@@ -158,10 +158,9 @@ func TestPromotingSomethingThatIsNotThereChangesNothing(t *testing.T) {
 
 // Renaming a group says nothing about which group is the default.
 //
-// Put used to write is_default from the model, so an update built on a
-// read taken moments earlier demoted whatever had been promoted in
-// between - and left the project with no default, from a request that
-// only changed a name.
+// Put must not write is_default from the model: an update built on a
+// read taken moments earlier would demote whatever was promoted in
+// between and leave the project with no default.
 func TestRenamingAGroupDoesNotMoveTheDefault(t *testing.T) {
 	s, proj, ctx := groupStore(t)
 

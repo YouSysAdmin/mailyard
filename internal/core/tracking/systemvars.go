@@ -51,11 +51,11 @@ type Links struct {
 	Unsubscribe string
 }
 
-// ONE table, and everything below is derived from it. Adding a third
-// system link used to mean editing four places - the constants, the
-// injection map, the has-any probe and the substitution - and missing
-// any one of them fails silently: the variable renders empty, or the
-// placeholder ships to a subscriber as a broken relative link.
+// ONE table, and everything below is derived from it. A system link
+// kept in several places - the constants, the injection map, the
+// has-any probe, the substitution - fails silently when one is missed:
+// the variable renders empty, or the placeholder ships to a subscriber
+// as a broken relative link.
 var systemLinks = []systemLink{
 	{
 		names:       []string{VarWebView, VarWebViewAlias},

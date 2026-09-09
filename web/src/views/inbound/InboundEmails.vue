@@ -48,10 +48,9 @@ const hasMore = ref(false)
 const pagedBack = ref(false)
 const deletingId = ref<string | null>(null)
 
-// The counts ride on the filter that selects them. Three stat tiles
-// carried the same three numbers above the split and took a fixed slice
-// off a page whose only growing part is the message being read - on a
-// 13-inch screen the body was a few lines tall.
+// The counts ride on the filter that selects them rather than on stat
+// tiles above the split, which would take a fixed slice off a page
+// whose only growing part is the message being read.
 const STATUSES = [
   { value: 'received', label: 'Received' },
   { value: 'rejected', label: 'Rejected' },
@@ -241,12 +240,10 @@ onMounted(() => loadAll())
 
     <LoadingBlock v-if="loading" />
 
-    <!-- The split renders whether or not there is anything in it. It
-         used to be replaced by an EmptyState when the list was empty,
-         and the STATUS FILTER lives inside the split - so a filter that
-         matched nothing removed the one control that could undo it,
-         and the only way out was reloading the page. An empty list is
-         now said in the reader pane, with every control still standing.
+    <!-- The split renders whether or not there is anything in it. The
+         STATUS FILTER lives inside it, so replacing it with an EmptyState
+         would remove the one control that can undo a filter matching
+         nothing. An empty list is said in the reader pane instead.
 
          The split is the only thing that grows, so the two panes share
          exactly what the page has left and neither the window nor the

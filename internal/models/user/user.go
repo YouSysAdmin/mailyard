@@ -52,11 +52,8 @@ type User struct {
 	// AccountType is stored, not derived. See the type.
 	AccountType AccountType `json:"account_type"`
 
-	// Admin is the whole of platform administration. It replaced a
-	// role string plus a super_user boolean, which no code anywhere
-	// told apart: IsAdmin ORed them and the console ORed them again,
-	// so an install could have a user who was admin by one and not the
-	// other, and nothing could act on the difference.
+	// Admin is the whole of platform administration: one boolean, so
+	// two flags cannot disagree about who administers the installation.
 	Admin    bool `json:"admin"`
 	Disabled bool `json:"disabled"`
 

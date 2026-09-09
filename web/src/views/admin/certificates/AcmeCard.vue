@@ -2,9 +2,8 @@
 // Certificates ordered from a CA, cached in the database so one
 // certificate serves every node.
 //
-// Always on screen, unlike before: the card only appeared once yaml had
-// already configured ACME, so the one place you would look to turn it on
-// was hidden until it was on.
+// Always on screen, whether or not ACME is on: this is the one place
+// you would look to turn it on.
 import { computed, ref } from 'vue'
 import { certificatesApi, type ACMEStatus } from '../../../api/certificates'
 import { settingsApi } from '../../../api/settings'
@@ -140,8 +139,7 @@ async function saveSettings() {
   } catch (e) {
     // Plainly, not on a field. Every write here is a settings write -
     // the body is a list of {key, value} pairs - so a refusal names
-    // `key` or `value` and never `email` or `directory_url`. Two fields
-    // used to bind those names and could never have shown anything.
+    // `key` or `value` and never `email` or `directory_url`.
     notify.error(apiErrorMessage(e, 'Failed to save'))
   } finally {
     saving.value = false

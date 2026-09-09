@@ -84,12 +84,10 @@ func scopesLeft(t *testing.T, s *Store, ctx context.Context, proj, email string)
 
 // Unblocking an address must not undo what that person asked for.
 //
-// Delete was `WHERE project_id = ? AND email = ?` on a table whose
-// unique key has three columns, so pressing Remove on a hard bounce
-// deleted the global block AND every list opt-out the address had made -
-// silently putting them back on lists they had left through a one-click
-// RFC 8058 link. Nothing in the confirmation said anything about lists,
-// because nothing in the code knew there were any.
+// The unique key has three columns. A Delete keyed on project and
+// address alone would remove the global block AND every list opt-out
+// the address made - silently putting them back on lists they left
+// through a one-click RFC 8058 link.
 func TestUnblockingAnAddressKeepsItsListOptOuts(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)

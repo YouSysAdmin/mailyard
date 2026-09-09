@@ -67,8 +67,8 @@ export function encodeLines(text: string): string {
 }
 
 /**
- * A setting rendered as TEXT, for the ones with no control - managed
- * elsewhere, or belonging to the other edition.
+ * A setting rendered as TEXT, for the ones with no control because they
+ * are managed elsewhere.
  *
  * Empty says "not set" rather than showing a blank, which reads as a
  * value that failed to load.

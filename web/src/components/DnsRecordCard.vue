@@ -1,9 +1,8 @@
 <script setup lang="ts">
 // A DNS record the operator has to publish, with the reason it matters.
 //
-// Three of these were written out - the SPF fragment and the MX set on
-// the platform relay page, the MX set again on a project's own - as the
-// same card with the same copy control and the same code block, differing
+// The SPF fragment and the MX sets on both relay pages are the same
+// card with the same copy control and the same code block, differing
 // only in the words. The record itself is the one thing that varies and
 // it comes in as a value.
 //

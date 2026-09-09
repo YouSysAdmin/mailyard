@@ -13,15 +13,10 @@ import (
 
 // The sidebar's icons, checked as data rather than looked at.
 //
-// TestEveryNavIconExists beside this catches a name that is not in the
-// map, which is the typo. This one catches the mistake that is easy to
-// make and impossible to report: two rows in the same section carrying
-// the same glyph. Nothing breaks, so it survives until somebody reads
-// the menu.
-//
-// An icon that does not distinguish the row beside it is worse than no
-// icon, because a repeated glyph reads as a category and two rows look
-// like one feature listed twice.
+// TestEveryNavIconExists catches a name that is not in the map. This
+// one catches two rows in the same section carrying the same glyph:
+// nothing breaks, and a repeated glyph reads as a category, so two rows
+// look like one feature listed twice.
 //
 // Across sections a repeat is fine, and several are deliberate: `users`
 // for Contacts, Members and platform Users, `settings` for a project's
@@ -41,9 +36,7 @@ var itemNameRE = regexp.MustCompile(`label: '([^']+)'`)
 // project switcher renders its briefcase, and the sidebar its collapse
 // control. The argument, not a bare name, because it is not always one:
 // `getIcon(collapsed ? 'panel-open' : 'panel-shut')` names two, and a
-// pattern that insisted on a lone literal reported both as unused. That
-// is the shape of failure worth avoiding here, since the obvious fix for
-// it is to delete the glyphs rather than the pattern.
+// pattern that insisted on a lone literal would report both as unused.
 var iconCallRE = regexp.MustCompile(`getIcon\(([^)]*)\)`)
 
 // iconNameRE picks the glyph names out of such an argument.
@@ -67,10 +60,10 @@ func TestNoTwoItemsInASectionShareAnIcon(t *testing.T) {
 
 	for _, sec := range sections {
 		// Paired by POSITION rather than by one regex spanning both
-		// fields: the items are written three ways in this file - on one
-		// line, over several, and over several with a projectSubpath
-		// between the name and the icon - and a single pattern covering
-		// the pair matches only the first shape while looking correct.
+		// fields: the items are written on one line, over several, and
+		// over several with a projectSubpath between the name and the
+		// icon, and a single pattern covering the pair matches only the
+		// first shape.
 		names := itemNameRE.FindAllStringSubmatch(sec.body, -1)
 		icons := iconRefRE.FindAllStringSubmatch(sec.body, -1)
 
@@ -102,14 +95,9 @@ func TestNoTwoItemsInASectionShareAnIcon(t *testing.T) {
 // use. Both directions matter - the sibling test catches a name with no
 // glyph, this one a glyph with no name.
 func TestEveryIconInTheMapIsUsed(t *testing.T) {
-	// THE WHOLE CONSOLE, not the four files the menu is built from.
-	// The nav declares its icons as data and the shell calls getIcon for
-	// the few that are not nav entries, and while that was all of them
-	// this read those four files by name. It stopped being all of them
-	// the moment the confirm dialog took its glyph from the map instead
-	// of drawing three of its own - and a walker pointed at the wrong
-	// place reports the new ones as orphans, which is a failure that
-	// argues for deleting exactly the code that fixed the problem.
+	// THE WHOLE CONSOLE, not the files the menu is built from: any
+	// component may take a glyph from the map, and a walker pointed at a
+	// fixed list reports the ones elsewhere as orphans.
 	referenced := consoleSources(t)
 
 	used := map[string]bool{}

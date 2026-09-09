@@ -16,9 +16,8 @@ import (
 //
 // The trail is written on another goroutine, so an event is read long
 // after fasthttp has put the request back in its pool and reused the
-// buffers behind it. A field that merely pointed at a header read as
-// whatever request came next - measured before the fix, where the FIRST
-// event reported the THIRD request's user agent.
+// buffers behind it. A field that merely pointed at a header would read
+// as whatever request came next.
 //
 // Three requests over one app is what reproduces it: app.Test serves them
 // through the same pooled context, which is what a keep-alive connection

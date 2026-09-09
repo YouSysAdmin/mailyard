@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The "there is nothing here yet" block, written by hand 57 times.
+// The "there is nothing here yet" block.
 //
 // Text goes in the props for the ordinary case. The default slot is for
 // the handful that need markup - a link into another page, a second

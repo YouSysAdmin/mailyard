@@ -11,16 +11,6 @@ vars:
     sh: 'echo "${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo devel)}"'
   LDFLAGS: '-s -w -X github.com/yousysadmin/mailyard/pkg.Version={{.VERSION}}'
 
-  # Which EDITION is being built. Empty is the community build, which is
-  # what the public repository contains and compiles by default; the
-  # enterprise one is `enterprise`. Threaded through every go
-  # invocation below, so `task check-ee` is `task check` with one var
-  # rather than a second copy of the recipe.
-  #
-  # Note the shape: -tags "" is accepted by the toolchain, so no recipe
-  # needs to branch on whether the var is set.
-  TAGS: '{{.TAGS | default ""}}'
-
   # Local dev stack (compose.yaml): Postgres on :5432 with its files in
   # dev-data/pg, plus a mailyard_test database for the store tests.
   PG_PORT: '{{.MAILYARD_PG_PORT | default "5432"}}'
@@ -73,10 +63,8 @@ tasks:
   # it, hence the touch.
   #
   # The theme is VENDORED at docs/themes/mailyard, so a plain clone
-  # builds. It used to be a submodule, and a clone without it had no
-  # layouts and Hugo built a site of empty pages rather than failing -
-  # which is why this task, the Dockerfile and the goreleaser hook each
-  # had to test for theme.toml first.
+  # builds. Hugo does not fail on a missing theme, it builds a site of
+  # empty pages.
   docs:
     desc: Build the embedded documentation into docs/dist
     dir: docs
@@ -119,7 +107,7 @@ tasks:
     env:
       CGO_ENABLED: '0'
     cmds:
-      - go build -tags "{{.TAGS}}" -ldflags "{{.LDFLAGS}}" -o bin/mailyard{{if .TAGS}}-{{.TAGS}}{{end}} ./cmd/mailyard
+      - go build -ldflags "{{.LDFLAGS}}" -o bin/mailyard ./cmd/mailyard
 
   dev-up:
     desc: Start the dev Postgres and wait until it answers
@@ -150,7 +138,7 @@ tasks:
   test:
     desc: Go tests - the store tests SKIP without a database, see test-db
     cmds:
-      - go test -tags "{{.TAGS}}" ./...
+      - go test ./...
       - task: sdk
 
   # The store tests skip without a database. This points them at the
@@ -161,7 +149,7 @@ tasks:
     env:
       MAILYARD_TEST_DSN: '{{.DEV_TEST_DSN}}'
     cmds:
-      - go test -tags "{{.TAGS}}" ./...
+      - go test ./...
       - task: sdk
 
   # The Go client is a SEPARATE MODULE, so `go test ./...` from the root
@@ -175,8 +163,8 @@ tasks:
       - task: sdk-go
 
   # Its own task because `dir` only works at task level: go-task accepts
-  # `dir` on a single cmd and silently ignores it, which ran all of this
-  # against the server module instead of the client, and passed.
+  # `dir` on a single cmd and silently ignores it, so an inline cmd runs
+  # against the server module instead of the client.
   sdk-go:
     internal: true
     dir: sdk/go
@@ -237,28 +225,23 @@ tasks:
   vet:
     desc: go vet
     cmds:
-      - go vet -tags "{{.TAGS}}" ./...
+      - go vet ./...
 
-  # Lists what is unformatted and does NOT fail on it, which is what the
-  # Makefile did too.
+  # Lists what is unformatted and does NOT fail on it.
   fmt:
     desc: List unformatted Go files
     cmds:
       - gofmt -l internal cmd pkg
 
-  # `test` already runs `sdk`, so this does not list it a second time -
-  # make ran it twice through a sub-make.
-  # golangci-lint over the whole tree, at the tag `check` is running
-  # under. Config in .golangci.yml, which carries no blanket exclusions:
-  # a finding is either fixed or marked at its line with a reason.
-  #
-  # It is a hard failure, unlike `fmt` below, because it caught real
-  # things the compiler does not - a dead branch in the SDK generator, a
-  # doc comment attached to the wrong symbol, unchecked writes.
+  # golangci-lint over the whole tree. Config in .golangci.yml, which
+  # carries no blanket exclusions: a finding is either fixed or marked
+  # at its line with a reason. A hard failure, unlike `fmt`, because it
+  # catches what the compiler does not - a dead branch, a doc comment on
+  # the wrong symbol, an unchecked write.
   lint:
     desc: golangci-lint
     cmds:
-      - golangci-lint run --build-tags "{{.TAGS}}" ./...
+      - golangci-lint run ./...
 
   check:
     desc: vet, lint, tests, gofmt, plus the console type-check and format
@@ -269,121 +252,6 @@ tasks:
       - task: fmt
       - task: type-check
       - task: format-check
-
-  # The enterprise half of the three checks above. A var rather than a
-  # copy of the recipe, because two recipes is two places for one of
-  # them to stop matching the other - which is the whole failure this
-  # split is trying not to have.
-  build-ee:
-    desc: Build the enterprise binary (bin/mailyard-enterprise)
-    cmds:
-      - task: binary
-        vars: { TAGS: 'enterprise' }
-
-  test-ee:
-    desc: Go tests, enterprise build
-    cmds:
-      - task: test
-        vars: { TAGS: 'enterprise' }
-
-  check-ee:
-    desc: check, enterprise build
-    cmds:
-      - task: check
-        vars: { TAGS: 'enterprise' }
-
-  # BOTH editions, back to back. The untagged run is the one that
-  # matters most in this repository: it is the continuous proof that the
-  # community tree stands on its own, compiled from a tree that contains
-  # the enterprise source and excludes every line of it.
-  check-both:
-    desc: check untagged and tagged - what CI runs here
-    cmds:
-      - task: check
-      - task: check-ee
-
-  # Every file this tree has and the public one does not must be
-  # enterprise BY CONSTRUCTION - tagged, under internal/ee, or on the
-  # short list of things a build tag cannot reach (Hugo pages, this
-  # repository's own enterprise workflow and release config).
-  #
-  # The failure it exists for is the opposite of the obvious one. A
-  # enterprise file leaking into the public repository is caught there,
-  # by the no-enterprise-source job. What nothing else catches is a
-  # COMMUNITY half that only exists here: the untagged build passes in
-  # this tree, because the file is present, and breaks in the public one
-  # where it is not.
-  #
-  # Needs a remote named oss pointing at the public repository.
-  # THE OVERLAY ONLY ADDS. Nothing shared with the community repository
-  # is modified, with one documented exception below, and this is what
-  # keeps that true.
-  #
-  # It matters more than it looks. The enterprise tree is the community
-  # tree plus a few files, kept in step by merging DOWN from here - and
-  # merges cost nothing only while the overlay adds. The day it edits a
-  # shared file, every later merge has two sides to reconcile, forever.
-  #
-  # So a change to anything that exists upstream belongs, even
-  # when only the enterprise build needs it: that is what the _ce half of
-  # each seam is for.
-  #
-  # In the community repository there is no oss remote and this REFUSES,
-  # naming the remote to add. That is correct rather than a gap: here
-  # there is no overlay to check, and a task that passed by comparing
-  # HEAD against itself would report the same green whether it had
-  # checked anything or not. Nothing in this repository's CI runs it.
-  edition-diff:
-    desc: The overlay only ADDS - nothing shared with the community tree is modified
-    cmds:
-      - |
-        set -e
-        if ! git remote get-url oss >/dev/null 2>&1; then
-          echo "no remote named oss - this task compares against the community"
-          echo "repository, so add it first:"
-          echo "  git remote add oss git@github.com:YouSysAdmin/mailyard.git"
-          exit 1
-        fi
-        git fetch --quiet oss
-        # Captured rather than piped into a variable: a while loop on the
-        # right of a pipe runs in a subshell, so a flag set inside it is
-        # lost. Collecting the complaints on stdout has neither that
-        # problem nor a here-document to indent wrongly.
-        offenders="$(git diff --name-status oss/master HEAD | while read -r status path; do
-          case "$path" in
-            internal/ee/*|*_ee.go|*_ee_test.go) owned=yes ;;
-            .github/workflows/ci-ee.yaml|.github/workflows/release-ee.yaml) owned=yes ;;
-            .goreleaser.ee.yml) owned=yes ;;
-            docs/content/en/smtp-domains/relay-nodes-operations.md) owned=yes ;;
-            docs/content/en/getting-started/scaling-roles.md) owned=yes ;;
-            examples/mailyard-relay.yaml.example) owned=yes ;;
-            # go.mod and go.sum are the one pair that legitimately
-            # DIFFERS rather than being added. The enterprise tree needs
-            # a package the community one does not - bbolt, for the
-            # relay agent's spool - and a module file has to list what
-            # its build actually imports. go mod tidy resolves each tree
-            # correctly on its own, so the two are kept in step by
-            # running it, not by being identical.
-            #
-            # Its own answer rather than owned=yes: this pair is the
-            # one expected to show as MODIFIED, and owned=yes falls
-            # into the added-only check below, which then fails on
-            # exactly the status this exception exists to permit.
-            go.mod|go.sum) owned=differs ;;
-            *) owned=no ;;
-          esac
-          if [ "$owned" = no ]; then
-            echo "  $path exists upstream and this branch changed it ($status) - make that change in the community repository instead"
-          elif [ "$owned" = yes ] && [ "$status" != "A" ]; then
-            echo "  $path is enterprise but shows as $status rather than added, so a copy of it reached the community repository"
-          fi
-        done)"
-        if [ -n "$offenders" ]; then
-          echo "the overlay is no longer purely additive:"
-          echo "$offenders"
-          exit 1
-        fi
-        echo "overlay is purely additive over oss/master"
 
   type-check:
     desc: vue-tsc over the console
@@ -434,8 +302,7 @@ tasks:
   #
   # REPLICA_DSNS is empty unless run-replica passes it, and an empty
   # MAILYARD_DATABASE_REPLICA_DSNS parses to no replicas rather than to
-  # one blank one - verified, because a replica that will not answer
-  # refuses the boot.
+  # one blank one.
   run:
     desc: Run the server against the dev stack (:3000)
     env:

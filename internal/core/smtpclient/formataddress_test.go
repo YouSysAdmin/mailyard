@@ -73,8 +73,8 @@ func TestADisplayNameSurvivesBeingAName(t *testing.T) {
 	}
 }
 
-// What the old composition did, kept as a statement of the bug rather
-// than as a test of dead code.
+// A mailbox composed by hand from a name with a comma is two addresses
+// to a parser. Kept as a statement of the bug FormatAddress exists for.
 func TestTheHandComposedFormWasTwoAddresses(t *testing.T) {
 	byHand := "Faria, Inc. <no-reply@faria.co>"
 	list, err := mail.ParseAddressList(byHand)

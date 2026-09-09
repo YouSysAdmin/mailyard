@@ -11,17 +11,10 @@ import (
 
 // Four places decide whether an account may manage its own sign-in:
 // the password change, the password reset request, TOTP setup and
-// passkey enrolment. They must ask the same question.
-//
-// Three of them did not exist or asked a different one. Passkeys
-// tested PasswordHash == "" directly, which is the derivation
-// account_type replaced, and it disagrees with the others the moment a
-// row carries both a hash and an identity provider. The reset request
-// tested the same thing. TOTP tested nothing at all, so an account the
-// IdP owns could enrol a second factor here. And the password change
-// had no handler, which is the bug that started this: an admin created
-// an ordinary local account and its owner was told to ask an
-// administrator.
+// passkey enrolment. They must ask the same question, because
+// PasswordHash == "" disagrees with account_type the moment a row
+// carries both a hash and an identity provider, and a gate that asks
+// nothing lets an account the IdP owns enrol a second factor here.
 func TestOneAnswerToWhoManagesTheirOwnCredentials(t *testing.T) {
 	// The gate and the file that must ask it.
 	const gate = "ManagesOwnCredentials()"
@@ -37,9 +30,8 @@ func TestOneAnswerToWhoManagesTheirOwnCredentials(t *testing.T) {
 			t.Fatalf("read %s: %v", file, err)
 		}
 
-		// Code only. The comments explain what the old check was, and
-		// a check that reads its own explanation as a violation is one
-		// people delete.
+		// Code only, so a comment naming the forbidden check is not a
+		// violation.
 		var code []string
 		for line := range strings.SplitSeq(string(body), "\n") {
 			if t := strings.TrimSpace(line); !strings.HasPrefix(t, "//") {
@@ -52,7 +44,7 @@ func TestOneAnswerToWhoManagesTheirOwnCredentials(t *testing.T) {
 			t.Errorf("%s gates %s without calling %s", file, what, gate)
 		}
 
-		// The derivation it replaced must not come back alongside it.
+		// The derivation must not appear alongside the gate.
 		if strings.Contains(src, `PasswordHash == ""`) {
 			t.Errorf(`%s still tests PasswordHash == "" - that is the check `+
 				`account_type replaced, and the two disagree on an account `+

@@ -44,19 +44,11 @@ type Handler struct {
 
 	// The accept list handed to nodes, memoized per project. See
 	// inboundDomains for why the key matters.
-	//
-	// Only the enterprise half fills these, and a struct cannot be split
-	// by build tag, so in the community build they are carried and never
-	// read.
-	domainsMu   sync.Mutex                  //nolint:unused // read by the enterprise half
-	domainCache map[string]domainCacheEntry //nolint:unused // read by the enterprise half
+	domainsMu   sync.Mutex
+	domainCache map[string]domainCacheEntry
 }
 
-// domainCacheEntry is one project's memoized accept list. Declared
-// beside the field rather than beside the code that fills it, because
-// the field is on the shared struct and the filling is not.
-//
-//nolint:unused // filled by the enterprise half
+// domainCacheEntry is one project's memoized accept list.
 type domainCacheEntry struct {
 	names []string
 	etag  string

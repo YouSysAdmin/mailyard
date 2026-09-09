@@ -14,10 +14,7 @@ import (
 // "Every tenant resource has project_id and every store query scopes
 // on it first. Cross-project access must look like a missing
 // resource." That is the first rule in the house style and the one
-// whose failure is worst - a leak between customers - and until this
-// file existed nothing checked it. It rested on the same thing the
-// placeholder rule rested on before TestNoDynamicSQL: a reviewer
-// noticing.
+// whose failure is worst - a leak between customers.
 //
 // The check reads the SCHEMA for which tables carry project_id, and
 // the evaluated query text (see schemaguard_test.go) for whether a
@@ -119,9 +116,8 @@ var tableRef = regexp.MustCompile(`(?is)(?:\bFROM\s+|\bJOIN\s+|\bINTO\s+|\bUPDAT
 // not by line, so ordinary edits do not churn it.
 //
 // A list rather than a marker at each call, following
-// undocumentedConsoleRoutes: these cluster into four reasons, and
-// reading them together is what makes a fifth reason look wrong.
-// Every entry below was checked against its callers, not assumed.
+// undocumentedConsoleRoutes: the entries cluster into a few reasons,
+// and reading them together is what makes a new reason look wrong.
 var crossProjectByDesign = map[string]string{
 	// 1. Retention and maintenance. They run on the worker with no
 	// request behind them and are installation-wide by definition -

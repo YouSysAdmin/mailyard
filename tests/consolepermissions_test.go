@@ -13,10 +13,9 @@ import (
 	"github.com/yousysadmin/mailyard/internal/models/permission"
 )
 
-// The console tree is walked in full. A fixed file list was tried first
-// and fell behind twice in one day - every view that gains a can()
-// call would need remembering, and a forgotten file is a permission
-// string nothing validates.
+// The console tree is walked in full: a fixed file list falls behind
+// with every view that gains a can() call, and a forgotten file is a
+// permission string nothing validates.
 
 // permInConsole matches `permission: 'emails:read'` in the nav and
 // router, and every can('...') call in a view or store.

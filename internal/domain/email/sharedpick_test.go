@@ -403,7 +403,7 @@ func TestCandidatesAreFilteredAndOrdered(t *testing.T) {
 }
 
 // A project splitting its relay nodes by domain is the case the column
-// was added for, and the group branch is where it has to hold: every
+// exists for, and the group branch is where it has to hold: every
 // enabled member of a group is a failover candidate, so without the
 // domain rule a send from one domain walks straight onto a node that is
 // in nobody's SPF record for it. Nothing errors - the mail leaves and

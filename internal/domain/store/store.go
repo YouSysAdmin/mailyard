@@ -349,11 +349,11 @@ type UserStore interface {
 	MarkEmailVerified(ctx context.Context, userID string) error
 
 	// SetPassword and SetTOTP write their own columns and nothing else.
-	// Put writes the whole row, so a handler that read the user, changed
-	// one field and called Put undid whatever had changed in between -
-	// an account disabled during its own password reset came back
-	// enabled. Use Put only where writing the entire row IS the
-	// intention.
+	// Put writes the whole row, so a handler that reads the user,
+	// changes one field and calls Put undoes whatever changed in
+	// between - an account disabled during its own password reset
+	// comes back enabled. Use Put only where writing the entire row IS
+	// the intention.
 	SetPassword(ctx context.Context, userID, hash string) error
 	SetTOTP(ctx context.Context, userID, secret string, enabled bool) error
 }
@@ -627,7 +627,7 @@ type EmailStore interface {
 	// unauthenticated and lives in the recipient's mailbox forever.
 	//
 	// createdAt is in the predicate because `emails` is range partitioned
-	// by it; without it Postgres opens an Update node on every live
+	// by it. Without it Postgres opens an Update node on every live
 	// partition. The tracking handler has already read the row.
 	MarkOpened(ctx context.Context, id string, createdAt, at time.Time) (first bool, opens int64, err error)
 	MarkClicked(ctx context.Context, id string, createdAt, at time.Time) (clicks int64, err error)
@@ -673,7 +673,7 @@ type EmailStore interface {
 // N. See internal/core/keyset.
 //
 // Search is the field that matters. Paging walks a million rows in
-// twenty thousand clicks; search answers the question people arrive
+// twenty thousand clicks. Search answers the question people arrive
 // with, which is whether one address is blocked.
 type SuppressionFilter struct {
 	Kind string

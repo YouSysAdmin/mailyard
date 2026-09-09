@@ -14,7 +14,6 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
-	"github.com/yousysadmin/mailyard/internal/core/edition"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/memo"
 	coreoidc "github.com/yousysadmin/mailyard/internal/core/oidc"
@@ -383,10 +382,7 @@ func (h *Handler) Me(c fiber.Ctx) error {
 func (h *Handler) Info(c fiber.Ctx) error {
 	cfg := h.Runtime.Config.Auth
 	if cfg.Disabled {
-		// The edition travels on this branch too - it is the same
-		// question, and a console on an install with auth off reads it
-		// from the same call.
-		return response.Success(c, AuthDisabledResponse{AuthDisabled: true, Edition: edition.Name})
+		return response.Success(c, AuthDisabledResponse{AuthDisabled: true})
 	}
 
 	// Identity providers are read from the database, memoized for
@@ -423,7 +419,6 @@ func (h *Handler) Info(c fiber.Ctx) error {
 	}
 
 	return response.Success(c, AuthInfoResponse{
-		Edition:      edition.Name,
 		LocalEnabled: cfg.Local.Enabled,
 		OIDCEnabled:  len(list) > 0,
 		Providers:    list,

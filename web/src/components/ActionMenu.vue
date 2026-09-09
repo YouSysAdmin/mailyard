@@ -1,16 +1,15 @@
 <script setup lang="ts">
 // The row actions of a table, folded into one button.
 //
-// Three buttons per row was fine while every column was short. Give the
-// name column real names and the row wraps or the table scrolls, and it
-// is the actions - the least-read cells on the page - that took the
+// Three buttons per row make the row wrap or the table scroll, and it
+// is the actions - the least-read cells on the page - that take the
 // room. One trigger, and the choices appear only when asked for.
 //
 // TELEPORTED to body and positioned from the trigger's rectangle: the
 // table sits in an overflow-x: auto wrapper, and a popover positioned
 // inside it is clipped at the wrapper's edge - which for the last rows is
 // exactly where the menu wants to open. Fixed positioning survives the
-// wrapper; scrolling or resizing closes the menu rather than trying to
+// wrapper. Scrolling or resizing closes the menu rather than trying to
 // follow.
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 

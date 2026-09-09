@@ -1,9 +1,8 @@
 <script setup lang="ts">
 // Adding or editing one identity provider.
 //
-// Two hundred lines of form against an eighty-line table, and the form
-// is where every rule about an IdP lives - which is why it is its own
-// file rather than the back half of a listing page.
+// The form is where every rule about an IdP lives, which is why it is
+// its own file rather than the back half of a listing page.
 //
 // THE SECRET IS NEVER READ BACK. The console cannot show it, so an empty
 // field on an edit means "leave the stored one alone" and the body
@@ -140,9 +139,7 @@ watch(
       allowed_groups: joinList(p.allowed_groups),
     }
     // Open Advanced only for the PROTOCOL fields that live there.
-    // groups_claim is not one of them - it sits with the access rules
-    // now, so including it would open the section for a setting that is
-    // no longer inside it.
+    // groups_claim is not one of them - it sits with the access rules.
     showAdvanced.value = Boolean(p.auth_url || p.token_url || p.userinfo_url)
   },
   { immediate: true },
@@ -277,10 +274,9 @@ async function save() {
 
     <!--
       Who may sign in. All four together and none of them behind
-      the advanced toggle: these are the access rules, and three
-      of them used to be hidden under settings named for the
-      OIDC protocol. An operator restricting a provider to one
-      group had to go looking for the control in a section about
+      the advanced toggle: these are the access rules, not protocol
+      settings, and an operator restricting a provider to one group
+      must not have to look for the control in a section about
       token URLs.
     -->
     <p class="form-section">Who may sign in</p>

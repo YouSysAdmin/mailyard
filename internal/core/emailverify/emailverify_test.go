@@ -186,11 +186,8 @@ func TestCacheHitAvoidsSecondLookup(t *testing.T) {
 }
 
 // RFC 7505: a domain publishing a single MX with the root as its target
-// is declaring that it accepts no mail.
-//
-// It used to score valid/90, because the check was `err == nil &&
-// len(mx) > 0` and a null MX satisfies both. The domain owner had said
-// the opposite of what we reported.
+// is declaring that it accepts no mail. `err == nil && len(mx) > 0` is
+// satisfied by a null MX, so the check has to look at the target.
 func TestNullMXIsNotDeliverable(t *testing.T) {
 	for _, host := range []string{".", ""} {
 		r := &fakeResolver{mx: map[string][]*net.MX{"example.com": {{Host: host}}}}

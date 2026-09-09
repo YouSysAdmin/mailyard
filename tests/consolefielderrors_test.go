@@ -118,11 +118,9 @@ func TestEveryFieldErrorKeyIsOneTheServerRefuses(t *testing.T) {
 // A BOUND KEY MUST ALSO BE ONE THE REQUEST CARRIES.
 //
 // The check above knows the key is a name SOME handler refuses. It
-// cannot know it is the name this form sends, and that gap is not
-// theoretical: the create-project dialog bound `language` while the
-// body carries `default_language`. `language` is a real field - the
-// send-email endpoint validates it - so the first check passed, and the
-// dialog would have gone on silently refusing to explain itself.
+// cannot know it is the name this form sends: a dialog binding
+// `language` while its body carries `default_language` passes the
+// first check, because the send-email endpoint validates `language`.
 //
 // The payload is built either in the view or in the api module it calls,
 // so both are read. Keys are collected loosely, which makes this a check
@@ -134,8 +132,8 @@ func TestEveryFieldErrorKeyIsOneTheFormSends(t *testing.T) {
 	key := regexp.MustCompile(`([a-z_][a-z0-9_]*)\??\s*:`)
 
 	// Per api module, because the union of all of them is no test at
-	// all: `language` is a real key in emails.ts, which is exactly how
-	// the create-project dialog got away with binding it.
+	// all: `language` is a real key in emails.ts and a wrong one in a
+	// project form.
 	apiDir := filepath.Join(console, "api")
 	moduleKeys := map[string]map[string]bool{}
 	entries, err := os.ReadDir(apiDir)
@@ -243,13 +241,10 @@ func TestEveryFieldErrorKeyIsOneTheFormSends(t *testing.T) {
 // field errors it is not: the map is written, nothing reads it, the toast
 // is suppressed, and the request fails in complete silence.
 //
-// Three did exactly that. Attaching a file to a template refused a
-// filename over 255 characters and the page simply carried on; importing
-// subscribers and importing a template did the same. None of the three
-// could have rendered the message anyway - the refusal names a leaf field
-// of a pasted document, and there is no input on screen for it - which is
-// the point: capture is the wrong tool wherever the form has no field to
-// put the answer under, and the server's summary line already reads well.
+// An upload or an import is the usual case: the refusal names a leaf
+// field of a pasted document and there is no input on screen for it.
+// capture is the wrong tool wherever the form has no field to put the
+// answer under, and the server's summary line already reads well.
 //
 // Passing the map to a child counts, since that is how the campaign forms
 // render theirs.

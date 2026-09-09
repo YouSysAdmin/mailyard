@@ -76,10 +76,9 @@ async function open(msg: CampaignMessage) {
     </div>
 
     <div class="card-body pb-0">
-      <!-- The stylesheet's tab strip. These were buttons carrying two
-           variant classes at once - btn-secondary from the static class
-           and btn-primary from the bound one - so which won came down to
-           the order the rules appear in. -->
+      <!-- The stylesheet's tab strip, not buttons with a bound variant
+           class: two variant classes on one element are decided by rule
+           order. -->
       <div class="tabs">
         <button
           v-for="t in TABS"

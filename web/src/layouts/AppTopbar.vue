@@ -161,10 +161,8 @@ defineExpose({ onOutsideClick })
   color: var(--text-primary);
 }
 
-/* It borrowed the rail's .nav-icon until that moved into its own
-   component and took the rule with it - which is the right outcome: an
-   element here should not depend on the navigation's styling to have a
-   size. */
+/* Its own rule: an element here must not depend on the navigation's
+   styling to have a size. */
 .bar-glyph {
   display: flex;
   width: 18px;

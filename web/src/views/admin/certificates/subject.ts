@@ -1,8 +1,7 @@
 // The Subject a form holds, and what of it is worth sending.
 //
 // Both minting dialogs need these and neither owns them, so they live
-// beside SubjectFields rather than in whichever dialog was written
-// first.
+// beside SubjectFields.
 import type { CertificateSubject } from '../../../api/certificates'
 
 /**

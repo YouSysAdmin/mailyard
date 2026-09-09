@@ -56,6 +56,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/certificate"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
 	"github.com/yousysadmin/mailyard/internal/domain/inbound"
+	"github.com/yousysadmin/mailyard/internal/domain/relaynode"
 	"github.com/yousysadmin/mailyard/internal/domain/sandbox"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	"github.com/yousysadmin/mailyard/internal/domain/submission"
@@ -142,11 +143,9 @@ func newServeCmd() *cobra.Command {
 	})
 }
 
-// The api and worker commands live in roles_ee.go. The role STRUCT and
-// every branch on it stay here, in both editions: a community node is
-// always role{api: true, worker: true}, and forking this bootstrap to
-// delete branches that are simply always taken would be a second copy
-// of eight hundred lines to keep in step.
+// The api and worker commands live in roles.go. Every role runs this
+// one bootstrap and branches on r - a second copy of eight hundred
+// lines per role would be a second copy to keep in step.
 func runServe(cmd *cobra.Command, r role) error {
 	configPath, _ := cmd.Flags().GetString("config")
 
@@ -381,7 +380,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// Delivery worker: the email store is its queue source, the email
 	// processor its delivery leg. Started before the HTTP server so
 	// rows left queued by a previous run drain immediately. relayClient
-	// was resolved beside SystemMail above - one identity for the three
+	// is resolved beside SystemMail above - one identity for the three
 	// places a node is dialled from: the worker, the console's Test
 	// button (see smtpserver.testTransport) and platform mail.
 	processor := &email.Processor{
@@ -461,8 +460,8 @@ func runServe(cmd *cobra.Command, r role) error {
 	defer stopWorker()
 	// The worker is CONSTRUCTED on every role, and only STARTED on a
 	// worker one. An api node still hands rt.Queue to the email
-	// service, whose Wake now broadcasts - so accepting a send on an
-	// api node is what tells the worker nodes to look. Leaving
+	// service, whose Wake broadcasts - so accepting a send on an api
+	// node is what tells the worker nodes to look. Leaving
 	// rt.Queue nil there would drop that signal and put every send
 	// back on the poll interval.
 	if r.worker {
@@ -514,7 +513,16 @@ func runServe(cmd *cobra.Command, r role) error {
 	// on a worker node.
 	rt.RelayBell = &bell.Bell{}
 	listener.Subscribe(postgres.ChannelRelayAssign, rt.RelayBell.Ring)
-	editionQueueWiring(rt, listener, processor)
+
+	// The pull-node seam: a candidate that is a node in pull mode is
+	// assigned to rather than dialled, and the assignment rings every
+	// claim long-poll through the same LISTEN/NOTIFY relay the queue
+	// wake uses.
+	processor.Pull = &relaynode.Pull{
+		Store:  rt.Store,
+		TTL:    rt.Config.RelayNodes.AssignmentTTL,
+		Notify: func() { listener.Notify(postgres.ChannelRelayAssign) },
+	}
 
 	listener.Start(workerCtx)
 
@@ -537,8 +545,8 @@ func runServe(cmd *cobra.Command, r role) error {
 		Host: cfg.TLSHost(),
 
 		// Read fresh on every handshake and every order, because all of
-		// it is platform settings now - an administrator turns ACME on
-		// and names a host without restarting anything.
+		// it is platform settings - an administrator turns ACME on and
+		// names a host without restarting anything.
 		ACME: func() tlsbuild.ACME {
 			return tlsbuild.ACME{
 				Enabled:      rt.Settings.Bool(smodel.KeyACMEEnabled),
@@ -571,7 +579,23 @@ func runServe(cmd *cobra.Command, r role) error {
 	// concurrently on several nodes - they are all delete-by-age
 	// sweeps - so no leader election is needed.
 	rt.Cron = cron.New(log)
-	editionJobs(rt, r.worker)
+
+	// The assignment sweep, on worker nodes: a pull node that stopped
+	// claiming loses its messages to the next candidate.
+	if r.worker {
+		rt.Cron.Register(cron.Job{
+			Name:     "relay-assignments",
+			Schedule: cron.EveryInterval(time.Minute),
+			Run: func(ctx context.Context) error {
+				n, err := relaynode.ReleaseExpired(ctx, rt)
+				if n > 0 {
+					rt.Log.Warn("relay node: assignments taken back from nodes that stopped claiming", "released", n)
+				}
+
+				return err
+			},
+		})
+	}
 
 	// Alerts: an in-app notification that means something is WRONG also
 	// goes out as mail. The raiser calls it rather than alertmail
@@ -836,8 +860,8 @@ func runServe(cmd *cobra.Command, r role) error {
 	}
 
 	// A worker still binds server.addr, but serves only the probes and
-	// the metrics scrape. Not serving anything was the alternative,
-	// and it makes a worker unschedulable: an orchestrator needs a
+	// the metrics scrape. Serving nothing makes a worker
+	// unschedulable: an orchestrator needs a
 	// liveness endpoint, and the delivery node is the one whose
 	// metrics an operator most wants. Running the full console there
 	// would instead put the whole authenticated surface on a machine

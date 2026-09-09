@@ -2,7 +2,7 @@
 // One list: what it is, who is in it, and the per-list opt-outs.
 //
 // The type decides which half of the page exists. A static list has
-// MEMBERS and no rules; a dynamic one has RULES and no member table,
+// MEMBERS and no rules. A dynamic one has RULES and no member table,
 // because its membership is not stored anywhere to show - it is
 // computed when a campaign sends.
 import { computed, ref } from 'vue'
@@ -197,10 +197,9 @@ void start()
     <PageHeader>
       <template #title>
         <!-- A bare router-link, deliberately: the stylesheet underlines
-             anchors that carry no class, which is the only cue left now
-             that the accent is ink. It used to be given --primary-600,
-             which rule 1 of the stylesheet forbids as text because it
-             does not reach 4.5:1. -->
+             anchors that carry no class, which is the only cue for a
+             link when the accent is ink. A ramp colour as text does
+             not reach 4.5:1. -->
         <p class="trail"><router-link to="/subscriber-lists">Lists</router-link> /</p>
         <h1>{{ list?.name || 'List' }}</h1>
       </template>
@@ -373,12 +372,10 @@ void start()
 }
 
 /* Underlined here rather than by the stylesheet's `a:not([class])`.
-   That rule is what marks a prose link now that the accent is ink and a
+   That rule is what marks a prose link when the accent is ink and a
    link cannot be told by its colour - but a router-link whose target is
    a PREFIX of the current path is given router-link-active, so this
-   anchor carries a class and the rule skips it. Measured: the same ink
-   as the sentence around it, with nothing else to say it was
-   clickable. */
+   anchor carries a class and the rule skips it. */
 .trail a {
   color: var(--accent-fg);
   text-decoration: underline;

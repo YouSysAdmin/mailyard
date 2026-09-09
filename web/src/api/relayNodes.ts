@@ -22,11 +22,6 @@ export const relayNodesApi = {
       // way, but with it off no node can enrol - so an empty list
       // means "not turned on" rather than "none yet".
       enabled: boolean
-      // available reports whether the SERVER BUILD carries relay nodes.
-      // The community edition answers false, and the page says so
-      // instead of pointing at a switch that build refuses to start
-      // with.
-      available: boolean
     }>('/admin/relay-nodes/'),
   approve: (id: string) => api.post<{ status: string }>(`/admin/relay-nodes/${id}/approve`),
   suspend: (id: string) => api.post<{ status: string }>(`/admin/relay-nodes/${id}/suspend`),
@@ -50,7 +45,6 @@ export const myRelayNodesApi = {
       relay_nodes: RelayNode[]
       mx_hosts: string[]
       enabled: boolean
-      available: boolean
     }>('/my/relay-nodes/'),
   approve: (id: string) => api.post<{ status: string }>(`/my/relay-nodes/${id}/approve`),
   suspend: (id: string) => api.post<{ status: string }>(`/my/relay-nodes/${id}/suspend`),

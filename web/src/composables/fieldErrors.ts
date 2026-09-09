@@ -1,13 +1,9 @@
 // The server's field errors, put back where they belong.
 //
-// `internal/core/validation` has answered with
-// `{"error": "...", "fields": [{"field", "rule", "message"}]}` since it
-// was written, and its own comment says the array is there "so the SPA
-// can incrementally adopt field-level rendering". The SPA never did:
-// apiErrorMessage reads `.error` and nothing ever looked at `.fields`,
-// so a refused field reported itself as one line at the top right of the
-// screen, well away from the input that caused it, and a body with three
-// bad fields reported them as one run-on sentence.
+// `internal/core/validation` answers with
+// `{"error": "...", "fields": [{"field", "rule", "message"}]}`, and a
+// refused field belongs next to the input that caused it, not in one
+// run-on toast at the top right of the screen.
 //
 // `field` is the JSON name the request actually sent - validation
 // registers a tag-name function for exactly that - so a form keyed by

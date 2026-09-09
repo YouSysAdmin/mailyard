@@ -19,49 +19,24 @@ import (
 //
 // `response.BadRequest(c, msg)` is `c.Status(400).JSON(...)`, and that
 // returns the JSON encoder's error - which is NIL. So a helper that
-// refuses by returning one of those returns nil, and a caller written as
-//
-//	if err := h.checkSomething(c, ...); err != nil {
-//	    return err
-//	}
-//
-// Never fires. The handler carries on past the refusal, does the work,
-// and writes a second response over the first - so the CALLER sees the
-// success. Not a 500, not a silent no-op: a 201 with the created body,
-// after a 404 had already been written into the same fasthttp response.
-//
-// This has cost five bugs. Four were found one at a time and each was
-// fixed in place with a note - verifySession, passkeySelf,
-// enrolmentScope, refuseCAOverAnAssignedName. The fifth was found by
-// looking for the shape rather than for its symptoms, and it was four
-// call sites at once:
-//
-//   - template.CreateVersion and UpdateVersion, where checkStylesheet is
-//     the only thing verifying the stylesheet belongs to this project
-//   - campaign.Create and Update, where validateCampaignRefs is the only
-//     thing checking the template exists, has an active version, belongs
-//     to this project, that the subscriber list and SMTP group exist, and
-//     that the A/B splits add up. Every one of those refusals was
-//     unreachable, and the campaign RUNNER acts on the row that results.
-//
-// Four notes in four files did not stop the fifth, which is why this is a
-// test.
+// refuses by returning one of those returns nil, and a caller that
+// tests the error and returns it never fires. The handler carries on
+// past the refusal, does the work, and writes a second response over
+// the first - a 201 with the created body after a 404 was already
+// written into the same fasthttp response.
 //
 // The rule is about the CALL, not the definition. A helper that renders
-// the response and is the caller's last statement is correct and there
-// are nine of them (sendFailure, accessFailure, transition, respondWith,
-// setStatus, runImport, refusePermission, checkPermission, store) - what
-// is wrong is TESTING one of those results and continuing. So: a
-// function that returns a lone error and answers with `response.*` may
-// only be called as `return f(...)`.
+// the response and is the caller's last statement is correct - what is
+// wrong is TESTING one of those results and continuing. So a function
+// that returns a lone error and answers with `response.*` may only be
+// called as `return f(...)`.
 //
 // Fiber handlers are exempt by construction: `func(c fiber.Ctx) error`
 // returns the refusal AS the response, which is the whole convention.
 //
-// Package scoped, and that is load-bearing rather than tidy:
-// relaynode.setStatus propagates a real store error while
-// smtpserver.setStatus renders a response, and matching on the bare name
-// reported the honest one.
+// Package scoped, and that is load-bearing: relaynode.setStatus
+// propagates a real store error while smtpserver.setStatus renders a
+// response, so the bare name is not enough.
 func TestARefusalHelperIsReturnedAndNotTested(t *testing.T) {
 	root := repoRoot(t)
 	fset := token.NewFileSet()
@@ -154,11 +129,8 @@ func TestARefusalHelperIsReturnedAndNotTested(t *testing.T) {
 
 // returnsLoneError reports whether the function's only result is an error.
 func returnsLoneError(fn *ast.FuncDecl) bool {
-	// LAST result is error, however many precede it. It was "the only
-	// result", and relaynode.projectNode returned (node, server,
-	// error) with the same trap in the third slot: every caller tested
-	// it, fell through the refusal, and dereferenced a nil node. Found
-	// by the live permission audit as a 500, not by this test.
+	// LAST result is error, however many precede it: (node, server,
+	// error) carries the same trap in its third slot.
 	res := fn.Type.Results
 	if res == nil || len(res.List) == 0 {
 		return false
@@ -183,9 +155,8 @@ func isFiberHandler(fn *ast.FuncDecl) bool {
 	}
 
 	// Not a StarExpr: Fiber v3's Ctx is an INTERFACE, so a handler takes
-	// it by value. Left matching on the pointer, this predicate answered
-	// false for every handler in the tree and the exemption below it was
-	// dead - each one would have been collected as a refusal helper.
+	// it by value. Matching on the pointer answers false for every
+	// handler in the tree and collects each one as a refusal helper.
 	sel, ok := params.List[0].Type.(*ast.SelectorExpr)
 
 	return ok && sel.Sel.Name == "Ctx"

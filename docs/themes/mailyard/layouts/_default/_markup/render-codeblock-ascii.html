@@ -2,18 +2,18 @@
   ASCII / box-drawing diagrams. Use a fenced ```ascii block:
 
     ```ascii
-    ┌────────┐      ┌────────────────┐
-    │ Client │──TLS─▶     Server      │
-    └────────┘      └────────────────┘
+    +--------+      +----------------+
+    | Client |-TLS->|     Server     |
+    +--------+      +----------------+
     ```
 
-  The block is auto-dedented (the common leading indentation is stripped) and
-  trailing spaces are trimmed; the inner .cs-ascii-art is then centred as a
-  rigid unit inside the full-width frame by the CSS. So you can draw the
-  diagram flush-left or indented for readability and never hand-pad it to
-  centre. Rendered in a diagram-friendly <pre> (tight line-height + a monospace
-  stack with full box-drawing coverage) so connectors line up. Box-drawing
-  chars pass through; any <, >, & are auto-escaped.
+  The block is auto-dedented (the common leading indentation is stripped)
+  and trailing spaces are trimmed. The inner .cs-ascii-art is then centred
+  as a rigid unit inside the full-width frame by the CSS, so a diagram can
+  be drawn flush-left or indented and never hand-padded to centre. Rendered
+  in a diagram-friendly <pre> (tight line-height and a monospace stack with
+  full box-drawing coverage) so connectors line up. Unicode box-drawing
+  characters pass through unchanged, and any <, >, & are escaped.
 */ -}}
 {{- $lines := split (trim .Inner "\n") "\n" -}}
 {{- /* smallest leading-space run across non-blank lines = the common indent */ -}}

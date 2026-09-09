@@ -1,11 +1,10 @@
 // What a role selector offers.
 //
-// The same pair - an empty option naming what happens without a role,
-// then one per role - was written out three times: the row selector, the
-// add dialog and the invite dialog. The empty option is the part that
-// matters and the part that drifted risk lies in: it has to say what
-// leaving it alone MEANS, and that depends on whether the project has a
-// default at all.
+// The same pair everywhere a role is picked - the row selector, the add
+// dialog and the invite dialog: an empty option naming what happens
+// without a role, then one per role. The empty option is the part that
+// matters: it has to say what leaving it alone MEANS, and that depends
+// on whether the project has a default at all.
 import type { ProjectRole } from '../../../api/types'
 
 export interface RoleOption {

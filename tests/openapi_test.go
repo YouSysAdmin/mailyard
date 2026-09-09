@@ -18,15 +18,13 @@ import (
 	"github.com/yousysadmin/mailyard/internal/openapi"
 )
 
-// TestEveryV1RouteIsDocumented is what remains to be enforced once the
-// shapes are reflected.
+// TestEveryV1RouteIsDocumented pins the route metadata to the router.
 //
-// The document's FIELDS now come from the response types, so it cannot
-// disagree with the code about what a body contains - that class of
-// drift is gone by construction rather than by test. What reflection
+// The document's FIELDS come from the response types, so it cannot
+// disagree with the code about what a body contains. What reflection
 // cannot notice is a route nobody described, or a description whose
 // route was renamed: metadata is a separate list from the
-// registrations, so the two can still fall out of step.
+// registrations.
 //
 // Both directions fail. An undocumented route ships a surface the
 // document denies exists, and an orphaned entry documents a 404.
@@ -149,11 +147,9 @@ func v1Routes(t *testing.T) map[string]bool {
 // routes.go to the full prefix x carries, following the chain up to
 // the app.
 //
-// A flat list of v1.Get calls would need only one receiver name
-// recognised. The surface registers
-// through per-resource groups, because permOn declares its resource on
-// the GROUP - so a checker that cannot resolve a prefix would silently
-// see zero routes and pass while describing nothing.
+// The surface registers through per-resource groups, because permOn
+// declares its resource on the GROUP - so a checker that cannot resolve
+// a prefix would silently see zero routes and pass.
 func groupPrefixes(file *ast.File) map[string]string {
 	prefix := map[string]string{}
 	// Repeat until stable: a group may be declared before the one it
@@ -202,11 +198,8 @@ func groupPrefixes(file *ast.File) map[string]string {
 // groupPath resolves the prefix argument of a Group() call.
 //
 // It is not always a literal: the console's own api is mounted at
-// env.ConsolePath + "/api", because the mount point is defined once
-// and three unrelated places build links from it. A parser that only
-// understood literals silently saw no routes under that group and
-// reported every one of them as an orphaned doc entry - which is how
-// this function came to exist.
+// env.ConsolePath + "/api". A parser that only understood literals
+// would silently see no routes under that group.
 func groupPath(arg ast.Expr) (string, bool) {
 	switch e := arg.(type) {
 	case *ast.BasicLit:
@@ -304,11 +297,9 @@ func routesUnder(t *testing.T, base string, exclude func(full string) bool) map[
 // form routes.go uses - never {name}.
 //
 // The Go generator reads the colon form when it builds a method name
-// and passes anything else through verbatim, so one brace produced
-// `func (c *Client) DeleteAdminCertificates{name}(...)`. That is not a
-// compile error anybody sees in this module: sdk/go is a separate
-// module, and what actually failed was three SQL guards that parse the
-// tree and could no longer parse the client.
+// and passes anything else through verbatim, so a brace lands in a Go
+// identifier. sdk/go is a separate module, so nothing in this one
+// would fail to compile over it.
 func TestDocumentedPathParametersUseTheRouterForm(t *testing.T) {
 	var findings []string
 	for _, r := range openapi.Routes() {

@@ -43,7 +43,7 @@ func CallbackPath(slug string) string {
 // Registry builds and caches a Provider per configured IdP.
 //
 // Discovery is an outbound HTTPS round-trip to the issuer, far too
-// slow to repeat on every sign-in, but providers are now editable at
+// slow to repeat on every sign-in, and providers are editable at
 // runtime so it cannot be done once at startup either. The cache key
 // includes the row's UpdatedAt, so an edit invalidates the entry by
 // construction - there is no way to save a change and keep serving

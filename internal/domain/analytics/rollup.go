@@ -48,13 +48,11 @@ func (s *Store) RecomputeDaily(ctx context.Context, days int) error {
 	// ONE NODE AT A TIME, and the rest skip rather than queue.
 	//
 	// Every node runs every job it registers - there is no leader
-	// election - so on a three node installation this fired three times a
-	// minute apart or, on a restart, together. Two runs then raced: each
-	// DELETEs the window and INSERTs the aggregate, and because a DELETE
-	// takes its snapshot when the statement starts, the second one removed
-	// rows the first had already replaced and then hit the primary key on
-	// re-inserting them. The job logged an error, the transaction rolled
-	// back, and two nodes could deadlock on the same rows.
+	// election - so two runs can overlap. Each DELETEs the window and
+	// INSERTs the aggregate, and because a DELETE takes its snapshot
+	// when the statement starts, the second removes rows the first has
+	// already replaced and then hits the primary key re-inserting them,
+	// or the two deadlock on the same rows.
 	//
 	// A transaction-scoped advisory lock, so it is released on commit or
 	// rollback with nothing to clean up, and TRY rather than wait: this is
@@ -82,13 +80,10 @@ func (s *Store) RecomputeDaily(ctx context.Context, days int) error {
 	// log than that. But retention purges `emails` on its own window, so
 	// a DELETE over the whole recompute span would drop every day the
 	// source no longer covers and then fail to put it back, with nothing
-	// left to count. With a seven day retention and a fifteen day window
-	// that takes the rollup from twenty days to twelve on the first run,
-	// and another eight on every run after. Nothing errors - the chart
-	// just trails off to zero.
+	// left to count. Nothing errors - the chart just trails off to zero.
 	//
 	// So the floor is the oldest row the source still holds. Everything
-	// below it is history that this table is now the only record of.
+	// below it is history that this table is the only record of.
 	var oldest sql.NullTime
 	if err := tx.QueryRowContext(ctx, s.Q(`
         SELECT MIN(created_at) FROM emails WHERE created_at >= ?`), since).Scan(&oldest); err != nil {

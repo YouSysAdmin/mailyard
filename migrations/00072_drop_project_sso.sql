@@ -27,8 +27,8 @@
 --
 -- What replaces it, all of it already present: a provider admits people
 -- by allowed_domains / allowed_emails / require_email_verified, which is
--- the right layer and the answer to a global IdP like Google;
--- auto_register creates the account; and membership comes from an
+-- the right layer and the answer to a global IdP like Google,
+-- auto_register creates the account, and membership comes from an
 -- INVITATION, which is also where the role comes from - so a group in an
 -- IdP is never a privilege grant. An installation that wants SSO only
 -- sets auth.local.enabled=false, which refuses password login outright.

@@ -6,11 +6,10 @@
 // it takes effect without a restart, because a listener resolves its
 // certificate per handshake through a short cache.
 //
-// The page owns the DATA and the reload; each card owns its own writes
-// and says `changed` when it made one. Four of them are separate
-// questions - what the listeners present, what a CA has signed, what the
-// relay fleet trusts, what the installation keeps for itself - and they
-// were one 1500 line file.
+// The page owns the DATA and the reload. Each card owns its own writes
+// and says `changed` when it made one. The four are separate questions:
+// what the listeners present, what a CA has signed, what the relay fleet
+// trusts, what the installation keeps for itself.
 import { ref, computed } from 'vue'
 import {
   certificatesApi,
@@ -244,9 +243,8 @@ void load()
             </thead>
             <tbody>
               <!-- The whole row opens the detail. The fingerprint, the
-                   serial and the exact dates used to sit in the cells and
-                   pushed everything else off the side - they are what you
-                   look at once, not what you scan. -->
+                   serial and the exact dates are what you look at once,
+                   not what you scan, so they live there. -->
               <tr v-for="c in assignable" :key="c.name" class="row-clickable" @click="detail = c">
                 <td>
                   <strong>{{ c.name }}</strong>
@@ -282,9 +280,8 @@ void load()
                     {{ c.used_by.join(', ') }}
                   </span>
                   <!-- Assigned to a listener that does not terminate TLS.
-                       Shown as a warning rather than as "in use", which is
-                       what this cell used to claim while openssl showed
-                       the listener speaking plaintext. -->
+                       A warning rather than "in use": the listener speaks
+                       plaintext. -->
                   <span
                     v-else-if="c.dormant?.length"
                     class="badge badge-warning"

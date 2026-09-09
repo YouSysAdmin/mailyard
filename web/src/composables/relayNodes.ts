@@ -2,12 +2,9 @@
 //
 // There are two of them - the platform's listing under Admin and a
 // project's own under Infrastructure - showing the same machines to
-// different readers, and everything below was written out on both.
-//
-// The three were written out twice, once per page, identical apart from
-// the api object and one word in a success message. They are the same
-// three decisions either way: a node either may carry mail or may not,
-// and removing one costs it its certificate.
+// different readers. The three writes are the same three decisions on
+// both: a node either may carry mail or may not, and removing one costs
+// it its certificate.
 //
 // The API object is passed in rather than chosen here. A project admin
 // acts through their own project's routes and a platform admin through
@@ -83,7 +80,7 @@ export function useRelayNodeActions(
   }
 
   // The only one that asks first. Approving and suspending are both
-  // reversible from this page; this one is not - the node loses its
+  // reversible from this page. This one is not - the node loses its
   // certificate and has to enrol again.
   async function remove(node: RelayNode) {
     const ok = await confirm({
@@ -104,11 +101,10 @@ export function useRelayNodeActions(
  * The MX record set to publish for the domains whose mail should reach
  * these nodes.
  *
- * Shared because the FORMAT is a correctness detail and it was written
- * on both pages: the trailing dot makes the name absolute, and the equal
- * priorities are the point - the nodes are interchangeable and a sender
- * picking either is the redundancy. Changed on one page only, the two
- * would print different records for the same machines.
+ * Shared because the FORMAT is a correctness detail: the trailing dot
+ * makes the name absolute, and the equal priorities are the point - the
+ * nodes are interchangeable and a sender picking either is the
+ * redundancy.
  */
 export function mxRecordFor(hosts: string[]): string {
   return hosts.map((h) => `IN MX 10 ${h}.`).join('\n')

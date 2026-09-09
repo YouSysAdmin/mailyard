@@ -4,13 +4,10 @@ import { ref, computed, watch } from 'vue'
 //
 // A `datetime-local` input has no empty state a person can aim for:
 // it opens showing a mask, and clearing it back to nothing once
-// something has been typed is fiddly in every browser. So "leave it
-// empty for a key that never expires" asked for a gesture the control
-// does not really offer, and the safe outcome - a key that lives
-// forever - was the one you got by doing nothing.
-//
-// Now it is a decision. The field opens one day ahead, and a key that
-// should outlive that says so out loud.
+// something has been typed is fiddly in every browser. So a key that
+// never expires is a DECISION, not what you get by doing nothing: the
+// field opens one day ahead, and a key that should outlive that says
+// so out loud.
 const DEFAULT_DAYS = 1
 
 // datetime-local wants `YYYY-MM-DDTHH:mm` in LOCAL time, which is

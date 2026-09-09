@@ -28,10 +28,10 @@ import (
 // itself, with no way to hand it a Cache. That is the whole reason
 // these lines exist.
 //
-// A directory cost this: with ACME every node ordered its own
+// A directory is per node. With ACME every node would order its own
 // certificate, and Let's Encrypt allows five duplicates a week, so the
-// sixth node served no TLS. Self-signed, every node generated a
-// different pair, so a client reaching two nodes saw two certificates
+// sixth node serves no TLS. Self-signed, every node would mint a
+// different pair, so a client reaching two nodes sees two certificates
 // under one name - which is what pinning a fingerprint is meant to
 // detect.
 //
@@ -219,8 +219,6 @@ func (b *Builder) Order(host string) error {
 		// Discarding the manager is what makes the retry a retry. The
 		// account key lives in the shared cache, so nothing re-registers,
 		// and any certificate already issued is re-read from there.
-		//
-		// Found by pressing the button twice.
 		b.forgetManager()
 
 		return err
@@ -274,10 +272,8 @@ func (b *Builder) Renew(ctx context.Context, host string) error {
 func selfSignedHosts(fqdn string) []string {
 	fqdn = strings.TrimSpace(fqdn)
 	// Empty AND the case where the operator's own name IS localhost,
-	// which a scratch instance has. Appending it a second time put
-	// "DNS:localhost, DNS:localhost" in the SAN list of every generated
-	// pair on such an installation - harmless, and it reads as a bug to
-	// anybody running openssl on it.
+	// which a scratch instance has, so the SAN list never carries
+	// localhost twice.
 	if fqdn == "" || strings.EqualFold(fqdn, "localhost") {
 		return []string{"localhost"}
 	}

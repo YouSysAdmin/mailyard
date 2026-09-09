@@ -18,8 +18,7 @@ export const useProjectStore = defineStore('project', () => {
   // Sent by the server rather than derived from the role in here. A
   // second copy of the presets in TypeScript would be a second thing
   // to keep true, and the copy that drifts is always the one that
-  // enforces nothing - so the menu would start offering pages the API
-  // refuses, which is the failure this replaced.
+  // enforces nothing - the menu would offer pages the API refuses.
   //
   // It decides what is SHOWN and nothing else. Every request is
   // checked again server-side, so editing this in a browser changes a
@@ -29,7 +28,7 @@ export const useProjectStore = defineStore('project', () => {
   //
   // Not "is the set non-empty": a member of a project that names no
   // default role legitimately holds nothing, and keying on emptiness
-  // re-fetched their access on every navigation forever.
+  // would re-fetch their access on every navigation forever.
   const accessFor = ref<string | null>(null)
   // What the caller may do in every project they can see, from the list
   // response, keyed by project id.
@@ -92,10 +91,8 @@ export const useProjectStore = defineStore('project', () => {
   // isProjectOwner gates the two controls no permission can express:
   // deleting the project and rewriting its single sign-on policy.
   //
-  // It replaced isProjectAdmin, which also gated the destructive
-  // DELETE buttons back when read/write could not say "may edit but
-  // not remove". Those ask can() for the resource's delete action
-  // now, and reaching for ownership instead would put a control
+  // Not for DELETE buttons: those ask can() for the resource's delete
+  // action, and reaching for ownership instead would put a control
   // behind a tier the server happily lets a role hold.
   const isProjectOwner = computed(() => {
     const auth = useAuthStore()
@@ -169,15 +166,10 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   // Everything above belongs to one account, so it goes when the account
-  // does.
-  //
-  // clear() existed from the beginning and NOTHING CALLED IT. Signing out
-  // dropped the user and the stored project id and left this store whole:
-  // `loaded` stayed true so the next person never fetched their own list,
-  // `accessFor` stayed so their permissions were never resolved, and
-  // `currentProjectId` stayed in memory so pages asked for a project they
-  // were not a member of. An administrator signing out and a member
-  // signing in got the administrator's menu and a 400 per page.
+  // does. Left whole, `loaded` would keep the next person from fetching
+  // their own list, `accessFor` would keep their permissions unresolved,
+  // and `currentProjectId` would ask for a project they are not a member
+  // of.
   //
   // Watched here rather than called from the auth store: this store
   // already imports that one, and the reverse edge would be a cycle

@@ -81,10 +81,9 @@ async function onFile(e: Event) {
 
 <template>
   <BaseModal title="Import subscribers" @close="emit('close')">
-    <!-- The stylesheet's own tab strip. These were three button classes
-         deep - `btn btn-secondary btn-sm` with a bound `btn-primary`
-         layered on top - so the chosen one carried two variants at once
-         and which won came down to the order rules appear in. -->
+    <!-- The stylesheet's own tab strip, not buttons with a bound
+         variant class: two variant classes on one element are decided
+         by rule order. -->
     <div class="tabs">
       <button class="tab" :class="{ active: mode === 'json' }" @click="mode = 'json'">JSON</button>
       <button class="tab" :class="{ active: mode === 'csv' }" @click="mode = 'csv'">CSV</button>

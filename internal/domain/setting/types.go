@@ -64,12 +64,6 @@ type SettingItem struct {
 	ManagedAt string `json:"managed_at,omitempty"`
 	ManagedIn string `json:"managed_in,omitempty"`
 
-	// Edition names a build this key only does something in, absent
-	// when it is both. The console compares it with what /auth/info
-	// reports and renders a control that governs nothing as a value
-	// plus the reason, rather than as a switch.
-	Edition string `json:"edition,omitempty"`
-
 	// Absent until somebody writes the key, which is what tells a
 	// choice from an untouched default.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`

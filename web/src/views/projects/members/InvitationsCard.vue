@@ -165,11 +165,9 @@ async function revoke(inv: ProjectInvitation) {
       @submit="create"
       @close="showCreate = false"
     >
-      <!-- It does NOT say invitations are never emailed, which is what
-           it used to: whether one is sent depends on whether platform
-           mail is configured, and the link dialog two steps later
-           reports what actually happened. A flat "not emailed" was
-           contradicted by that dialog on any install with mail set up. -->
+      <!-- It does NOT say whether the invitation is emailed: that
+           depends on whether platform mail is configured, and the link
+           dialog two steps later reports what actually happened. -->
       <FormField
         label="Email Address"
         :error="errors.email"

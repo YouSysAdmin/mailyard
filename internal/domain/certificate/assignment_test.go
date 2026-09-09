@@ -231,12 +231,10 @@ func upload(t *testing.T, h *Handler, name, certPEM, keyPEM string) int {
 // underneath.
 //
 // This test drives the write path rather than the guard function, since
-// a guard that is correct but unreachable protects nothing.
-// It returned a lone error, and response.* writes the status and
-// returns NIL - so the refusal was nil, the caller's `!= nil` never
-// fired, and this upload answered 201. It was found by pressing the
-// button on a live instance, which is one round trip too many. Same
-// trap as verifySession, passkeySelf and enrolmentScope.
+// a guard that is correct but unreachable protects nothing: response.*
+// writes the status and returns NIL, so a guard returning a lone error
+// would have the caller's `!= nil` never fire and the upload answer
+// 201. Same contract as verifySession, passkeySelf and enrolmentScope.
 func TestAnAuthorityCannotBeUploadedOverWhatAListenerServes(t *testing.T) {
 	h, certs := testHandler(t, "edge")
 	caCert, caKey := caPair(t)
@@ -355,13 +353,9 @@ func TestAnOrdinaryCertificateIsStillReplaceable(t *testing.T) {
 // A listener that does not terminate TLS is not serving anything,
 // whatever the assignment says.
 //
-// This is the bug the whole TLS rework started from. All three TLS
-// blocks in a reported configuration were `{mode: none}`, an
-// administrator assigned a certificate in the console, and three things
-// then disagreed: the page said in use, `openssl s_client` showed no TLS
-// at all, and the delete was refused on the strength of the assignment.
-// The assignment being inert is correct - the config decides whether
-// there is a handshake - but claiming otherwise is not.
+// An assignment to a listener with TLS off is recorded and inert - the
+// config decides whether there is a handshake - and the page and the
+// delete check must say so rather than claim the certificate is in use.
 func TestAnAssignmentToAPlaintextListenerIsNotInUse(t *testing.T) {
 	h, certs := handlerWithTLS(t, "edge", false)
 	cert, key := leafPair(t)

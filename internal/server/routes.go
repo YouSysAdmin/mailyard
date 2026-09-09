@@ -164,8 +164,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 		perMinute(rt, rt.Config.RateLimit.SESWebhookPerMinute, nil), sesh.Receive)
 
 	// Relay node enrolment, and the one authority the console-facing
-	// relay routes below share with it. Minting the CA on first use, so
-	// two concurrent enrolments cannot each generate one.
+	// relay routes below share with it. The CA is minted on first use,
+	// so two concurrent enrolments cannot each generate one.
 	relayCA := registerRelayEnrolment(app, rt)
 
 	// The console's own api, beside the console it belongs to: the
@@ -508,8 +508,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	ssh := &smtpserver.SharedHandler{Runtime: rt}
 	// Relay node administration and a project's own nodes.
 	//
-	// Registered unconditionally, unlike the enrolment endpoints above.
-	// Those are gated on relay_nodes.enabled because they are PUBLIC -
+	// Registered unconditionally, unlike the enrolment endpoints in
+	// routes_relay.go. Those are gated on relay_nodes.enabled because they are PUBLIC -
 	// an unused public surface is one nobody watches. These sit behind
 	// requireAdmin and requireProject, so that reasoning does not
 	// apply, and gating them meant a console menu entry that answered
@@ -1012,11 +1012,8 @@ func specHandler(build func() ([]byte, error)) fiber.Handler {
 //
 // The segment check is the whole point. Fiber's Use matches a raw string
 // prefix, so `/app/api` also matches `/app/api-keys` - which is a
-// console PAGE. Clicking to it inside the SPA worked, because that is
-// client-side routing and never asks the server, so the failure showed
-// up only on a reload or a shared link: `{"error":"not found"}` where
-// the API Keys page should have been. Found by fetching every console
-// path in a browser and reading the status codes.
+// console PAGE, and a reload or a shared link to it would get
+// `{"error":"not found"}`.
 func apiNotFound(prefix string) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		path := c.Path()

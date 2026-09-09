@@ -1,10 +1,6 @@
-// WHICH COLOUR A STATUS IS, decided once.
-//
-// This was ten copies of the same switch across ten views. Three of them
-// (Emails, EmailDetail, Dashboard) were byte for byte identical, and the
-// rest were the same shape over a different vocabulary - so a status
-// added to the API meant finding every copy, and a colour changed in one
-// place meant the same badge reading differently on two pages.
+// WHICH COLOUR A STATUS IS, decided once, so a status added to the API
+// is added in one place and the same badge reads the same on every
+// page.
 //
 // The vocabularies are kept APART rather than merged into one table,
 // because they disagree: a campaign message that is `pending` is neutral
@@ -56,8 +52,7 @@ const scopes: Record<StatusScope, Record<string, string>> = {
   },
 }
 
-// An unknown status is a bare badge rather than a guess. That is what
-// every copy of the switch did, and it is the right answer: a status this
+// An unknown status is a bare badge rather than a guess: a status this
 // build has never heard of is one the server added, and colouring it as
 // success or danger would be inventing a meaning for it.
 export function statusBadgeClass(status: string, scope: StatusScope): string {

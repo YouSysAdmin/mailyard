@@ -157,10 +157,10 @@ onMounted(load)
                      cleartext when the call is HTTPS. -->
                 <span v-else class="text-muted">over the provider API</span>
               </td>
-              <!-- A count, not the list. The list was one cell holding an
-                   unbounded number of names, so the column was sized by
-                   whichever server had the most - the full names stay one
-                   hover away, and the Edit dialog is where they are set. -->
+              <!-- A count, not the list: a cell holding an unbounded
+                   number of names sizes the column by whichever server
+                   has the most. The full names stay one hover away, and
+                   the Edit dialog is where they are set. -->
               <td>
                 <span v-if="!srv.allowed_domains?.length" class="text-muted">Any</span>
                 <span v-else :title="srv.allowed_domains.join(', ')">

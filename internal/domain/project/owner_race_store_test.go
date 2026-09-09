@@ -66,14 +66,12 @@ func ownerCount(t *testing.T, s *Store, ctx context.Context, projID string) int 
 // is worse than no test, because it reads as proof.
 //
 // So instead: a peer transaction locks the other owner's row, and
-// removing this one must then BLOCK. That is the discriminating shape,
-// and getting there took two wrong turns worth recording - locking the
-// TARGET row blocks both versions, because a DELETE locks its own row
-// anyway. What separates them is the row the RULE counts: the old guard
-// read it through the snapshot and sailed past a held lock, answering
-// immediately, which is exactly how two concurrent removals could each
-// believe the other owner was still there and leave the project with
-// none.
+// removing this one must then BLOCK. Locking the TARGET row would not
+// discriminate, because a DELETE locks its own row anyway. What
+// separates a guard that locks from one that reads through the
+// snapshot is the row the RULE counts - two concurrent removals each
+// reading it unlocked can both believe the other owner is still there
+// and leave the project with none.
 func TestAnOwnerMutationWaitsForTheOwnerRows(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
@@ -84,9 +82,9 @@ func TestAnOwnerMutationWaitsForTheOwnerRows(t *testing.T) {
 	projID, a, b := twoOwners(t, s, ctx)
 
 	// Hold the other owner's row - deliberately not the one being
-	// removed. Locking the target would block either version, since a
-	// DELETE takes a lock on its own row: it is the rows the RULE counts
-	// that the old guard read without locking.
+	// removed. Locking the target would block any version, since a
+	// DELETE takes a lock on its own row: it is the rows the RULE
+	// counts that must be read under lock.
 	tx, err := peer.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin peer tx: %v", err)
@@ -205,8 +203,8 @@ func TestDeletingARoleWaitsForTheProjectRow(t *testing.T) {
 	// functional paths are covered sequentially in role_store_test.go.
 }
 
-// The ordinary rules still hold, or the lock would have replaced a race
-// with a refusal that never lifts.
+// The ordinary rules still hold under the lock: the last owner is
+// refused, and every other mutation goes through.
 func TestTheLastOwnerIsStillRefusedAndTheRestStillWork(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)

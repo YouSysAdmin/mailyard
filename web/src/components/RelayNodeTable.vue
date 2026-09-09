@@ -1,13 +1,10 @@
 <script setup lang="ts">
 // The relay-node listing, wherever it is being read.
 //
-// TWO pages show it and they were 60% the same file, down to the same
-// name in two directories: a project's own nodes under Infrastructure,
-// and every node on the installation under Admin. What they actually
-// differ in is small - who may approve what, and one extra line marking
-// a tenant's node - and it was buried under eighty lines of identical
-// markup that had already started to drift. Last seen said "5 min ago"
-// here and "5m ago" in the notification bell for the same interval.
+// TWO pages show it: a project's own nodes under Infrastructure, and
+// every node on the installation under Admin. What they differ in is
+// small - who may approve what, and one extra line marking a tenant's
+// node.
 //
 // It renders rows and raises intent. The WRITES stay with each page,
 // because they go to different endpoints: a project admin approves
@@ -21,7 +18,7 @@ const props = defineProps<{
   /** The node whose request is in flight, so its buttons go quiet. */
   busy: string
   /**
-   * Whether to offer the actions at all. The platform page always does;
+   * Whether to offer the actions at all. The platform page always does,
    * a project page offers them to a member holding smtp:write.
    */
   canEdit: boolean

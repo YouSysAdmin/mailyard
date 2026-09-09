@@ -34,10 +34,6 @@ const spfInclude = ref('')
 const mxHosts = ref<string[]>([])
 const autoApprove = ref(false)
 const enabled = ref(true)
-// Whether this build carries relay nodes, which is a different question
-// from whether the operator switched them on. Optimistic until the
-// server answers, like enabled above.
-const available = ref(true)
 const loading = ref(true)
 
 // Only the platform's own nodes are this page's decision. A tenant's
@@ -51,7 +47,6 @@ async function load() {
     const res = await relayNodesApi.list()
     nodes.value = res.data.relay_nodes ?? []
     enabled.value = res.data.enabled ?? false
-    available.value = res.data.available ?? false
     spfInclude.value = res.data.spf_include ?? ''
     mxHosts.value = res.data.mx_hosts ?? []
     autoApprove.value = res.data.auto_approve ?? false
@@ -118,11 +113,9 @@ onMounted(load)
       <div class="card-header">
         <div>
           <h2>Nodes</h2>
-          <!-- What a node is, in both editions. The how-to naming the
-               enrolment token moved into the empty state below, which
-               only renders once the server has answered - up here it
-               rendered optimistically and then vanished, explaining
-               enrolment to a reader whose build has none. -->
+          <!-- What a node is. The how-to naming the enrolment token
+               lives in the empty state below, which only renders once
+               the server has answered. -->
           <p class="text-sm text-muted">
             Machines that enrolled themselves and deliver straight to recipient mail exchangers.
             They are not created here.
@@ -131,20 +124,6 @@ onMounted(load)
       </div>
 
       <LoadingBlock v-if="loading" />
-
-      <!-- Before the not-enabled state: both answer an empty table and
-           only one of them can be true. The keys named below are a boot
-           failure on a community build, not a step to take. -->
-      <EmptyState v-else-if="!available" title="Enterprise edition">
-        <p>
-          Relay nodes are not available in the community edition, which this installation runs. Mail
-          goes out through the SMTP servers a project configures and through the shared pool.
-        </p>
-        <p>
-          Setting <code>relay_nodes.enabled</code> will not turn them on - this binary refuses to
-          start with it set.
-        </p>
-      </EmptyState>
 
       <!-- With the feature off no node can enrol, so an empty list is
            not "none yet" and must not read as one. -->

@@ -44,10 +44,6 @@ import (
 	"github.com/yousysadmin/mailyard/pkg"
 )
 
-// The description is assembled rather than written out, because one of
-// the two groups it introduces exists only in the enterprise build -
-// and a document that describes a prefix this binary does not serve
-// sends a reader looking for routes that are not there.
 var consoleDescription = `What is NOT on the product API, and could not be.
 
 Under ` + "`/app/api`" + `: the browser ceremonies. Signing in, passkeys, the
@@ -55,7 +51,14 @@ second factor, the OIDC round-trip, session management, the caller's
 own security log. An API key is not accepted here and would have
 nothing to do with any of it - these describe how a PERSON proves who
 they are, and they move whenever the sign-in page does.
-` + enrolDescription + `
+
+Under ` + "`/api/relay-nodes`" + `: what a relay node says to the platform.
+Enrolment first, authenticated by a shared token because the node has
+no identity yet, then heartbeat, renewal, delivery outcomes, and the
+mail a node's own MX received. Mounted only where relay_nodes.enabled
+is set. Deliberately unversioned - it is a handshake between our own
+binaries, not an API anybody builds against.
+
 Everything else an installation can do is on the product API
 (` + "`/api/v1`" + `), which the console also calls with its session. Describe
 that one unless you specifically need what is above.`
@@ -63,12 +66,10 @@ that one unless you specifically need what is above.`
 // ConsoleRoutes is every documented endpoint the console talks to,
 // with the FULL path including its prefix.
 //
-// Full paths because the console now spans two of them. The browser
-// ceremonies - signing in, passkeys, the event stream - moved to
-// /app/api, beside the console they belong to, while the product
-// surface is on its way to /api/v1. A document that named one base for
-// both would be describing routes that are not there, which is the
-// exact failure this generator exists to make impossible.
+// Full paths because the console spans two prefixes: the browser
+// ceremonies - signing in, passkeys, the event stream - under /app/api,
+// and the product surface under /api/v1. A document naming one base
+// for both would describe routes that are not there.
 //
 // Assembled from each domain's generated ConsoleDocs, which is what
 // TestEveryConsoleRouteIsDocumented compares against routes.go.

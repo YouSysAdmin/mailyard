@@ -22,11 +22,6 @@ export interface PlatformSetting {
   // server so the console keeps no list of its own.
   managed_at?: string
   managed_in?: string
-  // The build this setting only does something in, when it is not both.
-  // Compared against the edition the server reports on /auth/info: the
-  // key stays stored and settable, but a control that governs nothing
-  // in the running build says so rather than pretending.
-  edition?: string
   updated_at?: string
   updated_by?: string
 }

@@ -51,13 +51,8 @@ type RequestContext struct {
 
 	// ProjectOwner is the one thing about this caller that is not a
 	// permission: they own the project, so they may delete it and
-	// rewrite its SSO policy.
-	//
-	// It replaced ProjectRole, which was a five-value ladder every
-	// gate had to interpret. Two gates ever consulted it in the end -
-	// owner-only acts and four destructive deletes - and the second
-	// group is now permission.ActionDelete, leaving exactly the acts
-	// the catalogue genuinely cannot name.
+	// rewrite its SSO policy - the acts the permission catalogue
+	// cannot name.
 	ProjectOwner bool `json:"project_owner,omitzero"`
 
 	// Permissions is what this caller may do in Project, and it is

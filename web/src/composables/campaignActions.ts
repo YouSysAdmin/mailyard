@@ -1,8 +1,7 @@
 // What can be done to a campaign, from either page that offers it.
 //
-// The list and the detail page both carry all six, written out twice -
-// including three confirmations worded twice, which is three chances for
-// the same act to be described two ways.
+// The list and the detail page both carry all six, and a confirmation
+// is worded once for both.
 //
 // TWO of them genuinely differ and the difference is where the reader
 // ends up, not what happens: duplicating from the list leaves you on the

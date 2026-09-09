@@ -67,9 +67,8 @@ func TestAStoredTemplateResolvesAReservedVariable(t *testing.T) {
 		t.Fatalf("activate: %v", err)
 	}
 
-	// Lenient is false, which is what a transactional send uses and what
-	// made this fail before: a missing key was an error, and the
-	// reserved names were missing keys.
+	// Lenient is false, which is what a transactional send uses: a
+	// missing key is an error, so the reserved names must be injected.
 	svc := &Service{Store: &store.Store{
 		Template:   ts,
 		Stylesheet: stylesheetdomain.NewStore(db),

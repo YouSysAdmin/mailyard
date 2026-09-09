@@ -29,9 +29,7 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "Create",
 			Description: "Needs the `domains:write` permission.",
 			Request:     createInput{},
-			// Created, not OK: the handler answers 201. And a shape at
-			// last - all three of these were documented as returning
-			// nothing while domainPayload was a map.
+			// Created, not OK: the handler answers 201.
 			Responses: []apidoc.Response{apidoc.Created("The result.", DetailResponse{})},
 		},
 		{

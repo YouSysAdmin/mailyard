@@ -24,11 +24,9 @@ func TestNothingElseMintsAnID(t *testing.T) {
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			// A path that vanished between the walk listing it and
-			// this callback. Nothing gitignored is source, and the
-			// dev database churns constantly - this test failed a
-			// gate once on a file Postgres had just deleted under
-			// dev-data, which is a guard reporting an unrelated
-			// outage as a violation.
+			// this callback - the dev database under dev-data churns,
+			// and a guard must not report an unrelated outage as a
+			// violation.
 			if os.IsNotExist(err) {
 				return nil
 			}
@@ -39,8 +37,7 @@ func TestNothingElseMintsAnID(t *testing.T) {
 		if info.IsDir() {
 			switch info.Name() {
 			// dev-data holds the dev Postgres and the blob store. No
-			// Go source, and walking a live database is how the
-			// above happens.
+			// Go source.
 			case "node_modules", "vendor", ".git", "dist", "sdk", "dev-data":
 				return filepath.SkipDir
 			}

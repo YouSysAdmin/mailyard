@@ -1,12 +1,10 @@
 {{- /*
   Callout / admonition box.
 
-  THE TITLE IS RENDERED AS INLINE MARKDOWN rather than as plain text, which
-  is the one place this diverges from the upstream shortcode. These pages
-  carry titles naming a config key or a field - "`trusted` may not be
-  empty", "`acme_enabled` on its own does nothing" - which came over from
-  the Docusaurus admonitions that allowed it, and plain text prints the
-  backticks. Worth upstreaming, since it is a strict superset.
+  THE TITLE IS RENDERED AS INLINE MARKDOWN rather than as plain text.
+  These pages carry titles naming a config key or a field - "`trusted`
+  may not be empty", "`acme_enabled` on its own does nothing" - and plain
+  text prints the backticks.
 
     {{< callout type="warning" >}}
     Body text in **markdown**.
@@ -15,7 +13,7 @@
   type:  note (default) | info | tip | success | warning | danger
          aliases: warn->warning, caution/error->danger, important->info
          (may also be passed positionally: {{< callout warning >}})
-  title: overrides the auto title; pass title="" to hide it
+  title: overrides the auto title, and title="" hides it
   icon:  overrides the auto icon (any name under assets/icons)
 */ -}}
 {{- $type := "note" -}}

@@ -62,10 +62,9 @@ func BinarySchemaVersion() (int64, error) {
 // RequireCurrentSchema refuses a database whose schema is older than
 // the migrations this binary carries.
 //
-// Without it, a node booting without --init only checked that a schema
-// existed at all: an upgraded binary started happily on last month's
-// schema, answered health checks and served pages whose columns did
-// not exist. Fatal for the same reason a refused port bind is - in a
+// Without it an upgraded binary would start on last month's schema,
+// answer health checks and serve pages whose columns do not exist.
+// Fatal for the same reason a refused port bind is - in a
 // rolling upgrade the node with --init applies the schema and the rest
 // boot once it has.
 //

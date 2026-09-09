@@ -81,8 +81,8 @@ func TestASecondCopyOfAMessageIsRefused(t *testing.T) {
 	}
 
 	// The SAME Message-ID over DIFFERENT content is a different
-	// message, not a duplicate. The id used to be a key of its own,
-	// and a stranger who could guess it pre-empted the real message.
+	// message, not a duplicate - otherwise a stranger who can guess
+	// the id pre-empts the real message.
 	other := dedupHash("<abc@sender.test>", "sender@x.test", []string{"in@acme.test"}, "something else", 99)
 	if err := s.Put(ctx, arrived(proj, "<abc@sender.test>", other)); err != nil {
 		t.Fatalf("a different message under a reused Message-ID was refused: %v", err)

@@ -89,8 +89,8 @@ type updateInput struct {
 
 	// Provider is not patchable, deliberately. Switching a live row from
 	// a dial to an API leaves the credentials meaning something else -
-	// an SMTP login read as an access key - and the fields that are now
-	// wrong are the ones a PATCH leaves unchanged. Delete and recreate,
+	// an SMTP login read as an access key - and the fields made wrong
+	// are the ones a PATCH leaves unchanged. Delete and recreate,
 	// which is one action and says what is happening.
 	//
 	// ProviderConfig IS patchable: a region or a configuration set is

@@ -2,11 +2,7 @@
 // One row in a mail client's left pane.
 //
 // The console has two of those - the sandbox and the inbound log - and
-// they are the same act: reading down a list of mail that arrived. The
-// row was written twice and the copies had already drifted in the ways
-// copies do: one clamped the subject to two lines and the other
-// truncated it to one, one offered a delete on hover and the other made
-// you open the message first.
+// they are the same act: reading down a list of mail that arrived.
 //
 // Slotted where they genuinely differ. Inbound carries a status badge -
 // rejected and failed are why somebody opened that page - and the

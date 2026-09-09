@@ -5,8 +5,7 @@
 // visibility flag, so the menu cannot advertise a page that answers
 // 403, nor hide one that would have worked. That is why every entry
 // names a permission rather than a role - a role flag could say
-// "project admin" or "safe for a developer" and nothing between, and
-// everything that fitted neither was shown to everyone.
+// "project admin" or "safe for a developer" and nothing between.
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -36,14 +35,6 @@ export interface NavEntry {
 
   /** `resource:action` the caller must hold. Absent means any member. */
   permission?: string
-
-  /**
-   * Enterprise-only, so the community build leaves it out of the menu.
-   * The ROUTE stays registered in both editions - the page explains
-   * the edition to anyone arriving by bookmark or from the docs - so
-   * this hides the advertisement and nothing else.
-   */
-  enterprise?: boolean
 }
 
 export interface NavGroup {
@@ -163,13 +154,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Domains', path: '/domains', icon: 'globe', permission: 'domains:read' },
       { label: 'SMTP Servers', path: '/smtp-servers', icon: 'server', permission: 'smtp:read' },
       { label: 'Server Groups', path: '/smtp-groups', icon: 'layers', permission: 'smtp:read' },
-      {
-        label: 'Relay Nodes',
-        path: '/relay-nodes',
-        icon: 'radio-tower',
-        permission: 'smtp:read',
-        enterprise: true,
-      },
+      { label: 'Relay Nodes', path: '/relay-nodes', icon: 'radio-tower', permission: 'smtp:read' },
     ],
   },
   {
@@ -228,7 +213,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Identity Providers', path: '/admin/oauth-providers', icon: 'id-card' },
       { label: 'Shared SMTP', path: '/admin/shared-smtp', icon: 'server' },
       { label: 'Certificates', path: '/admin/certificates', icon: 'shield' },
-      { label: 'Relay Nodes', path: '/admin/relay-nodes', icon: 'radio-tower', enterprise: true },
+      { label: 'Relay Nodes', path: '/admin/relay-nodes', icon: 'radio-tower' },
       { label: 'Platform Credentials', path: '/admin/api-keys', icon: 'key' },
       { label: 'Platform Settings', path: '/admin/settings', icon: 'settings' },
     ],
@@ -276,14 +261,7 @@ export function useNavigation() {
   }
 
   function allowed(entry: NavEntry): boolean {
-    if (entry.permission && !projects.can(entry.permission)) return false
-
-    // isCommunity is false while the edition is still unknown, so a
-    // slow /auth/info shows the entry and then removes it, rather than
-    // hiding features on an install that has them.
-    if (entry.enterprise && auth.isCommunity) return false
-
-    return true
+    return !entry.permission || projects.can(entry.permission)
   }
 
   /**

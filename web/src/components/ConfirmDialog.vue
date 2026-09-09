@@ -6,10 +6,8 @@
 // caller awaits an answer and never renders a dialog.
 //
 // The glyph comes from the console's icon map like every other glyph in
-// the product. Three were written out here as inline SVG on Feather's
-// own 24 grid at stroke 2, beside a nav drawn at 18 and stroke 1.5, so
-// the one icon a person sees at the moment of deciding was the one
-// drawn to a different weight from everything around it.
+// the product, so the one icon a person sees at the moment of deciding
+// is drawn to the same weight as everything around it.
 import { computed } from 'vue'
 import { useConfirm } from '../composables/useConfirm'
 import { getIcon } from '../layouts/icons'

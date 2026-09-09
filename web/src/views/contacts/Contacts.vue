@@ -210,10 +210,9 @@ function addAsSubscriber(c: Contact) {
             </thead>
             <tbody>
               <tr v-for="c in contacts" :key="c.id">
-                <!-- Both truncate with the full value on hover: a long
-                     address used to squeeze the name into a one-word
-                     column, and a long name did the same to everything
-                     after it. -->
+                <!-- Both truncate with the full value on hover, so a
+                     long address cannot squeeze the name into a one-word
+                     column, nor a long name everything after it. -->
                 <td class="cell-title truncate w-search" :title="c.email">{{ c.email }}</td>
                 <td class="truncate w-filter" :title="c.name">{{ c.name || '-' }}</td>
                 <td class="text-right">{{ c.sent_count }}</td>

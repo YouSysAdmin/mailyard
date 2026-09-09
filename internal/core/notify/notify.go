@@ -35,8 +35,7 @@ type Raiser struct {
 	Log   *slog.Logger
 
 	// Alerts mails the ones that mean something is wrong. Optional: a
-	// nil Alerter leaves the notification in the console only, which is
-	// how this worked before there was any mail at all.
+	// nil Alerter leaves the notification in the console only.
 	Alerts Alerter
 }
 

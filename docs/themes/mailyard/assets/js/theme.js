@@ -1,7 +1,7 @@
 // Theme behavior: the mobile nav drawer, the dark/light toggle, and the "On this
 // page" TOC scrollspy. Shipped as a deferred bundle, so the DOM is parsed before
 // this runs. The initial theme is resolved by a separate inline script in <head>
-// (no flash); this only handles user interaction. Each block self-guards, so it is
+// (no flash). This only handles user interaction. Each block self-guards, so it is
 // a no-op on pages that lack the relevant elements.
 
 // Mobile navigation drawer.

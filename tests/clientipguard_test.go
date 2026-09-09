@@ -22,13 +22,12 @@ var readsPeerAddress = regexp.MustCompile(`\bc\.IPs?\(\)`)
 // TestNothingElseAsksWhichAddressIsTheCaller keeps the answer in one
 // place.
 //
-// It was in forty-four, and they did not agree. The address reached an api
-// key's ip allowlist, a per-ip rate bucket, the audit trail and every
-// access log line, and behind two proxies Fiber's reader returned the
-// whole header - "203.0.113.9, 10.0.0.7" - so the allowlist refused every
-// key and the rate bucket took a key the caller had chosen. Turning on
-// Fiber's ip validation only changes which end is wrong: it returns the
-// first VALID entry, which a caller sets by sending the header itself.
+// The address reaches an api key's ip allowlist, a per-ip rate bucket,
+// the audit trail and every access log line. Behind two proxies Fiber's
+// reader returns the whole header - "203.0.113.9, 10.0.0.7" - so the
+// allowlist refuses every key, and Fiber's ip validation only changes
+// which end is wrong: it returns the first VALID entry, which a caller
+// sets by sending the header itself.
 //
 // So internal/core/clientip walks the header from the RIGHT, stopping at
 // the first address none of our own proxies wrote, and it is the only

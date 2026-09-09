@@ -17,8 +17,8 @@ import (
 )
 
 // newClaimStore runs the real migrations rather than a copy of the
-// emails table. The copy drifted the first time a column was added
-// elsewhere, and the failure surfaced as a column-does-not-exist deep
+// emails table. A copy drifts the first time a column is added
+// elsewhere, and the failure surfaces as a column-does-not-exist deep
 // inside an unrelated suite.
 //
 // emails.project_id has a foreign key, so a project row has to exist

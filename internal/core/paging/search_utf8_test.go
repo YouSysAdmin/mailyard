@@ -30,9 +30,9 @@ func searchOf(t *testing.T, raw string) string {
 	return got
 }
 
-// A two-byte script is the case the OLD code got right by luck: 200 is
-// a multiple of 2, so the byte cut landed on a boundary. Kept so the
-// rune cut is exercised on more than the one width that used to break.
+// A two-byte script: 200 is a multiple of 2, so a byte cut would land
+// on a boundary by luck. The rune cut has to hold on more than one
+// width.
 func TestALongTwoByteTermStaysValidUTF8(t *testing.T) {
 	long := strings.Repeat("\u0436", 400)
 	got := searchOf(t, long)
@@ -46,11 +46,11 @@ func TestALongTwoByteTermStaysValidUTF8(t *testing.T) {
 	}
 }
 
-// three bytes is the width that actually broke: 200 is not a multiple
-// of 3, so the old byte cut split the last character and produced
-// invalid UTF-8, which Postgres refuses with 22021 - not the 22P02 that
+// Three bytes is the width a byte cut breaks: 200 is not a multiple of
+// 3, so cutting bytes splits the last character and produces invalid
+// UTF-8, which Postgres refuses with 22021 - not the 22P02 that
 // response.Internal turns into a 404. CJK and most scripts above U+07FF
-// are three bytes, so search failed for those users and nobody else.
+// are three bytes, so search would fail for those users and nobody else.
 func TestALongThreeByteTermStaysValidUTF8(t *testing.T) {
 	got := searchOf(t, strings.Repeat("\u5b57", 400))
 

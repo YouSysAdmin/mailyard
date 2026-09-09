@@ -2,9 +2,9 @@
 // What an existing key is and what it can reach.
 //
 // A RECORD, not a form with every control greyed out. Nothing here is
-// editable - a key's reach is fixed at creation - so reading it back as
-// disabled inputs was showing a shape that invited an edit and then
-// refused it. The permissions stay a grid, because a matrix is how they
+// editable - a key's reach is fixed at creation - and disabled inputs
+// are a shape that invites an edit and then refuses it. The
+// permissions stay a grid, because a matrix is how they
 // are chosen and how they are best read.
 import { computed } from 'vue'
 import type { APIKey, PermissionResource } from '../../api/types'

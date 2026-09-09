@@ -8,16 +8,12 @@
 //
 // Refitted rather than imported: Feather is drawn on a 24 viewBox at
 // stroke 2, and this set is 18 at stroke 1.5. Some are the same shape
-// scaled by exactly 0.75 (send, users); others needed their geometry
-// adjusted, because a straight scale loses a shape at this size: `key`
-// came through as a lollipop - ring, diagonal stub, stray tick - and had
-// to be redrawn from its own geometry.
+// scaled by exactly 0.75 (send, users). Others need their geometry
+// adjusted, because a straight scale loses a shape at this size.
 //
-// Pasted rather than depended on, and that is the deliberate part:
-// @mdi/font was a dependency once, nothing used a single mdi- class,
-// and it shipped 3.6 MB of webfont into the binary - HALF the bundle,
-// which went from 7.1 MB to 3.4 MB when it went. Inline SVG for the
-// 36 glyphs actually used costs a few kilobytes.
+// Pasted rather than depended on: an icon font ships megabytes into
+// the binary, where inline SVG for the glyphs actually used costs a few
+// kilobytes.
 //
 // Adding one means matching the grid - 18x18 viewBox, 1.5 stroke,
 // currentColor, round caps - or it reads as a different weight beside

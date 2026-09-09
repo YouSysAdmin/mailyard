@@ -2,10 +2,7 @@
 // The distinguished name on a certificate about to be minted.
 //
 // Six fields, and both dialogs that mint something ask for all six in
-// the same order - so they were the same fifty lines of markup twice,
-// differing only in an id prefix and one placeholder. The two that gave
-// them away: `subject.locality` is labelled City in both, and only one
-// of them said the whole block was optional.
+// the same order.
 //
 // It is optional. An empty Subject is a real answer - the server falls
 // back to the first host for a certificate and to the name for an

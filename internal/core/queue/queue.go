@@ -55,7 +55,7 @@ type Outcome struct {
 	//
 	// It has to come back through here because the winner is a local
 	// in the failover loop and nothing outside the processor can know
-	// it - which is exactly why it went unrecorded until now.
+	// it.
 	ServerID string
 }
 

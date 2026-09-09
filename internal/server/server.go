@@ -136,8 +136,8 @@ func New(opts Options) (*Server, error) {
 		Concurrency: concurrencyFor(opts.Runtime.Config),
 
 		// 8 KiB rather than fasthttp's 4 KiB. Our own session cookie is
-		// a 369-byte JWT (measured, on an account with one project),
-		// and it arrives alongside whatever else the browser has for
+		// a 369-byte JWT, and it arrives alongside whatever else the
+		// browser has for
 		// the origin plus the headers each proxy hop adds. Past the
 		// buffer fasthttp answers 431 before any handler runs, which
 		// reads as the site being broken for one person and fine for
@@ -223,8 +223,7 @@ func concurrencyFor(cfg *env.Config) int {
 // fasthttp sets the write deadline ONCE, after the handler returns and
 // before it writes the response, and a streamed body is written under
 // that one deadline - so the app-wide WriteTimeout is not a per-write
-// budget for a stream, it is the stream's whole lifetime. Measured: at
-// WriteTimeout 2s a stream writing every 500ms was cut at 2.0s exactly.
+// budget for a stream, it is the stream's whole lifetime.
 //
 // The feed recycles itself at eventstream.MaxStreamLife, so this only has
 // to sit above that. Derived from it rather than written down, because
@@ -246,8 +245,8 @@ const apiBodyLimit = 8 * 1024 * 1024
 // Everything else gets apiBodyLimit or, off the API, baseBodyLimit.
 //
 // Exported for the guard in tests/ that asks the router whether each
-// entry still names a route - an entry nobody matches is a route that
-// has been renamed out from under its ceiling and now answers 413.
+// entry still names a route - an entry nobody matches is a route
+// renamed out from under its ceiling, answering 413.
 var LargeBodyPaths = []string{
 	"/api/v1/emails/send",
 	"/api/v1/emails/send-template",
@@ -256,8 +255,9 @@ var LargeBodyPaths = []string{
 	// A template export bundle carries every version, each up to a
 	// template's own size.
 	"/api/v1/templates/import",
-	// Enterprise only, but a path is a string and the community binary
-	// has no route here, so the entry costs it nothing.
+	// Mounted only where relay_nodes.enabled is set, but a path is a
+	// string and an installation with no route here pays nothing for
+	// the entry.
 	"/api/relay-nodes/inbound",
 }
 

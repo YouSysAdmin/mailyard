@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// The ipcidr tag replaced a hand-rolled check in two handlers. If it
-// were never registered, validator would fail open on an unknown tag
-// name in some configurations and those handlers would stop checking
-// their input entirely - so assert both directions.
+// If the ipcidr tag were never registered, validator would fail open
+// on an unknown tag name in some configurations and the handlers using
+// it would stop checking their input entirely - so assert both
+// directions.
 func TestIPCIDRTag(t *testing.T) {
 	v := Init()
 

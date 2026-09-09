@@ -48,9 +48,9 @@ export const auditApi = {
   // Account activity. `all` is honored only for platform admins.
   //
   // On appApi, not api: the security log is a browser ceremony - who
-  // signed in, from where, and whether it worked - so it stayed on
-  // /app/api when the product surface moved to /api/v1. The project
-  // audit trail above it is a product operation and did move.
+  // signed in, from where, and whether it worked - so it lives on
+  // /app/api. The project audit trail above it is a product operation
+  // and lives on /api/v1.
   securityLog: (limit = 50, offset = 0, all = false) =>
     appApi.get<{ events: AuditEvent[]; limit: number; offset: number }>('/security-log', {
       params: { limit, offset, ...(all ? { all: 'true' } : {}) },

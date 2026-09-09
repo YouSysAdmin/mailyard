@@ -3,9 +3,8 @@
 //
 // Both exports in this console are DOCUMENTS rather than streams: the
 // server answers in the same JSON envelope as every other endpoint and
-// the page builds the file. That was written twice - the project data
-// export and now the audit log - and the blob/objectURL/revoke dance is
-// exactly the kind of thing where the second copy forgets to revoke.
+// the page builds the file. One copy of the blob/objectURL/revoke dance,
+// so nothing forgets to revoke.
 
 // downloadText saves text as a file with the given name.
 export function downloadText(filename: string, mime: string, text: string) {

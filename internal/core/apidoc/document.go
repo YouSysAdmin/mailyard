@@ -28,13 +28,9 @@ type Route struct {
 
 	// Permission is the `resource:action` the route requires,
 	// rendered into the description so a reader does not have to look
-	// it up.
-	//
-	// It was Scope, naming one of seven strings that no longer exist -
-	// and 35 operations went on publishing "requires scope read" to
-	// every integrator who downloaded this document, because nothing
-	// checked the PROSE against what the router enforces. That is what
-	// TestDocumentedPermissionsMatchTheRouter is for.
+	// it up. TestDocumentedPermissionsMatchTheRouter checks it against
+	// what the router enforces, because a reader provisions a
+	// credential from this sentence.
 	Permission string
 
 	Query      []Param

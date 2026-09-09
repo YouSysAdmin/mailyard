@@ -116,14 +116,8 @@ type UserResponse struct {
 
 // AuthDisabledResponse is the answer on an install running with
 // authentication switched off entirely.
-//
-// It carries the edition too, because /auth/info answers with this
-// shape when auth.disabled is set and the console reads the edition
-// from that call either way. Without it a console on such an install
-// learns nothing about which build it is talking to.
 type AuthDisabledResponse struct {
-	AuthDisabled bool   `json:"auth_disabled"`
-	Edition      string `json:"edition"`
+	AuthDisabled bool `json:"auth_disabled"`
 }
 
 // RegisterPendingResponse is returned when self-registration created
@@ -151,21 +145,7 @@ type MessageResponse struct {
 // passkey flag says whether the install offers passkeys at all - never
 // whether a particular account has one, which would be an oracle.
 type AuthInfoResponse struct {
-	// Edition is which build this is - "community" or "enterprise".
-	//
-	// It sits on this endpoint because this is already the "what does
-	// this installation offer" answer, it is the first call the console
-	// makes, and it is reachable before anyone has signed in. The
-	// alternative was a capability endpoint of its own, which is a
-	// second thing to keep in step with the first.
-	//
-	// The console bundle is identical in both editions - it is public
-	// source either way - so every difference a reader sees is a
-	// runtime branch on this one string. Nothing is GATED on it: the
-	// gate is the absent code, and a page reading this only knows
-	// whether to explain itself.
-	Edition      string `json:"edition"`
-	LocalEnabled bool   `json:"local_enabled"`
+	LocalEnabled bool `json:"local_enabled"`
 
 	// OIDCEnabled is a convenience: true when Providers is non-empty,
 	// so a template does not have to reason about an empty array.
@@ -254,9 +234,8 @@ type RecoveryCodesStatusResponse struct {
 //
 // A declared shape for something deliberately opaque. The handler returns
 // go-webauthn's own CredentialCreation / CredentialAssertion, which
-// marshal to `{"publicKey": {...}}` - and both routes were documented as
-// returning nothing at all, so a reader could not tell there was a body,
-// let alone that it goes straight to a browser API.
+// marshal to `{"publicKey": {...}}`, and the document has to say that a
+// body comes back and that it goes straight to a browser API.
 //
 // publicKey is a free-form object on purpose. Its contents are the
 // WebAuthn spec's, not ours: reflecting the library's struct would paste

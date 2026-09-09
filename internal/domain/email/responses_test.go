@@ -10,16 +10,10 @@ import (
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
 )
 
-// These response bodies were fiber.Map literals until the OpenAPI
-// document started being reflected from types. Converting them was a
-// rename of every key in every body, and a key that changed spelling
-// silently breaks every client without failing a single existing test.
-//
-// So the wire form is pinned here. The live comparison against the
-// previous binary covered fourteen endpoints, but not the email log:
-// exercising it needs an accepted send, which needs a verified domain
-// and a resolvable server. This does the same job deterministically,
-// and unlike that comparison it keeps doing it.
+// The wire form of the email log's response bodies, pinned: a key
+// that changes spelling silently breaks every generated client
+// without failing a single other test, and exercising the log live
+// needs an accepted send, a verified domain and a resolvable server.
 func TestResponseKeysAreStable(t *testing.T) {
 	sent := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
 	e := &emailmodel.Email{ID: "9e2f6f11-cdd3-4058-86f2-29f3ad60b06a", Status: emailmodel.StatusSent, Attempts: 2}

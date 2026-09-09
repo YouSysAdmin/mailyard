@@ -944,7 +944,6 @@ type ListOutput struct {
 	MXHosts     []string   `json:"mx_hosts"`
 	AutoApprove bool       `json:"auto_approve"`
 	Enabled     bool       `json:"enabled"`
-	Available   bool       `json:"available"`
 }
 
 // ListResponse is the response body.
@@ -1583,7 +1582,6 @@ type SettingItem struct {
 	Unit        string     `json:"unit,omitempty"`
 	ManagedAt   string     `json:"managed_at,omitempty"`
 	ManagedIn   string     `json:"managed_in,omitempty"`
-	Edition     string     `json:"edition,omitempty"`
 	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 	UpdatedBy   string     `json:"updated_by,omitempty"`
 }

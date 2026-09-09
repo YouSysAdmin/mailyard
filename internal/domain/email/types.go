@@ -184,12 +184,10 @@ type verifyInput struct {
 // The response types of this domain.
 //
 // They exist so the OpenAPI document can be REFLECTED rather than
-// transcribed. While these were fiber.Map literals there was no type
-// to read, the description of eight bodies was written by hand, and
-// eight of them were wrong - with a test that compared paths and
-// noticed nothing.
+// transcribed: a hand-written description of a body drifts from what
+// the handler sends, and nothing that compares paths notices.
 //
-// The json tags must keep producing exactly what the maps produced.
+// The json tags are the wire contract three generated clients read.
 // Note `suppressed_recipients` carries no omitempty on purpose: it is
 // built with emptyIfNil so it marshals as [] rather than null, and a
 // client should not have to tell those apart.

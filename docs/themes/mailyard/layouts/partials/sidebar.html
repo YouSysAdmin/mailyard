@@ -9,7 +9,7 @@
 {{- /* Collapsible sidebar sections. Site-wide defaults (params.sidebarCollapsible
        / params.sidebarCollapsed), overridable per section in its _index.md front
        matter (sidebar_collapsible / sidebar_collapsed). A section is only
-       collapsible if it actually has sub-pages; the section holding the current
+       collapsible if it actually has sub-pages, and the section holding the current
        page is always expanded. */ -}}
 {{- $cfgCollapsible := true -}}
 {{- if isset site.Params "sidebarcollapsible" }}{{ $cfgCollapsible = site.Params.sidebarCollapsible }}{{ end -}}
@@ -33,7 +33,7 @@
       {{- /* Whether the section's own _index.md shows as a sidebar entry. A
              section WITH sub-pages usually has a landing/stub _index (its content
              feeds the "Browse the manual" cards), so its link is hidden by
-             default; a section WITHOUT sub-pages keeps it (the _index IS the
+             default, and a section WITHOUT sub-pages keeps it (the _index IS the
              page). Flip the multi-page default with params.sidebarIndexLink, or
              per section with `sidebar_index` in the _index.md front matter (wins). */ -}}
       {{- $showIndex := not $hasChildren -}}

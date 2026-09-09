@@ -521,9 +521,9 @@ func scanEmail(r interface{ Scan(...any) error }) (*emailmodel.Email, error) {
 
 // AcceptedSince sums the per-minute counter over a window.
 //
-// What the plan limits read. It replaced COUNT(*) over the emails
-// table, 14-30ms per send at 1.2M rows and growing with the project's
-// own volume, with a range over at most 1440 tiny rows.
+// What the plan limits read: a range over at most 1440 tiny rows,
+// where COUNT(*) over the emails table grows with the project's own
+// volume.
 //
 // Truncated to the minute, so the answer can include up to a minute
 // more than an exact "since" would - see the migration for why the
@@ -605,9 +605,9 @@ func (s *Store) StorageKeysOlderThan(ctx context.Context, before time.Time) ([]s
 	// The in-flight exemption has to match ClearAttachmentsOlderThan
 	// and PurgeOlderThan exactly. Collecting a wider set than the
 	// statement that clears the rows means deleting blobs still
-	// referenced by a live row: a message scheduled past the
-	// attachment window kept its storage_key while its object was
-	// dropped, so the send failed on a file that no longer existed.
+	// referenced by a live row - a message scheduled past the
+	// attachment window would keep its storage_key while its object
+	// is dropped, and the send fails on a file that is not there.
 	rows, err := s.Query(ctx, `
         SELECT attachments_json FROM emails
         WHERE created_at < ? AND status NOT IN (?, ?, ?)
@@ -799,7 +799,7 @@ func (s *Store) PurgeForAddress(ctx context.Context, projID, email string) (int6
 
 // MarkOpened records an open and reports whether it was the first.
 //
-// Unique opens are the number people quote; total opens count a reader
+// Unique opens are the number people quote. Total opens count a reader
 // who reopened the message weeks later. One statement returns both by
 // looking at whether opened_at was already set.
 //

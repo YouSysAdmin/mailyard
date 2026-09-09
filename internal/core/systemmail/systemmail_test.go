@@ -229,10 +229,10 @@ func TestANodeRowNeedsTheRelayTransport(t *testing.T) {
 
 // A stored from that is not an address fails HERE with the setting
 // named, never as a 501 from the far end: EnvelopeAddress hands back
-// what it cannot parse, so the raw string used to land inside
-// MAIL FROM:<...> and the pool server's protocol error was the only
-// symptom. The write path refuses such a value now, but a row stored
-// before it learned to still has to fail legibly.
+// what it cannot parse, and inside MAIL FROM:<...> the pool server's
+// protocol error would be the only symptom. The write path refuses
+// such a value, but a row that predates the check still has to fail
+// legibly.
 func TestABrokenFromFailsBeforeDialling(t *testing.T) {
 	// A name without angle brackets - what typing "Name address" into
 	// one field produces - is the shape that does not parse, so it is

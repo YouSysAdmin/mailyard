@@ -114,8 +114,7 @@ func (h *Handler) check() readiness {
 		// The probe is open, so the REASON goes to the log and not to
 		// the response. A pgx connection error carries the DSN's host,
 		// port, user and database name, and this endpoint answers
-		// anybody - so an outage was handing internal topology and the
-		// database username to whoever asked.
+		// anybody.
 		slog.Error("health: database unreachable", "error", err)
 		checks["database"] = "unreachable"
 		ready = false

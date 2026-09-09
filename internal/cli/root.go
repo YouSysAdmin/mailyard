@@ -17,9 +17,7 @@ func NewRoot() *cobra.Command {
 	root.PersistentFlags().String("config", "", "config file path (yaml); defaults to ./mailyard.yaml")
 	root.AddCommand(newServeCmd())
 
-	// The split roles and the relay agent, which the community build
-	// does not carry - see roles_ce.go.
-	root.AddCommand(editionCommands()...)
+	root.AddCommand(nodeCommands()...)
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newSetPasswordCmd())
 	root.AddCommand(newTLSCmd())

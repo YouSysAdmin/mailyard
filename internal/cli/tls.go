@@ -225,9 +225,8 @@ func newTLSUnassignCmd() *cobra.Command {
 
 // convergenceNote says how long a running node takes to notice.
 //
-// FIVE minutes, not thirty seconds, and the difference was measured
-// rather than assumed.
-// The certificate itself is re-resolved every 30 seconds, but the name
+// FIVE minutes, not thirty seconds. The certificate itself is
+// re-resolved every 30 seconds, but the name
 // comes from the settings cache, which a node reloads on a five-minute tick - and a
 // write made out here reaches neither directly, because nothing tells the node it happened.
 //

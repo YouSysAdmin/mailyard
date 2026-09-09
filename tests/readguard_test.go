@@ -192,21 +192,14 @@ func excusedReadLines(fset *token.FileSet, path string) map[int]bool {
 
 // queryText recovers the SQL a read helper was handed.
 //
-// Three shapes, and all three appear in the stores:
-//
-//	s.ReadQuery(ctx, `SELECT ...`)                  inline
-//	query := supSelect + ` where ...`; query += ...  a local
-//	sb.WriteString(inboundSelect); sb.WriteString(...)  a Builder
-//
-// The last two are what TestNoDynamicSQL explicitly permits, so a
-// guard that only understood the first would have flagged every real
-// call site and been switched off. What comes back is every literal
-// and resolved constant that reaches the variable, joined - not the
-// exact string any single call sends, which does not exist as a
-// constant anyway once optional clauses are involved. That is the
-// right shape for the question being asked: a FOR UPDATE or an UPDATE
-// verb has to appear in one of these pieces to reach the follower at
-// all.
+// Three shapes, and all three appear in the stores: an inline literal,
+// a local assembled with `+=` out of constants, and a strings.Builder
+// written only constants. The last two are what TestNoDynamicSQL
+// permits. What comes back is every literal and resolved constant that
+// reaches the variable, joined - not the exact string any single call
+// sends, which does not exist once optional clauses are involved. A
+// FOR UPDATE or an UPDATE verb has to appear in one of those pieces to
+// reach the follower at all.
 func queryText(e ast.Expr, body *ast.BlockStmt, consts map[string]string) (string, bool) {
 	if text, ok := literalText(e, consts); ok {
 		return text, true

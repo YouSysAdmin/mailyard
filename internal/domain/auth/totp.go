@@ -144,11 +144,6 @@ func (h *Handler) TOTPEnable(c fiber.Ctx) error {
 	// Recorded here, explicitly, like every other security event: the
 	// middleware only sees the request, and what matters is that this
 	// account's second factor changed.
-	//
-	// It was missing. Both constants existed in internal/models/audit and
-	// nothing wrote either one, so turning 2FA off left no trace in the
-	// security log at all - found by a guard that asks whether every
-	// mailed event is an event something produces.
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type: amodel.TypeTOTPEnabled, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusOK,
 	})

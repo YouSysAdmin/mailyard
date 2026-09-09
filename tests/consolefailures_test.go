@@ -24,12 +24,8 @@ var writesToTheBrowserConsole = regexp.MustCompile(`\bconsole\.(log|debug|info|w
 // view kept its empty state, and the empty state is a sentence about
 // there being nothing here yet.
 //
-// Two did exactly that. Opening a message whose request failed left
-// "Not found" on screen, indistinguishable from one that had been
-// deleted - and it polls every three seconds, so the log filled while
-// the page said nothing. The compose form swallowed the same failure and
-// showed an empty template picker, which reads as "this project has no
-// templates".
+// A message whose request failed reads as "Not found", and an empty
+// template picker reads as "this project has no templates".
 //
 // The exception is where the silence is the DESIGN and is written down
 // beside it: the tracked-link lookup on a message detail falls back to

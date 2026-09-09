@@ -1,9 +1,8 @@
 -- Rewritten links, with their click tallies.
 --
 -- Keyed (project_id, campaign_id, hash), campaign id EMPTY for a
--- transactional send. Tracking used to key on campaign_messages.id,
--- which is why it could not exist outside a campaign - everything
--- keys on emails.id now.
+-- transactional send. Everything keys on emails.id, never the campaign
+-- message id, so tracking exists outside a campaign.
 --
 -- campaign_id is a plain grouping key with no foreign key, since an
 -- empty string satisfies none, and campaign deletion clears these rows

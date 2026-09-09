@@ -255,7 +255,7 @@ func (r *Runner) processBatch(ctx context.Context, c *cmodel.Campaign) {
 	// needs a floor of its own: with send_rate 0 next is still NOW, so
 	// pollOnce would re-claim this campaign in the same pass and spin
 	// at full speed - claim, pending read, subscriber read, render,
-	// quota check - until the window rolled, up to an hour of pegging
+	// quota check - until the window rolls, up to an hour of pegging
 	// the node and the database over one oversized campaign.
 	if quotaPaused {
 		if floor := time.Now().UTC().Add(r.PollInterval); next.Before(floor) {
@@ -338,12 +338,9 @@ func (r *Runner) deliverBatch(ctx context.Context, c *cmodel.Campaign, batch []*
 		}
 
 		// Has the operator stopped this since the batch was claimed?
-		//
-		// Shutdown and context were the only two things this loop
-		// watched, so Pause and Cancel did not reach it: the whole batch
-		// went out and only the NEXT one noticed. A batch is bounded by
-		// batchSize and spaced by SendRate, so "cancelled" could mean
-		// hundreds more messages, minutes apart, after the button.
+		// A batch is bounded by batchSize and spaced by SendRate, so a
+		// loop that only noticed between batches would send hundreds
+		// more messages, minutes apart, after the button.
 		//
 		// One indexed read per message, against several queries plus a
 		// render and an insert in deliverMessage - and it decides whether
@@ -367,12 +364,10 @@ func (r *Runner) deliverBatch(ctx context.Context, c *cmodel.Campaign, batch []*
 			//
 			// quota.Error is the type the HTTP surface answers 429 with
 			// and the relay answers 452 with, both meaning try again when
-			// the window rolls. Here it was marked MsgFailed like any
-			// other error, permanently - so a campaign larger than the
-			// plan's hourly limit burnt the whole remainder of its
-			// audience the moment the limit was reached, and then
-			// "completed". The message stays pending and the batch stops:
-			// the loop comes back after next_batch_at, by which time the
+			// the window rolls. Marking it MsgFailed would burn the
+			// remainder of a campaign larger than the plan's hourly
+			// limit. The message stays pending and the batch stops: the
+			// loop comes back after next_batch_at, by which time the
 			// window has moved.
 			if qe, ok := errors.AsType[*quota.Error](err); ok {
 				r.Log.Warn("campaign: batch paused on quota",

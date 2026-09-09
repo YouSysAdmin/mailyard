@@ -187,9 +187,8 @@ type RateLimitConfig struct {
 
 	// The three below govern endpoints whose rate is set by somebody
 	// else's software rather than by a person at a keyboard, which is
-	// why they are an order of magnitude higher than the ones above and
-	// why they were constants in routes.go until an operator needed to
-	// change one. They are here and not in `inbound` or `relay_nodes`
+	// why they are an order of magnitude higher than the ones above.
+	// They are here and not in `inbound` or `relay_nodes`
 	// because what they cap is the HTTP edge, and one place to look is
 	// the point of this section.
 
@@ -519,13 +518,8 @@ type LoggingConfig struct {
 // says nothing about which certificate - that is chosen in the console
 // and stored in the database.
 //
-// It was a mode per listener (none / manual / self / acme) plus a
-// file pair and an fqdn. Uploading in the console already did manual,
-// self is the fallback when nothing is assigned, acme is one block
-// below, and fqdn came from server.public_url. What was left
-// duplicated the assignment and disagreed with it in both directions -
-// mode none made an assignment inert, an assignment overrode the file.
-// A boolean cannot disagree with anything.
+// A boolean and not a mode per listener, because a mode can disagree
+// with the assignment stored in the database and a boolean cannot.
 type TLSConfig struct {
 	// Enabled terminates TLS here.
 	//
@@ -652,7 +646,7 @@ type DatabaseConfig struct {
 // ReplicaReadsConfig turns follower reads on or off per group.
 //
 // The second of two gates. Which queries MAY use a follower is decided
-// in code, per query, by calling ReadQuery; this decides which of those
+// in code, per query, by calling ReadQuery. This decides which of those
 // groups an installation wants routed away, which depends on its
 // replication lag and how its console is used.
 //
@@ -753,9 +747,8 @@ func Load(path string) (*Config, error) {
 		v.SetConfigFile(path)
 	} else {
 		// SetConfigFile and not SetConfigName: the name form also tries
-		// the bare name, so a binary called `mailyard` in the working
-		// directory was read as YAML and the operator got "invalid
-		// trailing UTF-8 octet" from their own executable.
+		// the bare name, and a binary called `mailyard` in the working
+		// directory is then read as YAML.
 		v.SetConfigFile("mailyard.yaml")
 	}
 
@@ -786,8 +779,7 @@ func Load(path string) (*Config, error) {
 	// installation with no follower exactly nothing.
 	//
 	// On where the console never writes and re-reads the same list,
-	// off where it does. See ReplicaReadsConfig for how each was
-	// decided.
+	// off where it does. See ReplicaReadsConfig for the rule.
 	v.SetDefault("database.replica_reads.analytics", true)
 	v.SetDefault("database.replica_reads.email_log", true)
 	v.SetDefault("database.replica_reads.inbound_log", true)
@@ -815,7 +807,26 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("relay_nodes.assignment_ttl", "5m")
 	v.SetDefault("relay_nodes.claim_max", 20)
 	v.SetDefault("relay_nodes.claim_wait_max", "30s")
-	relayNodeDefaults(v)
+
+	// The relay_node section - what one node knows about itself.
+	v.SetDefault("relay_node.addr", ":2587")
+	v.SetDefault("relay_node.mode", "listen")
+	v.SetDefault("relay_node.spool_dir", "./relay-spool")
+	v.SetDefault("relay_node.max_lifetime", 72*time.Hour)
+	v.SetDefault("relay_node.heartbeat_interval", 2*time.Minute)
+	v.SetDefault("relay_node.delivery_concurrency", 8)
+	v.SetDefault("relay_node.smtp_port", 25)
+	v.SetDefault("relay_node.ipv6", false)
+	v.SetDefault("relay_node.inbound.enabled", false)
+	v.SetDefault("relay_node.inbound.addr", ":25")
+	v.SetDefault("relay_node.inbound.max_message_size", 26214400)
+	v.SetDefault("relay_node.inbound.rate_per_minute", 120)
+	// Off, and off is the only safe default: a PROXY header is an
+	// unauthenticated claim about who is calling, so a listener that
+	// reads one without a trusted list hands a stranger a forged source
+	// address. Turning it on REQUIRES naming the balancer.
+	v.SetDefault("relay_node.inbound.proxy_protocol.enabled", false)
+
 	v.SetDefault("worker.concurrency", 4)
 	v.SetDefault("worker.poll_interval", "2s")
 	v.SetDefault("worker.max_attempts", 5)
@@ -901,7 +912,7 @@ func Load(path string) (*Config, error) {
 		// Two error shapes mean the same thing here: viper reports
 		// ConfigFileNotFoundError when it searched for a name, and a
 		// bare os.ErrNotExist when it was handed an explicit path,
-		// which is what the default arm now uses.
+		// which is what the default arm uses.
 		missing := os.IsNotExist(err)
 		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); ok {
 			missing = true
@@ -914,8 +925,7 @@ func Load(path string) (*Config, error) {
 		// No file, and that is allowed. Say so, and name any YAML
 		// sitting in the working directory: a config under a name
 		// nothing reads looks exactly like a config that is being
-		// ignored, and the symptom shows up far away - a renamed file
-		// once cost an afternoon of chasing missing tracking pixels.
+		// ignored, and the symptom shows up far away.
 		if near := nearbyYAML(); len(near) > 0 {
 			source = "environment only (ignoring " + strings.Join(near, ", ") + ", expected mailyard.yaml)"
 		}
@@ -1209,10 +1219,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if err := c.validateRelayEdition(); err != nil {
-		return err
-	}
-
 	if c.RelayNodes.Enabled && c.RelayNodes.AutoRegisterToken == "" {
 		return fmt.Errorf("relay_nodes.auto_register_token required when relay_nodes.enabled is set, otherwise any caller can enrol a node (generate with `openssl rand -hex 32`)")
 	}
@@ -1226,9 +1232,8 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Database.Crypto.EncryptionKey == "" {
-		// Named in full, because this MOVED: it was crypto.encryption_key
-		// at the top level, and an operator upgrading meets this message
-		// rather than a key that is quietly ignored.
+		// Names the previous key too, so an operator upgrading meets
+		// this message rather than a key that is quietly ignored.
 		return fmt.Errorf("database.crypto.encryption_key required, secrets at rest are not stored without it (generate with `openssl rand -hex 32`) - this was crypto.encryption_key, and MAILYARD_CRYPTO_ENCRYPTION_KEY is now MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY")
 	}
 
@@ -1265,7 +1270,7 @@ func (c *Config) Validate() error {
 			}
 		}
 
-		// Local login is the only YAML-configured method now that
+		// Local login is the only YAML-configured method, because
 		// identity providers live in the database. It is also the
 		// bootstrap path: an operator needs an account before there is
 		// an admin API to configure SSO with, and a break-glass way back

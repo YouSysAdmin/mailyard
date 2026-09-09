@@ -2,11 +2,11 @@
 // Picking when a campaign starts sending.
 //
 // One dialog, two callers: the list, where a row's own Schedule button
-// opens it, and the detail page. They were the same fifteen lines twice.
+// opens it, and the detail page.
 //
 // It holds the value and hands back an ISO string, so neither caller
-// carries a `scheduleAt` ref of its own - which is what both of them had,
-// left behind after the dialog closed.
+// carries a `scheduleAt` ref of its own to leave behind after the dialog
+// closes.
 import { ref } from 'vue'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'

@@ -67,9 +67,7 @@ function select(id: string) {
 //
 // Everything in it - host, port, credentials, and the warning when the
 // listener is off - is read once, when somebody wires an application
-// up. On a page people leave open while a suite runs it was three
-// hundred pixels of permanent furniture above the thing they came to
-// read.
+// up, and this page is left open while a suite runs.
 const showConnection = ref(false)
 
 const activeCredentials = computed(() => credentials.value.filter((c) => !c.revoked))

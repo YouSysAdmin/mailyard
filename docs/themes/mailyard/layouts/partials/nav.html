@@ -11,7 +11,7 @@
     </a>
     <div class="cs-nav-links">
       {{ range site.Menus.main }}
-        {{- /* External when the URL is absolute (http/https); an explicit
+        {{- /* External when the URL is absolute (http/https), and an explicit
                `external` menu param overrides either way. */ -}}
         {{- $external := or (hasPrefix .URL "http://") (hasPrefix .URL "https://") -}}
         {{- if isset .Params "external" }}{{ $external = .Params.external }}{{ end -}}

@@ -20,9 +20,8 @@ import (
 //	    return &Store{database.NewBase(db)}
 //	}
 //
-// Twenty-eight stores each carried their own identical copy, which is
-// twenty-eight chances for one to forget Rebind and send `?` straight
-// at a driver that wants $1. The fields stay unexported so the
+// One copy, so no store can forget Rebind and send `?` straight at a
+// driver that wants $1. The fields stay unexported so the
 // embedding store reaches a handle through DB() and cannot acquire a
 // second way to build queries. TestStoresDoNotReachPastTheHelpers
 // keeps DB() itself down to transactions.

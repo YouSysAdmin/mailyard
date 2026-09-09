@@ -16,11 +16,8 @@ import (
 // TestDocumentedPermissionsMatchTheRouter checks the AUTHORIZATION the
 // document promises against the one routes.go enforces.
 //
-// This is the gap the rest of the guards left. TestEveryV1RouteIsDocumented
-// pins paths and the reflector pins body SHAPES - and between them, 35
-// operations went on publishing "requires an API key with scope
-// `read`" for a year after scopes were deleted, because nothing read
-// the sentence.
+// TestEveryV1RouteIsDocumented pins paths and the reflector pins body
+// SHAPES. Neither reads the sentence that says who may call the route.
 //
 // The one sentence in this document worth asserting. It is not
 // documentation prose - it is the authorization contract, and
@@ -37,27 +34,14 @@ func TestDocumentedPermissionsMatchTheRouter(t *testing.T) {
 		t.Fatalf("only extracted %d route permissions - the routes.go parse is broken", len(enforced))
 	}
 
-	// both documents. This walked openapi.Routes() only, so the console
-	// document - /app/api and /api/relay-nodes - was never checked.
+	// Both documents.
 	//
-	// WHAT THIS DOES NOT COVER, and it is worth stating because looking
-	// for it is how the limit was found: declaredPermission reads the
-	// Permission FIELD first and only falls back to the sentence. So a
-	// route whose field is right and whose PROSE contradicts it passes.
-	// GET /data/export did exactly that - field `data:read`, description
-	// opening "Behind `admin` rather than `read`", which is the deleted
-	// scope vocabulary this guard was written after. Recognising that
-	// needs a regex over every way of writing a permission in English,
-	// which is the argument the case below already makes for why a gated
-	// route must name its permission rather than describe it.
-	//
-	// Seven wrong sentences in the per-domain ConsoleDocs files were found
-	// at the same time and are not published: consoleDocs() keeps only the
-	// console-own and enrolment surfaces, and mergeDocs lets the
-	// hand-written /api/v1 entry win on collision, so those strings are
-	// shadowed. They were corrected in place because a reader of the
-	// source reads them, and because a route that later loses its
-	// hand-written entry would start publishing whatever is left there.
+	// WHAT THIS DOES NOT COVER: declaredPermission reads the Permission
+	// FIELD first and only falls back to the sentence, so a route whose
+	// field is right and whose PROSE contradicts it passes. Recognising
+	// that needs a regex over every way of writing a permission in
+	// English, which is why a gated route must name its permission
+	// rather than describe it.
 	documented := append(openapi.Routes(), openapi.ConsoleRoutes()...)
 
 	var problems []string

@@ -33,8 +33,8 @@ const promoting = ref(false)
 const { pageable, pageItems, goToPage } = useClientPager(languages, 20)
 
 // One ref for the whole dialog: whether it is open, whether it is an
-// edit, and what it holds. It was four - showModal, editing, form and a
-// resetForm to put them back - which is four things to keep agreeing.
+// edit, and what it holds. Separate refs would be four things to keep
+// agreeing.
 const draft = ref<{
   editing: Language | null
   code: string
@@ -79,9 +79,8 @@ async function save() {
     notify.success(d.editing ? 'Language updated' : 'Language added')
     await load()
   } catch (e) {
-    // capture() places a server field error on the control it names. It
-    // was missing here, so a refused code arrived as a toast in the
-    // corner while the dialog stayed open saying nothing.
+    // capture() places a server field error on the control it names,
+    // rather than a toast in the corner while the dialog says nothing.
     if (!capture(e)) {
       notify.error(apiErrorMessage(e, d.editing ? 'Failed to save' : 'Failed to add it'))
     }

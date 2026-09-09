@@ -4,9 +4,7 @@
 // switcher on the HTML tab.
 //
 // A component because it exists twice - the sandbox reader and the
-// email log detail - and two hand-written copies of the same tab bar
-// is exactly the drift the design-system components were extracted to
-// stop. The two callers differ in shape, not in form: the sandbox
+// email log detail. The two callers differ in shape, not in form: the sandbox
 // fills a fixed pane and carries a Raw tab (it stores the bytes, the
 // log does not), the log is ordinary page content inside a card. fill
 // and the raw slot carry that difference so the form itself stays one.
@@ -393,8 +391,7 @@ function selectTab(next: Tab) {
 }
 
 /* The stage the emulated viewport stands on. At desktop width it is a
-   pass-through column, so the full-width rendering is exactly what it
-   was before the switcher existed. */
+   pass-through column, so the full-width rendering is unchanged. */
 .device-stage {
   display: flex;
   flex-direction: column;

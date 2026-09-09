@@ -47,7 +47,7 @@ const contentResources = computed(() => props.catalog.filter((r) => !r.infrastru
 const infraResources = computed(() => props.catalog.filter((r) => r.infrastructure))
 
 // The Vault-style text form. The GRID is authoritative while
-// checkboxes are clicked; the textarea applies on blur, refusing
+// checkboxes are clicked. The textarea applies on blur, refusing
 // unknown entries loudly instead of dropping them - a typo that saved
 // fine and then silently granted nothing is the failure mode this
 // guards.
@@ -183,8 +183,7 @@ function toggleWildcard() {
     </template>
 
     <!-- The parse failure is the field's ERROR, not a hint painted red:
-         FormField already replaces the guidance with it, which is what
-         the two branches here were doing by hand. -->
+         FormField replaces the guidance with it. -->
     <FormField
       class="mt-4"
       label="As policy text"

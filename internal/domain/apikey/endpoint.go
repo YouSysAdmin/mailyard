@@ -196,9 +196,7 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // ALLOWED. See permission.ForKey for why a key may hold what a group may not.
 //
 // An empty result is legal and means a key that may do nothing. That
-// is not a mistake worth guessing about - the old code defaulted an
-// empty list to send, which was a sensible default only while sending
-// was the whole surface.
+// is not a mistake worth guessing a default for.
 func normalizePermissions(in []string) ([]string, string) {
 	if len(in) > 2*len(perm.Registry) {
 		return nil, "too many permissions - the catalogue is smaller than this list"

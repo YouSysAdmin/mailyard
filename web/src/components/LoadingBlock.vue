@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The full-block spinner a page shows while its first load is in
-// flight - `loading-page` plus `spinner`, written out 57 times.
+// flight.
 //
 // Not for the QUIET refresh path: an automatic refresh deliberately
 // leaves the current rows on screen (see useAutoRefresh), so a page that

@@ -1,9 +1,6 @@
 // Mailyard, Copyright (c) 2021-2026 YouSysAdmin
 
-// A rule about the console, checked by reading web/src - which is why it
-// lives beside it. These sat in internal/server and
-// internal/domain/trackingpage, packages that have nothing to do with
-// what they check and were simply where somebody was working at the time.
+// A rule about the console, checked by reading web/src.
 
 package tests
 
@@ -95,9 +92,8 @@ func TestThePreviewComponentStripsOurTrackingMarkup(t *testing.T) {
 
 	src := string(body)
 	// The ESCAPED forms, as they appear inside the regexes. The plain
-	// paths appear in the comments too, so matching those would pass on a
-	// component that only talks about stripping - which is what the first
-	// cut of this test did.
+	// paths appear in the comments too, so matching those would pass on
+	// a component that only talks about stripping.
 	for _, want := range []string{`\/tracking\/open\/`, `\/tracking\/click\/`} {
 		if !strings.Contains(src, want) {
 			t.Errorf("HtmlPreview.vue has no pattern matching %s, so it strips nothing - "+
@@ -107,8 +103,7 @@ func TestThePreviewComponentStripsOurTrackingMarkup(t *testing.T) {
 
 	// An empty sandbox, which is what denies the frame an origin. Checked
 	// as the ATTRIBUTE: a comment explaining that same-origin is not
-	// granted contains the words, so grepping for allow-same-origin
-	// failed on a component that was already correct.
+	// granted contains the words too.
 	if !strings.Contains(src, `sandbox=""`) {
 		t.Error(`HtmlPreview.vue does not render sandbox="" - sender-authored markup would ` +
 			`share the console's origin, and its session with it`)

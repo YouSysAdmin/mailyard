@@ -4,10 +4,9 @@
   A table does not shrink below its min-content width, so `width: 100%`
   is a floor rather than a ceiling: a four-column settings table with
   long env-var names is simply wider than the article column, paints
-  outside it, and slides UNDER the sticky "On this page" rail - which is
-  what /docs/security/rate-limiting looked like. The column is already
-  `minmax(0, 1fr)` with `min-width: 0`, so the grid was never the
-  problem and no amount of layout tuning fixes it.
+  outside it, and slides UNDER the sticky "On this page" rail. The
+  column is already `minmax(0, 1fr)` with `min-width: 0`, so no grid
+  tuning fixes it.
 
   The wrapper carries the frame (border, radius, background) because it
   is the element whose edges you actually see once the content scrolls,

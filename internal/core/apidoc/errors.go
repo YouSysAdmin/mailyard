@@ -99,9 +99,9 @@ func EventStream(description string) Response {
 // Redirect is a 3xx with no body - a browser ceremony handing the caller
 // somewhere else.
 //
-// The two OAuth legs were documented as 200s, which is wrong twice over:
-// the status is not what they answer, and a client that follows the
-// document would look for a body that never comes.
+// A redirect documented as a 200 is wrong twice over: the status is
+// not what it answers, and a client that follows the document would
+// look for a body that never comes.
 func Redirect(status int, description string) Response {
 	return Response{Status: status, Description: description}
 }

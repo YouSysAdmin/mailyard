@@ -15,24 +15,19 @@ import (
 // AN EMPTY LIST IS []. `out := []T{}` marshals to [] and `var out []T`
 // marshals to null, and the tree builds BOTH at the accumulators - so
 // the encoder formats a nil slice as [], and it never reaches the wire.
-// This used to be a reflective walk over every response body
-// (withEmptyLists); json/v2 makes it the encoder's default, and the
-// walk, its addressable copy and its depth cap are gone with it.
 //
 // A nil MAP STAYS null, deliberately. The v2 default would format it as
-// {}, but the published document and both script SDKs were proven
-// against null maps field by field, and unlike the lists nobody was
-// being lied to about them - so that shape does not move.
+// {}, but the published document and both script SDKs are proven
+// against null maps, so that shape does not move.
 //
 // INVALID UTF-8 IS COERCED, NOT REFUSED. Response bodies carry strings
 // taken from received mail - subjects, header values - and a latin-1
-// byte in one of those must not turn a 200 into a 500. v1 replaced the
-// bad byte with U+FFFD and this keeps that: strict output would make
-// the whole response fail over one byte the sender got wrong.
+// byte in one of those must not turn a 200 into a 500. The bad byte
+// becomes U+FFFD.
 //
-// A nil []byte becomes "" where v1 wrote null. No wire type carries a
-// []byte today, so nothing observes it - stated here so the first one
-// added is a decision and not a surprise.
+// A nil []byte becomes "". No wire type carries a []byte today, so
+// nothing observes it - stated here so the first one added is a
+// decision and not a surprise.
 var marshalOptions = json.JoinOptions(
 	json.FormatNilMapAsNull(true),
 	jsontext.AllowInvalidUTF8(true),

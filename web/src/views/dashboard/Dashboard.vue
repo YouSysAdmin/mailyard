@@ -39,9 +39,8 @@ function daysAgo(n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-// Opens and clicks were recorded from the day tracking shipped and
-// displayed nowhere: a project with tracking on had a pixel in every
-// message and no page that admitted it had ever fired.
+// Opens and clicks, so a project with tracking on has a page that
+// shows what its pixel recorded.
 function blankEngagement(): Engagement {
   return { tracked_sent: 0, opened: 0, clicked: 0, open_rate: 0, click_rate: 0 }
 }
@@ -133,10 +132,8 @@ async function load(quiet = false) {
 
 // Offered but off by default here, alone among these pages: one refresh
 // is six requests, one of them an aggregation over the table that grows
-// per message. It was two of those until the status counts stopped being
-// fetched twice - the conclusion is unchanged, since a dashboard is read
-// for a minute and left where a log is watched, so the cost is still real
-// and the benefit still is not.
+// per message. A dashboard is read for a minute and left where a log is
+// watched, so the cost is real and the benefit is not.
 const { refreshing, refresh, auto, paused, everySeconds } = useAutoRefresh(() => load(true), {
   storageKey: 'mailyard.autorefresh.dashboard',
   autoDefault: false,
@@ -257,8 +254,8 @@ const statCards = computed(() => [
     <template v-else>
       <SendingLimitCard :usage="usage" />
 
-      <!-- Every one of these is already in the /dashboard/stats payload
-           this page was fetching anyway, so the row costs no query. -->
+      <!-- Every one of these is in the /dashboard/stats payload this
+           page fetches anyway, so the row costs no query. -->
       <div class="stats-grid">
         <StatCard v-for="s in statCards" :key="s.label" v-bind="s" />
       </div>

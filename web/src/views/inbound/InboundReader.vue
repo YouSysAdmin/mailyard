@@ -96,9 +96,9 @@ async function retryWebhook() {
 /**
  * Opens the compose form addressed back to the sender.
  *
- * Worth having because of exactly the case that makes people write to a
- * no-reply address: they had something to say and the address they had
- * was one nobody reads. Mailyard receives it, so somebody can answer.
+ * For the case that makes people write to a no-reply address: they had
+ * something to say and the address they had was one nobody reads.
+ * Mailyard receives it, so somebody can answer.
  */
 function reply() {
   const src = email.value

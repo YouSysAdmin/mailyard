@@ -37,10 +37,10 @@ const ProjectHeader = "X-Mailyard-Project-Id"
 // the project default, else nothing - which permOn and permRead /
 // permWrite / permDelete consult.
 //
-// The old floor of viewer was also a ceiling: admitting viewer to
-// every group is why a viewer could read the domain list, the SMTP
-// configuration and the whole data export. A group that declares no
-// resource is now refused outright.
+// There is no floor role: a group that declares no resource is
+// refused outright, since admitting a viewer everywhere is what lets
+// one read the domain list, the SMTP configuration and the data
+// export.
 func requireProject(rt *env.Runtime) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if ok, resp := stampProject(c, rt); !ok {

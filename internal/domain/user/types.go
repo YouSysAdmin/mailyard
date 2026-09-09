@@ -32,8 +32,7 @@ type createInput struct {
 	Email    string `json:"email"      validate:"required,email,max=320"    normalize:"normalize"`
 	Password string `json:"password"   validate:"omitempty,min=12,max=256,bcryptlen"   normalize:"trim"`
 
-	// Admin is the whole of platform administration - it replaced a
-	// role string and a super_user boolean that meant the same thing.
+	// Admin is the whole of platform administration.
 	Admin bool `json:"admin"`
 }
 

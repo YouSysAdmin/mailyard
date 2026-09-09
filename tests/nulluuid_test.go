@@ -17,24 +17,9 @@ import (
 // Go says "" where the database says NULL, and the translation lives
 // at the two edges: database.NullStr writing, database.Str scanning.
 // A nullable UUID column is where forgetting it stops being cosmetic -
-// "" is not a uuid, so Postgres refuses the whole statement and the
-// caller gets a 500 with "invalid input syntax for type uuid" and no
-// hint about which value.
-//
-// It cost four live bugs before this test existed:
-//
-//   - suppressions.unsubscribe_list_id, on the read side, which meant
-//     every ordinary send failed at the suppression check
-//   - tracked_links.campaign_id, both sides, so click tracking on
-//     transactional mail could not work at all
-//   - bounces.email_id, on a route whose own validation says the id
-//     is optional
-//   - project_invitations.role_id, so inviting somebody without
-//     naming a role answered 500
-//
-// Every one of them worked when the value happened to be present,
-// which is why nothing caught them: the tests, the fixtures and the
-// console all had a real id to hand.
+// "" is not a uuid, so Postgres refuses the whole statement, and the
+// write works whenever the value happens to be present, which is why
+// the tests, the fixtures and the console all miss it.
 //
 // This reads the INSERT column list and the argument list positionally
 // - they are one-to-one by construction here - and asks that a
@@ -72,9 +57,8 @@ func TestNullableUUIDColumnsAreWrittenAsNull(t *testing.T) {
 		}
 	})
 
-	// A floor, because the first cut of this test lined up ZERO
-	// statements and passed: an off-by-one made every INSERT
-	// unparseable, and nothing said so.
+	// A floor: a parser that lines up ZERO statements passes while
+	// checking nothing.
 	if checked < 40 {
 		t.Fatalf("only %d INSERT(s) were checked - the parser has stopped "+
 			"lining them up, so this test is passing vacuously", checked)
@@ -97,51 +81,22 @@ func TestNullableUUIDColumnsAreWrittenAsNull(t *testing.T) {
 	}
 }
 
-// The read side is deliberately not guarded statically here, and that
-// is a measured decision rather than an omission.
+// The read side is deliberately not guarded statically here.
 //
 // The rule would be "a nullable uuid column compared to a parameter
-// must cast it or ask IS NOT DISTINCT FROM". Run against this tree it
-// reports nineteen sites, eighteen of which pass an id that is always
-// present - a campaign id inside campaign analytics, a plan id being
-// deleted - and one of which is not a uuid at all
-// (user_passkeys.credential_id is TEXT, and shares its name with
-// sandbox_emails.credential_id, which is a uuid). Telling those apart
-// needs the TABLE a one-line fragment belongs to, which is not there
-// to be read.
+// must cast it or ask IS NOT DISTINCT FROM", and most sites pass an id
+// that is always present - a campaign id inside campaign analytics, a
+// plan id being deleted. Telling those apart needs the TABLE a one-line
+// fragment belongs to, which is not there to be read, and an allowlist
+// reading "this id is always set" is evidence of nothing.
 //
-// An allowlist of eighteen entries reading "this id is always set" is
-// friction on every future query and evidence of nothing. What
-// actually caught the two read-side bugs was a store test that took
-// the empty path - TestAnUnscopedSendConsultsGlobalBlocksOnly and
-// TestATransactionalTrackedLinkHasNoCampaign. Both worked with a real
-// id, which is exactly why nothing else noticed.
-//
-// So: writes are checked mechanically below, reads are checked by
-// exercising the case where the value is absent.
-//
-// A LATER AUDIT FOUND THE HARDER HALF, and it is worth naming because it
-// is outside this test's model entirely: a NON-nullable uuid column
-// compared to a parameter some caller passes empty. `id <> ?` on a
-// primary key, where the empty id means "no exception". This test skips
-// NOT NULL columns and primary keys by construction, and
-// TestEveryQueryMatchesTheSchema PREPAREs without ever BINDING, so the
-// statement looks perfect to both - it fails only on EXECUTE, with the
-// same 22P02 that MalformedID then disguises as a 404.
-//
-// Two of the three worst bugs that audit found were this exact shape, so
-// the same discipline is applied to it and the empty path is now exercised
-// at every site of it:
-//
-//	TestSlugTakenWorksWithNoExceptionID          smtp server groups, every CREATE answered 404
-//	TestMarkingAMessageWithNoEmailIDSucceeds     campaign_messages, campaigns never finished
-//	TestRevokingOtherSessionsWithNoSessionToKeep sessions, a jti-less token could not sign out elsewhere
-//	TestProviderSlugTakenWorksWithNoExceptionID  oauth providers, the same shape, not reachable today
-//	TestALiftedListOptOutTakesOnlyThatList       suppressions, an empty list id means the global row
-//
-// Still no static rule, for the reason above: which parameters can be
-// empty is a fact about callers, not about SQL. The seam that holds is a
-// test per site that passes nothing where an id would go.
+// So writes are checked mechanically below, and reads are checked by a
+// store test per site that passes nothing where an id would go. That
+// also covers the shape outside this test's model: a NON-nullable uuid
+// column compared to a parameter some caller passes empty, `id <> ?`
+// on a primary key where the empty id means "no exception". This test
+// skips NOT NULL columns by construction and TestEveryQueryMatchesTheSchema
+// PREPAREs without BINDING, so only executing the empty path finds it.
 
 // nullableUUIDColumns reads the migrations, keyed table.column so a
 // name that is TEXT in one table and UUID in another is not confused
@@ -259,14 +214,13 @@ func insertsIn(src string) []insertStmt {
 
 		rest := after
 
-		// Three shapes, and reading only the first left thirteen
-		// statements unchecked - among them projects, which writes
-		// three nullable uuid columns.
+		// Three shapes:
 		//
 		//   Exec(ctx, `...`, a, b)          bind values follow
 		//   ExecContext(ctx, s.Q(`...`), a) the literal is WRAPPED, so
 		//                                   a close paren comes first
-		//   PrepareContext(...); stmt.ExecContext(ctx, a, b)
+		//   PrepareContext(`...`)           the bind values are on a
+		//                                   later stmt.ExecContext call
 		//
 		// The first two are the same once the wrapper's close parens
 		// are stepped over - but only when a comma is what follows
@@ -332,11 +286,8 @@ func splitArgs(s string) []string {
 				// Skip the empty leading element. The scan starts just
 				// after the backtick closing the query, so the text
 				// begins with the comma separating it from the first
-				// argument - counting that as an argument made every
-				// statement come out one long, every statement get
-				// skipped, and the whole test pass while checking
-				// nothing. Found by planting a bug and watching it not
-				// fail.
+				// argument - counted as an argument, every statement
+				// comes out one long and gets skipped.
 				if a := strings.TrimSpace(cur.String()); a != "" {
 					out = append(out, a)
 				}

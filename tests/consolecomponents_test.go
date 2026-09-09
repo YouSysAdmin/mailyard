@@ -13,28 +13,11 @@ import (
 
 // A PIECE OF UI THAT EXISTS AS A COMPONENT IS WRITTEN AS THAT COMPONENT.
 //
-// This is not tidiness. Every one of the patterns below was hand-written
-// in thirty to sixty views, and each drifted in a way nobody could see
-// from any single file:
-//
-//   - the dialog: closing one was three different things. 22 views used
-//     useModalSafeClose, others a bare @click.self - which throws the
-//     form away when a drag that started inside the box ends on the
-//     overlay - and seven had no dismiss handling at all. Escape worked
-//     in two of 29. Meanwhile the composable armed a document listener
-//     for the life of the VIEW, so a page holding three dialogs ran
-//     three Escape handlers whether or not anything was open.
-//   - the status pill: ten copies of one switch, three byte-identical,
-//     so a colour changed in one place meant the same status reading
-//     differently on two pages.
-//   - the empty state, the page header and the loading block: 160 copies
-//     between them, and the header's two-children rule was kept by a
-//     test that read the INDENTATION of the file.
-//
-// The components already existed for some of this - useModalSafeClose
-// was there and 7 views did not call it - which is the argument for a
-// check rather than a note in the README. An abstraction nothing
-// enforces is one that half the tree uses.
+// Hand-written copies of a dialog, a status pill, an empty state or a
+// page header drift in ways nobody can see from any single file: one
+// dialog dismisses on Escape and the next does not, one page colours a
+// status differently from another. An abstraction nothing enforces is
+// one that half the tree uses.
 //
 // Each rule names the component that replaces it, because a failure here
 // is a person about to write markup by hand, and the useful thing to
@@ -60,21 +43,17 @@ func TestTheConsoleUsesItsOwnComponents(t *testing.T) {
 		// The `spinner` class on its own is not listed. A lone spinner
 		// beside a card heading, or inside a button that is saving, is a
 		// different thing from the block that stands in for a page while
-		// it loads - and only the block was written out 57 times.
+		// it loads.
 		{regexp.MustCompile(`class="page-header"`), "components/PageHeader.vue", "PageHeader"},
 		{regexp.MustCompile(`class="page-actions"`), "components/PageHeader.vue", "PageHeader"},
 		{regexp.MustCompile(`class="form-group"`), "components/FormField.vue", "FormField"},
 		// Not `stat-block` or a bare `stat-value`. The campaign page
 		// stacks plain labelled numbers with no glyph and no header,
-		// which is a different shape - what StatCard owns is the CARD,
-		// and the inbound page had written three of them with its own
-		// inline svgs drawn on the nav grid rather than this one.
+		// which is a different shape - what StatCard owns is the CARD.
 		{regexp.MustCompile(`class="stat-card"`), "components/StatCard.vue", "StatCard"},
-		// The inline notice. Ten views wrote out the same four elements,
-		// one of which - a wrapper for an icon none of them had - did
-		// nothing at all, and the severity was two classes that had to
-		// agree. The component takes the severity and the lead line as
-		// props and the body as its slot.
+		// The inline notice. The component takes the severity and the
+		// lead line as props and the body as its slot, so the severity
+		// is one value rather than two classes that have to agree.
 		// The whole class, not a suffix of one: `card-notice` is a caller
 		// placing the component, which is the sanctioned way to do it.
 		{regexp.MustCompile(`class="(?:[^"]*\s)?notice(-[a-z]+)?[\s"]`), "components/Notice.vue", "Notice"},
@@ -144,18 +123,8 @@ func TestTheConsoleUsesItsOwnComponents(t *testing.T) {
 // written into the default slot is markup the component never touches,
 // so it goes on sitting under the error.
 //
-// The prop was written for exactly this and had ZERO callers. All 110 of
-// them hand-wrote the markup instead, in three different tags - `p`,
-// `span` and `small` - which is what a component whose better path
-// nothing takes looks like from the outside. Converting them turned up
-// three fields hand-rolling the error itself: a JSON parse failure
-// painted red with a private class, a domain error, and a password
-// length rule that was a hint with a red modifier on it. Those are
-// `:error` now, and two scoped colour rules went with them.
-//
 // A form-hint OUTSIDE a FormField is untouched - a standalone paragraph
-// introducing a group of fields is not a field's guidance, and fifteen
-// of those are legitimate.
+// introducing a group of fields is not a field's guidance.
 func TestAFieldsHintGoesThroughFormField(t *testing.T) {
 	root := consoleSrc(t)
 
@@ -223,15 +192,7 @@ func TestAFieldsHintGoesThroughFormField(t *testing.T) {
 // twoHints finds fields given a hint twice.
 //
 // FormField renders `<slot name="hint">{{ hint }}</slot>`, so a filled
-// slot shadows the prop entirely. Two of these existed on the project
-// settings page and the shadowed text was not filler: one was the caveat
-// that a bounce address does nothing on a provider which replaces the
-// Return-Path, the other a paragraph explaining that owners always
-// receive alerts whatever address is named. Neither had ever rendered.
-//
-// Both were made by the sweep that moved hints into the component: a
-// <small> became the prop, and the sibling that carried markup became
-// the slot.
+// slot shadows the prop entirely and the prop's text never renders.
 func twoHints(t *testing.T, root string) []string {
 	t.Helper()
 
@@ -323,11 +284,10 @@ func attrEnd(src string, at int) int {
 
 // Copying to the clipboard is CopyButton's job.
 //
-// Fourteen views wrote it out, and the same act reported itself
-// differently depending on the page: some swapped the button's label,
-// some raised a toast, some did neither, and a refused clipboard was
-// silent in half of them. The component does the swap and takes an
-// `announce` for the values a label cannot name.
+// Written out per view, the same act reports itself differently on
+// every page and a refused clipboard is silent on half of them. The
+// component does the label swap and takes an `announce` for the values
+// a label cannot name.
 func TestNothingElseTouchesTheClipboard(t *testing.T) {
 	root := consoleSrc(t)
 
@@ -375,10 +335,7 @@ func TestNothingElseTouchesTheClipboard(t *testing.T) {
 }
 
 // The colour of a status is decided in composables/statusBadge.ts and
-// nowhere else. Ten views held a copy of that switch, and the three
-// that spoke the same vocabulary had already been edited apart from one
-// another - a status added to the API reached whichever of them somebody
-// remembered.
+// nowhere else, so a status added to the API reaches every page.
 func TestNothingElseDecidesWhatAStatusLooksLike(t *testing.T) {
 	root := consoleSrc(t)
 	owner := filepath.Join("composables", "statusBadge.ts")

@@ -228,10 +228,7 @@ defineExpose({ close: () => (open.value = false), closeIfOutside })
   background: var(--bg-active);
 }
 
-/* Ordinary news needs no stripe, so only the two that are not say so.
-   The severity arrives on every notification and was being dropped:
-   these two rules existed under names the markup never wrote, so a
-   warning and a failure looked exactly like an announcement. */
+/* Ordinary news needs no stripe, so only the two that are not say so. */
 .entry.is-warning {
   border-left-color: var(--warning-fg);
 }

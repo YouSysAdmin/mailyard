@@ -7,9 +7,8 @@
 // the same thing rather than as the same weight.
 //
 // Merging the two sets is a DESIGN decision, not a refactor: it means
-// redrawing seven glyphs onto the other grid and accepting a different
-// weight on this page. Written down here so the next person deciding
-// that knows it was noticed and left alone.
+// redrawing these glyphs onto the other grid and accepting a different
+// weight on this page.
 //
 // Feather geometry, like the rest of the product - see layouts/icons.ts
 // for the licence note that covers both.

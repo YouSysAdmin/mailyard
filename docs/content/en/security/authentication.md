@@ -79,5 +79,5 @@ These need no token:
   [Health checks](/docs/analytics/health-checks)
 - `/tracking/*` - open pixel, click redirects, hosted unsubscribe
 - `POST /webhooks/ses` - SES feedback, authenticated by the SNS signature
-- `/api/relay-nodes/*` - relay node enrolment, authenticated by its enrol token
-  (enterprise edition)
+- `/api/relay-nodes/*` - relay node enrolment, authenticated by its enrol token,
+  mounted only with `relay_nodes.enabled` set

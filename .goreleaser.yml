@@ -17,9 +17,7 @@ project_name: mailyard
 # and stops compiling.
 #
 # The docs theme is vendored under docs/themes/mailyard, so a plain
-# checkout carries it. It used to be a submodule, and a checkout that had
-# not fetched it built a site with no layouts, so a hook here had to
-# refuse first.
+# checkout carries it.
 before:
   hooks:
     - go mod download
@@ -28,8 +26,7 @@ before:
 
 # A tag carrying a semver pre-release part (v1.4.0-rc.1, cut from devel or
 # any other branch) is a PRE-RELEASE: GitHub marks it so, and the moving
-# image tags below stay where they are. Without this the last image
-# built, whatever its tag said, became :latest.
+# image tags below stay where they are rather than following it.
 release:
   prerelease: auto
 
@@ -63,8 +60,10 @@ archives:
     files:
       # What an operator needs beside the binary to stand one up. The
       # example config is the one that matters: every setting it does not
-      # mention lives in the database now, and it says so.
+      # mention lives in the database, and it says so.
       - examples/mailyard.yaml.example
+      # A relay node is configured from its OWN file on its own machine.
+      - examples/mailyard-relay.yaml.example
       - README.md
 
 checksum:
@@ -72,8 +71,7 @@ checksum:
 
 snapshot:
   # .Version, not .Tag. The tag carries its leading v and the archive
-  # template adds one, so a snapshot came out named
-  # mailyard_vv0.0.0-devel_linux_amd64.
+  # template adds one.
   version_template: "{{ .Version }}-devel"
 
 changelog:
@@ -85,10 +83,8 @@ changelog:
       - "^chore:"
 
 # ONE block for both architectures, and no manifest section: dockers_v2
-# builds the platforms together and publishes the manifest itself. The
-# older `dockers` plus `docker_manifests` pair is deprecated, and it also
-# meant the same nine labels written out twice, once per arch, with
-# nothing keeping the copies equal.
+# builds the platforms together and publishes the manifest itself, so
+# the labels are written once rather than once per arch.
 #
 # Dockerfile.release, NOT the repository Dockerfile. That one builds
 # everything from source in three stages, which is what you want from

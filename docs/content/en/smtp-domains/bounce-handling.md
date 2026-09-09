@@ -83,8 +83,7 @@ has nowhere to put a port number - see
 
 ### When the reports cannot reach Mailyard
 
-Point the MX at a [relay node](/docs/smtp-domains/relay-nodes) instead of at Mailyard. Relay nodes are part of the
-enterprise edition.
+Point the MX at a [relay node](/docs/smtp-domains/relay-nodes) instead of at Mailyard.
 
 ```
 bounce.user.com   MX   -> node1.example.com    (a relay node running an MX)

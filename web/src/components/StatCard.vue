@@ -1,16 +1,9 @@
 <script setup lang="ts">
 // One number with a glyph and a line saying what it is measured against.
 //
-// The markup was written out ten times on the dashboard alone - six
-// nested elements and a ten-line inline svg each - so adding a stat
-// meant copying twenty-five lines and rewording a caption meant editing
-// ten places. The inbound page had written three more, and its glyphs
-// were drawn on the NAV grid (18 viewBox, stroke 1.5) rather than this
-// one, so the same card read at a visibly thinner weight there.
-//
-// It sits in components/ and not under views/dashboard/ for that reason:
-// two pages draw these, and the second one only found the first by
-// copying its CSS classes.
+// It sits in components/ and not under views/dashboard/ because two
+// pages draw these, and a glyph drawn on the nav grid (18 viewBox,
+// stroke 1.5) rather than this one reads at a visibly thinner weight.
 //
 // The CLASSES are the stylesheet's own `.stat-card` family, not a
 // private set: they are global, the inbound page and the campaign page

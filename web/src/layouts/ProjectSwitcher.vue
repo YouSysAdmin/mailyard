@@ -3,14 +3,12 @@
 //
 // Its own component because it is the one thing in the rail that is not
 // navigation: it does not link anywhere, it changes what every other
-// link MEANS. The rail was carrying its markup, its menu, its dropdown
-// styling and the switch itself alongside the menu it has nothing to do
-// with.
+// link MEANS.
 //
 // `narrow` is a PROP rather than something read off the rail, and it has
 // to be: a scoped rule reaches a child component's root element and
 // nothing deeper, so `.rail.narrow .picker-open` written in the parent
-// would silently stop matching the moment this markup moved in here.
+// would silently match nothing.
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
 import { getIcon } from './icons'
@@ -203,8 +201,7 @@ async function choose(id: string) {
 }
 
 /* Every line in the menu is one of these, whether it picks a project or
-   does something else. They were two identical rules under two names,
-   which is two places to change a padding. */
+   does something else. */
 .picker-row {
   display: flex;
   align-items: center;

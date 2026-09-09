@@ -2,11 +2,10 @@
 
 // Package tests holds the checks that are not about any one package.
 //
-// A test lives beside the code it describes - that is the rule
-// everywhere else in this tree, and every package's own tests, store
-// tests included, stay where they are. What is here is the other kind:
-// a rule over the whole repository, where the subject is the agreement
-// between two things that live in different packages.
+// A test lives beside the code it describes, store tests included.
+// What is here is the other kind: a rule over the whole repository,
+// where the subject is the agreement between things that live in
+// different packages.
 //
 //	The router against the OpenAPI document, and against the permission
 //	catalogue, the console nav, the alert list and three SDKs
@@ -15,17 +14,10 @@
 //	the console's own rules - one clock, one preview, one stylesheet
 //	nothing but ids.New minting an id, no pointer field saying omitempty
 //
-// Put one of these in the package it happens to touch - the Vue preview
-// guard in internal/domain/trackingpage, say - and it sits in a package
-// that does not break the rule and is not where anyone would look for
-// it.
-//
 // Two of them need a database and skip without MAILYARD_TEST_DSN,
-// schemaguard and tenancyguard. They are not split into a directory of
-// their own because they share the query evaluator with the static
-// guards beside them, and a second copy of that evaluator would be a
-// second answer to "what SQL does this repository contain".
-// `task test-db` runs everything either way.
+// schemaguard and tenancyguard. They stay beside the static guards
+// because they share the query evaluator, and a second copy of it would
+// be a second answer to "what SQL does this repository contain".
 package tests
 
 import (
@@ -40,12 +32,9 @@ import (
 
 // repoRoot finds the repository by searching upward for go.mod.
 //
-// Searching, never a fixed number of `..` segments. Half of these
-// guards walk a directory, and a walker pointed at nothing finds no
-// violations and PASSES - which reads exactly like a repository with no
-// violations in it. Two of them arrived here with a hardcoded depth,
-// which is a guard that silently stops guarding the day somebody moves
-// the file. This is the same search dbtest.MigrationsDir does.
+// Searching, never a fixed number of `..` segments: a walker pointed at
+// nothing finds no violations and PASSES, which reads exactly like a
+// repository with none. The same search dbtest.MigrationsDir does.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -78,24 +67,13 @@ func consoleSrc(t *testing.T) string {
 	return filepath.Join(repoRoot(t), "web", "src")
 }
 
-// The three source files these guards read rather than walk.
-//
-// Named from the repository root for the same reason repoRoot searches:
-// they were opened as "routes.go", relative to whatever directory the
-// test happened to run in, so every one of them stopped finding its
-// subject the moment these files moved. That failed loudly - a parse
-// error naming the file - which is the only reason this was a five
-// minute fix rather than a suite that had quietly stopped checking.
-// routerFiles is every file that registers routes, not routes.go alone.
-//
-// It was one filename, and that stopped being true the moment a route
-// group moved into a file of its own: six guards went on parsing
-// routes.go and simply did not see the routes that had left it. The
-// failure was loud here - the console document described five routes
-// "routes.go registers no such route" - but the same walk decides
-// whether a route is DOCUMENTED, PERMISSIONED and MAINTENANCE-GATED, and
-// in those directions a route the parser cannot see is a route nobody
-// checks.
+// The source files these guards read rather than walk, named from the
+// repository root for the same reason repoRoot searches.
+
+// routerFiles is every file that registers routes, not routes.go
+// alone. The same walk decides whether a route is DOCUMENTED,
+// PERMISSIONED and MAINTENANCE-GATED, and a route the parser cannot see
+// is a route nobody checks.
 //
 // The subject of these guards is the router, and the router is a
 // package. Test files are skipped, nothing else is.
@@ -115,10 +93,6 @@ func routerFiles(t *testing.T) []string {
 			continue
 		}
 
-		if !editionFile(name) {
-			continue
-		}
-
 		out = append(out, filepath.Join(dir, name))
 	}
 
@@ -129,30 +103,7 @@ func routerFiles(t *testing.T) []string {
 	return out
 }
 
-// editionFile reports whether a source file is part of this build.
-//
-// By name, not by reading the build constraint, and the two must agree:
-// a `//go:build enterprise` file is named _ee.go, its community half
-// _ce.go. That pairing is the convention the whole split rests on, and
-// TestEveryEditionFileIsNamedForItsTag is what keeps the name and the
-// tag from drifting apart - without it a mis-named file compiles into
-// one build while every guard here judges it as part of the other.
-//
-// Neither ce nor ee is a GOOS or a GOARCH, so Go's own implicit
-// filename constraints never fire on them.
-func editionFile(name string) bool {
-	switch {
-	case strings.HasSuffix(name, "_ee.go"):
-		return enterpriseBuild
-	case strings.HasSuffix(name, "_ce.go"):
-		return !enterpriseBuild
-	default:
-		return true
-	}
-}
-
-// parseRouter parses them all, so a caller walks the package the way it
-// used to walk the file.
+// parseRouter parses every router file into one file set.
 func parseRouter(t *testing.T, mode parser.Mode) (*token.FileSet, []*ast.File) {
 	t.Helper()
 

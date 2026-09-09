@@ -49,8 +49,6 @@ export const analyticsApi = {
   // Delivery trend over a date range, optionally narrowed to one
   // status. Defaults to the trailing 30 days server-side.
   trend: (params: TrendParams = {}) => api.get<TrendResponse>('/analytics', { params }),
-  // The project readout in one call. The dashboard predated this
-  // endpoint and assembled its own numbers from /emails/stats, which is
-  // why the engagement figures it computes were visible nowhere.
+  // The project readout in one call, engagement figures included.
   dashboard: () => api.get<{ stats: DashboardStats }>('/dashboard/stats'),
 }

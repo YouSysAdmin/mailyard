@@ -10,14 +10,10 @@ import (
 	docsite "github.com/yousysadmin/mailyard/docs"
 )
 
-// script-src carries no 'unsafe-inline', and the thing that replaced it
-// has to actually cover what the binary serves.
-//
-// The carve-out was there for years on the reasoning that the Vue
-// bootstrap was inline. It had stopped being true - the Vite build emits
-// one external script tag - and what genuinely needed it was the embedded
-// documentation, which writes two inline scripts. So the policy names
-// their hashes, computed from the shipped bytes.
+// script-src carries no 'unsafe-inline', so the hashes it names have
+// to cover what the binary serves: the Vite build emits one external
+// script tag, and the embedded documentation writes inline scripts
+// whose hashes are computed from the shipped bytes.
 //
 // A hardcoded hash is the failure this guards: the next docs build changes
 // the colour-mode probe by a byte, the browser refuses it, and the only
@@ -34,7 +30,7 @@ func TestScriptSrcNamesTheInlineScriptsItServes(t *testing.T) {
 		t.Errorf("script-src does not allow our own bundles: %q", got)
 	}
 
-	// With docs embedded there must be hashes; without them (a plain
+	// With docs embedded there must be hashes. Without them (a plain
 	// go build, no `task docs`) there is nothing to hash and /docs is not
 	// registered either.
 	hashes := strings.Count(got, "'sha256-")

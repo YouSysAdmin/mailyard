@@ -239,8 +239,8 @@ void load().then(openFromQuery)
                     </button>
                     <!-- delete, not write - DELETE /subscribers/:id is
                          permDelete on the server, so a member holding
-                         write without delete was offered a button that
-                         could only ever answer 403. -->
+                         write without delete must not see a button that
+                         can only answer 403. -->
                     <button
                       v-if="projects.can('subscribers:delete')"
                       class="btn btn-danger btn-sm"

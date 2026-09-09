@@ -168,10 +168,9 @@ module Mailyard
 // language's escape helper.
 //
 // The escape is not decoration. A path parameter reaches these clients
-// as an ordinary string, so an id of "../users/x" walked the URL up a
-// level and hit a different endpoint, and one carrying "?" or "#"
-// injected a query or truncated the path. The Go generator has escaped
-// these since it was written - script.go rendered them raw.
+// as an ordinary string, so an unescaped id of "../users/x" walks the
+// URL up a level and hits a different endpoint, and one carrying "?"
+// or "#" injects a query or truncates the path.
 //
 // Built left to right rather than by replacing in place: a replacement
 // introduces a brace of its own, and scanning the result again finds

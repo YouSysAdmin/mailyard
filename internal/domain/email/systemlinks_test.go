@@ -14,13 +14,9 @@ import (
 // A template referencing a reserved variable must RENDER, on every
 // surface and not only in a campaign.
 //
-// This is the half that used to be missing. RenderTemplate passed the
-// caller's data map through untouched and rendered strict, so
-// {{ mailyard_unsubscribe_url }} in a transactional template failed the
-// whole send with "map has no entry for key" - while the identical
-// template sent by a campaign worked, because the runner injected the
-// names itself. Nothing in the template told an author which of the two
-// they had written.
+// The render is strict, so a surface that does not inject the names
+// fails the whole send with "map has no entry for key" - and nothing
+// in the template tells an author which surface they wrote for.
 func TestAReservedVariableRendersOnAStrictSend(t *testing.T) {
 	body := `<a href="{{ mailyard_unsubscribe_url }}">out</a> ` +
 		`<a href="{{ mailyard_web_view_url }}">online</a>`

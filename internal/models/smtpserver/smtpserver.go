@@ -110,8 +110,7 @@ type Server struct {
 	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
 
 	// Provider is how this row is reached: a dial, or a provider's own
-	// API. Empty means smtp, which is what every row was before this
-	// column existed and is what keeps them behaving identically.
+	// API. Empty means smtp.
 	//
 	// A column rather than a second table, because ResolveCandidates is
 	// the one answer to "what can carry this" and has three callers that

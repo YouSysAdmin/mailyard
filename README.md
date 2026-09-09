@@ -16,8 +16,10 @@ One Go binary and a PostgreSQL. The binary carries the console, the documentatio
   import/export.
 - **Campaigns.** Subscriber lists (static or rule-based dynamic segments), A/B variants, throttling, delivery at each
   recipient's local time, open/click tracking, hosted one-click unsubscribe (RFC 8058).
-- **Your own delivery.** Per-project SMTP servers in named groups with failover, a platform-wide shared pool, DKIM signing for verified domains, approved
-  sender addresses, bounce records feeding the suppression list. Address verification (syntax, disposable, role, MX).
+- **Your own delivery.** Per-project SMTP servers in named groups with failover, a platform-wide shared pool, relay
+  nodes (machines you run that deliver straight to recipient mail exchangers from their own address), DKIM signing for
+  verified domains, approved sender addresses, bounce records feeding the suppression list. Address verification
+  (syntax, disposable, role, MX).
 - **Inbound.** Point MX at the host and receive on :25, claim domains with a DNS TXT record, SPF/DKIM/DMARC checked
   at ingest, received mail stored per project and emitted as webhooks.
 - **Multi-tenant.** Projects with their own roles over a permission catalogue, members and invitations, usage plans
@@ -102,6 +104,7 @@ docker run -p 3000:3000 -p 587:587 -p 25:25 -v mailyard-data:/data \
 | `storage.backend`    | inline  | `fs` or `s3` attachment storage                      |
 | `metrics.enabled`    | off     | Prometheus scrape endpoint, `metrics.token` gates it |
 | `database.replica_dsns` | none | Read replicas for the list and analytics queries    |
+| `relay_nodes.enabled` | off    | Enrolment of relay nodes, started with `mailyard relay` |
 
 ## Development
 

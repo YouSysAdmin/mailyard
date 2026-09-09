@@ -183,11 +183,10 @@ func (s *Store) engagement(ctx context.Context, projID string) (amodel.Engagemen
 // into Go to group it would scale with the send volume rather than
 // with the number of days.
 func (s *Store) DailyCounts(ctx context.Context, projID string, from, to time.Time, status string) ([]amodel.DayCount, error) {
-	// From the rollup, not from the emails table. The same GROUP BY over
-	// a fourteen-day window cost 434-698ms per status on 1.2M rows, twice
-	// per dashboard load - see migration 00069 for why this is
-	// recomputed rather than incremented, and what that costs in
-	// freshness.
+	// From the rollup, not from the emails table: a GROUP BY over the
+	// emails table scales with the send volume. See migration 00069 for
+	// why this is recomputed rather than incremented, and what that
+	// costs in freshness.
 	query := `
         SELECT to_char(day, 'YYYY-MM-DD') AS day, SUM(n) FROM email_daily
         WHERE project_id = ? AND day >= ?::date AND day <= ?::date`

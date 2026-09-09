@@ -9,7 +9,7 @@ application. Mailyard is the MX: it runs its own SMTP listener and accepts mail 
 is no upstream provider to sign up with and no ingestion webhook to POST to.
 
 {{< callout type="note" title="Or a relay node is the MX" >}}
-A [relay node](/docs/smtp-domains/relay-nodes) - enterprise edition - can run the mail exchanger instead and forward
+A [relay node](/docs/smtp-domains/relay-nodes) can run the mail exchanger instead and forward
 what it receives over its own outbound HTTP. That is for a network Mailyard cannot be reached from - mail sent into a
 region behind a national firewall, whose bounces cannot cross it. Everything below is unchanged: the node holds no
 database and decides nothing, so the same verified-domain gate, the same authentication and the same dedup run here

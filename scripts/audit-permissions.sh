@@ -35,8 +35,7 @@ go run ./cmd/mailyard export-api-spec --surface api --out "$WORK/openapi.yaml" >
 
 # Its OWN config file, empty, rather than the ./mailyard.yaml a developer
 # has in the working tree. Everything this audit needs is set below, and a
-# throwaway instance reading the dev config is not the isolation the
-# header claims - it picked up dev settings and warned about removed keys.
+# throwaway instance reading the dev config is not isolated.
 echo '{}' >"$WORK/mailyard.yaml"
 
 # The rate limiter buckets per credential and this sends hundreds of
@@ -51,9 +50,7 @@ export MAILYARD_AUTH_LOCAL_EMAIL="admin@example.test"
 export MAILYARD_RATELIMIT_API_PER_MINUTE="1000000"
 #
 # --init because the database is empty and a node that was not asked to
-# create a schema refuses to boot. Without it this audit could not run at
-# all, and the failure arrived as an empty password with the diagnostic
-# swallowed by pipefail.
+# create a schema refuses to boot.
 "$WORK/mailyard" serve --init --config "$WORK/mailyard.yaml" >"$WORK/server.log" 2>&1 &
 SERVER_PID=$!
 

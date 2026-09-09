@@ -35,8 +35,8 @@ func TestEveryLargeBodyPathIsARoute(t *testing.T) {
 	for _, p := range server.LargeBodyPaths {
 		rel, ok := strings.CutPrefix(p, base)
 		if !ok {
-			// The relay ingest route mounts outside /api/v1 and exists
-			// in the enterprise build only.
+			// The relay ingest route mounts outside /api/v1, under
+			// /api/relay-nodes, and only where relay_nodes.enabled is set.
 			continue
 		}
 

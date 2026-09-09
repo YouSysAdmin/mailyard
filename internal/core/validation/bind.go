@@ -11,11 +11,9 @@ import (
 // Bind parses and validates the request body, writing the 400 itself
 // when the body does not hold up.
 //
-// It replaced five lines at the top of sixty-five handlers, and the
-// duplication that mattered was not the line count: every one of them
-// knew how a validation error becomes a response - Humanize, then
-// Summary, then which helper - so changing the error envelope meant
-// sixty-five edits and one of them missed.
+// The one place that knows how a validation error becomes a response
+// - Humanize, then Summary, then which helper - so the error envelope
+// is decided here and not in every handler.
 //
 // Three return values, like the auth middleware: the response helpers
 // write the status and return nil, so an error alone cannot tell

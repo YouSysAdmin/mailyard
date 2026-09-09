@@ -85,8 +85,8 @@ const dataDoc = useCodeMirror({
 })
 
 // The subject is a plain input, not a CodeMirror: template syntax works
-// in one line exactly as well, and what an editor pane bought was an
-// empty page under a sentence.
+// in one line exactly as well, and an editor pane for a sentence is an
+// empty page.
 const subject = ref('')
 const subjectInput = ref<HTMLInputElement | null>(null)
 
@@ -316,8 +316,7 @@ onMounted(async () => {
     loading.value = false
 
     // The containers exist only once loading is false, and CodeMirror
-    // mounts into a real element - hence nextTick rather than the
-    // zero-delay timeout this used to guess with.
+    // mounts into a real element - hence nextTick.
     await nextTick()
     subject.value = start?.subject ?? ''
     htmlDoc.mount(start?.html ?? '')
@@ -400,9 +399,7 @@ onBeforeUnmount(() => {
     <div v-else-if="template && version" class="editor-split" :class="{ solo: !previewOpen }">
       <section class="editor-source">
         <!-- The stylesheet's tab strip, the same one the preview
-             pane opposite uses. This pane had invented its own -
-             underlined rather than pilled - and putting the two side by
-             side is what made that visible. -->
+             pane opposite uses, so the two panes read as one tool. -->
         <div class="strip">
           <div class="tabs">
             <button
@@ -470,8 +467,7 @@ onBeforeUnmount(() => {
 /* Full-bleed like the visual builder: two panes that scroll
    independently, and a page that does not scroll at all. The negative
    margin escapes the layout's content padding, so the height is the
-   whole window less the topbar - 52px, which this said was 60 and left
-   eight dead pixels under the sample-data pane. dvh rather than vh so a
+   whole window less the 52px topbar. dvh rather than vh so a
    mobile browser's collapsing address bar does not hang it below the
    fold, which is the same pair the two-pane reader uses. */
 .editor {

@@ -20,8 +20,7 @@ RUN apk add --no-cache ca-certificates tzdata \
 # $TARGETPLATFORM, not a bare filename. dockers_v2 builds both
 # architectures from ONE build and lays the context out per platform -
 # linux/amd64/mailyard, linux/arm64/mailyard - so `COPY mailyard` finds
-# nothing. Caught by running a snapshot build rather than by reading:
-# "failed to compute cache key: /mailyard: not found".
+# nothing.
 ARG TARGETPLATFORM
 COPY $TARGETPLATFORM/mailyard /usr/local/bin/mailyard
 

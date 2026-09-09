@@ -15,14 +15,11 @@ import (
 
 // An audit event takes where it came from from one place.
 //
-// `ClientIP: c.IP()` was written out at twenty-five event literals, which
-// is twenty-five chances for the twenty-sixth to omit it - and that field
-// is the only trace of origin the trail has. `Recorder.Project` and
-// `Recorder.Security` take the request and stamp it now, so an event
-// cannot be recorded without one.
+// `Recorder.Project` and `Recorder.Security` take the request and stamp
+// the origin, so an event cannot be recorded without one - and that
+// field is the only trace of origin the trail has.
 //
-// The same move added the user agent, and the two travel together on
-// purpose. Neither identifies anybody: a Safari user with iCloud Private
+// The user agent travels with it on purpose. Neither identifies anybody: a Safari user with iCloud Private
 // Relay on arrives from a Cloudflare, Akamai or Fastly egress shared with
 // strangers, and no header carries their own - the egress proxy is never
 // told the client's address, so nothing downstream can reveal what it
@@ -31,8 +28,7 @@ import (
 //
 // Matched on the type, through the AST, rather than on the field name:
 // sessions, tracking events and the relay node's own reports all record
-// an address and an agent legitimately, and a name-based rule reported
-// every one of them.
+// an address and an agent legitimately.
 func TestAnAuditEventTakesItsOriginFromOnePlace(t *testing.T) {
 	root := filepath.Join(repoRoot(t), "internal")
 	// core/audit is the one place allowed to say it - that is the point.

@@ -16,16 +16,9 @@ import (
 // TestTrackingReadsRunAgainstTheRealSchema exercises every tracking
 // query the campaign analytics page issues.
 //
-// One of them joined `tracking_events.message_id`, a column that has
-// never existed - it is `campaign_message_id`, which the INSERT thirty
-// lines below it always got right. Nothing failed until somebody
-// opened a campaign that existed: no test called it, and a query is
-// only checked by Postgres when it runs. The symptom was a 500 on the
-// campaign detail page.
-//
-// So the point here is COVERAGE of the read path, not the numbers. A
-// query naming a column that is not there fails on the first call
-// whatever the data is.
+// The point is COVERAGE of the read path, not the numbers: a query is
+// only checked by Postgres when it runs, and one naming a column that
+// is not there fails on the first call whatever the data is.
 func TestTrackingReadsRunAgainstTheRealSchema(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)

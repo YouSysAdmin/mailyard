@@ -243,12 +243,10 @@ func (s *GroupStore) Delete(ctx context.Context, projID, id, defaultGroupID stri
 // ignoring exceptID so an update can keep its own slug.
 //
 // IS DISTINCT FROM over a NULL, not a comparison against an empty
-// string. id is a uuid column, so an
-// empty exceptID was compared as a uuid and answered 22P02 - whose
-// pgconn Routine is string_to_uuid, which is exactly what
-// database.MalformedID matches, so response.Internal softened it into
-// 404 "not found". CREATE passes an empty exceptID by definition, so
-// every attempt to create a group answered 404 before inserting
+// string. id is a uuid column, so an empty exceptID compared as a uuid
+// answers 22P02, which database.MalformedID softens into a 404 - and
+// CREATE passes an empty exceptID by definition, so every create
+// would answer 404 before inserting
 // anything, on both surfaces, and the log recorded a warn rather than an
 // error. A NULL is distinct from every id, so the clause is simply true
 // for a create.

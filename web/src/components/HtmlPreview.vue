@@ -25,10 +25,8 @@ const props = defineProps<{
    * would otherwise be seven near-identical scoped rules.
    *
    * An inline style and not a class name, because the notice bar above
-   * the frame means the iframe is no longer this component's ROOT
-   * element - and a parent's scoped styles reach only the root. Passing a
-   * class silently stopped working the moment the wrapper appeared, which
-   * cost five previews their sizing before it was caught.
+   * the frame means the iframe is not this component's ROOT element,
+   * and a parent's scoped styles reach only the root.
    */
   minHeight?: string
   /** Fill the parent instead of sizing to content - the editor pane. */

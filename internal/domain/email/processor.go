@@ -65,9 +65,8 @@ type Processor struct {
 	// instead of real listeners or a real API.
 
 	// Pull hands a message to a relay node that cannot be dialled -
-	// see PullAssigner. Nil where no node pulls, which is every
-	// community installation: the candidate is then dialled as any
-	// other server is.
+	// see PullAssigner. Nil where no node pulls: the candidate is then
+	// dialled as any other server is.
 	Pull PullAssigner
 
 	send func(context.Context, transport.Spec, *smtpclient.Message) error

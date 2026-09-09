@@ -36,11 +36,6 @@ const projStore = useProjectStore()
 const nodes = ref<RelayNode[]>([])
 const mxHosts = ref<string[]>([])
 const enabled = ref(true)
-// Whether this build carries relay nodes, which is a different question
-// from whether the operator switched them on. Optimistic until the
-// server answers, like enabled above: claiming a feature is missing
-// while the page is still loading is the one wrong answer here.
-const available = ref(true)
 const loading = ref(true)
 
 // smtp:write, matching the server gate on these routes. Not a
@@ -60,7 +55,6 @@ async function load() {
     nodes.value = res.data.relay_nodes ?? []
     mxHosts.value = res.data.mx_hosts ?? []
     enabled.value = res.data.enabled ?? false
-    available.value = res.data.available ?? false
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load relay nodes'))
   } finally {
@@ -115,11 +109,8 @@ onMounted(load)
       <div class="card-header">
         <div>
           <h2>Your sending machines</h2>
-          <!-- What a node is, in both editions. The how-TO moved down
-               into the empty state, which only renders once the server
-               has answered - up here it would render optimistically and
-               then vanish, so a community reader saw a command this
-               binary does not have, for as long as the request took. -->
+          <!-- What a node is. The how-to lives in the empty state,
+               which only renders once the server has answered. -->
           <p class="text-sm text-muted">
             A relay node delivers straight to recipients from its own address, so SPF, reverse DNS
             and reputation are yours.
@@ -128,16 +119,6 @@ onMounted(load)
       </div>
 
       <LoadingBlock v-if="loading" />
-
-      <!-- Before the not-enabled state: both answer an empty table and
-           only one of them can be true. -->
-      <EmptyState v-else-if="!available" title="Enterprise edition">
-        <p>
-          Relay nodes are not available in the community edition, which this installation runs. Your
-          mail goes out through the SMTP servers configured for this project and through the
-          platform pool.
-        </p>
-      </EmptyState>
 
       <!-- With the feature off no node can enrol, so an empty list is
            not "none yet" and must not read as one.

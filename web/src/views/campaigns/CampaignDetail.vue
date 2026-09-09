@@ -184,11 +184,6 @@ async function deleteCampaign() {
 
 /**
  * Read the campaign and its messages, once, on arrival.
- *
- * This was missing: `onMounted` was imported and never called, and
- * `loading` was set true and never cleared - so the page rendered its
- * spinner and nothing else, from the root commit onwards. Every path to
- * a campaign went through it.
  */
 async function start() {
   await loadCampaign()

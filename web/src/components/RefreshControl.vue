@@ -2,11 +2,9 @@
 // The Refresh button and the Auto switch, for every page whose rows are
 // written by something other than the person reading them.
 //
-// One component because it is one control: six pages had no way to see
-// current data short of reloading the console, and six hand-written
-// copies of a button plus a checkbox would differ in wording within a
-// week. The behaviour lives in composables/useAutoRefresh - this is only
-// what it looks like.
+// One component because it is one control, worded the same on every
+// page. The behaviour lives in composables/useAutoRefresh - this is
+// only what it looks like.
 const props = defineProps<{
   refreshing?: boolean
   // Omit to render the button alone. A page polling one thing until it
@@ -18,9 +16,8 @@ const props = defineProps<{
   //
   // Comes from useAutoRefresh, which is the one place the cadence is
   // decided - `everySeconds` is in its return value for that reason.
-  // It was optional here with a `?? 10` fallback and NOTHING passed it,
-  // so the tooltip claimed ten seconds on every page whatever the
-  // interval, and one of them polls every three.
+  // Required, not defaulted, so the tooltip cannot claim a cadence the
+  // page does not poll at.
   everySeconds: number
 }>()
 

@@ -7,7 +7,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/yousysadmin/mailyard/internal/core/edition"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	nodemodel "github.com/yousysadmin/mailyard/internal/models/relaynode"
@@ -43,10 +42,9 @@ func (h *Handler) ListMine(c fiber.Ctx) error {
 
 	now := time.Now()
 	out := listOutput{
-		Nodes:     []nodeView{},
-		MXHosts:   []string{},
-		Enabled:   h.Runtime.Config.RelayNodes.Enabled,
-		Available: edition.RelayNodes,
+		Nodes:   []nodeView{},
+		MXHosts: []string{},
+		Enabled: h.Runtime.Config.RelayNodes.Enabled,
 	}
 	for _, n := range nodes {
 		v := nodeView{Node: n, Alive: n.Fresh(nodemodel.StaleAfter, now)}
@@ -143,11 +141,9 @@ func (h *Handler) DeleteMine(c fiber.Ctx) error {
 // project answers exactly like one that does not exist, so this
 // cannot be used to discover that somebody else's node is there.
 //
-// OK is a BOOL beside the response, not an error alone, for the reason spelled out
-// on verifySession: response.* writes the status and returns nil, so a
-// caller testing an error result falls straight through the refusal.
-// This helper shipped that way and the live permission audit caught it
-// as a 500 - a nil node dereferenced after a 404 had been written.
+// OK is a BOOL beside the response, not an error alone: response.*
+// writes the status and returns nil, so a caller testing only the
+// error would fall through the refusal and dereference a nil node.
 // adminNode carries the same contract for the platform-admin side.
 func (h *Handler) projectNode(c fiber.Ctx) (*nodemodel.Node, *ssmodel.Server, error, bool) {
 	rc := domain.GetRequestContext(c)
