@@ -22,6 +22,7 @@ func consoleFS() fstest.MapFS {
 		"assets/index-AAAA.js":          {Data: []byte("export const a = 1")},
 		"assets/SmtpServers-BBBB.js":    {Data: []byte("export const b = 2")},
 		"assets/SmtpServers-BBBB.js.br": {Data: []byte("compressed")},
+		"favicon.svg":                   {Data: []byte("<svg/>")},
 	}
 }
 
@@ -51,6 +52,12 @@ func TestAMissingChunkIsNotTheHTMLShell(t *testing.T) {
 		// Not an asset: a deep link the router resolves client-side.
 		{env.ConsolePath + "/smtp-servers", 200, "<div id=app>"},
 		{env.ConsolePath + "/", 200, "<div id=app>"},
+
+		// The icon lives at the console root, and that is the only place
+		// it is a file. Asked for under a deep link's own path it is the
+		// fallback shell, which is why the shell links it absolutely
+		// (TestTheShellLinksItsIconsAbsolutely).
+		{env.ConsolePath + "/favicon.svg", 200, "<svg/>"},
 	} {
 		req := httptest.NewRequest("GET", tc.path, nil)
 		res, err := app.Test(req)
