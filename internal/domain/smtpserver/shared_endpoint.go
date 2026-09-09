@@ -209,6 +209,10 @@ func (h *SharedHandler) Delete(c fiber.Ctx) error {
 		return response.NotFound(c, "shared smtp server not found")
 	}
 
+	if srv.IsNode() {
+		return response.BadRequest(c, errServerIsANode)
+	}
+
 	if err := h.Runtime.Store.SharedSMTP.Delete(c.Context(), srv.ID); err != nil {
 		return response.Internal(c, err)
 	}

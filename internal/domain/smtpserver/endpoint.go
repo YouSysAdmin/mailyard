@@ -235,7 +235,16 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	return response.Success(c, ServerResponse{SMTPServer: srv})
 }
 
-// Delete serves DELETE /api/v1/smtp-servers/:id.
+// errServerIsANode is the refusal both server Delete routes give a row
+// that a relay node enrolled. relay_nodes.server_id carries no foreign
+// key - it may point into either server table - so nothing in the
+// schema stops the row going alone, and a node left behind is listed,
+// cannot be approved or suspended, and is refused on every heartbeat.
+const errServerIsANode = "this server is a relay node - remove it from the relay nodes page, " +
+	"which unenrols the node with it"
+
+// Delete serves DELETE /api/v1/smtp-servers/:id. A relay node's row is
+// refused: the node is removed from its own page, and its row with it.
 func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
@@ -245,6 +254,12 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 
 	if srv == nil {
 		return response.NotFound(c, "smtp server not found")
+	}
+
+	// A relay node's row is removed with the node, or the node is left
+	// enrolled and listed with nothing behind it.
+	if srv.IsNode() {
+		return response.BadRequest(c, errServerIsANode)
 	}
 
 	if err := h.Runtime.Store.SMTPServer.Delete(c.Context(), rc.Project.ID, srv.ID); err != nil {

@@ -115,9 +115,15 @@ func (h *Handler) SuspendMine(c fiber.Ctx) error {
 // rule only applies to rows a node still claims, that orphan would
 // look like an ordinary server and be handed mail forever.
 func (h *Handler) DeleteMine(c fiber.Ctx) error {
-	node, srv, resp, ok := h.projectNode(c)
-	if !ok {
-		return resp
+	rc := domain.GetRequestContext(c)
+
+	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if node == nil || node.ProjectID != rc.Project.ID {
+		return response.NotFound(c, "relay node not found")
 	}
 
 	if err := h.Runtime.Store.RelayNode.Delete(c.Context(), node.ID); err != nil {
@@ -125,7 +131,7 @@ func (h *Handler) DeleteMine(c fiber.Ctx) error {
 	}
 
 	h.forgetIssued(c, node.ID)
-	if err := h.Runtime.Store.SMTPServer.Delete(c.Context(), node.ProjectID, srv.ID); err != nil {
+	if err := h.Runtime.Store.SMTPServer.Delete(c.Context(), node.ProjectID, node.ServerID); err != nil {
 		return response.Internal(c, err)
 	}
 

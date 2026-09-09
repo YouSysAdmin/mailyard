@@ -141,9 +141,18 @@ func (h *Handler) Suspend(c fiber.Ctx) error {
 // to rows a node still claims, so an orphan would look like an
 // ordinary manually configured server and be handed mail.
 func (h *Handler) Delete(c fiber.Ctx) error {
-	node, srv, resp, ok := h.adminNode(c)
-	if !ok {
-		return resp
+	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if node == nil {
+		return response.NotFound(c, "relay node not found")
+	}
+
+	srv, err := h.serverFor(c.Context(), node)
+	if err != nil {
+		return response.Internal(c, err)
 	}
 
 	if err := h.Runtime.Store.RelayNode.Delete(c.Context(), node.ID); err != nil {
@@ -152,15 +161,20 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 
 	h.forgetIssued(c, node.ID)
 	if node.Platform() {
-		if err := h.Runtime.Store.SharedSMTP.Delete(c.Context(), srv.ID); err != nil {
+		if err := h.Runtime.Store.SharedSMTP.Delete(c.Context(), node.ServerID); err != nil {
 			return response.Internal(c, err)
 		}
 	} else if err := h.Runtime.Store.SMTPServer.Delete(c.Context(),
-		node.ProjectID, srv.ID); err != nil {
+		node.ProjectID, node.ServerID); err != nil {
 		return response.Internal(c, err)
 	}
 
-	h.log().Info("relay node removed", "node_id", node.ID, "host", srv.Host)
+	host := ""
+	if srv != nil {
+		host = srv.Host
+	}
+
+	h.log().Info("relay node removed", "node_id", node.ID, "host", host, "had_server_row", srv != nil)
 
 	return response.NoContent(c)
 }
