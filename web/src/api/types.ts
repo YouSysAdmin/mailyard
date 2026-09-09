@@ -179,6 +179,9 @@ export interface SharedSMTPServer {
   // Reserved for the platform's own mail - invitations, password
   // resets, signup confirmations. No tenant is routed through it.
   platform_only: boolean
+  // node_id is set when this row is a self-enrolled relay node. Its
+  // status is the node's approval, managed from the relay nodes page.
+  node_id?: string
   // ses_topic_arn is the SNS topic SES publishes this server's
   // bounces to. On the server rather than in platform config because
   // SES belongs to one server - and it is what ties a notification to
@@ -252,6 +255,9 @@ export interface SMTPServer {
   // within it (lowest first).
   group_id?: string
   priority: number
+  // node_id is set when this row is a self-enrolled relay node. Its
+  // status is the node's approval, managed from the relay nodes page.
+  node_id?: string
   status: 'enabled' | 'disabled' | 'invalid'
   validation_error?: string
   validated_at?: string

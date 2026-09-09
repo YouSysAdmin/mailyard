@@ -274,6 +274,7 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // Test dials the server (auth included when credentials are set) and
 // records the verdict on the row: success re-enables an invalid
 // server, failure marks it invalid so the delivery worker skips it.
+// A relay node's row is the exception - see testNode.
 func (h *Handler) Test(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
@@ -283,6 +284,10 @@ func (h *Handler) Test(c fiber.Ctx) error {
 
 	if srv == nil {
 		return response.NotFound(c, "smtp server not found")
+	}
+
+	if srv.IsNode() {
+		return testNode(c, h.Runtime, srv)
 	}
 
 	now := new(time.Now().UTC())
@@ -446,6 +451,33 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 	}
 
 	return t.Test(ctx)
+}
+
+// errNodePulls is the refusal a connection test gives a relay node in
+// pull mode: nothing dials a pull node, so there is no connection to
+// test from here.
+const errNodePulls = "this server is a relay node in pull mode - nothing dials it, it claims " +
+	"its mail over the control channel, so there is no connection to test from here. " +
+	"Its last heartbeat is on the relay nodes page"
+
+// testNode is the connection test for a relay node's row, and it writes
+// nothing back to that row.
+func testNode(c fiber.Ctx, rt *env.Runtime, srv *ssmodel.Server) error {
+	node, err := rt.Store.RelayNode.Get(c.Context(), srv.NodeID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if node != nil && node.Pulls() {
+		return response.BadRequest(c, errNodePulls)
+	}
+
+	if testErr := testTransport(c.Context(), srv, rt.RelayNodeTLS,
+		rt.Config.Sending.AllowPrivateSMTPTargets); testErr != nil {
+		return response.Success(c, TestResponse{Ok: false, Error: testErr.Error()})
+	}
+
+	return response.Success(c, TestResponse{Ok: true})
 }
 
 // refusePrivateTarget is the courtesy half of the guard the dialer

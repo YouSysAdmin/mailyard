@@ -226,7 +226,8 @@ func (h *SharedHandler) Delete(c fiber.Ctx) error {
 // Test dials the server and records the verdict, exactly like the
 // per-project test. A shared server that fails goes invalid and the
 // delivery path stops considering it, which matters more here: it is
-// the fallback for every project that owns nothing.
+// the fallback for every project that owns nothing. A relay node's row
+// is the exception - see testNode.
 func (h *SharedHandler) Test(c fiber.Ctx) error {
 	srv, err := h.Runtime.Store.SharedSMTP.Get(c.Context(), c.Params("id"))
 	if err != nil {
@@ -235,6 +236,10 @@ func (h *SharedHandler) Test(c fiber.Ctx) error {
 
 	if srv == nil {
 		return response.NotFound(c, "shared smtp server not found")
+	}
+
+	if srv.IsNode() {
+		return testNode(c, h.Runtime, &srv.Server)
 	}
 
 	now := new(time.Now().UTC())

@@ -178,6 +178,16 @@ onMounted(fetchServer)
       <div class="card">
         <div class="card-header">
           <h2>{{ server.host }}:{{ server.port }}</h2>
+          <!-- A node's row is managed from the relay nodes page: its
+               status there is approval, and removing the row alone
+               leaves the node enrolled with nothing behind it. -->
+          <router-link
+            v-if="server.node_id"
+            :to="{ name: 'relay-nodes' }"
+            class="badge badge-info"
+            title="Enrolled relay node - approve, suspend or remove it on the relay nodes page"
+            >relay node</router-link
+          >
           <span v-if="server.status === 'enabled'" class="badge badge-success badge-dot"
             >Enabled</span
           >
@@ -251,7 +261,7 @@ onMounted(fetchServer)
               {{ server.status === 'disabled' ? 'Enable' : 'Disable' }}
             </button>
             <button
-              v-if="projStore.can('smtp:delete')"
+              v-if="projStore.can('smtp:delete') && !server.node_id"
               class="btn btn-danger"
               @click="deleteServer"
             >

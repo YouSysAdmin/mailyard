@@ -168,6 +168,16 @@ onMounted(load)
                   <router-link :to="`/smtp-servers/${server.id}`" class="cell-link">{{
                     server.name
                   }}</router-link>
+                  <!-- A node's row is managed from the relay nodes page: its
+                       status there is approval, and removing the row alone
+                       leaves the node enrolled with nothing behind it. -->
+                  <router-link
+                    v-if="server.node_id"
+                    :to="{ name: 'relay-nodes' }"
+                    class="badge badge-info"
+                    title="Enrolled relay node - approve, suspend or remove it on the relay nodes page"
+                    >relay node</router-link
+                  >
                 </td>
                 <td>{{ providerLabel(server.provider) }}</td>
                 <td>
@@ -241,7 +251,7 @@ onMounted(load)
                       Edit
                     </button>
                     <button
-                      v-if="projStore.can('smtp:delete')"
+                      v-if="projStore.can('smtp:delete') && !server.node_id"
                       class="btn btn-danger btn-sm"
                       @click="deleteServer(server)"
                     >

@@ -144,6 +144,16 @@ onMounted(load)
               <td>
                 {{ srv.name }}
                 <span v-if="srv.platform_only" class="badge badge-info">platform</span>
+                <!-- A node's row is managed from the relay nodes page: its
+                     status there is approval, and removing the row alone
+                     leaves the node enrolled with nothing behind it. -->
+                <router-link
+                  v-if="srv.node_id"
+                  :to="{ name: 'admin-relay-nodes' }"
+                  class="badge badge-info"
+                  title="Enrolled relay node - approve, suspend or remove it on the relay nodes page"
+                  >relay node</router-link
+                >
                 <div class="text-sm text-muted">priority {{ srv.priority }}</div>
               </td>
               <td>{{ providerLabel(srv.provider) }}</td>
@@ -193,7 +203,9 @@ onMounted(load)
                   <button class="btn btn-secondary btn-sm" @click="toggle(srv)">
                     {{ srv.status === 'enabled' ? 'Disable' : 'Enable' }}
                   </button>
-                  <button class="btn btn-danger btn-sm" @click="remove(srv)">Delete</button>
+                  <button v-if="!srv.node_id" class="btn btn-danger btn-sm" @click="remove(srv)">
+                    Delete
+                  </button>
                 </div>
               </td>
             </tr>
