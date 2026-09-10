@@ -117,9 +117,8 @@ async function remove(box: SandboxInbox) {
   <div>
     <BaseModal title="Inboxes" size="modal-w760" @close="emit('close')">
       <p class="lead">
-        An inbox is a saved filter.
-        Name the addresses one application sends from and the sandbox can filter that application's
-        mail on its own.
+        An inbox is a saved filter. Name the addresses one application sends from and the sandbox
+        can filter that application's mail on its own.
       </p>
 
       <div class="inboxes-head">
