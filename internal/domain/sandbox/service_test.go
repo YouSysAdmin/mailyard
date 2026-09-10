@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/settings"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
@@ -35,13 +36,13 @@ func (f *fakeStore) Trim(_ context.Context, _ string, keep int) (int64, error) {
 
 func (f *fakeStore) Get(context.Context, string, string) (*sbmodel.Email, error) { return nil, nil }
 func (f *fakeStore) Raw(context.Context, string, string) ([]byte, error)         { return nil, nil }
-func (f *fakeStore) List(context.Context, string, int, int) ([]*sbmodel.Email, error) {
+func (f *fakeStore) List(context.Context, string, store.SandboxFilter) ([]*sbmodel.Email, error) {
 	return nil, nil
 }
-func (f *fakeStore) Count(context.Context, string) (int, error)             { return 0, nil }
-func (f *fakeStore) Delete(context.Context, string, string) error           { return nil }
-func (f *fakeStore) Clear(context.Context, string) (int64, error)           { return 0, nil }
-func (f *fakeStore) PurgeExpired(context.Context, time.Time) (int64, error) { return 0, nil }
+func (f *fakeStore) Count(context.Context, string, store.SandboxFilter) (int, error) { return 0, nil }
+func (f *fakeStore) Delete(context.Context, string, string) error                    { return nil }
+func (f *fakeStore) Clear(context.Context, string) (int64, error)                    { return 0, nil }
+func (f *fakeStore) PurgeExpired(context.Context, time.Time) (int64, error)          { return 0, nil }
 
 // fakeLoader feeds the settings cache without a database.
 type fakeLoader struct{ rows []*smodel.Setting }

@@ -73,6 +73,7 @@ type Store struct {
 	Domain          DomainStore
 	Inbound         InboundStore
 	Sandbox         SandboxStore
+	SandboxInbox    SandboxInboxStore
 	Plan            PlanStore
 	Sender          SenderStore
 	SMTPCredential  SMTPCredentialStore
@@ -950,8 +951,11 @@ type InboundStore interface {
 type SandboxStore interface {
 	Get(ctx context.Context, projID, id string) (*sandbox.Email, error)
 	Raw(ctx context.Context, projID, id string) ([]byte, error)
-	List(ctx context.Context, projID string, limit, offset int) ([]*sandbox.Email, error)
-	Count(ctx context.Context, projID string) (int, error)
+
+	// List and Count answer the same filter, so a page and the total
+	// beside it describe the same set.
+	List(ctx context.Context, projID string, f SandboxFilter) ([]*sandbox.Email, error)
+	Count(ctx context.Context, projID string, f SandboxFilter) (int, error)
 	Put(ctx context.Context, e *sandbox.Email) error
 	Delete(ctx context.Context, projID, id string) error
 	Clear(ctx context.Context, projID string) (int64, error)
@@ -962,6 +966,29 @@ type SandboxStore interface {
 
 	// Retention sweep, unscoped by project.
 	PurgeExpired(ctx context.Context, now time.Time) (int64, error)
+}
+
+// SandboxFilter narrows a capture listing.
+//
+// Addresses is an inbox's sender list, already lowercased, and the
+// capture's envelope sender has to be one of them. Empty means every
+// capture - an inbox with NO addresses is the handler's business, since
+// the store cannot tell "no filter" from "a filter nothing satisfies".
+type SandboxFilter struct {
+	Addresses []string
+	Limit     int
+	Offset    int
+}
+
+// SandboxInboxStore persists sandbox inboxes, the saved sender filters
+// over captured mail. Nothing in sandbox_emails references an inbox, so
+// deleting one deletes no capture.
+type SandboxInboxStore interface {
+	Get(ctx context.Context, projID, id string) (*sandbox.Inbox, error)
+	GetByName(ctx context.Context, projID, name string) (*sandbox.Inbox, error)
+	List(ctx context.Context, projID string) ([]*sandbox.Inbox, error)
+	Put(ctx context.Context, in *sandbox.Inbox) error
+	Delete(ctx context.Context, projID, id string) error
 }
 
 // InboundFilter narrows inbound listings.

@@ -92,6 +92,25 @@ The detail page shows the **SMTP envelope** separately from the `From` and `To`
 headers. They routinely differ - a `Bcc` recipient appears in the envelope and in no header at all - and that difference
 is usually the thing being debugged.
 
+## Splitting the sandbox into inboxes
+
+One sandbox per project, and often more than one application sending into it. An **inbox** splits the list without a
+second credential: it is a name over a list of sender addresses, and the sandbox page gets a dropdown - **All mail**,
+then one entry per inbox - that narrows the list to captures whose **envelope sender** is on that inbox's list.
+
+Open **Inboxes** on the sandbox page to create one. Addresses match exactly and without regard to case. A domain on
+its own does not match anything.
+
+An inbox holds no mail. It is a saved filter, decided every time the list is read:
+
+- Editing the address list changes what the inbox shows immediately, captures already held included.
+- Deleting an inbox deletes no message. Everything it showed is still under **All mail**.
+- **Empty sandbox** empties the whole project's sandbox, not the inbox selected in the dropdown. The confirmation
+  says so.
+
+Inboxes are sandbox configuration and are gated on the same permissions as the captures: `sandbox:read` to see them,
+`sandbox:write` to create and edit, `sandbox:delete` to remove.
+
 ## How long a message is kept
 
 Two limits, and the second is the one that matters in practice.
@@ -228,13 +247,18 @@ The sandbox has a console API under `/api/v1/sandbox`, session-authenticated lik
 
 | Route                                      | Purpose                                       |
 |--------------------------------------------|-----------------------------------------------|
-| `GET /api/v1/sandbox`                      | Page of captured messages, newest first       |
+| `GET /api/v1/sandbox`                      | Page of captured messages, newest first. `?inbox=<id>` narrows it to one inbox's senders |
 | `GET /api/v1/sandbox/info`                 | Connection details and the retention settings |
 | `GET /api/v1/sandbox/:id`                  | One message, parsed                           |
 | `GET /api/v1/sandbox/:id/raw`              | The wire bytes as `text/plain`                |
 | `GET /api/v1/sandbox/:id/attachments/:idx` | One attachment                                |
 | `DELETE /api/v1/sandbox/:id`               | Delete one message                            |
 | `POST /api/v1/sandbox/clear`               | Empty the project's sandbox                   |
+| `GET /api/v1/sandbox/inboxes`              | Every inbox in the project                    |
+| `POST /api/v1/sandbox/inboxes`             | Create an inbox: `name`, `description`, `addresses` |
+| `GET /api/v1/sandbox/inboxes/:id`          | One inbox                                     |
+| `PATCH /api/v1/sandbox/inboxes/:id`        | Edit an inbox                                 |
+| `DELETE /api/v1/sandbox/inboxes/:id`       | Delete an inbox. No captured mail is removed  |
 
 ## What a sandbox credential may do
 

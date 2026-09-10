@@ -12,7 +12,12 @@
 // page with it selected.
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { sandboxApi, type SandboxEmail, type SandboxInfo } from '../../api/sandbox'
+import {
+  sandboxApi,
+  type SandboxEmail,
+  type SandboxInbox,
+  type SandboxInfo,
+} from '../../api/sandbox'
 import type { SMTPCredential } from '../../api/types'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
@@ -27,6 +32,7 @@ import PageHeader from '../../components/PageHeader.vue'
 import MessageListRow from '../../components/MessageListRow.vue'
 import SandboxReader from './SandboxReader.vue'
 import SandboxConnection from './SandboxConnection.vue'
+import SandboxInboxes from './SandboxInboxes.vue'
 
 const PAGE_SIZE = 25
 
@@ -48,20 +54,39 @@ const deletingId = ref<string | null>(null)
 const clearing = ref(false)
 
 const credentials = ref<SMTPCredential[]>([])
+const inboxes = ref<SandboxInbox[]>([])
 
 const hasMore = computed(() => emails.value.length < total.value)
 
 // The selection lives in the URL, not in a ref. One source of truth, so
 // a deep link, the back button and a click in the list all arrive the
-// same way.
+// same way. The inbox filter rides beside it as `?inbox=`, for the same
+// reason: a refresh or a shared link lands on the same view.
 const selectedId = computed(() => (route.params.id ? String(route.params.id) : ''))
+const inbox = computed(() => (route.query.inbox ? String(route.query.inbox) : ''))
+
+// Every navigation on this page goes through here so the filter is
+// never dropped by a click in the list.
+function go(id: string, box = inbox.value) {
+  // replace, not push: reading down a list of captures is not twenty
+  // steps of history to walk back out through.
+  router.replace({ path: id ? `/sandbox/${id}` : '/sandbox', query: box ? { inbox: box } : {} })
+}
 
 function select(id: string) {
   if (id === selectedId.value) return
-  // replace, not push: reading down a list of captures is not twenty
-  // steps of history to walk back out through.
-  router.replace(`/sandbox/${id}`)
+  go(id)
 }
+
+// Switching inbox keeps the selection: the watcher below drops it once
+// the new page arrives without it, and only then, so the reader does not
+// flash empty on every switch.
+function setInbox(box: string) {
+  if (box === inbox.value) return
+  go(selectedId.value, box)
+}
+
+const inboxName = computed(() => inboxes.value.find((b) => b.id === inbox.value)?.name ?? '')
 
 // Connection details live in a DIALOG, not on the page.
 //
@@ -69,6 +94,7 @@ function select(id: string) {
 // listener is off - is read once, when somebody wires an application
 // up, and this page is left open while a suite runs.
 const showConnection = ref(false)
+const showInboxes = ref(false)
 
 const activeCredentials = computed(() => credentials.value.filter((c) => !c.revoked))
 
@@ -101,7 +127,11 @@ const keptForLabel = computed(() => {
 async function load(quiet = false) {
   if (!quiet) loading.value = true
   try {
-    const res = await sandboxApi.list({ limit: PAGE_SIZE, offset: 0 })
+    const res = await sandboxApi.list({
+      limit: PAGE_SIZE,
+      offset: 0,
+      inbox: inbox.value || undefined,
+    })
     emails.value = res.data.sandbox_emails ?? []
     total.value = res.data.total ?? emails.value.length
   } catch (e) {
@@ -129,10 +159,37 @@ async function loadCredentials() {
   }
 }
 
+async function loadInboxes() {
+  try {
+    inboxes.value = (await sandboxApi.listInboxes()).data.sandbox_inboxes ?? []
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to load sandbox inboxes'))
+  }
+}
+
+// An inbox that was deleted, or edited away from under the filter, is
+// rereading the list: the dropdown must not keep offering a name the
+// server no longer knows, and a filter on a gone inbox is "All mail".
+async function inboxesChanged() {
+  await loadInboxes()
+  if (inbox.value && !inboxes.value.some((b) => b.id === inbox.value)) {
+    setInbox('')
+
+    return
+  }
+
+  pagedBack.value = false
+  load()
+}
+
 async function loadMore() {
   loadingMore.value = true
   try {
-    const res = await sandboxApi.list({ limit: PAGE_SIZE, offset: emails.value.length })
+    const res = await sandboxApi.list({
+      limit: PAGE_SIZE,
+      offset: emails.value.length,
+      inbox: inbox.value || undefined,
+    })
     emails.value = emails.value.concat(res.data.sandbox_emails ?? [])
     pagedBack.value = true
     total.value = res.data.total ?? total.value
@@ -153,7 +210,7 @@ function forget(id: string) {
   if (selectedId.value !== id) return
 
   const next = emails.value[at] ?? emails.value[at - 1]
-  router.replace(next ? `/sandbox/${next.id}` : '/sandbox')
+  go(next ? next.id : '')
 }
 
 async function deleteEmail(em: SandboxEmail) {
@@ -169,9 +226,13 @@ async function deleteEmail(em: SandboxEmail) {
 }
 
 async function clearAll() {
+  // The count on screen is the filtered one, so the sentence says what
+  // the button actually does when an inbox is selected: everything goes.
   const ok = await confirm({
     title: 'Empty the sandbox',
-    message: `Delete all ${total.value} captured messages? Nothing here was ever delivered, so this affects no recipient.`,
+    message: inbox.value
+      ? 'Delete every captured message in this project, not only the ones in this inbox? Nothing here was ever delivered, so this affects no recipient.'
+      : `Delete all ${total.value} captured messages? Nothing here was ever delivered, so this affects no recipient.`,
     confirmText: 'Delete all',
     variant: 'danger',
   })
@@ -187,7 +248,7 @@ async function clearAll() {
     // are gone.
     emails.value = []
     total.value = 0
-    if (selectedId.value) router.replace('/sandbox')
+    if (selectedId.value) go('')
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to empty the sandbox'))
   } finally {
@@ -222,21 +283,52 @@ const { refreshing, refresh, auto, paused, everySeconds } = useAutoRefresh(() =>
 watch(
   [emails, selectedId],
   ([list, sel]) => {
-    if (!sel && list.length > 0) router.replace(`/sandbox/${list[0].id}`)
+    if (!sel && list.length > 0) go(list[0].id)
   },
   { immediate: true },
 )
+
+// A new filter is a new list. The selection is dropped only when the
+// page that comes back does not hold it, which is what lets a switch to
+// the inbox the open message belongs to keep it open.
+watch(inbox, async () => {
+  pagedBack.value = false
+  await load()
+  if (selectedId.value && !emails.value.some((e) => e.id === selectedId.value)) go('')
+})
 
 onMounted(() => {
   load()
   loadInfo()
   loadCredentials()
+  loadInboxes()
 })
 </script>
 
 <template>
   <div class="reader-page">
-    <PageHeader title="Inbound Sandbox">
+    <PageHeader>
+      <!-- The filter sits beside the title, not among the actions: it
+           says WHICH mail the page shows, the way a folder name does in
+           a mail client, and the buttons on the right act on it. Shown
+           once there is something to pick - "All mail" alone is a
+           control with one setting, and the Inboxes button is where the
+           first one gets made. -->
+      <template #title>
+        <div class="title-row">
+          <h1>Inbound Sandbox</h1>
+          <select
+            v-if="inboxes.length > 0"
+            :value="inbox"
+            class="form-select inbox-filter"
+            aria-label="Filter by inbox"
+            @change="setInbox(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">All mail</option>
+            <option v-for="box in inboxes" :key="box.id" :value="box.id">{{ box.name }}</option>
+          </select>
+        </div>
+      </template>
       <RefreshControl
         :every-seconds="everySeconds"
         :refreshing="refreshing"
@@ -249,6 +341,7 @@ onMounted(() => {
         Connection
         <span v-if="connectionNeedsAttention" class="attn-dot" aria-hidden="true"></span>
       </button>
+      <button class="btn btn-secondary" @click="showInboxes = true">Inboxes</button>
       <template v-if="emails.length > 0 && projStore.can('sandbox:delete')">
         <button class="btn btn-danger" :disabled="clearing" @click="clearAll">
           {{ clearing ? 'Deleting...' : 'Empty sandbox' }}
@@ -294,6 +387,15 @@ onMounted(() => {
 
       <div class="reader-pane">
         <SandboxReader v-if="selectedId" :id="selectedId" @deleted="forget" />
+        <EmptyState
+          v-else-if="emails.length === 0 && inbox"
+          :title="`Nothing from ${inboxName || 'this inbox'} yet`"
+        >
+          <p>
+            No capture has an envelope sender on this inbox's list. Pick All mail to see everything
+            the sandbox holds.
+          </p>
+        </EmptyState>
         <EmptyState v-else-if="emails.length === 0" title="Nothing captured yet">
           <p>
             Send a message with a sandbox credential and it will appear here instead of going to a
@@ -314,10 +416,32 @@ onMounted(() => {
       @changed="loadCredentials"
       @close="showConnection = false"
     />
+
+    <SandboxInboxes
+      v-if="showInboxes"
+      :inboxes="inboxes"
+      @changed="inboxesChanged"
+      @close="showInboxes = false"
+    />
   </div>
 </template>
 
 <style scoped>
+/* The heading and the filter share one line. The shared select is
+   full-width because every other one sits in a form, so it gets a
+   width of its own here or it takes the whole row. */
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.inbox-filter {
+  width: auto;
+  min-width: 160px;
+  max-width: 260px;
+}
+
 /* The button says something is unset before it is pressed - no
    credential to send with, or a listener that is off. */
 .attn-dot {

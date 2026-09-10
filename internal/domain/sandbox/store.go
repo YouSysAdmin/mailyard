@@ -7,9 +7,11 @@ import (
 	"database/sql"
 	"encoding/json/v2"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/database"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
 	scmodel "github.com/yousysadmin/mailyard/internal/models/smtpcredential"
 )
@@ -78,15 +80,35 @@ func (s *Store) Raw(ctx context.Context, projID, id string) ([]byte, error) {
 	return raw, err
 }
 
-// List returns one page, newest first.
-func (s *Store) List(ctx context.Context, projID string, limit, offset int) ([]*sbmodel.Email, error) {
+// senderIn is the inbox filter, shared by List and Count so the page
+// and the total beside it cannot disagree about what is in the set.
+//
+// lower() on the column rather than on the parameter: an inbox stores
+// its addresses lowercased already, and the envelope sender was written
+// exactly as the client said it. A text[] parameter, not an IN list, so
+// the statement text is one constant whatever the list's length.
+const senderIn = ` AND lower(e.sender) = ANY(?::text[])`
+
+// List returns one page, newest first, narrowed by f.
+func (s *Store) List(ctx context.Context, projID string, f store.SandboxFilter) ([]*sbmodel.Email, error) {
+	limit := f.Limit
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 
-	rows, err := s.ReadQuery(ctx,
-		sandboxSelect+` WHERE e.project_id = ? ORDER BY e.received_at DESC LIMIT ? OFFSET ?`,
-		projID, limit, offset)
+	var sb strings.Builder
+	sb.WriteString(sandboxSelect)
+	sb.WriteString(` WHERE e.project_id = ?`)
+	args := []any{projID}
+	if len(f.Addresses) > 0 {
+		sb.WriteString(senderIn)
+		args = append(args, f.Addresses)
+	}
+
+	sb.WriteString(` ORDER BY e.received_at DESC LIMIT ? OFFSET ?`)
+	args = append(args, limit, f.Offset)
+
+	rows, err := s.ReadQuery(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,10 +127,18 @@ func (s *Store) List(ctx context.Context, projID string, limit, offset int) ([]*
 	return out, rows.Err()
 }
 
-// Count returns how many captured messages projID holds.
-func (s *Store) Count(ctx context.Context, projID string) (int, error) {
+// Count returns how many captured messages projID holds under f.
+func (s *Store) Count(ctx context.Context, projID string, f store.SandboxFilter) (int, error) {
+	var sb strings.Builder
+	sb.WriteString(`SELECT COUNT(*) FROM sandbox_emails e WHERE e.project_id = ?`)
+	args := []any{projID}
+	if len(f.Addresses) > 0 {
+		sb.WriteString(senderIn)
+		args = append(args, f.Addresses)
+	}
+
 	var n int
-	err := s.ReadQueryRow(ctx, `SELECT COUNT(*) FROM sandbox_emails WHERE project_id = ?`, projID).Scan(&n)
+	err := s.ReadQueryRow(ctx, sb.String(), args...).Scan(&n)
 
 	return n, err
 }

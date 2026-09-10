@@ -869,6 +869,14 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	sb.Get("/credentials", permRead, sbh.ListCredentials)
 	sb.Post("/credentials", permWrite, sbh.CreateCredential)
 	sb.Post("/credentials/:id/revoke", permWrite, sbh.RevokeCredential)
+	// Inboxes are saved sender filters over the capture list. Deleting
+	// one deletes no mail, so sandbox:delete gates it for symmetry with
+	// the rest of the group and nothing more.
+	sb.Get("/inboxes", permRead, sbh.ListInboxes)
+	sb.Post("/inboxes", permWrite, sbh.CreateInbox)
+	sb.Get("/inboxes/:id", permRead, sbh.GetInbox)
+	sb.Patch("/inboxes/:id", permWrite, sbh.UpdateInbox)
+	sb.Delete("/inboxes/:id", permDelete, sbh.DeleteInbox)
 	sb.Get("/:id", permRead, sbh.Get)
 	sb.Get("/:id/raw", permRead, sbh.Raw)
 	sb.Get("/:id/attachments/:idx", permRead, sbh.Attachment)

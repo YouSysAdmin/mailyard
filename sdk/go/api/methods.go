@@ -1064,6 +1064,42 @@ func (c *Client) CredentialsRevokeSandbox(ctx context.Context, id string, opts .
 	return do[CredentialResponse](ctx, c, "POST", fmt.Sprintf("/sandbox/credentials/%s/revoke", escape(id)), nil, opts)
 }
 
+// ListSandboxInboxes List inboxes.
+//
+// GET /sandbox/inboxes
+func (c *Client) ListSandboxInboxes(ctx context.Context, opts ...RequestOption) (InboxListResponse, error) {
+	return do[InboxListResponse](ctx, c, "GET", "/sandbox/inboxes", nil, opts)
+}
+
+// CreateSandboxInboxe Create inbox.
+//
+// POST /sandbox/inboxes
+func (c *Client) CreateSandboxInboxe(ctx context.Context, body InboxCreateInput, opts ...RequestOption) (InboxResponse, error) {
+	return do[InboxResponse](ctx, c, "POST", "/sandbox/inboxes", body, opts)
+}
+
+// DeleteSandboxInboxe Delete inbox.
+//
+// DELETE /sandbox/inboxes/:id
+func (c *Client) DeleteSandboxInboxe(ctx context.Context, id string, opts ...RequestOption) error {
+	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/sandbox/inboxes/%s", escape(id)), nil, opts)
+	return err
+}
+
+// GetSandboxInboxe Get inbox.
+//
+// GET /sandbox/inboxes/:id
+func (c *Client) GetSandboxInboxe(ctx context.Context, id string, opts ...RequestOption) (InboxResponse, error) {
+	return do[InboxResponse](ctx, c, "GET", fmt.Sprintf("/sandbox/inboxes/%s", escape(id)), nil, opts)
+}
+
+// UpdateSandboxInboxe Update inbox.
+//
+// PATCH /sandbox/inboxes/:id
+func (c *Client) UpdateSandboxInboxe(ctx context.Context, id string, body InboxUpdateInput, opts ...RequestOption) (InboxResponse, error) {
+	return do[InboxResponse](ctx, c, "PATCH", fmt.Sprintf("/sandbox/inboxes/%s", escape(id)), body, opts)
+}
+
 // GetSandboxInfo Info.
 //
 // GET /sandbox/info

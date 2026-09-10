@@ -257,7 +257,7 @@ func Usage(ctx context.Context, st *store.Store, projID string) (Counts, *pmodel
 		return out, nil, err
 	}
 
-	sandboxKept, err := st.Sandbox.Count(ctx, projID)
+	sandboxKept, err := st.Sandbox.Count(ctx, projID, store.SandboxFilter{})
 	if err != nil {
 		return out, nil, err
 	}

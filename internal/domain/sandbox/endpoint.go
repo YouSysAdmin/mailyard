@@ -12,7 +12,9 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
+	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
 
@@ -31,15 +33,43 @@ type Handler struct {
 // Bundled rather than left to a second endpoint because "where did my
 // message go" is the first question this page has to answer, and the
 // answer is usually one of those two numbers.
+//
+// `?inbox=<id>` narrows the page to one inbox's senders. The inbox is
+// resolved here and its addresses handed to the store, so an inbox with
+// no addresses is an empty page rather than the whole sandbox - the
+// store reads an empty list as "no filter".
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	p := paging.From(c)
-	msgs, err := h.Runtime.Store.Sandbox.List(c.Context(), rc.Project.ID, p.Limit, p.Offset)
+	settings := RetentionInfo{
+		RetentionDays: h.retentionFor(c, rc.Project.ID),
+		MaxMessages:   h.maxMessagesFor(c, rc.Project.ID),
+	}
+
+	f := store.SandboxFilter{Limit: p.Limit, Offset: p.Offset}
+	if id := c.Query("inbox"); id != "" {
+		in, err := h.Runtime.Store.SandboxInbox.Get(c.Context(), rc.Project.ID, id)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if in == nil {
+			return response.NotFound(c, "inbox not found")
+		}
+
+		if len(in.Addresses) == 0 {
+			return response.Success(c, ListResponse{SandboxEmails: []*sbmodel.Email{}, Settings: settings})
+		}
+
+		f.Addresses = in.Addresses
+	}
+
+	msgs, err := h.Runtime.Store.Sandbox.List(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	total, err := h.Runtime.Store.Sandbox.Count(c.Context(), rc.Project.ID)
+	total, err := h.Runtime.Store.Sandbox.Count(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -47,10 +77,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 	return response.Success(c, ListResponse{
 		SandboxEmails: msgs,
 		Total:         total,
-		Settings: RetentionInfo{
-			RetentionDays: h.retentionFor(c, rc.Project.ID),
-			MaxMessages:   h.maxMessagesFor(c, rc.Project.ID),
-		},
+		Settings:      settings,
 	})
 }
 

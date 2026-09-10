@@ -821,6 +821,41 @@ type InboundStatsResponse struct {
 	Counts map[string]int64 `json:"counts"`
 }
 
+// Inbox is the wire body.
+type Inbox struct {
+	ID          string     `json:"id"`
+	ProjectID   string     `json:"project_id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description,omitempty"`
+	Addresses   []string   `json:"addresses"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
+}
+
+// InboxCreateInput is the request body.
+type InboxCreateInput struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Addresses   []string `json:"addresses"`
+}
+
+// InboxListResponse is the response body.
+type InboxListResponse struct {
+	SandboxInboxes []*Inbox `json:"sandbox_inboxes"`
+}
+
+// InboxResponse is the response body.
+type InboxResponse struct {
+	SandboxInbox *Inbox `json:"sandbox_inbox"`
+}
+
+// InboxUpdateInput is the request body.
+type InboxUpdateInput struct {
+	Name        string   `json:"name"`
+	Description *string  `json:"description"`
+	Addresses   []string `json:"addresses"`
+}
+
 // IngestInput is the request body.
 type IngestInput struct {
 	Recipient string `json:"recipient"`

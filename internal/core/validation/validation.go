@@ -188,9 +188,21 @@ func applyNormalizeTags(v reflect.Value) {
 			fv := v.Field(i)
 			ft := t.Field(i)
 			applyNormalizeTags(fv)
-			if fv.Kind() == reflect.String && fv.CanSet() {
-				if tag := ft.Tag.Get("normalize"); tag != "" {
-					fv.SetString(applyStringOps(fv.String(), tag))
+			tag := ft.Tag.Get("normalize")
+			if tag == "" || !fv.CanSet() {
+				continue
+			}
+
+			switch {
+			case fv.Kind() == reflect.String:
+				fv.SetString(applyStringOps(fv.String(), tag))
+			case (fv.Kind() == reflect.Slice || fv.Kind() == reflect.Array) && fv.Type().Elem().Kind() == reflect.String:
+				// The tag sits on the field, the strings sit one level
+				// down: a list of addresses is normalised element by
+				// element or the tag on it means nothing.
+				for j := range fv.Len() {
+					el := fv.Index(j)
+					el.SetString(applyStringOps(el.String(), tag))
 				}
 			}
 		}

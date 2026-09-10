@@ -42,6 +42,26 @@ export interface SandboxEmail {
   created_at: string
 }
 
+// SandboxInbox mirrors internal/models/sandbox.Inbox - a saved filter
+// over the envelope sender. Decided when the list is read, never stamped
+// on a capture: editing the addresses changes which captures it shows,
+// old ones included, and deleting it deletes no mail.
+export interface SandboxInbox {
+  id: string
+  project_id: string
+  name: string
+  description?: string
+  addresses: string[]
+  created_at: string
+  updated_at?: string
+}
+
+export interface SandboxInboxPayload {
+  name?: string
+  description?: string
+  addresses?: string[]
+}
+
 export interface SandboxSettings {
   retention_days: number
   max_messages: number
@@ -68,7 +88,7 @@ export interface SandboxInfo {
 }
 
 export const sandboxApi = {
-  list: (params: { limit?: number; offset?: number } = {}) =>
+  list: (params: { limit?: number; offset?: number; inbox?: string } = {}) =>
     api.get<{ sandbox_emails: SandboxEmail[]; total: number; settings: SandboxSettings }>(
       '/sandbox/',
       { params },
@@ -95,4 +115,13 @@ export const sandboxApi = {
       submission: SandboxInfo['submission']
     }>('/sandbox/credentials', { name }),
   revokeCredential: (id: string) => api.post(`/sandbox/credentials/${id}/revoke`),
+
+  // Inboxes are sandbox configuration, so they live under /sandbox and
+  // are gated on the same permissions as the captures they filter.
+  listInboxes: () => api.get<{ sandbox_inboxes: SandboxInbox[] }>('/sandbox/inboxes'),
+  createInbox: (payload: SandboxInboxPayload) =>
+    api.post<{ sandbox_inbox: SandboxInbox }>('/sandbox/inboxes', payload),
+  updateInbox: (id: string, payload: SandboxInboxPayload) =>
+    api.patch<{ sandbox_inbox: SandboxInbox }>(`/sandbox/inboxes/${id}`, payload),
+  removeInbox: (id: string) => api.delete(`/sandbox/inboxes/${id}`),
 }

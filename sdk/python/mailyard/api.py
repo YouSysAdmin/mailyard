@@ -623,6 +623,26 @@ class API:
         "Revoke credential"
         return self._t.request("POST", f"/sandbox/credentials/{_esc(id)}/revoke", body=None, query=query)
 
+    def list_sandbox_inboxes(self, **query: Any) -> Any:
+        "List inboxes"
+        return self._t.request("GET", "/sandbox/inboxes", body=None, query=query)
+
+    def create_sandbox_inboxe(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Create inbox"
+        return self._t.request("POST", "/sandbox/inboxes", body=body, query=query)
+
+    def delete_sandbox_inboxe(self, id, **query: Any) -> Any:
+        "Delete inbox"
+        return self._t.request("DELETE", f"/sandbox/inboxes/{_esc(id)}", body=None, query=query)
+
+    def get_sandbox_inboxe(self, id, **query: Any) -> Any:
+        "Get inbox"
+        return self._t.request("GET", f"/sandbox/inboxes/{_esc(id)}", body=None, query=query)
+
+    def update_sandbox_inboxe(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Update inbox"
+        return self._t.request("PATCH", f"/sandbox/inboxes/{_esc(id)}", body=body, query=query)
+
     def get_sandbox_info(self, **query: Any) -> Any:
         "Info"
         return self._t.request("GET", "/sandbox/info", body=None, query=query)

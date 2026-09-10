@@ -771,6 +771,31 @@ module Mailyard
       @t.request("POST", "/sandbox/credentials/#{esc(id)}/revoke", body: nil, query: query)
     end
 
+    # List inboxes
+    def list_sandbox_inboxes(**query)
+      @t.request("GET", "/sandbox/inboxes", body: nil, query: query)
+    end
+
+    # Create inbox
+    def create_sandbox_inboxe(body: nil, **query)
+      @t.request("POST", "/sandbox/inboxes", body: body, query: query)
+    end
+
+    # Delete inbox
+    def delete_sandbox_inboxe(id, **query)
+      @t.request("DELETE", "/sandbox/inboxes/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Get inbox
+    def get_sandbox_inboxe(id, **query)
+      @t.request("GET", "/sandbox/inboxes/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Update inbox
+    def update_sandbox_inboxe(id, body: nil, **query)
+      @t.request("PATCH", "/sandbox/inboxes/#{esc(id)}", body: body, query: query)
+    end
+
     # Info
     def get_sandbox_info(**query)
       @t.request("GET", "/sandbox/info", body: nil, query: query)

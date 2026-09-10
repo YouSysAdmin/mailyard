@@ -33,7 +33,7 @@ func Humanize(err error) []FieldError {
 	out := make([]FieldError, 0, len(ve))
 	for _, fe := range ve {
 		out = append(out, FieldError{
-			Field:   fe.Field(),
+			Field:   listField(fe.Field()),
 			Rule:    fe.Tag(),
 			Message: defaultMessage(fe),
 		})
@@ -42,6 +42,18 @@ func Humanize(err error) []FieldError {
 	sort.Slice(out, func(i, j int) bool { return out[i].Field < out[j].Field })
 
 	return out
+}
+
+// listField keys an element's error on the list it belongs to. A dive
+// rule reports `addresses[2]`, and a form has one control for the whole
+// list, so that is the name it looks the error up under. The message
+// keeps the index and says which entry.
+func listField(name string) string {
+	if i := strings.IndexByte(name, '['); i > 0 {
+		return name[:i]
+	}
+
+	return name
 }
 
 // Summary collapses []FieldError into one human line, suitable for

@@ -90,6 +90,7 @@ func BindStore(p *Postgres, cr *crypto.Service, reads env.ReplicaReadsConfig) *s
 		Domain:          domains.NewStore(p.db, cr),
 		Inbound:         inbound.NewStore(p.db, ro(reads.InboundLog)...),
 		Sandbox:         sandbox.NewStore(p.db, ro(reads.Sandbox)...),
+		SandboxInbox:    sandbox.NewInboxStore(p.db),
 		Plan:            plan.NewStore(p.db),
 		Sender:          sender.NewStore(p.db),
 		SMTPCredential:  smtpcredential.NewStore(p.db),

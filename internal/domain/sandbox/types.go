@@ -23,6 +23,22 @@ type credentialInput struct {
 	Name string `json:"name" validate:"required,min=1,max=100" normalize:"trim"`
 }
 
+// Addresses arrive trimmed and lowercased - normalize:"normalize" on a
+// []string is applied to every element - which is the form the list
+// query compares lower(sender) against. The handler dedupes what is
+// left.
+type inboxCreateInput struct {
+	Name        string   `json:"name"        validate:"required,min=1,max=100"              normalize:"trim"`
+	Description string   `json:"description" validate:"omitempty,max=500"                   normalize:"trim"`
+	Addresses   []string `json:"addresses"   validate:"required,min=1,max=50,dive,email"    normalize:"normalize"`
+}
+
+type inboxUpdateInput struct {
+	Name        string   `json:"name"        validate:"omitempty,min=1,max=100"             normalize:"trim"`
+	Description *string  `json:"description" validate:"omitzero,max=500"`
+	Addresses   []string `json:"addresses"   validate:"omitempty,min=1,max=50,dive,email"   normalize:"normalize"`
+}
+
 // ----------------------------------------------------------------------------
 // Responses
 // ----------------------------------------------------------------------------
@@ -108,4 +124,14 @@ type CredentialCreatedResponse struct {
 // CredentialResponse is one credential without the password.
 type CredentialResponse struct {
 	SMTPCredential *scmodel.Credential `json:"smtp_credential"`
+}
+
+// InboxListResponse is every inbox in the project, by name.
+type InboxListResponse struct {
+	SandboxInboxes []*sbmodel.Inbox `json:"sandbox_inboxes"`
+}
+
+// InboxResponse is one inbox.
+type InboxResponse struct {
+	SandboxInbox *sbmodel.Inbox `json:"sandbox_inbox"`
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/database/dbtest"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
 )
 
@@ -141,7 +142,7 @@ func TestACaptureNamesItsCredential(t *testing.T) {
 		}
 	}
 
-	list, err := s.List(t.Context(), proj, 10, 0)
+	list, err := s.List(t.Context(), proj, store.SandboxFilter{Limit: 10})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestAnotherProjectSeesNothing(t *testing.T) {
 		t.Error("raw bytes were readable from another project")
 	}
 
-	list, err := s.List(t.Context(), theirs, 50, 0)
+	list, err := s.List(t.Context(), theirs, store.SandboxFilter{Limit: 50})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
