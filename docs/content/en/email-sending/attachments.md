@@ -73,10 +73,10 @@ The same endpoint is on the machine API at `/api/v1/emails/limits` under `emails
 
 Each entry has three fields, and only two of them matter:
 
-| Field | Notes |
-|---|---|
-| `filename` | **Required.** An entry without one is refused |
-| `content` | The file, base64 with standard padding |
+| Field          | Notes                                             |
+|----------------|---------------------------------------------------|
+| `filename`     | **Required.** An entry without one is refused     |
+| `content`      | The file, base64 with standard padding            |
 | `content_type` | Optional — defaults to `application/octet-stream` |
 
 Leaving `content_type` out is safe but rarely what you want: `application/octet-stream` tells the recipient's client
@@ -112,12 +112,12 @@ stored attachments.
 
 Validation runs over the whole set before anything is written, and the message names the file:
 
-| Message | Cause |
-|---|---|
-| `attachment filename is required` | An entry with no `filename` |
-| `attachment "report.pdf" has invalid base64 content` | Not decodable — usually a stray newline or missing padding |
-| `attachment "report.pdf" exceeds maximum size of 10485760 bytes` | Over the per-file limit |
-| `total attachment size exceeds maximum of 26214400 bytes` | The set is over the combined limit |
+| Message                                                          | Cause                                                      |
+|------------------------------------------------------------------|------------------------------------------------------------|
+| `attachment filename is required`                                | An entry with no `filename`                                |
+| `attachment "report.pdf" has invalid base64 content`             | Not decodable — usually a stray newline or missing padding |
+| `attachment "report.pdf" exceeds maximum size of 10485760 bytes` | Over the per-file limit                                    |
+| `total attachment size exceeds maximum of 26214400 bytes`        | The set is over the combined limit                         |
 
 Sizes are measured on the **decoded** bytes, not on the base64 you sent, so a 9 MB file is a 9 MB attachment even though
 it travels as roughly 12 MB of text.

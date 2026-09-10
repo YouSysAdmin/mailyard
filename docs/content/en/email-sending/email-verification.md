@@ -68,24 +68,24 @@ cached `valid` cannot outlive a suppression you added a second ago.
 
 ```json
 {
-  "verification": {
-    "email": "support@acme-industrial.example",
-    "status": "risky",
-    "score": 60,
-    "reason": "this looks like a role account rather than a person",
-    "checks": {
-      "syntax": true,
-      "mx": true,
-      "disposable": false,
-      "role_account": true,
-      "smtp": "skipped"
-    },
-    "mailbox_verified": false,
-    "suppressed": false,
-    "previously_bounced": false,
-    "cached": true,
-    "checked_at": "2026-05-31T12:00:00Z"
-  }
+    "verification": {
+        "email": "support@acme-industrial.example",
+        "status": "risky",
+        "score": 60,
+        "reason": "this looks like a role account rather than a person",
+        "checks": {
+            "syntax": true,
+            "mx": true,
+            "disposable": false,
+            "role_account": true,
+            "smtp": "skipped"
+        },
+        "mailbox_verified": false,
+        "suppressed": false,
+        "previously_bounced": false,
+        "cached": true,
+        "checked_at": "2026-05-31T12:00:00Z"
+    }
 }
 ```
 
@@ -99,13 +99,13 @@ proof that an address is dead would suppress real customers, and caching it woul
 
 `status` and `score` always agree, so branch on whichever suits your code:
 
-| `status` | `score` | Reached when |
-|---|---|---|
-| `valid` | 90 | Syntax is good, the domain takes mail, the local part is not a role |
-| `risky` | 60 | The same, but the local part looks like a role rather than a person |
-| `unknown` | 50 | The lookup itself failed. Not evidence of anything |
-| `disposable` | 10 | The domain is a known throwaway provider |
-| `invalid` | 0 | Bad syntax, no mail servers, suppressed, or hard-bounced for you |
+| `status`     | `score` | Reached when                                                        |
+|--------------|---------|---------------------------------------------------------------------|
+| `valid`      | 90      | Syntax is good, the domain takes mail, the local part is not a role |
+| `risky`      | 60      | The same, but the local part looks like a role rather than a person |
+| `unknown`    | 50      | The lookup itself failed. Not evidence of anything                  |
+| `disposable` | 10      | The domain is a known throwaway provider                            |
+| `invalid`    | 0       | Bad syntax, no mail servers, suppressed, or hard-bounced for you    |
 
 `reason` carries a sentence explaining anything that is not plainly valid, and is omitted when there is nothing to
 explain.
@@ -124,10 +124,10 @@ which of the two you got.
 
 ## Refusals
 
-| Status | When |
-|---|---|
-| `400` | `email` is missing or not a valid address |
-| `400` | Verification is disabled on this install — the message names `email_verify.enabled` |
+| Status | When                                                                                |
+|--------|-------------------------------------------------------------------------------------|
+| `400`  | `email` is missing or not a valid address                                           |
+| `400`  | Verification is disabled on this install — the message names `email_verify.enabled` |
 
 There is no rate limit of its own on this route. The MX cache is what keeps a loop over a large list from becoming a
 loop over your resolver, so leave `fresh` alone unless you have a reason.

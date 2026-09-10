@@ -174,6 +174,8 @@ func (s *Service) AttachTemplateFiles(ctx context.Context, projID, templateID st
 // batch-level template ref) or raw mode (Subject plus a body).
 type BatchItem struct {
 	To                    []string
+	Cc                    []string
+	Bcc                   []string
 	Language              string
 	Data                  map[string]any
 	Subject               string
@@ -204,7 +206,6 @@ func (s *Service) SendBatch(ctx context.Context, projID, createdBy, apiKeyID, fr
 		req := &SendRequest{
 			From:                  from,
 			ReplyTo:               replyTo,
-			To:                    item.To,
 			Subject:               item.Subject,
 			HTML:                  item.HTML,
 			Text:                  item.Text,
@@ -212,6 +213,7 @@ func (s *Service) SendBatch(ctx context.Context, projID, createdBy, apiKeyID, fr
 			ListUnsubscribeMailto: item.ListUnsubscribeMailto,
 			ListUnsubscribePost:   item.ListUnsubscribePost,
 		}
+		req.To, req.HeaderTo, req.Cc = foldRecipients(item.To, item.Cc, item.Bcc)
 		var e *emailmodel.Email
 		var blocked []string
 		var err error

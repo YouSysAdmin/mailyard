@@ -60,8 +60,8 @@ The API has no route to cancel or reschedule one. Once accepted, it will be sent
 Data erasure will not remove it either — the erasure endpoints deliberately skip rows that are queued, scheduled or in
 flight, so there is no way through that door.
 
-Schedule close to the send, or keep the decision on your side and call `/emails/send` when the moment arrives. For
-anything you may need to stop, a [campaign](/docs/campaigns/sending) is the right shape instead — those can be paused
+Schedule close to send, or keep the decision on your side and call `/emails/send` when the moment arrives. For
+anything, you may need to stop, a [campaign](/docs/campaigns/sending) is the right shape instead — those can be paused
 and cancelled.
 {{< /callout >}}
 

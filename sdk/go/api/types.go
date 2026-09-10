@@ -34,6 +34,13 @@ type ActiveVersionResponse struct {
 	ActiveVersionID string `json:"active_version_id"`
 }
 
+// Addressing is the wire body.
+type Addressing struct {
+	To  []string `json:"to"`
+	Cc  []string `json:"cc"`
+	Bcc []string `json:"bcc"`
+}
+
 // Admin is the wire body.
 type Admin struct {
 	ID         string     `json:"id"`
@@ -171,6 +178,8 @@ type BatchInput struct {
 // BatchItemInput is the request body.
 type BatchItemInput struct {
 	To                    []string       `json:"to"`
+	Cc                    []string       `json:"cc"`
+	Bcc                   []string       `json:"bcc"`
 	Language              string         `json:"language"`
 	Data                  map[string]any `json:"data"`
 	Subject               string         `json:"subject"`
@@ -565,8 +574,9 @@ type EmailListResponse struct {
 
 // EmailResponse is the response body.
 type EmailResponse struct {
-	Email   *Email   `json:"email"`
-	SentVia *SentVia `json:"sent_via,omitempty"`
+	Email      *Email      `json:"email"`
+	SentVia    *SentVia    `json:"sent_via,omitempty"`
+	Addressing *Addressing `json:"addressing"`
 }
 
 // EmailSendInput is the request body.
@@ -574,6 +584,8 @@ type EmailSendInput struct {
 	From                  string            `json:"from"`
 	ReplyTo               string            `json:"reply_to"`
 	To                    []string          `json:"to"`
+	Cc                    []string          `json:"cc"`
+	Bcc                   []string          `json:"bcc"`
 	Subject               string            `json:"subject"`
 	HTML                  string            `json:"html"`
 	Text                  string            `json:"text"`
@@ -2042,6 +2054,8 @@ type TemplateSendInput struct {
 	From                  string            `json:"from"`
 	ReplyTo               string            `json:"reply_to"`
 	To                    []string          `json:"to"`
+	Cc                    []string          `json:"cc"`
+	Bcc                   []string          `json:"bcc"`
 	TemplateID            string            `json:"template_id"`
 	TemplateName          string            `json:"template_name"`
 	Language              string            `json:"language"`

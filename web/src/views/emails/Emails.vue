@@ -249,7 +249,7 @@ function recipientsSummary(recipients: string[]): string {
                       {{ email.open_count ?? 0 }} / {{ email.click_count ?? 0 }}
                     </span>
                   </td>
-                  <td>{{ formatDate(email.created_at) }}</td>
+                  <td class="cell-nowrap">{{ formatDate(email.created_at) }}</td>
                   <td class="col-actions">
                     <button
                       v-if="email.status === 'failed' && projStore.can('emails:write')"

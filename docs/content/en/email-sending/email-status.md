@@ -18,11 +18,11 @@ curl http://localhost:3000/api/v1/emails/0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33/st
 
 ```json
 {
-  "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
-  "status": "sent",
-  "attempts": 1,
-  "error_message": "",
-  "sent_at": "2026-01-01T00:00:01Z"
+    "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+    "status": "sent",
+    "attempts": 1,
+    "error_message": "",
+    "sent_at": "2026-01-01T00:00:01Z"
 }
 ```
 
@@ -36,14 +36,14 @@ or a client generator.
 
 ## The states
 
-| Status | Meaning | Moves on |
-|---|---|---|
-| `queued` | Accepted and waiting for a worker | When a worker claims it |
-| `scheduled` | Held for a future `send_at` | At that time |
-| `processing` | Claimed and being handed to SMTP | Within one attempt |
-| `sent` | An SMTP server accepted it | Terminal |
-| `failed` | Every attempt was spent | Terminal, unless retried |
-| `suppressed` | Every recipient was blocked before sending | Terminal |
+| Status       | Meaning                                    | Moves on                 |
+|--------------|--------------------------------------------|--------------------------|
+| `queued`     | Accepted and waiting for a worker          | When a worker claims it  |
+| `scheduled`  | Held for a future `send_at`                | At that time             |
+| `processing` | Claimed and being handed to SMTP           | Within one attempt       |
+| `sent`       | An SMTP server accepted it                 | Terminal                 |
+| `failed`     | Every attempt was spent                    | Terminal, unless retried |
+| `suppressed` | Every recipient was blocked before sending | Terminal                 |
 
 A seventh value, `pending`, is accepted as a filter on the [email log](/docs/email-sending/email-log) for historical
 reasons and is never written. Filtering on it always returns nothing.

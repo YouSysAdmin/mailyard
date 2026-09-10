@@ -50,28 +50,42 @@ Leave the template ref out and each item carries its own content:
 
 ```json
 {
-  "from": "alerts@example.com",
-  "items": [
-    { "to": ["ops@example.com"], "subject": "Disk 91% on db-2", "text": "Threshold crossed at 14:02 UTC." },
-    { "to": ["oncall@example.com"], "subject": "Disk 91% on db-2", "html": "<p>Threshold crossed at 14:02 UTC.</p>" }
-  ]
+    "from": "alerts@example.com",
+    "items": [
+        {
+            "to": [
+                "ops@example.com"
+            ],
+            "subject": "Disk 91% on db-2",
+            "text": "Threshold crossed at 14:02 UTC."
+        },
+        {
+            "to": [
+                "oncall@example.com"
+            ],
+            "subject": "Disk 91% on db-2",
+            "html": "<p>Threshold crossed at 14:02 UTC.</p>"
+        }
+    ]
 }
 ```
 
 ## What an item may carry
 
-| Field | Notes |
-|---|---|
-| `to` | Required, one or more addresses |
-| `data` | Template mode — the render values |
-| `language` | Overrides the batch default |
-| `subject`, `html`, `text` | Raw mode |
-| `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Per item, because an opt-out link identifies a recipient |
+| Field                                                                      | Notes                                                                                                                |
+|----------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `to`                                                                       | Required, one or more addresses                                                                                      |
+| `cc`, `bcc`                                                                | The other two recipient lists, with the [same rules](/docs/email-sending/single-email#who-sees-whom) as a plain send |
+| `data`                                                                     | Template mode — the render values                                                                                    |
+| `language`                                                                 | Overrides the batch default                                                                                          |
+| `subject`, `html`, `text`                                                  | Raw mode                                                                                                             |
+| `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Per item, because an opt-out link identifies a recipient                                                             |
 
 The opt-out fields are per item deliberately. A batch is where an application sends its bulk mail, and one link shared
 across a hundred items would unsubscribe whoever clicked it from nothing in particular.
 
-`from` and `reply_to` belong to the batch, not the item. `headers`, `attachments` and `send_at` are not available here — use
+`from` and `reply_to` belong to the batch, not the item. `headers`, `attachments` and `send_at` are not available here —
+use
 individual sends when you need them.
 
 ## What comes back
@@ -81,14 +95,27 @@ rather than as a status code:
 
 ```json
 {
-  "total": 3,
-  "accepted": 2,
-  "results": [
-    { "index": 0, "email_id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33", "status": "queued" },
-    { "index": 1, "email_id": "0198f6a1-3c80-7c44-b6e1-9d2f7a0c5188", "status": "queued",
-      "suppressed_recipients": ["carol@example.fr"] },
-    { "index": 2, "error": "template render failed: ... map has no entry for key \"plan\"" }
-  ]
+    "total": 3,
+    "accepted": 2,
+    "results": [
+        {
+            "index": 0,
+            "email_id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+            "status": "queued"
+        },
+        {
+            "index": 1,
+            "email_id": "0198f6a1-3c80-7c44-b6e1-9d2f7a0c5188",
+            "status": "queued",
+            "suppressed_recipients": [
+                "carol@example.fr"
+            ]
+        },
+        {
+            "index": 2,
+            "error": "template render failed: ... map has no entry for key \"plan\""
+        }
+    ]
 }
 ```
 

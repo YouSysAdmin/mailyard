@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { emailsApi, type SentVia } from '../../api/emails'
+import { emailsApi, type Addressing, type SentVia } from '../../api/emails'
 import { apiErrorMessage, browserURL } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
@@ -24,6 +24,13 @@ const loading = ref(true)
 const retrying = ref(false)
 const email = ref<Email | null>(null)
 const sentVia = ref<SentVia | null>(null)
+
+// Who was named and who only received. The server splits the envelope
+// back into the sender's lists; a response without it (an older
+// server) falls back to the envelope under To, which is what that
+// server would have written on the wire.
+const addressing = ref<Addressing | null>(null)
+const shownTo = computed(() => addressing.value?.to ?? email.value?.recipients ?? [])
 
 // How the message was submitted, in the words the reader knows. The
 // server resolves the name, because the row holds an id and a person
@@ -92,6 +99,7 @@ async function load(quiet = false) {
     const res = await emailsApi.get(route.params.id as string)
     email.value = res.data.email
     sentVia.value = res.data.sent_via ?? null
+    addressing.value = res.data.addressing ?? null
     if (email.value) await loadTrackedLinks(email.value)
   } catch (e) {
     // The manual path says so, or a message that failed to load is a
@@ -144,6 +152,7 @@ async function retryEmail() {
     const res = await emailsApi.retry(email.value.id)
     email.value = res.data.email
     sentVia.value = res.data.sent_via ?? null
+    addressing.value = res.data.addressing ?? null
     // Back under the poll: the message is in flight again, and the count
     // that stopped watching the last attempt should not stop this one.
     polls = 0
@@ -190,7 +199,18 @@ async function retryEmail() {
               </tr>
               <tr>
                 <td class="meta-label">To</td>
-                <td>{{ email.recipients.join(', ') }}</td>
+                <td>{{ shownTo.join(', ') }}</td>
+              </tr>
+              <tr v-if="addressing?.cc.length">
+                <td class="meta-label">Cc</td>
+                <td>{{ addressing.cc.join(', ') }}</td>
+              </tr>
+              <!-- Delivered to and named nowhere in the message. Shown
+                   here because this is the sender's own log, the one
+                   place a Bcc recipient is supposed to be visible. -->
+              <tr v-if="addressing?.bcc.length">
+                <td class="meta-label">Bcc</td>
+                <td>{{ addressing.bcc.join(', ') }}</td>
               </tr>
               <tr>
                 <td class="meta-label">Status</td>

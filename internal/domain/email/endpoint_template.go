@@ -18,7 +18,7 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		return resp
 	}
 
-	base := &sendInput{From: in.From, ReplyTo: in.ReplyTo, To: in.To, Headers: in.Headers,
+	base := &sendInput{From: in.From, ReplyTo: in.ReplyTo, To: in.To, Cc: in.Cc, Bcc: in.Bcc, Headers: in.Headers,
 		Attachments: in.Attachments, SendAt: in.SendAt,
 		UnsubscribeListID:     in.UnsubscribeListID,
 		ListUnsubscribeURL:    in.ListUnsubscribeURL,

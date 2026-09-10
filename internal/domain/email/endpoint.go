@@ -199,7 +199,11 @@ func (h *Handler) Get(c fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	return response.Success(c, EmailResponse{Email: e, SentVia: resolveSentVia(c.Context(), h.Runtime, e)})
+	return response.Success(c, EmailResponse{
+		Email:      e,
+		SentVia:    resolveSentVia(c.Context(), h.Runtime, e),
+		Addressing: splitRecipients(e),
+	})
 }
 
 // clickHashRE pulls the link hash out of a click-redirect URL in a
@@ -307,7 +311,11 @@ func (h *Handler) Retry(c fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	return response.Success(c, EmailResponse{Email: e, SentVia: resolveSentVia(c.Context(), h.Runtime, e)})
+	return response.Success(c, EmailResponse{
+		Email:      e,
+		SentVia:    resolveSentVia(c.Context(), h.Runtime, e),
+		Addressing: splitRecipients(e),
+	})
 }
 
 // toRequest converts the bound input into the service request, parsing send_at.
@@ -315,7 +323,6 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 	req := &SendRequest{
 		From:        in.From,
 		ReplyTo:     in.ReplyTo,
-		To:          in.To,
 		Subject:     in.Subject,
 		HTML:        in.HTML,
 		Text:        in.Text,
@@ -327,6 +334,7 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 		ListUnsubscribeMailto: in.ListUnsubscribeMailto,
 		ListUnsubscribePost:   in.ListUnsubscribePost,
 	}
+	req.To, req.HeaderTo, req.Cc = foldRecipients(in.To, in.Cc, in.Bcc)
 	if in.SendAt != "" {
 		t, err := time.Parse(time.RFC3339, in.SendAt)
 		if err != nil {

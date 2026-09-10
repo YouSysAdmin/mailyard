@@ -83,19 +83,7 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 		Log:      h.Runtime.Log,
 		All:      h.Runtime.Store,
 	}
-	msg := &smtpclient.Message{
-		From:                  req.From,
-		To:                    req.To,
-		ReplyTo:               req.ReplyTo,
-		Subject:               req.Subject,
-		HTML:                  req.HTML,
-		Text:                  req.Text,
-		Attachments:           toClientAttachments(req.Attachments),
-		Headers:               req.Headers,
-		ListUnsubscribeURL:    req.ListUnsubscribeURL,
-		ListUnsubscribeMailto: req.ListUnsubscribeMailto,
-		ListUnsubscribePost:   req.ListUnsubscribePost,
-	}
+	msg := captureMessage(req)
 	apiKeyID := ""
 	if rc.APIKey != nil {
 		apiKeyID = rc.APIKey.ID
@@ -119,4 +107,28 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 	// a 404, and a shape that invited that would be worse than one
 	// that plainly says what happened.
 	return true, response.Created(c, SandboxCaptureResponse{SandboxEmail: e, Sandboxed: true})
+}
+
+// captureMessage is the message a capture renders: the same fields the
+// processor hands the builder for a delivery, read off the request
+// instead of the stored row. The display To and Cc go with them - a
+// Bcc recipient is in req.To and in no header, and a raw record that
+// printed the envelope as To would show one where the delivered message
+// never would.
+func captureMessage(req *SendRequest) *smtpclient.Message {
+	return &smtpclient.Message{
+		From:                  req.From,
+		To:                    req.To,
+		HeaderTo:              req.HeaderTo,
+		Cc:                    req.Cc,
+		ReplyTo:               req.ReplyTo,
+		Subject:               req.Subject,
+		HTML:                  req.HTML,
+		Text:                  req.Text,
+		Attachments:           toClientAttachments(req.Attachments),
+		Headers:               req.Headers,
+		ListUnsubscribeURL:    req.ListUnsubscribeURL,
+		ListUnsubscribeMailto: req.ListUnsubscribeMailto,
+		ListUnsubscribePost:   req.ListUnsubscribePost,
+	}
 }

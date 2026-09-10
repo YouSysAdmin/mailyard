@@ -44,7 +44,7 @@ and is usually the better choice: it survives an export and import into another 
 
 The values go in **`data`**. That is the field name on the wire.
 
-Everything a [plain send](/docs/email-sending/single-email) accepts is accepted here too: `headers`, `attachments`,
+Everything a [plain send](/docs/email-sending/single-email) accepts is accepted here too: `cc` and `bcc`, `headers`, `attachments`,
 `send_at`, `dry_run`, `disable_tracking`, `unsubscribe_list_id`, the caller-supplied `list_unsubscribe_*` targets, the
 `smtp_group` and `smtp_server_id` routing selectors, and the sandbox controls.
 

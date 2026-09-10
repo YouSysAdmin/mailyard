@@ -60,6 +60,24 @@ Four things, and the request is refused with a `400` naming the one that is wron
 - **`subject`**, non-empty
 - **a body** — `html` or `text`, or both
 
+## Who sees whom
+
+Every address in `to` and `cc` is written into the message headers, so every recipient sees every other one. A
+`bcc` address receives the message and appears in no header at all. All three lists count towards the recipient
+ceiling, and the same mailbox named twice is delivered once.
+
+```json
+{
+  "to":  ["jane@customer.example"],
+  "cc":  ["account-manager@yourapp.example"],
+  "bcc": ["archive@yourapp.example"]
+}
+```
+
+`to` is required even when `bcc` carries the real audience, because a message with an empty `To` header scores badly
+with spam filters. Put your own address in `to` and the audience in `bcc`, or send one message per recipient - that
+is what `/emails/batch` is for.
+
 Sending both parts is worth the extra field. Clients that cannot render HTML fall back to the text part, and a message
 with no text alternative scores worse with spam filters than one that has it.
 
@@ -67,6 +85,7 @@ with no text alternative scores worse with spam filters than one that has it.
 
 | Field | Does |
 |---|---|
+| `cc`, `bcc` | The other two recipient lists - see [Who sees whom](#who-sees-whom) |
 | `reply_to` | Where a reply lands when it should not go back to `from`. Any parseable address, verified or not |
 | `headers` | Up to 20 custom headers |
 | `attachments` | Base64 files — see [Attachments](/docs/email-sending/attachments) |
@@ -88,7 +107,7 @@ MIME structure: `From`, `To`, `Cc`, `Bcc`, `Reply-To`, `Subject`, `Date`, `MIME-
 `DKIM-Signature`.
 
 The refusal names the header and, where there is one, the field to use instead — `List-Unsubscribe` points you at
-`list_unsubscribe_url`, `Reply-To` at `reply_to`. Matching is case-insensitive, and a header name or value containing a newline is refused
+`list_unsubscribe_url`, `Reply-To` at `reply_to`, `Cc` and `Bcc` at `cc` and `bcc`. Matching is case-insensitive, and a header name or value containing a newline is refused
 outright, which is what stops header injection through a value you interpolated.
 {{< /callout >}}
 

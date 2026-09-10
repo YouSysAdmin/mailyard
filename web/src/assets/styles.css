@@ -594,6 +594,20 @@ option::checkmark {
   color: var(--text-muted);
   margin-top: 4px;
 }
+/* A text button inside a hint that reveals more of the form - the
+   optional fields most sends leave empty. Inherits the hint's size so
+   it reads as part of the sentence, coloured so it reads as a control. */
+.form-reveal {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary-600);
+  font: inherit;
+  cursor: pointer;
+}
+.form-reveal:hover {
+  text-decoration: underline;
+}
 .form-error {
   font-size: 12px;
   color: var(--danger-fg);
@@ -1609,6 +1623,13 @@ input[type='checkbox']:checked::before {
    which sets the pointer AND the hover. */
 
 /* --------- Data table polish --------- */
+/* A cell whose value is one thing, a timestamp mostly: the table
+   shrinks the column and folds it onto two lines while the columns
+   beside it still have room. */
+.cell-nowrap {
+  white-space: nowrap;
+}
+
 .cell-title {
   font-weight: 500;
   color: var(--text-primary);

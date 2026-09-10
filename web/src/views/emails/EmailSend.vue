@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   emailsApi,
@@ -34,6 +34,15 @@ const sending = ref(false)
 const from = ref('')
 const replyTo = ref('')
 const recipientsText = ref('')
+const ccText = ref('')
+const bccText = ref('')
+
+// Cc and Bcc are folded away until asked for. Most sends have neither,
+// and two empty textareas push the body off the first screen. Once
+// either holds a value it stays open - a field hiding text the form is
+// about to send is worse than a long form.
+const showCopies = ref(false)
+const copiesOpen = computed(() => showCopies.value || ccText.value !== '' || bccText.value !== '')
 const sendAt = ref('')
 // Which SMTP pool to send through. Empty means the project's default
 // group, which is what every send did before groups existed. Mostly
@@ -189,11 +198,20 @@ onMounted(async () => {
 })
 
 // One address per line or comma separated.
-function parseRecipients(): string[] {
-  return recipientsText.value
+function parseAddresses(text: string): string[] {
+  return text
     .split(/[\n,]+/)
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+// The Cc and Bcc lists, set on the payload only when filled in, so a
+// send without them is the request it always was.
+function copyRecipients(payload: { cc?: string[]; bcc?: string[] }) {
+  const cc = parseAddresses(ccText.value)
+  const bcc = parseAddresses(bccText.value)
+  if (cc.length) payload.cc = cc
+  if (bcc.length) payload.bcc = bcc
 }
 
 function baseValidation(): string[] | null {
@@ -201,7 +219,7 @@ function baseValidation(): string[] | null {
     notify.error('Sender address is required')
     return null
   }
-  const to = parseRecipients()
+  const to = parseAddresses(recipientsText.value)
   if (to.length === 0) {
     notify.error('At least one recipient is required')
     return null
@@ -225,6 +243,7 @@ async function sendRaw() {
     to,
     subject: subject.value,
   }
+  copyRecipients(payload)
   if (replyTo.value.trim()) payload.reply_to = replyTo.value.trim()
   if (html.value) payload.html = html.value
   if (text.value) payload.text = text.value
@@ -262,6 +281,7 @@ async function sendTemplate() {
     to,
     template_id: templateId.value,
   }
+  copyRecipients(payload)
   if (replyTo.value.trim()) payload.reply_to = replyTo.value.trim()
   if (language.value) payload.language = language.value
   if (data) payload.data = data
@@ -341,12 +361,48 @@ function handleSubmit() {
             />
           </FormField>
 
-          <FormField label="Recipients" for="send-to">
+          <FormField label="To" for="send-to">
             <textarea
               id="send-to"
               v-model="recipientsText"
               class="form-textarea"
               rows="3"
+              placeholder="one address per line or comma separated"
+            ></textarea>
+            <template #hint>
+              Shown to every recipient.
+              <button
+                v-if="!copiesOpen"
+                type="button"
+                class="form-reveal"
+                @click="showCopies = true"
+              >
+                Add Cc / Bcc
+              </button>
+            </template>
+          </FormField>
+
+          <FormField v-if="copiesOpen" label="Cc" for="send-cc" hint="Shown to every recipient.">
+            <textarea
+              id="send-cc"
+              v-model="ccText"
+              class="form-textarea"
+              rows="2"
+              placeholder="one address per line or comma separated"
+            ></textarea>
+          </FormField>
+
+          <FormField
+            v-if="copiesOpen"
+            label="Bcc"
+            for="send-bcc"
+            hint="Delivered to these addresses, shown to nobody."
+          >
+            <textarea
+              id="send-bcc"
+              v-model="bccText"
+              class="form-textarea"
+              rows="2"
               placeholder="one address per line or comma separated"
             ></textarea>
           </FormField>

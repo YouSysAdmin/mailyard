@@ -104,7 +104,7 @@ Two limits, and the second is the one that matters in practice.
 Both are platform settings, under **Admin -> Settings**.
 
 The day window alone does not bound anything useful: a test suite can write ten thousand messages in a morning, and a
-seven day window does nothing about that until day seven. The per-project cap is what actually holds the table down, and
+seven-day window does nothing about that until day seven. The per-project cap is what actually holds the table down, and
 it is applied on every capture.
 
 ### Shortening the window for one message

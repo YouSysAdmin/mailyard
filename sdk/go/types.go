@@ -34,9 +34,17 @@ type SendRequest struct {
 	From    string   `json:"from"`
 	ReplyTo string   `json:"reply_to,omitempty"`
 	To      []string `json:"to"`
-	Subject string   `json:"subject"`
-	HTML    string   `json:"html,omitempty"`
-	Text    string   `json:"text,omitempty"`
+
+	// Cc and Bcc are the other two recipient lists. To and Cc are
+	// written into the headers and shown to every recipient, a Bcc
+	// address is delivered and shown to nobody. The recipient ceiling
+	// counts all three. To is required either way.
+	Cc  []string `json:"cc,omitempty"`
+	Bcc []string `json:"bcc,omitempty"`
+
+	Subject string `json:"subject"`
+	HTML    string `json:"html,omitempty"`
+	Text    string `json:"text,omitempty"`
 
 	Headers     map[string]string `json:"headers,omitempty"`
 	Attachments []Attachment      `json:"attachments,omitempty"`
@@ -90,6 +98,8 @@ type TemplateSendRequest struct {
 	From         string         `json:"from"`
 	ReplyTo      string         `json:"reply_to,omitempty"`
 	To           []string       `json:"to"`
+	Cc           []string       `json:"cc,omitempty"`
+	Bcc          []string       `json:"bcc,omitempty"`
 	TemplateID   string         `json:"template_id,omitempty"`
 	TemplateName string         `json:"template_name,omitempty"`
 	Language     string         `json:"language,omitempty"`
@@ -128,6 +138,8 @@ type BatchRequest struct {
 // BatchItem is one message in a batch.
 type BatchItem struct {
 	To       []string       `json:"to"`
+	Cc       []string       `json:"cc,omitempty"`
+	Bcc      []string       `json:"bcc,omitempty"`
 	Language string         `json:"language,omitempty"`
 	Data     map[string]any `json:"data,omitempty"`
 	Subject  string         `json:"subject,omitempty"`

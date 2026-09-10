@@ -37,11 +37,12 @@ type Message struct {
 	To []string
 
 	// HeaderTo and Cc are what the message DISPLAYS, when that is not
-	// the envelope. Submission sets them from the client's own headers:
-	// an SMTP client sends a Bcc recipient as an RCPT TO and leaves it
-	// out of the headers, and rebuilding To from the envelope printed
-	// every Bcc address for every other recipient to read. Empty means
-	// To is the header, which is what the API path wants.
+	// the envelope. Submission sets them from the client's own headers
+	// and the API from its cc and bcc lists: a Bcc recipient is an
+	// RCPT TO left out of the headers, and rebuilding To from the
+	// envelope printed every Bcc address for every other recipient to
+	// read. Empty means To is the header, which is what a send with
+	// neither list wants.
 	HeaderTo string
 	Cc       string
 

@@ -6,6 +6,15 @@ import type { Email, EmailAttachment } from './types'
 // an id is the one thing no screen shows. `name` is a credential's
 // name or username, a key's name, a campaign's name or a person's
 // address, and is empty when the row it came from is gone.
+// Addressing mirrors internal/domain/email.Addressing - the envelope
+// split back into the lists the sender wrote. to and cc are the headers
+// as written, bcc is every recipient the headers did not name.
+export interface Addressing {
+  to: string[]
+  cc: string[]
+  bcc: string[]
+}
+
 export interface SentVia {
   kind: 'submission' | 'api_key' | 'campaign' | 'console'
   name?: string
@@ -19,6 +28,10 @@ export interface SendEmailPayload {
   from: string
   reply_to?: string
   to: string[]
+  // to and cc are shown to every recipient, bcc is delivered and
+  // shown to nobody. The recipient ceiling counts all three.
+  cc?: string[]
+  bcc?: string[]
   subject: string
   html?: string
   text?: string
@@ -38,6 +51,8 @@ export interface SendTemplatePayload {
   from: string
   reply_to?: string
   to: string[]
+  cc?: string[]
+  bcc?: string[]
   template_id?: string
   template_name?: string
   language?: string
@@ -83,7 +98,8 @@ export const emailsApi = {
   list: (params: EmailListParams = {}) => api.get<{ emails: Email[] }>('/emails/', { params }),
   stats: () => api.get<{ counts: Record<string, number> }>('/emails/stats'),
   limits: () => api.get<{ limits: SendLimits }>('/emails/limits'),
-  get: (id: string) => api.get<{ email: Email; sent_via?: SentVia }>(`/emails/${id}`),
+  get: (id: string) =>
+    api.get<{ email: Email; sent_via?: SentVia; addressing?: Addressing }>(`/emails/${id}`),
 
   // The original destinations behind the click redirects in this
   // message's body, keyed by link hash. The preview strips our
@@ -104,5 +120,6 @@ export const emailsApi = {
     api.post<{ email: Email; suppressed_recipients: string[] }>('/emails/send-template', payload),
   batch: (payload: { emails: unknown[] }) => api.post('/emails/batch', payload),
   preview: (payload: Record<string, unknown>) => api.post('/emails/preview', payload),
-  retry: (id: string) => api.post<{ email: Email; sent_via?: SentVia }>(`/emails/${id}/retry`),
+  retry: (id: string) =>
+    api.post<{ email: Email; sent_via?: SentVia; addressing?: Addressing }>(`/emails/${id}/retry`),
 }

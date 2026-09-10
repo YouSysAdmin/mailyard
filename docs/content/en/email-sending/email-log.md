@@ -18,18 +18,29 @@ curl "http://localhost:3000/api/v1/emails?limit=50&status=failed" \
 ```
 
 ```json
-{ "emails": [ { "id": "...", "sender": "...", "recipients": ["..."], "status": "failed" } ] }
+{
+    "emails": [
+        {
+            "id": "...",
+            "sender": "...",
+            "recipients": [
+                "..."
+            ],
+            "status": "failed"
+        }
+    ]
+}
 ```
 
 ## Parameters
 
-| Param | Notes |
-|---|---|
-| `status` | One status. Not a list — see [Email Status](/docs/email-sending/email-status) for the values |
-| `search` | A whole recipient address, or part of a subject |
-| `limit` | Default 50, maximum 200 |
-| `before` | Cursor: RFC 3339 `created_at` of the last row you saw |
-| `before_id` | The id of that same row. Send it with `before` |
+| Param       | Notes                                                                                        |
+|-------------|----------------------------------------------------------------------------------------------|
+| `status`    | One status. Not a list — see [Email Status](/docs/email-sending/email-status) for the values |
+| `search`    | A whole recipient address, or part of a subject                                              |
+| `limit`     | Default 50, maximum 200                                                                      |
+| `before`    | Cursor: RFC 3339 `created_at` of the last row you saw                                        |
+| `before_id` | The id of that same row. Send it with `before`                                               |
 
 Rows come back newest first, ordered by `created_at` then `id`. That order is fixed — there is no sort parameter.
 
@@ -78,14 +89,26 @@ The full record: sender, recipients, subject, both bodies, headers, attachment m
 tracking counters. Content may be shortened or removed by the installation's
 [retention settings](/docs/admin/platform-settings) once a message is old enough.
 
+`recipients` is the envelope, every address the message was delivered to. Beside it, `addressing` splits that back
+into the lists the sender wrote: `to` and `cc` as the headers named them, and as `bcc` every recipient the headers
+did not name. A message sent with `to` alone has everybody under `to` and the other two empty.
+
+```json
+"addressing": {
+  "to":  ["jane@customer.example"],
+  "cc":  [],
+  "bcc": ["archive@yourapp.example"]
+}
+```
+
 Related routes on the same message:
 
-| Route | Answers |
-|---|---|
-| `GET /api/v1/emails/{id}/status` | Just the delivery state — the cheap poll |
-| `GET /api/v1/emails/{id}/attachments/{idx}` | One attachment's bytes, by position |
-| `GET /api/v1/emails/{id}/tracked-links` | The links rewritten for click tracking, with their tallies |
-| `POST /api/v1/emails/{id}/retry` | Requeue a failed message |
+| Route                                       | Answers                                                    |
+|---------------------------------------------|------------------------------------------------------------|
+| `GET /api/v1/emails/{id}/status`            | Just the delivery state — the cheap poll                   |
+| `GET /api/v1/emails/{id}/attachments/{idx}` | One attachment's bytes, by position                        |
+| `GET /api/v1/emails/{id}/tracked-links`     | The links rewritten for click tracking, with their tallies |
+| `POST /api/v1/emails/{id}/retry`            | Requeue a failed message                                   |
 
 ## Counts
 
@@ -96,7 +119,14 @@ GET /api/v1/emails/stats
 Per-status totals for the project, which is what the dashboard tiles read:
 
 ```json
-{ "counts": { "sent": 18422, "failed": 31, "queued": 4, "suppressed": 12 } }
+{
+    "counts": {
+        "sent": 18422,
+        "failed": 31,
+        "queued": 4,
+        "suppressed": 12
+    }
+}
 ```
 
 ## In the console

@@ -233,12 +233,14 @@ type SendRequest struct {
 	To []string
 
 	// HeaderTo and Cc are the To and Cc headers as the CLIENT wrote
-	// them, when they differ from the envelope. Only submission sets
-	// them: a recipient the client put in Bcc arrives as an RCPT TO
-	// with no header naming it, and printing the envelope as To showed
-	// every Bcc address to every other recipient. Stored under the
-	// reserved keys in Email.Headers, which is why Validate refuses
-	// those keys from a caller.
+	// them, when they differ from the envelope. Empty means To is the
+	// header. Submission sets them from the client's own headers, the
+	// HTTP handlers through foldRecipients when a request carries cc
+	// or bcc: a Bcc recipient is an RCPT TO with no header naming it,
+	// and printing the envelope as To showed every Bcc address to
+	// every other recipient. Stored under the reserved keys in
+	// Email.Headers, which is why Validate refuses those keys from a
+	// caller.
 	HeaderTo string
 	Cc       string
 

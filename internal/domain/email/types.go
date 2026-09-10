@@ -26,9 +26,18 @@ import (
 // sendInput is the POST /api/emails/send body. SendAt is RFC 3339.
 // DryRun runs every validation without persisting anything.
 type sendInput struct {
-	From        string                  `json:"from"        validate:"required,max=320"           normalize:"trim"`
-	ReplyTo     string                  `json:"reply_to"    validate:"omitempty,max=320"          normalize:"trim"`
-	To          []string                `json:"to"          validate:"required,min=1,dive,max=320"`
+	From    string   `json:"from"        validate:"required,max=320"           normalize:"trim"`
+	ReplyTo string   `json:"reply_to"    validate:"omitempty,max=320"          normalize:"trim"`
+	To      []string `json:"to"          validate:"required,min=1,dive,max=320"`
+
+	// Cc and Bcc are the other two recipient lists. Every address in
+	// To and Cc is written into the headers and so shown to every
+	// recipient, a Bcc address is delivered to and shown to nobody.
+	// The recipient ceiling counts all three lists together. To stays
+	// required so the To header is never empty.
+	Cc  []string `json:"cc"  validate:"omitempty,dive,max=320"`
+	Bcc []string `json:"bcc" validate:"omitempty,dive,max=320"`
+
 	Subject     string                  `json:"subject"     validate:"required,max=1000"`
 	HTML        string                  `json:"html"        validate:"omitempty,max=1048576"`
 	Text        string                  `json:"text"        validate:"omitempty,max=1048576"`
@@ -92,9 +101,14 @@ type sendInput struct {
 
 // templateSendInput is the POST /api/emails/send-template body.
 type templateSendInput struct {
-	From            string                  `json:"from"          validate:"required,max=320" normalize:"trim"`
-	ReplyTo         string                  `json:"reply_to"      validate:"omitempty,max=320" normalize:"trim"`
-	To              []string                `json:"to"            validate:"required,min=1,dive,max=320"`
+	From    string   `json:"from"          validate:"required,max=320" normalize:"trim"`
+	ReplyTo string   `json:"reply_to"      validate:"omitempty,max=320" normalize:"trim"`
+	To      []string `json:"to"            validate:"required,min=1,dive,max=320"`
+
+	// Same three recipient lists as a plain send. See sendInput.
+	Cc  []string `json:"cc"  validate:"omitempty,dive,max=320"`
+	Bcc []string `json:"bcc" validate:"omitempty,dive,max=320"`
+
 	TemplateID      string                  `json:"template_id"   validate:"omitempty,uuid"`
 	TemplateName    string                  `json:"template_name" validate:"omitempty,max=100"`
 	Language        string                  `json:"language"      validate:"omitempty,min=2,max=10" normalize:"normalize"`
@@ -138,8 +152,12 @@ type batchInput struct {
 	Items        []batchItemInput `json:"items"       validate:"required,min=1,max=100,dive"`
 }
 
+// batchItemInput is converted to BatchItem by a struct conversion, so
+// the two carry the same fields in the same order.
 type batchItemInput struct {
 	To       []string       `json:"to"       validate:"required,min=1,dive,max=320"`
+	Cc       []string       `json:"cc"       validate:"omitempty,dive,max=320"`
+	Bcc      []string       `json:"bcc"      validate:"omitempty,dive,max=320"`
 	Language string         `json:"language" validate:"omitempty,min=2,max=10"`
 	Data     map[string]any `json:"data"`
 	Subject  string         `json:"subject"  validate:"omitempty,max=1000"`
@@ -250,6 +268,21 @@ type EmailResponse struct {
 	// SentVia is how the message was submitted, resolved for this
 	// read. Absent when nothing on the row says.
 	SentVia *SentVia `json:"sent_via,omitempty"`
+
+	// Addressing is the envelope split back into the three lists the
+	// sender wrote, resolved for this read. Email.Recipients is who was
+	// delivered to and says nothing about who was shown to whom.
+	Addressing *Addressing `json:"addressing"`
+}
+
+// Addressing is who a message named and who it only reached. To and
+// Cc are the headers as written, Bcc is every envelope recipient the
+// headers do not name. A message sent with to alone has everybody in
+// To and the other two empty.
+type Addressing struct {
+	To  []string `json:"to"`
+	Cc  []string `json:"cc"`
+	Bcc []string `json:"bcc"`
 }
 
 // The values SentVia.Kind takes.
