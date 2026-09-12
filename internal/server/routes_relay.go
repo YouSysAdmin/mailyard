@@ -48,7 +48,7 @@ func registerRelayEnrolment(app *fiber.App, rt *env.Runtime) relaynode.CertAutho
 		// the feature exists for.
 		Ingest: inbound.NewService(rt),
 	}
-	enrol := app.Group("/api/relay-nodes", noStoreCache)
+	enrol := app.Group("/api/relay-nodes")
 	// Register is the ONLY unauthenticated surface here - it is
 	// where a shared token could be guessed - so it carries the
 	// tight per-IP limit.

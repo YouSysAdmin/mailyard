@@ -137,6 +137,12 @@ func TestTheShellIsNotCachedAndTheChunksAre(t *testing.T) {
 		env.ConsolePath + "/":                           "no-cache",
 		env.ConsolePath + "/smtp-servers":               "no-cache",
 		env.ConsolePath + "/assets/SmtpServers-BBBB.js": "immutable",
+
+		// A MISS is not immutable. The header above is keyed on the
+		// path, which is all that is known before the lookup, so a
+		// chunk that went in an upgrade would otherwise pin its own
+		// 404 in every cache on the way for a year.
+		env.ConsolePath + "/assets/Gone-CCCC.js": "no-store",
 	} {
 		res, err := app.Test(httptest.NewRequest("GET", path, nil))
 		if err != nil {
@@ -147,5 +153,94 @@ func TestTheShellIsNotCachedAndTheChunksAre(t *testing.T) {
 		if got := res.Header.Get("Cache-Control"); !strings.Contains(got, want) {
 			t.Errorf("%s: Cache-Control %q, want it to contain %q", path, got, want)
 		}
+	}
+}
+
+// A conditional request must be answered from the BUILD, not from the
+// Last-Modified fasthttp serves for an embedded file - which is the zero
+// time, and so matches every client date. Left to fasthttp, a browser
+// holding a stale shell revalidates and is told 304 forever, across
+// upgrades, which is the failure the no-cache above exists to prevent.
+func TestAStaleShellIsNotRevalidatedAwayByTheZeroModTime(t *testing.T) {
+	app := fiber.New()
+	mountConsole(app, consoleFS())
+
+	res, err := app.Test(httptest.NewRequest("GET", env.ConsolePath+"/", nil))
+	if err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+
+	_ = res.Body.Close()
+
+	tag := res.Header.Get("ETag")
+	if tag == "" {
+		t.Fatal("the shell carries no ETag, so nothing can validate against the build")
+	}
+
+	// The tag this build did hand out: 304, with no body.
+	match := httptest.NewRequest("GET", env.ConsolePath+"/", nil)
+	match.Header.Set("If-None-Match", tag)
+
+	res, err = app.Test(match)
+	if err != nil {
+		t.Fatalf("If-None-Match: %v", err)
+	}
+
+	body, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+
+	if res.StatusCode != 304 {
+		t.Errorf("If-None-Match with the current tag answered %d, want 304", res.StatusCode)
+	}
+
+	if len(body) != 0 {
+		t.Errorf("a 304 carried %d bytes of body, want none", len(body))
+	}
+
+	// The one that used to be answered 304 whatever the build said.
+	stale := httptest.NewRequest("GET", env.ConsolePath+"/", nil)
+	stale.Header.Set("If-Modified-Since", "Wed, 01 Jan 2025 00:00:00 GMT")
+
+	res, err = app.Test(stale)
+	if err != nil {
+		t.Fatalf("If-Modified-Since: %v", err)
+	}
+
+	body, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+
+	if res.StatusCode != 200 {
+		t.Errorf("If-Modified-Since answered %d, want 200 - the shell was not re-sent", res.StatusCode)
+	}
+
+	if len(body) == 0 {
+		t.Error("a 200 carried no body")
+	}
+
+	// A tag from another build must miss.
+	other := httptest.NewRequest("GET", env.ConsolePath+"/", nil)
+	other.Header.Set("If-None-Match", `"0123456789abcdef0123456789abcdef"`)
+
+	res, err = app.Test(other)
+	if err != nil {
+		t.Fatalf("stale If-None-Match: %v", err)
+	}
+
+	_ = res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Errorf("a tag from another build answered %d, want 200", res.StatusCode)
+	}
+}
+
+// Two different trees are two different tags, which is the whole
+// guarantee: an upgraded binary is what a browser is told about.
+func TestTwoBuildsDoNotShareATag(t *testing.T) {
+	one := consoleFS()
+
+	two := consoleFS()
+	two["index.html"] = &fstest.MapFile{Data: []byte("<!doctype html><title>next</title>")}
+
+	if buildTag(one) == buildTag(two) {
+		t.Error("a changed shell produced the same build tag, so a stale one would revalidate as current")
 	}
 }

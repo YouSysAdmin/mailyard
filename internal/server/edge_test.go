@@ -295,3 +295,43 @@ func TestAnErrorReachingTheTopIsTheEnvelope(t *testing.T) {
 		}
 	}
 }
+
+// NOTHING IS STORED UNLESS IT SAID SO. Cache policy used to be decided
+// per group, so a route registered outside those groups - the probes,
+// the bare redirect, the whole documentation site - answered with no
+// directive at all, which hands the decision to browser heuristics and
+// to any proxy in the path. The default is the guard against a surface
+// that simply never thought about it.
+func TestAResponseIsNotStoredUnlessItSaysSo(t *testing.T) {
+	app := fiber.New()
+	app.Use(cachePolicy)
+
+	// Stands in for every route that does not set a policy of its own.
+	app.Get("/anything", func(c fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	// And one that does, to pin that a later handler still wins - the
+	// two static mounts rest on exactly that.
+	app.Get("/static-ish", func(c fiber.Ctx) error {
+		c.Set(fiber.HeaderCacheControl, "public, max-age=31536000, immutable")
+
+		return c.SendString("ok")
+	})
+
+	for path, want := range map[string]string{
+		"/anything":   "no-store",
+		"/static-ish": "public, max-age=31536000, immutable",
+	} {
+		res, err := app.Test(httptest.NewRequest("GET", path, nil))
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+
+		_ = res.Body.Close()
+
+		if got := res.Header.Get(fiber.HeaderCacheControl); got != want {
+			t.Errorf("%s: Cache-Control %q, want %q", path, got, want)
+		}
+	}
+}

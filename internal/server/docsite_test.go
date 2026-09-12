@@ -24,6 +24,10 @@ func hugoFS() fstest.MapFS {
 		"email-sending/index.html":              {Data: []byte("<h1>Email Sending</h1>")},
 		"email-sending/single-email/index.html": {Data: []byte("<h1>Single Email</h1>")},
 		"css/app.min.abc123.css":                {Data: []byte(".cs-doc{}")},
+		"js/app.min.def456.js":                  {Data: []byte("void 0")},
+		"fonts/inter-tight-400.woff2":           {Data: []byte("wOF2")},
+		"assets/logo/favicon.svg":               {Data: []byte("<svg/>")},
+		"vendor/scalar/standalone.js":           {Data: []byte("void 0")},
 		"index.json":                            {Data: []byte(`[{"title":"Single Email"}]`)},
 	}
 }
@@ -119,5 +123,97 @@ func TestTheServedOpenAPIDocumentIsTheExportedOne(t *testing.T) {
 
 	if string(got) != string(want) {
 		t.Errorf("served document differs from MachineSpecJSON (%d vs %d bytes)", len(got), len(want))
+	}
+}
+
+// NOTHING UNDER /docs MAY BE STORED BY A SHARED CACHE. The whole tree is
+// behind a session gate, so every tier is private - a proxy holding a
+// page here would hand one reader's documentation to another. It used to
+// carry no directive at all, which left the decision to browser
+// heuristics and to whatever sat in front of the binary.
+//
+// Within that, the split is what the filename promises: Hugo
+// fingerprints css and js with a sha256, so those are immutable. The
+// vendored assets are unhashed but version-pinned. Everything else
+// describes the running binary and revalidates.
+func TestTheDocumentationSaysWhoMayStoreIt(t *testing.T) {
+	app := fiber.New()
+	mountDocs(app, hugoFS(), func(c fiber.Ctx) error { return c.Next() })
+
+	for path, want := range map[string]string{
+		"/docs/css/app.min.abc123.css":      "private, max-age=31536000, immutable",
+		"/docs/js/app.min.def456.js":        "private, max-age=31536000, immutable",
+		"/docs/fonts/inter-tight-400.woff2": "private, max-age=86400",
+		"/docs/assets/logo/favicon.svg":     "private, max-age=86400",
+		"/docs/vendor/scalar/standalone.js": "private, max-age=86400",
+		"/docs/":                            "private, no-cache",
+		"/docs/email-sending/single-email":  "private, no-cache",
+		"/docs/index.json":                  "private, no-cache",
+		"/docs/nothing-here":                "private, no-cache",
+	} {
+		res, err := app.Test(httptest.NewRequest("GET", path, nil))
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+
+		_ = res.Body.Close()
+
+		if got := res.Header.Get("Cache-Control"); got != want {
+			t.Errorf("%s: Cache-Control %q, want %q", path, got, want)
+		}
+
+		// public here would be the bug this test exists for.
+		if strings.Contains(res.Header.Get("Cache-Control"), "public") {
+			t.Errorf("%s: a gated page told a shared cache it could store it", path)
+		}
+	}
+}
+
+// The same conditional-request rule the console has, for the same
+// reason: an embedded file's Last-Modified is the zero time, so
+// revalidation has to run off the build tag or it answers 304 forever.
+func TestADocumentationPageRevalidatesAgainstTheBuild(t *testing.T) {
+	app := fiber.New()
+	mountDocs(app, hugoFS(), func(c fiber.Ctx) error { return c.Next() })
+
+	res, err := app.Test(httptest.NewRequest("GET", "/docs/", nil))
+	if err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+
+	_ = res.Body.Close()
+
+	tag := res.Header.Get("ETag")
+	if tag == "" {
+		t.Fatal("a documentation page carries no ETag")
+	}
+
+	match := httptest.NewRequest("GET", "/docs/", nil)
+	match.Header.Set("If-None-Match", tag)
+
+	res, err = app.Test(match)
+	if err != nil {
+		t.Fatalf("If-None-Match: %v", err)
+	}
+
+	_ = res.Body.Close()
+	if res.StatusCode != 304 {
+		t.Errorf("If-None-Match with the current tag answered %d, want 304", res.StatusCode)
+	}
+
+	stale := httptest.NewRequest("GET", "/docs/", nil)
+	stale.Header.Set("If-Modified-Since", "Wed, 01 Jan 2025 00:00:00 GMT")
+
+	res, err = app.Test(stale)
+	if err != nil {
+		t.Fatalf("If-Modified-Since: %v", err)
+	}
+
+	body, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+
+	if res.StatusCode != 200 || len(body) == 0 {
+		t.Errorf("If-Modified-Since answered %d with %d bytes, want 200 and a body",
+			res.StatusCode, len(body))
 	}
 }

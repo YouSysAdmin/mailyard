@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"io"
 	"io/fs"
 	"log/slog"
 	"strings"
@@ -141,7 +142,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// route is authorized by its HMAC-signed URL. Registered before
 	// the /api groups so no auth middleware ever shadows it.
 	trh := &trackingpage.Handler{Runtime: rt}
-	trk := app.Group("/tracking", noStoreCache)
+	trk := app.Group("/tracking")
 	trk.Get("/open/:file", trh.Open)
 	trk.Get("/click/:id/:hash", trh.Click)
 	trk.Get("/unsubscribe/:token", trh.UnsubscribePage)
@@ -160,7 +161,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// Rate limited, which the gated version never was. A refusal is
 	// cheap, but cheap times unbounded is not.
 	sesh := sesfeedback.New(rt, rt.SESTopics)
-	app.Post("/webhooks/ses", noStoreCache,
+	app.Post("/webhooks/ses",
 		perMinute(rt, rt.Config.RateLimit.SESWebhookPerMinute, nil), sesh.Receive)
 
 	// Relay node enrolment, and the one authority the console-facing
@@ -180,7 +181,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// It may grow routes of its own for shapes the public contract
 	// should not promise, like a per-page aggregate.
 	// TestNoRouteExistsOnBothPrefixes stops it becoming a second copy.
-	appAPI := app.Group(env.ConsolePath+"/api", noStoreCache, refuseCrossSite(rt))
+	appAPI := app.Group(env.ConsolePath+"/api", refuseCrossSite(rt))
 
 	// Auth endpoints - open (login obviously can't require an
 	// existing session - logout / me are cheap enough to not gate).
@@ -321,7 +322,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// means on the console's login routes. One limiter instance, because
 	// the budget is the IP's and not the route's.
 	v1AuthFailures := iplimit.New(rt.Config.RateLimit.LoginPerMinute, time.Minute)
-	v1 := app.Group("/api/v1", noStoreCache, v1Limiter, refuseCrossSite(rt),
+	v1 := app.Group("/api/v1", v1Limiter, refuseCrossSite(rt),
 		machineAuth(rt, v1AuthFailures), maintenanceMode(rt), auditWrites(rt))
 
 	// The machine surface is gated by the same two tokens as the
@@ -956,6 +957,46 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 func mountDocs(app *fiber.App, site fs.FS, gate fiber.Handler) {
 	docs := app.Group("/docs", gate)
 
+	// Cache policy, the same shape as the console's and for the same
+	// reason, with one difference that runs through every tier: PRIVATE,
+	// never public. The whole tree sits behind the gate above, so a
+	// shared cache storing any of it hands one reader's session another
+	// reader's pages. Without this the site answered with no directive
+	// at all and a proxy was free to do exactly that.
+	//
+	//   css, js       fingerprinted with sha256 by Hugo, so immutable
+	//   fonts,
+	//   assets,
+	//   vendor        unhashed but vendored and version-pinned, so a
+	//                 day of staleness costs nothing and the 3.7 MB
+	//                 Scalar bundle stops being re-fetched per visit
+	//   everything
+	//   else          the pages, the search index and the machine spec,
+	//                 all of which must describe the running binary
+	//
+	// Registered on the group, so it covers the openapi route below and
+	// the 404 page as well as the static mount.
+	tag := sync.OnceValue(func() string { return buildTag(site) })
+	docs.Use(func(c fiber.Ctx) error {
+		switch path := c.Path(); {
+		case strings.HasPrefix(path, "/docs/css/"), strings.HasPrefix(path, "/docs/js/"):
+			c.Set(fiber.HeaderCacheControl, "private, max-age=31536000, immutable")
+		case strings.HasPrefix(path, "/docs/fonts/"),
+			strings.HasPrefix(path, "/docs/assets/"),
+			strings.HasPrefix(path, "/docs/vendor/"):
+			c.Set(fiber.HeaderCacheControl, "private, max-age=86400")
+		default:
+			c.Set(fiber.HeaderCacheControl, "private, no-cache")
+		}
+
+		done, err := revalidate(c, tag())
+		if done {
+			return err
+		}
+
+		return c.Next()
+	})
+
 	// The /api/v1 OpenAPI document, as JSON, for the reference page in the
 	// site. Under the same gate as the page that embeds it, and registered
 	// before static so it is answered here rather than looked up in the
@@ -1033,6 +1074,92 @@ func apiNotFound(prefix string) fiber.Handler {
 	}
 }
 
+// buildTag is one ETag for a whole embedded tree, as a quoted token.
+//
+// Per mount rather than per file, because an embedded filesystem cannot
+// change while the process runs: within one binary a per-file tag would
+// answer exactly what this one answers, and between two binaries both
+// change. Hashing the paths as well as the bytes is what makes a
+// renamed file a different build.
+//
+// Computed once, lazily, by the caller wrapping it in sync.OnceValue -
+// a worker node never mounts either tree and must not pay for hashing
+// five megabytes at boot.
+func buildTag(site fs.FS) string {
+	sum := sha256.New()
+	err := fs.WalkDir(site, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		_, _ = sum.Write([]byte(path))
+
+		f, err := site.Open(path)
+		if err != nil {
+			return err
+		}
+
+		defer f.Close() //nolint:errcheck // read-only, nothing to report
+
+		_, err = io.Copy(sum, f)
+
+		return err
+	})
+	if err != nil {
+		// A tree that cannot be walked is a tree that cannot be served
+		// either, and the mount below reports that per request. The
+		// partial sum is still a usable tag, so this is logged rather
+		// than made fatal.
+		slog.Warn("cache: could not hash an embedded tree for its ETag", "error", err)
+	}
+
+	return `"` + hex.EncodeToString(sum.Sum(nil)[:16]) + `"`
+}
+
+// revalidate answers a conditional request for an embedded file, and is
+// the reason fasthttp never gets to.
+//
+// fasthttp serves Last-Modified from fs.FileInfo.ModTime, which an
+// embed.FS reports as the ZERO TIME - so the header is year 0001 and
+// its IfModifiedSince comparison is false for every real client date,
+// which means 304, always, including across an upgrade. That is exactly
+// the stale shell the cache policy below exists to prevent: a browser
+// holding the old index.html would revalidate, be told it was current,
+// and go on requesting chunk files the new binary does not have. So the
+// incoming If-Modified-Since is DELETED, and validation happens here
+// against a tag that does change when the binary does.
+//
+// Answering the 304 here also keeps the headers. fasthttp's NotModified
+// calls Response.Reset, which drops the Cache-Control set just above it
+// and everything securityHeaders wrote.
+//
+// Only GET and HEAD: no other method has a stored response to validate
+// against, and a 304 to a POST would be answering about something the
+// caller never cached.
+func revalidate(c fiber.Ctx, tag string) (bool, error) {
+	c.Set(fiber.HeaderETag, tag)
+
+	if m := c.Method(); m != fiber.MethodGet && m != fiber.MethodHead {
+		return false, nil
+	}
+
+	c.Request().Header.Del(fiber.HeaderIfModifiedSince)
+
+	if match := c.Get(fiber.HeaderIfNoneMatch); match == tag || match == "*" {
+		// Status only. A 304 carries no body, and SendStatus would
+		// write the status text as one.
+		c.Status(fiber.StatusNotModified)
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // mountConsole serves the embedded build under env.ConsolePath.
 //
 // Split out of registerRoutes so a test can mount a filesystem it
@@ -1044,11 +1171,25 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 	// index.html shell must always revalidate - a browser holding a
 	// stale shell after a binary upgrade would request chunk files
 	// that no longer exist and every lazy-loaded page would break.
+	//
+	// public, not private: the console shell and its chunks sit behind
+	// no gate. /docs, which does, is private for that reason.
+	//
+	// Revalidation is answered from the build tag rather than from the
+	// Last-Modified fasthttp would otherwise serve - see revalidate,
+	// where the zero ModTime of an embedded file is what makes that
+	// necessary.
+	tag := sync.OnceValue(func() string { return buildTag(sub) })
 	app.Use(env.ConsolePath, func(c fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), env.ConsolePath+"/assets/") {
 			c.Set(fiber.HeaderCacheControl, "public, max-age=31536000, immutable")
 		} else {
 			c.Set(fiber.HeaderCacheControl, "no-cache")
+		}
+
+		done, err := revalidate(c, tag())
+		if done {
+			return err
 		}
 
 		return c.Next()
@@ -1068,6 +1209,15 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 		if err != nil {
 			// Includes an invalid name, so traversal is refused here
 			// rather than checked for.
+			//
+			// The immutable header set above is undone first: it is
+			// keyed on the path, which is all that is known before the
+			// lookup, and a year-long "this never changes" over a MISS
+			// is the opposite of true. A tab left open across an
+			// upgrade asks for chunks that have gone, and pinning those
+			// 404s in a shared cache would outlive several more.
+			c.Set(fiber.HeaderCacheControl, "no-store")
+
 			return c.Status(fiber.StatusNotFound).SendString("not found")
 		}
 
@@ -1094,21 +1244,6 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 			return c.Status(fiber.StatusOK).Send(page)
 		},
 	}))
-}
-
-// noStoreCache forces Cache-Control: no-store on every /api/* response.
-// JSON returned by the API is session-bound or otherwise dynamic -
-// default browser heuristics could cache it on disk, leaking across
-// users on shared machines or showing stale state after logout /
-// privilege change. No-store is stricter than no-cache: it forbids
-// storing entirely, in the browser AND in any intermediate proxy.
-//
-// Set before c.Next() so a specific handler can still override if it
-// ever has reason to.
-func noStoreCache(c fiber.Ctx) error {
-	c.Set(fiber.HeaderCacheControl, "no-store")
-
-	return c.Next()
 }
 
 // perMinute builds a fixed-window rate limiter from the operator's

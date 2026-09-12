@@ -193,6 +193,7 @@ func New(opts Options) (*Server, error) {
 	// script-src is built once, from the hashes of whatever inline scripts
 	// the embedded documentation actually contains.
 	app.Use(securityHeaders(scriptSrcFor(docsite.FS())))
+	app.Use(cachePolicy)
 	app.Use(skipPaths(
 		// redactURLs first: the paths whose URL is itself a credential
 		// are logged by route pattern and never reach slog-fiber, which
@@ -414,6 +415,29 @@ func safeRecover(c fiber.Ctx) (err error) {
 			err = response.Internal(c, nil)
 		}
 	}()
+
+	return c.Next()
+}
+
+// cachePolicy is the default answer to "may this response be stored",
+// and the answer is no. It runs on every request, before any route, so
+// a surface that never thought about caching is safe rather than
+// silently heuristic - which is what a response with no Cache-Control
+// gets, and what /docs, the probes and the bare redirect used to get.
+//
+// no-store and not no-cache: almost everything this binary answers is
+// session-bound or otherwise dynamic, and no-store forbids storing
+// entirely, in the browser AND in any intermediate proxy, where
+// no-cache merely requires revalidation of something already written
+// to disk. That matters most on a shared machine and after a logout or
+// a privilege change.
+//
+// The two static mounts override it, because mountConsole and
+// mountDocs register later in the chain and c.Set replaces. Those are
+// the only two places allowed to widen this, and each does it for
+// paths it can name.
+func cachePolicy(c fiber.Ctx) error {
+	c.Set(fiber.HeaderCacheControl, "no-store")
 
 	return c.Next()
 }

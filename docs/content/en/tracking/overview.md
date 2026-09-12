@@ -36,7 +36,7 @@ Opening the email loads the GIF, and Mailyard records an **open**. Details:
 - The `sig` query parameter is a mandatory HMAC signature over the email id. A request with no signature or a bad
   signature returns `404` and records nothing, so a third party hitting the predictable path cannot inflate your
   metrics.
-- The endpoint always returns a 1×1 transparent GIF with `Cache-Control: no-cache`.
+- The endpoint always returns a 1×1 transparent GIF with `Cache-Control: no-store, max-age=0`.
 - Requests from known bot user-agents (such as security scanners and link pre-fetchers) are served the pixel but **not**
   counted.
 - The first open stamps `opened_at` on the email row, and `open_count` counts repeats up to fifty. Past that a hit
