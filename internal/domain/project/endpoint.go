@@ -46,7 +46,9 @@ func (h *Handler) List(c fiber.Ctx) error {
 	switch {
 	case h.Runtime.Config.Auth.Disabled:
 		out, err = h.Runtime.Store.Project.List(c.Context())
-	case rc != nil && rc.User != nil && rc.User.IsAdmin():
+	// A platform credential belongs to no project, so the membership
+	// branch below would answer it an empty list.
+	case rc.IsPlatformAdmin():
 		out, err = h.Runtime.Store.Project.List(c.Context())
 	case rc != nil && rc.User != nil:
 		out, err = h.Runtime.Store.Project.ListForUser(c.Context(), rc.User.ID)
@@ -94,7 +96,7 @@ func (h *Handler) accessForList(c fiber.Ctx, projects []*projmodel.Project) (map
 	out := make(map[string]ProjectAccess, len(projects))
 	rc := domain.GetRequestContext(c)
 	everything := ProjectAccess{Owner: true, Permissions: perm.NewSet(perm.All).List()}
-	if h.Runtime.Config.Auth.Disabled || (rc != nil && rc.User != nil && rc.User.IsAdmin()) {
+	if h.Runtime.Config.Auth.Disabled || rc.IsPlatformAdmin() {
 		for _, p := range projects {
 			out[p.ID] = everything
 		}
@@ -909,12 +911,19 @@ func (h *Handler) callerAccess(c fiber.Ctx, projID string) (access, error) {
 	}
 
 	rc := domain.GetRequestContext(c)
-	if rc == nil || rc.User == nil {
+	if rc == nil {
 		return access{}, nil
 	}
 
-	if rc.User.IsAdmin() {
+	// IsPlatformAdmin and not User.IsAdmin: a platform credential has
+	// no user. This is the path-addressed half of what stampProject
+	// decides for the header-addressed routes, and the two must agree.
+	if rc.IsPlatformAdmin() {
 		return everything, nil
+	}
+
+	if rc.User == nil {
+		return access{}, nil
 	}
 
 	m, err := h.Runtime.Store.Project.GetMember(c.Context(), projID, rc.User.ID)
