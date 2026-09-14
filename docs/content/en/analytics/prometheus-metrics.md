@@ -8,25 +8,32 @@ weight: 30
 GET /metrics
 ```
 
-Opt in with `metrics.enabled`. The route is not registered at all when it is off, so a disabled installation answers
-`404` rather than an empty scrape.
+Opt in with `metrics.enabled`. Nothing binds when it is off, so a disabled installation refuses the connection rather
+than answering an empty scrape.
 
 ```bash
 MAILYARD_METRICS_ENABLED=true
+MAILYARD_METRICS_ADDR=127.0.0.1:9090
 MAILYARD_METRICS_TOKEN=a-long-random-string
 ```
 
-{{< callout type="warning" title="Set a token unless the port is private" >}}
-`metrics.token` gates the endpoint behind `Authorization: Bearer <token>`. Leave it empty only when nothing outside your
-network can route to the process — a scrape reveals your sending volume, queue depth and failure rates to anyone who
-asks for it.
+## A listener of its own
 
-The comparison is constant-time, like every other credential check here, so it does not leak the length of a matching
-prefix.
+The scrape endpoint binds `metrics.addr`, not `server.addr`. It serves `/metrics` and nothing else, and every role
+runs it, the [worker node](/docs/getting-started/scaling) included.
+
+`metrics.addr` defaults to `127.0.0.1:9090` — reachable by a sidecar or a node exporter on the same host, and by
+nothing else. An address that cannot be bound fails the boot, and one sharing a port with `server.addr` is refused by
+config validation.
+
+{{< callout type="warning" title="Widening the bind needs a token" >}}
+`metrics.addr` set to `0.0.0.0:9090` puts the endpoint on the network, where a scrape reveals your sending volume,
+queue depth and failure rates to anyone who asks for it. `metrics.token` gates it behind
+`Authorization: Bearer <token>`, compared in constant time.
+
+Boot warns when the bind reaches past this host and no token gates it. A warning and not a refusal, since a private
+monitoring network is a legitimate place to skip the token.
 {{< /callout >}}
-
-The endpoint lives at the root, not under `/api/v1`, and it is one of the few things a
-[worker node](/docs/getting-started/scaling) serves — a node that only sends is the one whose metrics matter most.
 
 ## Counters
 
@@ -86,8 +93,11 @@ scrape_configs:
     authorization:
       credentials: a-long-random-string
     static_configs:
-      - targets: ['mailyard:3000']
+      - targets: ['mailyard:9090']
 ```
+
+The target port is `metrics.addr`. With the loopback default, Prometheus reaches the process from the same host — a
+sidecar in the same pod, or an agent on the same machine.
 
 Every node exposes its own numbers — the counters are per process and are not aggregated for you. Scrape each node and
 sum in Prometheus with `sum(rate(...))`, which is what you want anyway: a per-node breakdown is how you notice one

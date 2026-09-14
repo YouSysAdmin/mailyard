@@ -1,9 +1,10 @@
 // Mailyard, Copyright (c) 2021-2026 YouSysAdmin
 
 // Package metrics exposes Prometheus instrumentation. Counters are
-// package-level so instrumented code paths do not need wiring - the
-// /metrics route is registered only when metrics.enabled is true, and
-// an unexported registry keeps the default Go runtime collectors.
+// package-level so instrumented code paths do not need wiring -
+// HTTPHandler is served by server.MetricsServer, on a listener of its
+// own and only when metrics.enabled is true, and an unexported
+// registry keeps the default Go runtime collectors.
 package metrics
 
 import (

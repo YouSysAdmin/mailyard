@@ -91,7 +91,7 @@ docker run -p 3000:3000 -p 587:587 -p 25:25 -v mailyard-data:/data \
 | `inbound.enabled`       | off     | MX listener on :25 for verified domains                 |
 | `server.tls.enabled`    | off     | TLS on the HTTP listener (the SMTP ones default on)     |
 | `storage.backend`       | inline  | `fs` or `s3` attachment storage                         |
-| `metrics.enabled`       | off     | Prometheus scrape endpoint, `metrics.token` gates it    |
+| `metrics.enabled`       | off     | Prometheus scrape on its own listener (`metrics.addr`)  |
 | `database.replica_dsns` | none    | Read replicas for the list and analytics queries        |
 | `relay_nodes.enabled`   | off     | Enrolment of relay nodes, started with `mailyard relay` |
 

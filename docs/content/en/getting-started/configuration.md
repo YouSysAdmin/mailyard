@@ -144,8 +144,9 @@ topic. Attribution still comes from the
 
 | Variable                   | Default | Description                                                                                 |
 |----------------------------|---------|---------------------------------------------------------------------------------------------|
-| `MAILYARD_METRICS_ENABLED` | `false` | Serves the Prometheus scrape endpoint at `GET /metrics`                                     |
-| `MAILYARD_METRICS_TOKEN`   | —       | When set, the endpoint requires it as a bearer token. Leave empty only on a trusted network |
+| `MAILYARD_METRICS_ENABLED` | `false` | Binds the Prometheus scrape listener and serves `GET /metrics` on it                        |
+| `MAILYARD_METRICS_ADDR`    | `127.0.0.1:9090` | Where that listener binds. Its own port                                            |
+| `MAILYARD_METRICS_TOKEN`   | —       | When set, the endpoint requires it as a bearer token. Needed once the bind is widened       |
 
 ## Rate Limiting
 

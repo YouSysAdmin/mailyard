@@ -8,6 +8,7 @@ package env
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/mail"
 	"net/url"
 	"os"
@@ -222,12 +223,18 @@ type RateLimitConfig struct {
 	RelayNodeInboundPerMinute int `mapstructure:"relay_node_inbound_per_minute"`
 }
 
-// MetricsConfig exposes the Prometheus scrape endpoint. Token, when
-// set, must arrive as a bearer token - leave it empty only on
-// trusted networks.
+// MetricsConfig exposes the Prometheus scrape endpoint, on a LISTENER
+// OF ITS OWN and never a route on server.addr.
 type MetricsConfig struct {
-	Enabled bool   `mapstructure:"enabled"`
-	Token   string `mapstructure:"token"`
+	Enabled bool `mapstructure:"enabled"`
+
+	// Addr is where that listener binds, LOOPBACK by default. Widening
+	// it is the deliberate act, and the one that wants a token.
+	Addr string `mapstructure:"addr"`
+
+	// Token, when set, must arrive as a bearer token. Compared in
+	// constant time - see the metrics handler.
+	Token string `mapstructure:"token"`
 }
 
 // CORSConfig opens the API to browser clients on other origins.
@@ -892,6 +899,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("ratelimit.relay_node_chatter_per_minute", 600)
 	v.SetDefault("ratelimit.relay_node_inbound_per_minute", 1200)
 	v.SetDefault("metrics.enabled", false)
+	v.SetDefault("metrics.addr", "127.0.0.1:9090")
 	v.SetDefault("cors.enabled", false)
 	// The methods and headers the API actually uses, so a working
 	// config is just cors.enabled plus cors.allowed_origins.
@@ -1100,6 +1108,22 @@ func (c *Config) Validate() error {
 
 	if c.Server.MaxConcurrentRequests < 0 {
 		return fmt.Errorf("server.max_concurrent_requests cannot be negative - 0 means the fasthttp default")
+	}
+
+	if c.Metrics.Enabled {
+		if strings.TrimSpace(c.Metrics.Addr) == "" {
+			return fmt.Errorf("metrics.enabled is true but metrics.addr is empty - metrics bind a listener of their own, e.g. 127.0.0.1:9090")
+		}
+
+		if _, _, err := net.SplitHostPort(c.Metrics.Addr); err != nil {
+			return fmt.Errorf("metrics.addr must be host:port, e.g. 127.0.0.1:9090: %w", err)
+		}
+
+		// Otherwise the bind fails at boot with an error naming a port
+		// rather than the setting that chose it.
+		if sameListener(c.Metrics.Addr, c.Server.Addr) {
+			return fmt.Errorf("metrics.addr %q collides with server.addr %q - metrics need a port of their own", c.Metrics.Addr, c.Server.Addr)
+		}
 	}
 
 	if c.Worker.Concurrency < 1 {
@@ -1316,6 +1340,69 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// MetricsExposedWithoutToken reports a scrape endpoint that something
+// other than this host can reach, with nothing in front of it.
+//
+// Warned about at boot rather than refused, the same call RemovedKeys
+// makes: a private monitoring network is a legitimate place to skip
+// the token, and silence is the wrong answer either way.
+//
+// A host this cannot resolve counts as exposed - being wrong towards
+// saying something costs a line in the log.
+func (c *Config) MetricsExposedWithoutToken() bool {
+	if !c.Metrics.Enabled || c.Metrics.Token != "" {
+		return false
+	}
+
+	host, _, err := net.SplitHostPort(strings.TrimSpace(c.Metrics.Addr))
+	if err != nil {
+		return false
+	}
+
+	return !loopbackHost(host)
+}
+
+// loopbackHost reports a host only this machine can reach. An EMPTY
+// host is not one - it is the wildcard bind, which is every interface.
+func loopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+
+	return ip != nil && ip.IsLoopback()
+}
+
+// sameListener reports whether two bind addresses would contend for
+// the same socket.
+//
+// Different ports never do. The same port does unless BOTH sides name
+// a concrete host and the two differ, since a wildcard on either side
+// covers whatever the other names. It errs towards yes.
+func sameListener(a, b string) bool {
+	hostA, portA, err := net.SplitHostPort(strings.TrimSpace(a))
+	if err != nil {
+		return false
+	}
+
+	hostB, portB, err := net.SplitHostPort(strings.TrimSpace(b))
+	if err != nil {
+		return false
+	}
+
+	if portA != portB {
+		return false
+	}
+
+	return wildcardHost(hostA) || wildcardHost(hostB) || hostA == hostB
+}
+
+// wildcardHost reports the forms that bind every interface.
+func wildcardHost(host string) bool {
+	return host == "" || host == "0.0.0.0" || host == "::" || host == "[::]"
 }
 
 // TLSHost is the name a generated self-signed pair carries.

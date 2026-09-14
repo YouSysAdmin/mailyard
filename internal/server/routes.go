@@ -4,7 +4,6 @@ package server
 
 import (
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/hex"
 	"io"
 	"io/fs"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/static"
@@ -23,7 +21,6 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
-	"github.com/yousysadmin/mailyard/internal/core/metrics"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/analytics"
@@ -103,31 +100,11 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	})
 	app.Get("/readyz", hh.Ready)
 
-	// Prometheus scrape endpoint - opt in, optionally bearer-gated.
-	// Registered up here, above the early return below, because the
-	// worker role wants metrics more than any other node does.
-	if rt.Config.Metrics.Enabled {
-		mh := adaptor.HTTPHandler(metrics.HTTPHandler())
-		app.Get("/metrics", func(c fiber.Ctx) error {
-			if tok := rt.Config.Metrics.Token; tok != "" {
-				// Constant time, like every other credential check in
-				// this codebase (api keys, relay passwords). A plain !=
-				// returns as soon as two bytes differ, which leaks the
-				// length of the matching prefix - and this endpoint is
-				// reachable by anyone who can route to the process.
-				want := []byte("Bearer " + tok)
-				got := []byte(c.Get(fiber.HeaderAuthorization))
-				if subtle.ConstantTimeCompare(want, got) != 1 {
-					return c.SendStatus(fiber.StatusUnauthorized)
-				}
-			}
-
-			return mh(c)
-		})
-	}
+	// THE PROMETHEUS SCRAPE IS NOT A ROUTE HERE - it binds metrics.addr
+	// through server.NewMetrics, so every role serves it.
 
 	// Everything past this point is the api role. A worker node stops
-	// here: probes and metrics, no console, no API, no tracking.
+	// here: the probes, and nothing else this listener carries.
 	if healthOnly {
 		return
 	}

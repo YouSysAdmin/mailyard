@@ -182,6 +182,13 @@ func runServe(cmd *cobra.Command, r role) error {
 			"keys", removed)
 	}
 
+	// The two settings that make this sit on different lines and
+	// neither mentions the other - see MetricsExposedWithoutToken.
+	if cfg.MetricsExposedWithoutToken() {
+		log.Warn("metrics are reachable beyond this host and no metrics.token gates them - a scrape reports sending volume, queue depth and failure rates to anyone who asks: set metrics.token, or bind metrics.addr to loopback",
+			"addr", cfg.Metrics.Addr)
+	}
+
 	// Wire the JSON-body validator + custom rules before any handler
 	// can run. BindAndValidate panics if Init hasn't run, so this
 	// must precede server.New.
@@ -859,20 +866,30 @@ func runServe(cmd *cobra.Command, r role) error {
 		return fmt.Errorf("server tls: %w", err)
 	}
 
-	// A worker still binds server.addr, but serves only the probes and
-	// the metrics scrape. Serving nothing makes a worker
-	// unschedulable: an orchestrator needs a
-	// liveness endpoint, and the delivery node is the one whose
-	// metrics an operator most wants. Running the full console there
-	// would instead put the whole authenticated surface on a machine
-	// that has no reason to expose it.
+	// A worker still binds server.addr, but serves only the probes.
+	// Serving nothing makes a worker unschedulable: an orchestrator
+	// needs a liveness endpoint. Running the full console there would
+	// instead put the whole authenticated surface on a machine that has
+	// no reason to expose it.
 	srv, err := server.New(server.Options{Runtime: rt, TLS: serverTLS, HealthOnly: !r.api})
 	if err != nil {
 		return fmt.Errorf("server init: %w", err)
 	}
 
-	errCh := make(chan error, 1)
+	// The scrape endpoint, on metrics.addr rather than as a route on the
+	// one above. nil when metrics are off, and every role runs it.
+	metricsSrv := server.NewMetrics(cfg)
+
+	// Two listeners, ONE channel: either failing is a boot failure that
+	// takes the process down. The nil case is a BRANCH rather than a
+	// nil-safe Start, since returning immediately is how this channel
+	// says stop.
+	errCh := make(chan error, 2)
 	go func() { errCh <- srv.Start() }()
+
+	if metricsSrv != nil {
+		go func() { errCh <- metricsSrv.Start() }()
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -902,6 +919,12 @@ func runServe(cmd *cobra.Command, r role) error {
 		// attached.
 		rt.Events.Close()
 
+		// Logged rather than returned: a scrape must not decide the
+		// exit status of a clean shutdown.
+		if err := metricsSrv.Shutdown(5 * time.Second); err != nil {
+			log.Warn("metrics shutdown", "err", err)
+		}
+
 		return srv.Shutdown(shutdownTimeout)
 	case err := <-errCh:
 		stopWorker()
@@ -910,6 +933,17 @@ func runServe(cmd *cobra.Command, r role) error {
 		worker.Stop(5 * time.Second)
 		dispatcher.Close(5 * time.Second)
 		rt.Audit.Close(5 * time.Second)
+
+		// One listener failing takes the OTHER down with it, rather than
+		// leaving a survivor serving under a config just reported
+		// broken. Both are no-ops on the one that already stopped.
+		if merr := metricsSrv.Shutdown(5 * time.Second); merr != nil {
+			log.Warn("metrics shutdown", "err", merr)
+		}
+
+		if serr := srv.Shutdown(5 * time.Second); serr != nil {
+			log.Warn("server shutdown", "err", serr)
+		}
 
 		return err
 	}

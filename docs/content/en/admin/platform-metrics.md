@@ -16,8 +16,8 @@ There is no cross-project aggregation API. Installation-wide observability is th
 GET /metrics
 ```
 
-It sits at the root rather than under `/api`, is off unless `metrics.enabled` is set, and can be gated with a bearer
-token (`metrics.token`). It carries counters for accepted and finalized emails, inbound mail and webhook deliveries,
+It binds `metrics.addr` — loopback by default, its own listener — is off unless `metrics.enabled` is set, and can be
+gated with a bearer token (`metrics.token`). It carries counters for accepted and finalized emails, inbound mail and webhook deliveries,
 plus a scrape-time gauge of emails by status. Anything you want charted across tenants is built there, in your own
 monitoring stack, rather than in this console.
 
