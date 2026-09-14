@@ -33,6 +33,11 @@ const newName = ref('')
 const newIPs = ref('')
 const newSandbox = ref(false)
 
+// The server refuses a non-sandbox credential without emails:write, so
+// the checkbox is forced on and locked rather than the refusal arriving
+// as a 403 on a form that looked fine.
+const maySendReal = computed(() => projStore.can('emails:write'))
+
 // The one-time plaintext password shown after create.
 const createdCred = ref<SMTPCredential | null>(null)
 const createdPassword = ref('')
@@ -56,7 +61,7 @@ async function load() {
 function openCreate() {
   newName.value = ''
   newIPs.value = ''
-  newSandbox.value = false
+  newSandbox.value = !maySendReal.value
   showCreateModal.value = true
 }
 
@@ -302,10 +307,14 @@ onMounted(load)
         ></textarea>
       </FormField>
       <FormField
-        hint="Mail submitted with this credential is captured in the Inbound Sandbox and never delivered. It cannot be switched off later, and the credential cannot ask to send for real - which is the point of handing one out."
+        :hint="
+          maySendReal
+            ? 'Mail submitted with this credential is captured in the Inbound Sandbox and never delivered. It cannot be switched off later, and the credential cannot ask to send for real - which is the point of handing one out.'
+            : 'You do not hold emails:write, so the credentials you mint here are sandbox ones. Their mail is captured in the Inbound Sandbox and never delivered. Ask a project owner for a credential that sends.'
+        "
       >
         <label class="checkbox-label">
-          <input v-model="newSandbox" type="checkbox" />
+          <input v-model="newSandbox" type="checkbox" :disabled="!maySendReal" />
           <span>Sandbox credential</span>
         </label>
       </FormField>

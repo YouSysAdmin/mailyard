@@ -23,13 +23,15 @@ func ConsoleDocs() []apidoc.Route {
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
-			Method:      "POST",
-			Path:        "/smtp-credentials/",
-			Tag:         "smtpcredential",
-			Summary:     "Create",
-			Description: "Needs the `apikeys:write` permission.",
-			Request:     createInput{},
-			Responses:   []apidoc.Response{apidoc.Created("The result.", CreatedResponse{})},
+			Method:  "POST",
+			Path:    "/smtp-credentials/",
+			Tag:     "smtpcredential",
+			Summary: "Create",
+			Description: "Needs the `apikeys:write` permission, and `emails:write` as well " +
+				"unless `sandbox` is true - a credential that sends real mail cannot be " +
+				"minted by somebody who may not send.",
+			Request:   createInput{},
+			Responses: []apidoc.Response{apidoc.Created("The result.", CreatedResponse{})},
 		},
 		{
 			Method:      "DELETE",

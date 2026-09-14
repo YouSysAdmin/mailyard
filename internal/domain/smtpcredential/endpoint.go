@@ -14,6 +14,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	scmodel "github.com/yousysadmin/mailyard/internal/models/smtpcredential"
 )
 
@@ -45,12 +46,23 @@ func (h *Handler) List(c fiber.Ctx) error {
 }
 
 // Create mints a credential and returns the plaintext password
-// EXACTLY ONCE.
+// EXACTLY ONCE. A non-sandbox one needs emails:write on top of the
+// route's own apikeys:write.
 func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[createInput](c)
 	if !ok {
 		return resp
+	}
+
+	// You cannot MINT what you do not hold. The route is gated on
+	// apikeys:write and what it hands back SENDS, so sending needs its
+	// own permission.
+	if !in.Sandbox && !rc.Permissions.Has(perm.ResourceEmails, perm.ActionWrite) {
+		return response.Forbidden(c,
+			"a credential that sends real mail needs "+
+				string(perm.Of(perm.ResourceEmails, perm.ActionWrite))+
+				" - mint a sandbox credential instead, or ask a project owner")
 	}
 
 	// GetByUsername returns a single row and the column is UNIQUE, so
