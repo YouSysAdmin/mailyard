@@ -7,29 +7,18 @@ One Go binary and a PostgreSQL. The binary carries the console, the documentatio
 
 ## Features
 
-- **Amazon SES, natively.** SES is a provider on an SMTP server row: sending goes over the SES API, and bounce and
-  complaint notifications come back over SNS into the same bounce handling as everything else.
-- **Sending.** `POST /api/v1/emails/send`, or plain SMTP submission on :587 with an API key as the AUTH password.
-  Single, template, batch and scheduled sends, attachments (inline, or offloaded to filesystem/S3), a delivery log
-  per message, and a sandbox that captures mail instead of delivering it.
-- **Templates.** Versioned, per-language localizations, `{{ var }}` rendering, CSS inlining, preview and test sends,
-  import/export.
-- **Campaigns.** Subscriber lists (static or rule-based dynamic segments), A/B variants, throttling, delivery at each
-  recipient's local time, open/click tracking, hosted one-click unsubscribe (RFC 8058).
-- **Your own delivery.** Per-project SMTP servers in named groups with failover, a platform-wide shared pool, relay
-  nodes (machines you run that deliver straight to recipient mail exchangers from their own address), DKIM signing for
-  verified domains, approved sender addresses, bounce records feeding the suppression list. Address verification
-  (syntax, disposable, role, MX).
-- **Inbound.** Point MX at the host and receive on :25, claim domains with a DNS TXT record, SPF/DKIM/DMARC checked
-  at ingest, received mail stored per project and emitted as webhooks.
-- **Multi-tenant.** Projects with their own roles over a permission catalogue, members and invitations, usage plans
-  with volume limits and resource caps, per-project usage and analytics, export and erasure per address or in bulk.
-- **Auth.** Local sign-in with passkeys and TOTP, or OIDC/SSO. Sessions are tracked and revocable. Secrets (SMTP
-  passwords, TOTP seeds, private keys) sealed at rest.
-- **Operations.** TLS for every listener from one certificate chain (assigned, ACME, or self-signed), Prometheus
-  metrics, structured logs, an audit log, alert mail, retention windows, maintenance mode, PostgreSQL read replicas.
-- **Integration.** Outgoing webhooks with HMAC signatures and delivery logs. Both API surfaces are described in
-  OpenAPI (`mailyard export-api-spec`), and three clients are generated from it: [Go, Python and Ruby](sdk).
+| Feature           | Status | Notes                                                                                                                                                                                                                                                                                                                                                          |
+|-------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Amazon SES        | ✅     | SES is a provider on an SMTP server row: sending goes over the SES API, and bounce and complaint notifications come back over SNS into the same bounce handling as everything else.                                                                                                                                                                            |
+| Sending           | ✅     | `POST /api/v1/emails/send`, or plain SMTP submission on :587 with an API key as the AUTH password. Single, template, batch and scheduled sends, attachments (inline, or offloaded to filesystem/S3), a delivery log per message, and a sandbox that captures mail instead of delivering it.                                                                    |
+| Templates         | ✅     | Versioned, per-language localizations, `{{ var }}` rendering, CSS inlining, preview and test sends, import/export.                                                                                                                                                                                                                                             |
+| Campaigns         | ✅     | Subscriber lists (static or rule-based dynamic segments), A/B variants, throttling, delivery at each recipient's local time, open/click tracking, hosted one-click unsubscribe (RFC 8058).                                                                                                                                                                     |
+| Your own delivery | ✅     | Per-project SMTP servers in named groups with failover, a platform-wide shared pool, relay nodes (machines you run that deliver straight to recipient mail exchangers from their own address), DKIM signing for verified domains, approved sender addresses, bounce records feeding the suppression list. Address verification (syntax, disposable, role, MX). |
+| Inbound           | ✅     | Point MX at the host and receive on :25, claim domains with a DNS TXT record, SPF/DKIM/DMARC checked at ingest, received mail stored per project and emitted as webhooks.                                                                                                                                                                                      |
+| Multi-tenant      | ✅     | Projects with their own roles over a permission catalogue, members and invitations, usage plans with volume limits and resource caps, per-project usage and analytics, export and erasure per address or in bulk.                                                                                                                                              |
+| Auth              | ✅     | Local sign-in with passkeys and TOTP, or OIDC/SSO. Sessions are tracked and revocable. Secrets (SMTP passwords, TOTP seeds, private keys) sealed at rest.                                                                                                                                                                                                      |
+| Operations        | ✅     | TLS for every listener from one certificate chain (assigned, ACME, or self-signed), Prometheus metrics, structured logs, an audit log, alert mail, retention windows, maintenance mode, PostgreSQL read replicas.                                                                                                                                              |
+| Integration       | ✅     | Outgoing webhooks with HMAC signatures and delivery logs. Both API surfaces are described in OpenAPI (`mailyard export-api-spec`), and three clients are generated from it: [Go, Python and Ruby](sdk).                                                                                                                                                        |
 
 Documentation: [yousysadmin.github.io/mailyard](https://yousysadmin.github.io/mailyard/), or `/docs` on any running
 instance.
@@ -96,15 +85,15 @@ docker run -p 3000:3000 -p 587:587 -p 25:25 -v mailyard-data:/data \
 
 ## Optional listeners and services
 
-| Config               | Default | Purpose                                              |
-|----------------------|---------|------------------------------------------------------|
-| `submission.enabled` | off     | SMTP submission on :587, AUTH with an API key        |
-| `inbound.enabled`    | off     | MX listener on :25 for verified domains              |
-| `server.tls.enabled` | off     | TLS on the HTTP listener (the SMTP ones default on)  |
-| `storage.backend`    | inline  | `fs` or `s3` attachment storage                      |
-| `metrics.enabled`    | off     | Prometheus scrape endpoint, `metrics.token` gates it |
-| `database.replica_dsns` | none | Read replicas for the list and analytics queries    |
-| `relay_nodes.enabled` | off    | Enrolment of relay nodes, started with `mailyard relay` |
+| Config                  | Default | Purpose                                                 |
+|-------------------------|---------|---------------------------------------------------------|
+| `submission.enabled`    | off     | SMTP submission on :587, AUTH with an API key           |
+| `inbound.enabled`       | off     | MX listener on :25 for verified domains                 |
+| `server.tls.enabled`    | off     | TLS on the HTTP listener (the SMTP ones default on)     |
+| `storage.backend`       | inline  | `fs` or `s3` attachment storage                         |
+| `metrics.enabled`       | off     | Prometheus scrape endpoint, `metrics.token` gates it    |
+| `database.replica_dsns` | none    | Read replicas for the list and analytics queries        |
+| `relay_nodes.enabled`   | off     | Enrolment of relay nodes, started with `mailyard relay` |
 
 ## Development
 
@@ -119,7 +108,6 @@ task sdk          # regenerate and check the three clients
 
 Building the documentation into the binary needs [Hugo](https://gohugo.io). The public site is the same Hugo
 source built in the `pages` environment by `.github/workflows/docs.yaml`.
-
 
 ## License
 
