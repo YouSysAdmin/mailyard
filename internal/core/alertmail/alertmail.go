@@ -15,9 +15,11 @@
 package alertmail
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -184,18 +186,12 @@ func (n *Notifier) deliver(ctx context.Context, a Alert, e *amodel.Event) {
 		return
 	}
 
-	actor := e.ActorEmail
-	if actor == "" {
-		actor = e.ActorID
-	}
+	actor := cmp.Or(e.ActorEmail, e.ActorID)
 
 	// The request that produced the event, or for an event nothing
 	// requested - the dispatcher disabling a webhook - the detail
 	// that says which one and why.
-	action := strings.TrimSpace(e.Method + " " + e.Path)
-	if action == "" {
-		action = e.Detail
-	}
+	action := cmp.Or(strings.TrimSpace(e.Method+" "+e.Path), e.Detail)
 
 	subject, html, text := Message(a.Heading, a.Note, actor, action, n.trailLink(a.Tier))
 	n.Mail.SendAsync(to, subject, html, text)
@@ -252,11 +248,7 @@ func (n *Notifier) claim(key string) bool {
 	// Swept here rather than on a timer: the map is only ever touched
 	// from this function, and an install quiet enough not to reach it
 	// does not need the memory back.
-	for k, t := range n.sent {
-		if now.Sub(t) > collapseWindow {
-			delete(n.sent, k)
-		}
-	}
+	maps.DeleteFunc(n.sent, func(_ string, t time.Time) bool { return now.Sub(t) > collapseWindow })
 
 	n.sent[key] = now
 

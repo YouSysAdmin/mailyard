@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,7 +87,7 @@ func TestConsolePermissionsExist(t *testing.T) {
 		t.Fatalf("walk %s: %v", consoleSrc(t), err)
 	}
 
-	sort.Strings(unknown)
+	slices.Sort(unknown)
 
 	if len(seen) < 15 {
 		t.Fatalf("only found %d permission strings in the console, the scan is broken", len(seen))

@@ -317,20 +317,9 @@ func (s Set) List() []string {
 		out = append(out, string(p))
 	}
 
-	sortStrings(out)
+	slices.Sort(out)
 
 	return out
-}
-
-// sortStrings is an insertion sort. The set is at most twice the
-// registry, so this avoids pulling sort into a model package that is
-// otherwise dependency-free apart from strings.
-func sortStrings(xs []string) {
-	for i := 1; i < len(xs); i++ {
-		for j := i; j > 0 && xs[j] < xs[j-1]; j-- {
-			xs[j], xs[j-1] = xs[j-1], xs[j]
-		}
-	}
 }
 
 // FromStrings builds a Set from stored permission strings - the shape

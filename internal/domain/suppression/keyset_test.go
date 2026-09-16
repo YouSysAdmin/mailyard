@@ -4,6 +4,7 @@ package suppression
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -94,9 +95,7 @@ func TestPagingSeesEveryRowExactlyOnce(t *testing.T) {
 	}
 
 	// Newest first.
-	for i, j := 0, len(want)-1; i < j; i, j = i+1, j-1 {
-		want[i], want[j] = want[j], want[i]
-	}
+	slices.Reverse(want)
 
 	got := walk(t, s, proj, store.SuppressionFilter{}, 7)
 	if len(got) != len(want) {

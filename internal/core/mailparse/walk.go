@@ -3,6 +3,7 @@
 package mailparse
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -154,10 +155,7 @@ type naming struct {
 // senders skip the disposition entirely and put `name` on the content
 // type. Requiring the first would drop attachments from all three.
 func attachmentName(disposition string, dispParams, typeParams map[string]string) naming {
-	filename := dispParams["filename"]
-	if filename == "" {
-		filename = typeParams["name"]
-	}
+	filename := cmp.Or(dispParams["filename"], typeParams["name"])
 
 	return naming{
 		isAttachment: disposition == "attachment" || filename != "",

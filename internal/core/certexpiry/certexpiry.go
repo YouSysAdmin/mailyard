@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -90,8 +90,8 @@ func (c *Checker) Run(ctx context.Context) error {
 		return nil
 	}
 
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i].NotAfter.Before(*rows[j].NotAfter)
+	slices.SortFunc(rows, func(a, b *certmodel.Certificate) int {
+		return a.NotAfter.Compare(*b.NotAfter)
 	})
 
 	for _, r := range rows {

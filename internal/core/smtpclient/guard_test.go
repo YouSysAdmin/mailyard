@@ -3,7 +3,6 @@
 package smtpclient
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -17,8 +16,8 @@ import (
 func TestAGuardedServerRefusesAPrivateHost(t *testing.T) {
 	for _, enc := range []string{EncryptionNone, EncryptionSTARTTLS, EncryptionSSL} {
 		cfg := ServerConfig{Host: "127.0.0.1", Port: 25, Encryption: enc, GuardPrivate: true}
-		var blocked *safedial.ErrBlocked
-		if err := TestConnection(cfg); !errors.As(err, &blocked) {
+		err := TestConnection(cfg)
+		if _, ok := errors.AsType[*safedial.ErrBlocked](err); !ok {
 			t.Errorf("%s: got %v, want ErrBlocked", enc, err)
 		}
 	}
@@ -29,8 +28,8 @@ func TestAGuardedServerRefusesAPrivateHost(t *testing.T) {
 // into this network before any byte is exchanged.
 func TestAGuardedDirectDialRefusesAPrivateHost(t *testing.T) {
 	cfg := DirectConfig{GuardPrivate: true, Timeout: time.Second}
-	var blocked *safedial.ErrBlocked
-	if _, err := cfg.dial(context.Background(), "127.0.0.1:25"); !errors.As(err, &blocked) {
+	_, err := cfg.dial(t.Context(), "127.0.0.1:25")
+	if _, ok := errors.AsType[*safedial.ErrBlocked](err); !ok {
 		t.Fatalf("got %v, want ErrBlocked", err)
 	}
 }

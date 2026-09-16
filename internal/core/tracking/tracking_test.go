@@ -25,7 +25,7 @@ func TestOpenAndClickSignatures(t *testing.T) {
 		t.Fatalf("open url shape: %s", openURL)
 	}
 
-	sig := openURL[strings.Index(openURL, "sig=")+4:]
+	_, sig, _ := strings.Cut(openURL, "sig=")
 	if !s.VerifyOpen("msg-1", sig) {
 		t.Error("open sig must verify")
 	}
@@ -35,7 +35,7 @@ func TestOpenAndClickSignatures(t *testing.T) {
 	}
 
 	clickURL := s.ClickURL("msg-1", "abcd1234")
-	csig := clickURL[strings.Index(clickURL, "sig=")+4:]
+	_, csig, _ := strings.Cut(clickURL, "sig=")
 	if !s.VerifyClick("msg-1", "abcd1234", csig) {
 		t.Error("click sig must verify")
 	}
@@ -48,7 +48,7 @@ func TestOpenAndClickSignatures(t *testing.T) {
 func TestUnsubscribeToken(t *testing.T) {
 	s := signer()
 	url := s.UnsubscribeURL("msg-9")
-	tok := url[strings.LastIndex(url, "/")+1:]
+	_, tok, _ := strings.CutLast(url, "/")
 	id, err := s.VerifyUnsubscribeToken(tok)
 	if err != nil || id != "msg-9" {
 		t.Fatalf("got %q err %v", id, err)
@@ -66,7 +66,7 @@ func TestUnsubscribeToken(t *testing.T) {
 func TestWebViewTokenExpiry(t *testing.T) {
 	s := signer()
 	url := s.WebViewURL("em-1")
-	tok := url[strings.LastIndex(url, "/")+1:]
+	_, tok, _ := strings.CutLast(url, "/")
 	id, err := s.VerifyWebViewToken(tok)
 	if err != nil || id != "em-1" {
 		t.Fatalf("got %q err %v", id, err)

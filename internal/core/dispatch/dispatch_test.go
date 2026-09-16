@@ -28,8 +28,7 @@ func (s *memSink) List(context.Context, string) ([]*whmodel.Webhook, error) {
 func (s *memSink) Disable(_ context.Context, h *whmodel.Webhook, reason string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := time.Now()
-	h.DisabledAt, h.DisabledReason = &now, reason
+	h.DisabledAt, h.DisabledReason = new(time.Now()), reason
 
 	return nil
 }

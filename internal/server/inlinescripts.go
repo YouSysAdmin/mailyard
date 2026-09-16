@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"io/fs"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -86,12 +87,7 @@ func inlineScriptHashes(site fs.FS) []string {
 		return nil
 	})
 
-	out := make([]string, 0, len(seen))
-	for h := range seen {
-		out = append(out, h)
-	}
-
-	slices.Sort(out)
+	out := slices.Sorted(maps.Keys(seen))
 
 	return out
 }

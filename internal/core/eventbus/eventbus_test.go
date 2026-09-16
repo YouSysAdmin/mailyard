@@ -160,7 +160,7 @@ func TestConcurrentPublishAndSubscribe(t *testing.T) {
 // stream is a held connection.
 func TestSubscribeRefusesPastTheCeiling(t *testing.T) {
 	b := New()
-	for i := 0; i < MaxSubscribersPerProject; i++ {
+	for i := range MaxSubscribersPerProject {
 		if _, err := b.Subscribe("proj"); err != nil {
 			t.Fatalf("subscription %d refused: %v", i, err)
 		}

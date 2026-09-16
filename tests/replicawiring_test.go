@@ -8,7 +8,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -36,7 +36,11 @@ func TestReplicasGoExactlyToTheStoresThatReadThem(t *testing.T) {
 	paths := map[string]string{}
 	for _, imp := range file.Imports {
 		p := strings.Trim(imp.Path.Value, `"`)
-		name := p[strings.LastIndex(p, "/")+1:]
+		name := p
+		if _, after, ok := strings.CutLast(p, "/"); ok {
+			name = after
+		}
+
 		if imp.Name != nil {
 			name = imp.Name.Name
 		}
@@ -94,8 +98,8 @@ func TestReplicasGoExactlyToTheStoresThatReadThem(t *testing.T) {
 		}
 	}
 
-	sort.Strings(deadPlumbing)
-	sort.Strings(unrouted)
+	slices.Sort(deadPlumbing)
+	slices.Sort(unrouted)
 
 	if len(deadPlumbing) > 0 {
 		t.Errorf("%v are handed read replicas but never call ReadQuery or ReadQueryRow.\n"+

@@ -605,8 +605,7 @@ func scanRole(r interface{ Scan(...any) error }) (*projmodel.Role, error) {
 	}
 
 	if updated.Valid {
-		t := updated.Time.UTC()
-		role.UpdatedAt = &t
+		role.UpdatedAt = new(updated.Time.UTC())
 	}
 
 	return &role, nil

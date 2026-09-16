@@ -4,9 +4,11 @@ package smtpclient
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -180,7 +182,7 @@ func (f *fakeMX) snapshot() (helo, envFrom string, rcpts []string, data []byte, 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	return f.helo, f.envFrom, append([]string(nil), f.rcpts...), append([]byte(nil), f.data...), f.sessions
+	return f.helo, f.envFrom, slices.Clone(f.rcpts), bytes.Clone(f.data), f.sessions
 }
 
 func rawMessage() *Raw {
@@ -285,8 +287,8 @@ func TestRecipientsAreJudgedIndividually(t *testing.T) {
 		t.Fatalf("rejected map is %v", res.Rejected)
 	}
 
-	var se *SendError
-	if !errors.As(rej, &se) || !se.Permanent() {
+	se, ok := errors.AsType[*SendError](rej)
+	if !ok || !se.Permanent() {
 		t.Errorf("rejection is %v, want a permanent *SendError", rej)
 	}
 
@@ -382,8 +384,8 @@ func TestAPermanentRefusalDoesNotTrySiblings(t *testing.T) {
 		t.Fatal("expected a permanent failure")
 	}
 
-	var se *SendError
-	if !errors.As(err, &se) || !se.Permanent() {
+	se, ok := errors.AsType[*SendError](err)
+	if !ok || !se.Permanent() {
 		t.Errorf("err is %v, want a permanent *SendError", err)
 	}
 

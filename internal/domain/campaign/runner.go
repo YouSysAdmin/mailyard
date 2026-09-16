@@ -3,6 +3,7 @@
 package campaign
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -114,8 +115,7 @@ func (r *Runner) Start(ctx context.Context) {
 	defer close(r.done)
 	r.Log.Info("campaign: runner started",
 		"batch_size", r.BatchSize, "poll_interval", r.PollInterval.String())
-	ticker := time.NewTicker(r.PollInterval)
-	defer ticker.Stop()
+	ticker := time.Tick(r.PollInterval)
 	for {
 		// Guard each poll rather than the loop: a panic on one batch
 		// must cost that batch, not the runner. Without this the whole
@@ -125,7 +125,7 @@ func (r *Runner) Start(ctx context.Context) {
 			r.pollOnce(ctx)
 		}()
 		select {
-		case <-ticker.C:
+		case <-ticker:
 		case <-r.wake:
 		case <-r.stop:
 			return
@@ -482,10 +482,7 @@ func (r *Runner) renderFor(ctx context.Context, c *cmodel.Campaign, m *cmodel.Me
 	// reserved name the body accepts.
 	data = tracking.WithSystemVars(data)
 
-	language := sub.Language
-	if language == "" {
-		language = c.Language
-	}
+	language := cmp.Or(sub.Language, c.Language)
 
 	out, _, err := r.EmailService.RenderTemplate(ctx, c.ProjectID, &email.TemplateRef{
 		ID:       templateID,
@@ -646,9 +643,7 @@ func localDeliverAt(c *cmodel.Campaign, sub *submodel.Subscriber) *time.Time {
 	utc := ref.UTC()
 	y, mo, d := utc.Date()
 	h, mi, _ := utc.Clock()
-	local := time.Date(y, mo, d, h, mi, 0, 0, loc).UTC()
-
-	return &local
+	return new(time.Date(y, mo, d, h, mi, 0, 0, loc).UTC())
 }
 
 func eventPayload(c *cmodel.Campaign, counts map[string]int) map[string]any {

@@ -277,8 +277,7 @@ func scanSandbox(sc scanner) (*sbmodel.Email, error) {
 	}
 
 	if expires.Valid {
-		t := expires.Time.UTC()
-		e.ExpiresAt = &t
+		e.ExpiresAt = new(expires.Time.UTC())
 	}
 
 	return &e, nil

@@ -15,6 +15,7 @@
 package sesfeedback
 
 import (
+	"cmp"
 	"context"
 	"encoding/json/v2"
 	"log/slog"
@@ -207,10 +208,7 @@ func (h *Handler) record(ctx context.Context, topicARN, payload string) {
 		return
 	}
 
-	kind := n.NotificationType
-	if kind == "" {
-		kind = n.EventType
-	}
+	kind := cmp.Or(n.NotificationType, n.EventType)
 
 	report := bounce.Report{
 		EmailID: headerValue(n.Mail.Headers, smtpclient.HeaderEmailID),

@@ -14,6 +14,8 @@ package retention
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -60,12 +62,12 @@ type Result struct {
 
 // Run executes a full sweep. It keeps going after a per-section
 // error: one failing table must not stop the rest from being
-// trimmed. The first error is returned so the job is marked failed
-// and the operator investigates.
+// trimmed. Every section error is joined and returned, so the job is
+// marked failed and names each section the operator has to look at.
 func (s *Sweeper) Run(ctx context.Context) error {
 	now := time.Now().UTC()
 	var res Result
-	var firstErr error
+	var errs []error
 
 	note := func(section string, err error) {
 		if err == nil {
@@ -73,9 +75,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		}
 
 		s.Log.Error("retention: section failed", "section", section, "err", err)
-		if firstErr == nil {
-			firstErr = err
-		}
+		errs = append(errs, fmt.Errorf("%s: %w", section, err))
 	}
 
 	metaDays := s.Settings.Int(smodel.KeyRetentionDays)
@@ -285,7 +285,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		"blobs_deleted", res.BlobsDeleted,
 		"blob_errors", res.BlobErrors)
 
-	return firstErr
+	return errors.Join(errs...)
 }
 
 // deleteBlobs removes objects, tolerating individual failures - a

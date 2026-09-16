@@ -150,17 +150,16 @@ func (m *Manager) Register(j Job) {
 func (m *Manager) Start(ctx context.Context) {
 	defer m.once.Do(func() { close(m.stopped) })
 
-	t := time.NewTicker(30 * time.Second)
-	defer t.Stop()
+	t := time.Tick(30 * time.Second)
 	m.log.Info("cron: started", "jobs", len(m.jobs))
 
 	for {
 		select {
 		case <-ctx.Done():
-			m.log.Info("cron: stopped")
+			m.log.Info("cron: stopped", "cause", context.Cause(ctx))
 
 			return
-		case <-t.C:
+		case <-t:
 			m.runDue(ctx)
 		}
 	}

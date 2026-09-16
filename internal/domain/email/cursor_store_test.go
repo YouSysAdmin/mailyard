@@ -72,8 +72,7 @@ func TestPagingTheLogDoesNotSkipMessagesThatShareATimestamp(t *testing.T) {
 		}
 
 		last := rows[len(rows)-1]
-		created := last.CreatedAt
-		f.Before = &created
+		f.Before = new(last.CreatedAt)
 		f.BeforeID = last.ID
 	}
 

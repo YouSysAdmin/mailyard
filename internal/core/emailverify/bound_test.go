@@ -14,7 +14,7 @@ import (
 func TestTheMXCacheIsBounded(t *testing.T) {
 	v := New(Config{})
 	now := time.Now()
-	for i := 0; i < maxCacheEntries*2; i++ {
+	for i := range maxCacheEntries * 2 {
 		v.storeMX(fmt.Sprintf("d%d.example", i), true, now)
 	}
 

@@ -114,12 +114,11 @@ func (w *Worker) Start(ctx context.Context) {
 	w.log.Info("queue: worker started",
 		"concurrency", w.cfg.Concurrency, "poll_interval", w.cfg.PollInterval.String())
 
-	ticker := time.NewTicker(w.cfg.PollInterval)
-	defer ticker.Stop()
+	ticker := time.Tick(w.cfg.PollInterval)
 	for {
 		w.pollOnce(ctx)
 		select {
-		case <-ticker.C:
+		case <-ticker:
 		case <-w.wake:
 		case <-w.stop:
 			close(w.jobs)

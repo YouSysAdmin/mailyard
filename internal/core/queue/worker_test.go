@@ -43,8 +43,7 @@ func (s *memSource) ClaimDue(_ context.Context, now time.Time, limit int) ([]*em
 			r.Status = emailmodel.StatusProcessing
 			r.Attempts++
 			s.claims[r.ID]++
-			cp := *r
-			out = append(out, &cp)
+			out = append(out, new(*r))
 		}
 	}
 

@@ -19,11 +19,12 @@
 package sdkgen
 
 import (
+	"cmp"
 	"fmt"
 	"go/format"
+	"maps"
 	"reflect"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -41,12 +42,8 @@ func Render() (map[string]string, error) {
 	}
 
 	routes := openapi.Routes()
-	sort.Slice(routes, func(i, j int) bool {
-		if routes[i].Path != routes[j].Path {
-			return routes[i].Path < routes[j].Path
-		}
-
-		return routes[i].Method < routes[j].Method
+	slices.SortFunc(routes, func(a, b apidoc.Route) int {
+		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Method, b.Method))
 	})
 
 	methods := make([]method, 0, len(routes))
@@ -225,9 +222,7 @@ func (g *generator) fields(b *strings.Builder, t reflect.Type, indent string) {
 
 		// A field with no json tag would emit `json:""`, which is not
 		// what the server marshals it as. Fall back to the field name.
-		if tag == "" {
-			tag = f.Name
-		}
+		tag = cmp.Or(tag, f.Name)
 
 		fmt.Fprintf(b, "%s%s %s `json:%q`\n", indent, exported(f.Name), g.goType(f.Type), tag)
 	}
@@ -314,9 +309,9 @@ func (g *generator) method(r apidoc.Route) (method, bool) {
 			continue
 		}
 
-		if strings.HasPrefix(seg, ":") {
+		if name, ok := strings.CutPrefix(seg, ":"); ok {
 			formatt = append(formatt, "%s")
-			m.PathParams = append(m.PathParams, argName(strings.TrimPrefix(seg, ":")))
+			m.PathParams = append(m.PathParams, argName(name))
 			continue
 		}
 
@@ -539,10 +534,7 @@ func (g *generator) uniquifyMethodNames(ms []method) {
 }
 
 func methodDoc(r apidoc.Route) string {
-	summary := strings.TrimSpace(r.Summary)
-	if summary == "" {
-		summary = r.Method + " " + r.Path
-	}
+	summary := cmp.Or(strings.TrimSpace(r.Summary), r.Method+" "+r.Path)
 
 	line := summary
 	if !strings.HasSuffix(line, ".") {
@@ -562,12 +554,7 @@ const header = `
 `
 
 func (g *generator) renderTypes() string {
-	names := make([]string, 0, len(g.types))
-	for n := range g.types {
-		names = append(names, n)
-	}
-
-	slices.Sort(names)
+	names := slices.Sorted(maps.Keys(g.types))
 
 	var b strings.Builder
 	b.WriteString(header)

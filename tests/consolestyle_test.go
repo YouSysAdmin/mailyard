@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -341,7 +341,7 @@ func TestEveryNavIconExists(t *testing.T) {
 		}
 	}
 
-	sort.Strings(missing)
+	slices.Sort(missing)
 	if len(missing) > 0 {
 		t.Errorf("nav icon(s) with no glyph: %s\n\ngetIcon ends `icons[name] || ''`, so these render blank.",
 			strings.Join(missing, ", "))
@@ -636,7 +636,7 @@ func TestNoComponentStylesAnotherOnesInsides(t *testing.T) {
 				continue
 			}
 
-			sort.Strings(owners)
+			slices.Sort(owners)
 			t.Errorf("%s styles .%s, which is rendered by %s and by nothing here. A scoped "+
 				"rule reaches a child component's ROOT element and nothing deeper, so this "+
 				"compiles to a selector that matches nothing and the rule is simply absent. "+

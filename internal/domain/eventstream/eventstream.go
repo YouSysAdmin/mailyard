@@ -88,8 +88,7 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 
 		deadline := time.NewTimer(MaxStreamLife)
 		defer deadline.Stop()
-		ticker := time.NewTicker(heartbeat)
-		defer ticker.Stop()
+		ticker := time.Tick(heartbeat)
 
 		// An opening event tells the client the stream is live, and
 		// flushes the headers through any proxy that is holding them.
@@ -107,7 +106,7 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 				if !writeEvent(w, e.Type, fiber.Map{"at": e.At, "data": e.Data}) {
 					return
 				}
-			case <-ticker.C:
+			case <-ticker:
 				// A comment line. EventSource ignores it, proxies see
 				// traffic.
 				if _, err := w.WriteString(": ping\n\n"); err != nil {

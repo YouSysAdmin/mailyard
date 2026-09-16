@@ -178,23 +178,23 @@ module Mailyard
 func interpolatePath(p, prefix, esc string) string {
 	var b strings.Builder
 	for {
-		i := strings.Index(p, "{")
-		if i == -1 {
+		before, rest, ok := strings.Cut(p, "{")
+		if !ok {
 			b.WriteString(p)
 
 			return b.String()
 		}
 
-		j := strings.Index(p[i:], "}")
-		if j == -1 {
+		name, after, ok := strings.Cut(rest, "}")
+		if !ok {
 			b.WriteString(p)
 
 			return b.String()
 		}
 
-		b.WriteString(p[:i])
-		b.WriteString(prefix + "{" + esc + "(" + p[i+1:i+j] + ")}")
-		p = p[i+j+1:]
+		b.WriteString(before)
+		b.WriteString(prefix + "{" + esc + "(" + name + ")}")
+		p = after
 	}
 }
 

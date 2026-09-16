@@ -463,8 +463,12 @@ func runServe(cmd *cobra.Command, r role) error {
 		dispatcher.Emit(context.Background(), job.ProjectID, event, job.Sender, email.EventPayload(job))
 	}
 	rt.Queue = worker
-	workerCtx, stopWorker := context.WithCancel(context.Background())
-	defer stopWorker()
+	// WithCancelCause so the long-lived loops can report WHY they
+	// stopped. Three paths cancel this and they mean different things -
+	// a deferred cleanup, a signal, and a listener that failed - and
+	// ctx.Err() is context.Canceled for all three.
+	workerCtx, stopWorker := context.WithCancelCause(context.Background())
+	defer stopWorker(nil)
 	// The worker is CONSTRUCTED on every role, and only STARTED on a
 	// worker one. An api node still hands rt.Queue to the email
 	// service, whose Wake broadcasts - so accepting a send on an api
@@ -906,7 +910,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		// fire until this function returns - and it is about to block
 		// on shutdown, so scheduled jobs kept firing for the whole
 		// drain.
-		stopWorker()
+		stopWorker(fmt.Errorf("signal %s", s))
 		stopSMTPListeners(10 * time.Second)
 		runner.Stop(10 * time.Second)
 		worker.Stop(30 * time.Second)
@@ -927,7 +931,7 @@ func runServe(cmd *cobra.Command, r role) error {
 
 		return srv.Shutdown(shutdownTimeout)
 	case err := <-errCh:
-		stopWorker()
+		stopWorker(fmt.Errorf("listener failed: %w", err))
 		stopSMTPListeners(5 * time.Second)
 		runner.Stop(5 * time.Second)
 		worker.Stop(5 * time.Second)

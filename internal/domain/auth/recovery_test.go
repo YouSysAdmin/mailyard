@@ -65,7 +65,7 @@ func TestRecoveryCodesAreDistinctAndForgivinglyHashed(t *testing.T) {
 func TestRecoverySymbolsAreUnbiased(t *testing.T) {
 	counts := map[byte]int{}
 	rejected := 0
-	for r := 0; r < 256; r++ {
+	for r := range 256 {
 		sym, ok := recoverySymbol(byte(r))
 		if !ok {
 			rejected++

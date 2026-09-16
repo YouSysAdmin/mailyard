@@ -76,8 +76,8 @@ func TestTheConsoleImportsNothingItDoesNotUse(t *testing.T) {
 			for part := range strings.SplitSeq(m[1], ",") {
 				n := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(part), "type "))
 				// `X as Y` binds Y.
-				if at := strings.LastIndex(n, " as "); at >= 0 {
-					n = strings.TrimSpace(n[at+4:])
+				if _, after, ok := strings.CutLast(n, " as "); ok {
+					n = strings.TrimSpace(after)
 				}
 
 				if n != "" {

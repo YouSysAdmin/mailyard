@@ -20,6 +20,7 @@ package emailverify
 import (
 	"context"
 	"errors"
+	"maps"
 	"net"
 	"strings"
 	"sync"
@@ -254,11 +255,7 @@ func (v *Verifier) store(addr string, res Result, now time.Time) {
 const maxCacheEntries = 10000
 
 func (v *Verifier) evictLocked(now time.Time) {
-	for k, e := range v.results {
-		if now.Sub(e.at) > v.cfg.CacheTTL {
-			delete(v.results, k)
-		}
-	}
+	maps.DeleteFunc(v.results, func(_ string, e cachedResult) bool { return now.Sub(e.at) > v.cfg.CacheTTL })
 
 	// Still oversized after dropping the stale entries: clear it
 	// rather than grow without bound.
@@ -266,11 +263,7 @@ func (v *Verifier) evictLocked(now time.Time) {
 		v.results = map[string]cachedResult{}
 	}
 
-	for k, e := range v.mxAnswer {
-		if now.Sub(e.at) > v.cfg.MXCacheTTL {
-			delete(v.mxAnswer, k)
-		}
-	}
+	maps.DeleteFunc(v.mxAnswer, func(_ string, e cachedMX) bool { return now.Sub(e.at) > v.cfg.MXCacheTTL })
 
 	if len(v.mxAnswer) > maxCacheEntries {
 		v.mxAnswer = map[string]cachedMX{}

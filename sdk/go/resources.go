@@ -15,9 +15,9 @@ import (
 // ListTemplates returns the project's templates. They are authored in
 // the console, so this surface only reads them.
 func (c *Client) ListTemplates(ctx context.Context, limit, offset int) ([]Template, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Templates []Template `json:"templates"`
-	}](ctx, c, http.MethodGet, "/templates", page(limit, offset), nil)
+	}](ctx, http.MethodGet, "/templates", page(limit, offset), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -28,10 +28,10 @@ func (c *Client) ListTemplates(ctx context.Context, limit, offset int) ([]Templa
 // GetTemplate returns one template with its version history, so you
 // can pin a version without a second call.
 func (c *Client) GetTemplate(ctx context.Context, id string) (*Template, []TemplateVersion, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Template Template          `json:"template"`
 		Versions []TemplateVersion `json:"versions"`
-	}](ctx, c, http.MethodGet, "/templates/"+url.PathEscape(id), nil, nil)
+	}](ctx, http.MethodGet, "/templates/"+url.PathEscape(id), nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -63,10 +63,10 @@ func (c *Client) ListSuppressions(ctx context.Context, f SuppressionFilter) ([]S
 		q.Set("cursor", f.Cursor)
 	}
 
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Suppressions []Suppression `json:"suppressions"`
 		NextCursor   string        `json:"next_cursor"`
-	}](ctx, c, http.MethodGet, "/suppressions", q, nil)
+	}](ctx, http.MethodGet, "/suppressions", q, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -81,9 +81,9 @@ func (c *Client) Suppress(ctx context.Context, email, kind, reason string) (*Sup
 		Kind   string `json:"kind,omitempty"`
 		Reason string `json:"reason,omitempty"`
 	}{email, kind, reason}
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Suppression Suppression `json:"suppression"`
-	}](ctx, c, http.MethodPost, "/suppressions", nil, body)
+	}](ctx, http.MethodPost, "/suppressions", nil, body)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (c *Client) Suppress(ctx context.Context, email, kind, reason string) (*Sup
 // Unsuppress unblocks an address.
 func (c *Client) Unsuppress(ctx context.Context, email string) error {
 	q := url.Values{"email": {email}}
-	_, err := do[struct{}](ctx, c, http.MethodDelete, "/suppressions", q, nil)
+	_, err := c.do[struct{}](ctx, http.MethodDelete, "/suppressions", q, nil)
 
 	return err
 }
@@ -120,10 +120,10 @@ func (c *Client) ListBounces(ctx context.Context, f BounceFilter) ([]Bounce, str
 		q.Set("cursor", f.Cursor)
 	}
 
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Bounces    []Bounce `json:"bounces"`
 		NextCursor string   `json:"next_cursor"`
-	}](ctx, c, http.MethodGet, "/bounces", q, nil)
+	}](ctx, http.MethodGet, "/bounces", q, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -138,10 +138,10 @@ func (c *Client) ListBounces(ctx context.Context, f BounceFilter) ([]Bounce, str
 // Anything else is refused rather than filed against the wrong tenant.
 // The second return says whether the address was also suppressed.
 func (c *Client) ReportBounce(ctx context.Context, r BounceReport) (*Bounce, bool, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Bounce     Bounce `json:"bounce"`
 		Suppressed bool   `json:"suppressed"`
-	}](ctx, c, http.MethodPost, "/webhooks/bounce", nil, r)
+	}](ctx, http.MethodPost, "/webhooks/bounce", nil, r)
 	if err != nil {
 		return nil, false, err
 	}
@@ -153,9 +153,9 @@ func (c *Client) ReportBounce(ctx context.Context, r BounceReport) (*Bounce, boo
 
 // ListWebhooks returns the project's outgoing webhooks.
 func (c *Client) ListWebhooks(ctx context.Context) ([]Webhook, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Webhooks []Webhook `json:"webhooks"`
-	}](ctx, c, http.MethodGet, "/webhooks", nil, nil)
+	}](ctx, http.MethodGet, "/webhooks", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +169,10 @@ func (c *Client) ListWebhooks(ctx context.Context) ([]Webhook, error) {
 // The secret is returned HERE AND NOWHERE ELSE - only its hash is
 // stored. Save it now or create a new webhook later.
 func (c *Client) CreateWebhook(ctx context.Context, r WebhookRequest) (*Webhook, string, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Webhook Webhook `json:"webhook"`
 		Secret  string  `json:"secret"`
-	}](ctx, c, http.MethodPost, "/webhooks", nil, r)
+	}](ctx, http.MethodPost, "/webhooks", nil, r)
 	if err != nil {
 		return nil, "", err
 	}
@@ -182,7 +182,7 @@ func (c *Client) CreateWebhook(ctx context.Context, r WebhookRequest) (*Webhook,
 
 // DeleteWebhook removes a webhook.
 func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
-	_, err := do[struct{}](ctx, c, http.MethodDelete, "/webhooks/"+url.PathEscape(id), nil, nil)
+	_, err := c.do[struct{}](ctx, http.MethodDelete, "/webhooks/"+url.PathEscape(id), nil, nil)
 
 	return err
 }
@@ -190,9 +190,9 @@ func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
 // EnableWebhook puts back a webhook the server disabled after every
 // delivery attempt to it failed. Idempotent on an enabled one.
 func (c *Client) EnableWebhook(ctx context.Context, id string) (*Webhook, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Webhook Webhook `json:"webhook"`
-	}](ctx, c, http.MethodPost, "/webhooks/"+url.PathEscape(id)+"/enable", nil, nil)
+	}](ctx, http.MethodPost, "/webhooks/"+url.PathEscape(id)+"/enable", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -212,10 +212,10 @@ func (c *Client) WebhookDeliveries(ctx context.Context, id string, limit int, cu
 		q.Set("cursor", cursor)
 	}
 
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Deliveries []WebhookDelivery `json:"deliveries"`
 		NextCursor string            `json:"next_cursor"`
-	}](ctx, c, http.MethodGet, "/webhooks/"+url.PathEscape(id)+"/deliveries", q, nil)
+	}](ctx, http.MethodGet, "/webhooks/"+url.PathEscape(id)+"/deliveries", q, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -227,9 +227,9 @@ func (c *Client) WebhookDeliveries(ctx context.Context, id string, limit int, cu
 
 // DashboardStats returns the aggregate counts for the project.
 func (c *Client) DashboardStats(ctx context.Context) (*AnalyticsSummary, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Stats AnalyticsSummary `json:"stats"`
-	}](ctx, c, http.MethodGet, "/dashboard/stats", nil, nil)
+	}](ctx, http.MethodGet, "/dashboard/stats", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (c *Client) Analytics(ctx context.Context, from, to string) (*Analytics, er
 		q.Set("to", to)
 	}
 
-	return do[*Analytics](ctx, c, http.MethodGet, "/analytics", q, nil)
+	return c.do[*Analytics](ctx, http.MethodGet, "/analytics", q, nil)
 }
 
 // ListContacts returns one offset page of addresses the project has
@@ -261,10 +261,10 @@ func (c *Client) ListContacts(ctx context.Context, search string, limit, offset 
 		q.Set("search", search)
 	}
 
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Contacts []Contact `json:"contacts"`
 		Total    int       `json:"total"`
-	}](ctx, c, http.MethodGet, "/contacts", q, nil)
+	}](ctx, http.MethodGet, "/contacts", q, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -276,7 +276,7 @@ func (c *Client) ListContacts(ctx context.Context, search string, limit, offset 
 // DeleteContact forgets one contact and its tallies. It blocks nothing:
 // the next delivery to the address creates a fresh record.
 func (c *Client) DeleteContact(ctx context.Context, id string) error {
-	_, err := do[struct{}](ctx, c, http.MethodDelete, "/contacts/"+url.PathEscape(id), nil, nil)
+	_, err := c.do[struct{}](ctx, http.MethodDelete, "/contacts/"+url.PathEscape(id), nil, nil)
 
 	return err
 }
@@ -287,9 +287,9 @@ func (c *Client) DeleteContact(ctx context.Context, id string) error {
 func (c *Client) DeleteInactiveContacts(ctx context.Context, before time.Time) (int64, error) {
 	q := url.Values{}
 	q.Set("inactive_before", before.UTC().Format(time.RFC3339))
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Deleted int64 `json:"deleted"`
-	}](ctx, c, http.MethodDelete, "/contacts", q, nil)
+	}](ctx, http.MethodDelete, "/contacts", q, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -298,9 +298,9 @@ func (c *Client) DeleteInactiveContacts(ctx context.Context, before time.Time) (
 }
 
 func (c *Client) GetContact(ctx context.Context, id string) (*Contact, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Contact Contact `json:"contact"`
-	}](ctx, c, http.MethodGet, "/contacts/"+url.PathEscape(id), nil, nil)
+	}](ctx, http.MethodGet, "/contacts/"+url.PathEscape(id), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -314,9 +314,9 @@ func (c *Client) GetContact(ctx context.Context, id string) (*Contact, error) {
 // scopes. Pass a list id as SendRequest.UnsubscribeListID and Mailyard
 // mints the one-click link and filters against that list.
 func (c *Client) ListUnsubscribeLists(ctx context.Context) ([]UnsubscribeList, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Lists []UnsubscribeList `json:"unsubscribe_lists"`
-	}](ctx, c, http.MethodGet, "/unsubscribe-lists", nil, nil)
+	}](ctx, http.MethodGet, "/unsubscribe-lists", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -326,9 +326,9 @@ func (c *Client) ListUnsubscribeLists(ctx context.Context) ([]UnsubscribeList, e
 
 // GetUnsubscribeList returns one opt-out scope.
 func (c *Client) GetUnsubscribeList(ctx context.Context, id string) (*UnsubscribeList, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		List UnsubscribeList `json:"unsubscribe_list"`
-	}](ctx, c, http.MethodGet, "/unsubscribe-lists/"+url.PathEscape(id), nil, nil)
+	}](ctx, http.MethodGet, "/unsubscribe-lists/"+url.PathEscape(id), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -349,9 +349,9 @@ func (c *Client) ListInbound(ctx context.Context, status string, limit int) ([]I
 		q.Set("limit", strconv.Itoa(limit))
 	}
 
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Emails []InboundEmail `json:"inbound_emails"`
-	}](ctx, c, http.MethodGet, "/inbound-emails", q, nil)
+	}](ctx, http.MethodGet, "/inbound-emails", q, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -361,9 +361,9 @@ func (c *Client) ListInbound(ctx context.Context, status string, limit int) ([]I
 
 // InboundStats counts received mail by status.
 func (c *Client) InboundStats(ctx context.Context) (map[string]int, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Counts map[string]int `json:"counts"`
-	}](ctx, c, http.MethodGet, "/inbound-emails/stats", nil, nil)
+	}](ctx, http.MethodGet, "/inbound-emails/stats", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -375,9 +375,9 @@ func (c *Client) InboundStats(ctx context.Context) (map[string]int, error) {
 // than the individual verdicts: a valid signature from some other
 // domain is not authentication.
 func (c *Client) GetInbound(ctx context.Context, id string) (*InboundEmail, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Email InboundEmail `json:"inbound_email"`
-	}](ctx, c, http.MethodGet, "/inbound-emails/"+url.PathEscape(id), nil, nil)
+	}](ctx, http.MethodGet, "/inbound-emails/"+url.PathEscape(id), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -390,9 +390,9 @@ func (c *Client) GetInbound(ctx context.Context, id string) (*InboundEmail, erro
 // Subscribe adds an address to a static list, creating the subscriber
 // when the address is new. Subscribing twice is not an error.
 func (c *Client) Subscribe(ctx context.Context, r SubscribeRequest) (*Subscriber, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Subscriber Subscriber `json:"subscriber"`
-	}](ctx, c, http.MethodPost, "/subscriber-lists/subscribe", nil, r)
+	}](ctx, http.MethodPost, "/subscriber-lists/subscribe", nil, r)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +406,7 @@ func (c *Client) Unsubscribe(ctx context.Context, listID, email, reason string) 
 		Email  string `json:"email"`
 		Reason string `json:"reason,omitempty"`
 	}{email, reason}
-	_, err := do[struct{}](ctx, c, http.MethodPost,
+	_, err := c.do[struct{}](ctx, http.MethodPost,
 		"/subscriber-lists/"+url.PathEscape(listID)+"/unsubscribe", nil, body)
 
 	return err
@@ -417,7 +417,7 @@ func (c *Client) Resubscribe(ctx context.Context, listID, email string) error {
 	body := struct {
 		Email string `json:"email"`
 	}{email}
-	_, err := do[struct{}](ctx, c, http.MethodPost,
+	_, err := c.do[struct{}](ctx, http.MethodPost,
 		"/subscriber-lists/"+url.PathEscape(listID)+"/resubscribe", nil, body)
 
 	return err
@@ -433,9 +433,9 @@ func (c *Client) Resubscribe(ctx context.Context, listID, email string) error {
 // pinning them to types here would be a second definition to keep in
 // step.
 func (c *Client) Export(ctx context.Context) (map[string]any, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Export map[string]any `json:"export"`
-	}](ctx, c, http.MethodGet, "/data/export", nil, nil)
+	}](ctx, http.MethodGet, "/data/export", nil, nil)
 	if err != nil {
 		return nil, err
 	}

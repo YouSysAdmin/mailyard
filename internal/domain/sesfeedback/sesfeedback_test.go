@@ -78,7 +78,7 @@ func testHandler(t *testing.T, sent *emailmodel.Email) (*Handler, *fakeBounces, 
 	bounces := &fakeBounces{}
 	sup := &fakeSuppressions{}
 	shared := &fakeShared{byID: map[string]*ssmodel.Shared{
-		"server-1": {Server: ssmodel.Server{ID: "server-1", SESTopicARN: "arn:topic"}},
+		"server-1": {ID: "server-1", SESTopicARN: "arn:topic"},
 	}}
 	servers := &fakeServers{byID: map[string]*ssmodel.Server{
 		"tenant-server": {ID: "tenant-server", ProjectID: "other", SESTopicARN: "arn:other-topic"},

@@ -21,7 +21,7 @@ import (
 // different body for it.
 func (c *Client) Send(ctx context.Context, req SendRequest) (*SendResult, error) {
 	req.DryRun = false
-	out, err := do[*SendResult](ctx, c, http.MethodPost, "/emails/send", nil, req)
+	out, err := c.do[*SendResult](ctx, http.MethodPost, "/emails/send", nil, req)
 
 	return out, err
 }
@@ -31,14 +31,14 @@ func (c *Client) Send(ctx context.Context, req SendRequest) (*SendResult, error)
 func (c *Client) SendDryRun(ctx context.Context, req SendRequest) (*DryRunResult, error) {
 	req.DryRun = true
 
-	return do[*DryRunResult](ctx, c, http.MethodPost, "/emails/send", nil, req)
+	return c.do[*DryRunResult](ctx, http.MethodPost, "/emails/send", nil, req)
 }
 
 // SendTemplate renders a stored template and queues the result.
 func (c *Client) SendTemplate(ctx context.Context, req TemplateSendRequest) (*SendResult, error) {
 	req.DryRun = false
 
-	return do[*SendResult](ctx, c, http.MethodPost, "/emails/send-template", nil, req)
+	return c.do[*SendResult](ctx, http.MethodPost, "/emails/send-template", nil, req)
 }
 
 // SendBatch queues up to 100 messages in one call.
@@ -50,12 +50,12 @@ func (c *Client) SendTemplate(ctx context.Context, req TemplateSendRequest) (*Se
 // A sandbox-flagged key is refused here rather than delivering for
 // real - see the API description.
 func (c *Client) SendBatch(ctx context.Context, req BatchRequest) (*BatchResponse, error) {
-	return do[*BatchResponse](ctx, c, http.MethodPost, "/emails/batch", nil, req)
+	return c.do[*BatchResponse](ctx, http.MethodPost, "/emails/batch", nil, req)
 }
 
 // Preview renders a template without sending anything.
 func (c *Client) Preview(ctx context.Context, req PreviewRequest) (*Preview, error) {
-	return do[*Preview](ctx, c, http.MethodPost, "/emails/preview", nil, req)
+	return c.do[*Preview](ctx, http.MethodPost, "/emails/preview", nil, req)
 }
 
 // PreviewRequest names a template and the data to render it against.
@@ -80,9 +80,9 @@ func (c *Client) Verify(ctx context.Context, email string, fresh bool) (*Verific
 	body := struct {
 		Email string `json:"email"`
 	}{Email: email}
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Verification Verification `json:"verification"`
-	}](ctx, c, http.MethodPost, "/emails/verify", q, body)
+	}](ctx, http.MethodPost, "/emails/verify", q, body)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +105,9 @@ func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, error)
 		q.Set("limit", strconv.Itoa(f.Limit))
 	}
 
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Emails []Email `json:"emails"`
-	}](ctx, c, http.MethodGet, "/emails", q, nil)
+	}](ctx, http.MethodGet, "/emails", q, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -117,9 +117,9 @@ func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, error)
 
 // EmailStats counts emails by delivery status.
 func (c *Client) EmailStats(ctx context.Context) (map[string]int, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Counts map[string]int `json:"counts"`
-	}](ctx, c, http.MethodGet, "/emails/stats", nil, nil)
+	}](ctx, http.MethodGet, "/emails/stats", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,9 +130,9 @@ func (c *Client) EmailStats(ctx context.Context) (map[string]int, error) {
 // Limits reports what a send may carry on this installation, so a
 // client can validate before paying for a round trip.
 func (c *Client) Limits(ctx context.Context) (*Limits, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Limits Limits `json:"limits"`
-	}](ctx, c, http.MethodGet, "/emails/limits", nil, nil)
+	}](ctx, http.MethodGet, "/emails/limits", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -142,9 +142,9 @@ func (c *Client) Limits(ctx context.Context) (*Limits, error) {
 
 // GetEmail returns one message with its full delivery record.
 func (c *Client) GetEmail(ctx context.Context, id string) (*Email, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Email Email `json:"email"`
-	}](ctx, c, http.MethodGet, "/emails/"+url.PathEscape(id), nil, nil)
+	}](ctx, http.MethodGet, "/emails/"+url.PathEscape(id), nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -155,14 +155,14 @@ func (c *Client) GetEmail(ctx context.Context, id string) (*Email, error) {
 // Status is the cheap poll: delivery state without the bodies. Prefer
 // it over GetEmail when you are waiting for a message to finish.
 func (c *Client) Status(ctx context.Context, id string) (*EmailStatus, error) {
-	return do[*EmailStatus](ctx, c, http.MethodGet, "/emails/"+url.PathEscape(id)+"/status", nil, nil)
+	return c.do[*EmailStatus](ctx, http.MethodGet, "/emails/"+url.PathEscape(id)+"/status", nil, nil)
 }
 
 // Retry requeues a failed message.
 func (c *Client) Retry(ctx context.Context, id string) (*Email, error) {
-	out, err := do[struct {
+	out, err := c.do[struct {
 		Email Email `json:"email"`
-	}](ctx, c, http.MethodPost, "/emails/"+url.PathEscape(id)+"/retry", nil, nil)
+	}](ctx, http.MethodPost, "/emails/"+url.PathEscape(id)+"/retry", nil, nil)
 	if err != nil {
 		return nil, err
 	}

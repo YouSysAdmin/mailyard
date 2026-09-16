@@ -3,11 +3,13 @@
 package relayagent
 
 import (
+	"bytes"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -374,11 +376,9 @@ func (s *Spool) ReceivedDue(now time.Time, limit int) ([]*Received, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].ReceivedAt.Before(out[j-1].ReceivedAt); j-- {
-			out[j], out[j-1] = out[j-1], out[j]
-		}
-	}
+
+	slices.SortStableFunc(out, func(a, b *Received) int { return a.ReceivedAt.Compare(b.ReceivedAt) })
+
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]
 	}
@@ -419,7 +419,7 @@ func (s *Spool) Outcomes(limit int) (keys []string, blobs [][]byte, err error) {
 				return nil
 			}
 			keys = append(keys, string(k))
-			blobs = append(blobs, append([]byte(nil), v...))
+			blobs = append(blobs, bytes.Clone(v))
 
 			return nil
 		})
@@ -537,9 +537,5 @@ func (s *Spool) sweepDir(bucket []byte, dir string) (int, error) {
 }
 
 func sortByAccepted(msgs []*Message) {
-	for i := 1; i < len(msgs); i++ {
-		for j := i; j > 0 && msgs[j].AcceptedAt.Before(msgs[j-1].AcceptedAt); j-- {
-			msgs[j], msgs[j-1] = msgs[j-1], msgs[j]
-		}
-	}
+	slices.SortStableFunc(msgs, func(a, b *Message) int { return a.AcceptedAt.Compare(b.AcceptedAt) })
 }

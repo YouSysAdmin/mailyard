@@ -7,7 +7,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"maps"
 	"regexp"
+	"slices"
 	"sync"
 	"time"
 
@@ -121,10 +123,7 @@ func (l *Listener) Start(ctx context.Context) {
 	go l.notifyLoop(ctx)
 
 	l.mu.Lock()
-	channels := make([]string, 0, len(l.subs))
-	for ch := range l.subs {
-		channels = append(channels, ch)
-	}
+	channels := slices.Collect(maps.Keys(l.subs))
 
 	l.mu.Unlock()
 	if len(channels) > 0 {
@@ -143,10 +142,7 @@ func (l *Listener) notifyLoop(ctx context.Context) {
 		}
 
 		l.mu.Lock()
-		due := make([]string, 0, len(l.pending))
-		for ch := range l.pending {
-			due = append(due, ch)
-		}
+		due := slices.Collect(maps.Keys(l.pending))
 
 		clear(l.pending)
 		l.mu.Unlock()

@@ -16,6 +16,7 @@
 package sessioncache
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
@@ -116,9 +117,7 @@ func (c *Cache) InvalidateAll() {
 }
 
 func (c *Cache) evictLocked(now time.Time) {
-	for id, e := range c.entries {
-		if now.Sub(e.checkedAt) > TTL || !now.Before(e.expiresAt) {
-			delete(c.entries, id)
-		}
-	}
+	maps.DeleteFunc(c.entries, func(_ string, e entry) bool {
+		return now.Sub(e.checkedAt) > TTL || !now.Before(e.expiresAt)
+	})
 }

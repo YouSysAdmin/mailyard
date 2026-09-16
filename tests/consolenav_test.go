@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -81,7 +81,7 @@ func TestNoTwoItemsInASectionShareAnIcon(t *testing.T) {
 
 		for icon, rows := range byIcon {
 			if len(rows) > 1 {
-				sort.Strings(rows)
+				slices.Sort(rows)
 				t.Errorf("section %q gives %s to %s - two rows a person scans together must not "+
 					"carry the same glyph, or they read as one feature listed twice",
 					sec.id, icon, strings.Join(rows, " and "))
@@ -124,7 +124,7 @@ func TestEveryIconInTheMapIsUsed(t *testing.T) {
 		}
 	}
 
-	sort.Strings(orphans)
+	slices.Sort(orphans)
 
 	if len(orphans) > 0 {
 		t.Errorf("getIcon defines %s and nothing renders them", strings.Join(orphans, ", "))

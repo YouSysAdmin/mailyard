@@ -149,7 +149,7 @@ func statusIs(err error, code int) bool {
 // Generic over the response so every method below is three lines and
 // none of them repeats the auth, error and decode handling - which is
 // the part that has to behave identically everywhere.
-func do[T any](ctx context.Context, c *Client, method, path string, query url.Values, body any) (T, error) {
+func (c *Client) do[T any](ctx context.Context, method, path string, query url.Values, body any) (T, error) {
 	var out T
 
 	var reader io.Reader

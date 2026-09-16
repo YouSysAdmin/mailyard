@@ -401,9 +401,8 @@ func (h *Handler) Resume(c fiber.Ctx) error {
 	// sending, which the transition above just established - so a
 	// concurrent cancel between the two statements wins rather than
 	// being overwritten here.
-	now := time.Now().UTC()
 	if _, err := h.Runtime.Store.Campaign.SetRunState(c.Context(),
-		c.Params("id"), cmodel.StatusSending, nil, nil, &now, cmodel.StatusSending); err != nil {
+		c.Params("id"), cmodel.StatusSending, nil, nil, new(time.Now().UTC()), cmodel.StatusSending); err != nil {
 		return response.Internal(c, err)
 	}
 

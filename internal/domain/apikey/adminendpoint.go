@@ -60,8 +60,7 @@ func (h *AdminHandler) Create(c fiber.Ctx) error {
 			return response.BadRequest(c, "expires_at is in the past")
 		}
 
-		utc := t.UTC()
-		expiresAt = &utc
+		expiresAt = new(t.UTC())
 	}
 
 	// Same retry as the tenant path: GetByPrefix returns one row, so

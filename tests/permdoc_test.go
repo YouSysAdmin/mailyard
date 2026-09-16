@@ -4,7 +4,7 @@ package tests
 
 import (
 	"go/ast"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -72,7 +72,7 @@ func TestDocumentedPermissionsMatchTheRouter(t *testing.T) {
 		}
 	}
 
-	sort.Strings(problems)
+	slices.Sort(problems)
 	for _, p := range problems {
 		t.Errorf("the document describes an authorization the router does not apply:\n  %s", p)
 	}

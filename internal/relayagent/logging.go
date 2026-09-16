@@ -3,6 +3,7 @@
 package relayagent
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
@@ -79,13 +80,13 @@ func (w *traceWriter) Write(p []byte) (int, error) {
 	defer w.mu.Unlock()
 	w.buf = append(w.buf, p...)
 	for {
-		i := strings.IndexByte(string(w.buf), '\n')
-		if i < 0 {
+		head, rest, ok := bytes.Cut(w.buf, []byte{'\n'})
+		if !ok {
 			break
 		}
 
-		line := strings.TrimRight(string(w.buf[:i]), "\r")
-		w.buf = w.buf[i+1:]
+		line := string(bytes.TrimRight(head, "\r"))
+		w.buf = rest
 		if len(line) > traceLineCap {
 			line = line[:traceLineCap] + "..."
 		}
