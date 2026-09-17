@@ -47,9 +47,7 @@ func BinarySchemaVersion() (int64, error) {
 			return 0, fmt.Errorf("migration %q does not start with a version number", name)
 		}
 
-		if v > newest {
-			newest = v
-		}
+		newest = max(newest, v)
 	}
 
 	if newest == 0 {

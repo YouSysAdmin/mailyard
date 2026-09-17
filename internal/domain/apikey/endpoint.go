@@ -88,8 +88,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 			return response.BadRequest(c, "expires_at is in the past")
 		}
 
-		utc := t.UTC()
-		expiresAt = &utc
+		expiresAt = new(t.UTC())
 	}
 
 	// GetByPrefix returns a single row, so two keys sharing the

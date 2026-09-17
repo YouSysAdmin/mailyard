@@ -15,6 +15,7 @@
 package iplimit
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
@@ -142,11 +143,7 @@ func (l *Limiter) sweepLocked(now time.Time) {
 		return
 	}
 
-	for ip, w := range l.seen {
-		if now.After(w.until) {
-			delete(l.seen, ip)
-		}
-	}
+	maps.DeleteFunc(l.seen, func(_ string, w *window) bool { return now.After(w.until) })
 
 	l.sweptAt = now
 }

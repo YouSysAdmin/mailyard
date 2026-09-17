@@ -3,6 +3,7 @@
 package certificate
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -117,10 +118,7 @@ func (h *Handler) listenerStates(ctx context.Context, assignments map[string]str
 		return nil, err
 	}
 
-	selfSigned := h.Runtime.Config.TLSHost()
-	if selfSigned == "" {
-		selfSigned = "localhost"
-	}
+	selfSigned := cmp.Or(h.Runtime.Config.TLSHost(), "localhost")
 
 	// What the chain answers with nothing assigned. Computed once: it
 	// does not depend on the listener, only on whether an order has

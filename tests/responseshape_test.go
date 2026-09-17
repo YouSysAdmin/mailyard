@@ -3,7 +3,7 @@
 package tests
 
 import (
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/core/apidoc"
@@ -40,7 +40,7 @@ func TestEveryDocumentedSuccessDeclaresItsShape(t *testing.T) {
 	check("api", openapi.Routes())
 	check("console", openapi.ConsoleRoutes())
 
-	sort.Strings(bad)
+	slices.Sort(bad)
 	for _, b := range bad {
 		t.Errorf("%s declares a 2xx with no body and no content type - name the type the handler "+
 			"returns, or declare the stream with apidoc.OctetStream / apidoc.EventStream", b)

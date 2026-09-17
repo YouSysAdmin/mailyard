@@ -181,8 +181,7 @@ func TestANodeRowIsMarkedAsOneOnTheDeliveryPath(t *testing.T) {
 // deliberately does not select it.
 func TestTheDeliveryReadNeverLoadsTheControlToken(t *testing.T) {
 	s, ns := testStores(t)
-	seen := time.Now().UTC()
-	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, &seen)
+	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, new(time.Now().UTC()))
 
 	got, err := s.Get(t.Context(), srv.ID)
 	if err != nil {
@@ -290,8 +289,7 @@ func TestAManualServerIsNeverStale(t *testing.T) {
 // start carrying mail because it said hello.
 func TestAPendingNodeIsNotInThePool(t *testing.T) {
 	s, ns := testStores(t)
-	now := time.Now().UTC()
-	_, n := newNode(t, s, ns, "waiting", ssmodel.StatusPending, &now)
+	_, n := newNode(t, s, ns, "waiting", ssmodel.StatusPending, new(time.Now().UTC()))
 
 	pool, err := s.ListEnabled(t.Context())
 	if err != nil {
@@ -307,8 +305,7 @@ func TestAPendingNodeIsNotInThePool(t *testing.T) {
 
 func TestHeartbeatStampsLivenessWithoutPromoting(t *testing.T) {
 	s, ns := testStores(t)
-	old := time.Now().Add(-time.Hour).UTC()
-	srv, n := newNode(t, s, ns, "waiting", ssmodel.StatusPending, &old)
+	srv, n := newNode(t, s, ns, "waiting", ssmodel.StatusPending, new(time.Now().Add(-time.Hour).UTC()))
 
 	at := time.Now().UTC().Truncate(time.Second)
 	if err := ns.Heartbeat(t.Context(), n.ID, "198.51.100.7", at,
@@ -360,8 +357,7 @@ func TestHeartbeatStampsLivenessWithoutPromoting(t *testing.T) {
 // no node column there to clobber. The test pins that it stays so.
 func TestAnAdminEditCannotUnenrollANode(t *testing.T) {
 	s, ns := testStores(t)
-	now := time.Now().UTC()
-	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, &now)
+	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, new(time.Now().UTC()))
 
 	edit := &ssmodel.Shared{
 		ID: srv.ID, Name: "renamed", Host: srv.Host, Port: srv.Port,
@@ -402,8 +398,7 @@ func TestAnAdminEditCannotUnenrollANode(t *testing.T) {
 // nodes.
 func TestNodesAreListedByProject(t *testing.T) {
 	s, ns := testStores(t)
-	now := time.Now().UTC()
-	newNode(t, s, ns, "platform1", ssmodel.StatusEnabled, &now)
+	newNode(t, s, ns, "platform1", ssmodel.StatusEnabled, new(time.Now().UTC()))
 
 	tenant := &nodemodel.Node{
 		ID: ids.New(), ProjectID: "34a784af-436d-4faa-8fbe-dab57a87930c", ServerID: ids.New(),
@@ -471,8 +466,7 @@ func TestOnlyTheTokenHashIsStored(t *testing.T) {
 
 func TestDeletingANodeLeavesTheServerRow(t *testing.T) {
 	s, ns := testStores(t)
-	now := time.Now().UTC()
-	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, &now)
+	srv, n := newNode(t, s, ns, "node1", ssmodel.StatusEnabled, new(time.Now().UTC()))
 
 	if err := ns.Delete(t.Context(), n.ID); err != nil {
 		t.Fatalf("Delete: %v", err)

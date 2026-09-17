@@ -3,8 +3,9 @@
 package sdkgen
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/yousysadmin/mailyard/internal/core/apidoc"
@@ -54,12 +55,8 @@ type scriptMethod struct {
 // scriptMethods is the shared route list, sorted and de-collided.
 func scriptMethods() []scriptMethod {
 	routes := openapi.Routes()
-	sort.Slice(routes, func(i, j int) bool {
-		if routes[i].Path != routes[j].Path {
-			return routes[i].Path < routes[j].Path
-		}
-
-		return routes[i].Method < routes[j].Method
+	slices.SortFunc(routes, func(a, b apidoc.Route) int {
+		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Method, b.Method))
 	})
 
 	// The Go generator's names, lowered. Sharing them is the point: a
@@ -148,10 +145,7 @@ func snake(s string) string {
 }
 
 func pyDoc(m scriptMethod) string {
-	line := m.Summary
-	if line == "" {
-		line = m.HTTPMethod + " " + m.Path
-	}
+	line := cmp.Or(m.Summary, m.HTTPMethod+" "+m.Path)
 
 	if m.Permission != "" {
 		line += fmt.Sprintf(" Needs %s.", m.Permission)

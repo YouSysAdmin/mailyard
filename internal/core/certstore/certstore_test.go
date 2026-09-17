@@ -43,8 +43,7 @@ func (f *fakeStore) PutIfAbsent(_ context.Context, c *certmodel.Certificate) (bo
 		return false, nil
 	}
 
-	cp := *c
-	f.rows[key] = &cp
+	f.rows[key] = new(*c)
 
 	return true, nil
 }

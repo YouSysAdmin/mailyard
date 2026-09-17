@@ -8,7 +8,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,8 +69,8 @@ func TestSDKCoversEveryV1Route(t *testing.T) {
 		}
 	}
 
-	sort.Strings(missing)
-	sort.Strings(extra)
+	slices.Sort(missing)
+	slices.Sort(extra)
 
 	for _, m := range missing {
 		t.Errorf("the Go client has no method for %s - add one in sdk/go, or list it in notInTheSDK with a reason", m)

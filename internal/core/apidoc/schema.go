@@ -17,6 +17,7 @@
 package apidoc
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"reflect"
@@ -224,10 +225,7 @@ func jsonName(f reflect.StructField) (name string, omitempty, skip bool) {
 	}
 
 	parts := strings.Split(tag, ",")
-	name = parts[0]
-	if name == "" {
-		name = f.Name
-	}
+	name = cmp.Or(parts[0], f.Name)
 
 	for _, p := range parts[1:] {
 		// omitzero counts: for what the document derives from this -

@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -65,14 +65,14 @@ func TestNullableUUIDColumnsAreWrittenAsNull(t *testing.T) {
 	}
 
 	if len(unparsed) > 0 {
-		sort.Strings(unparsed)
+		slices.Sort(unparsed)
 		t.Errorf("%d INSERT(s) this test cannot read, so nothing checks them:\n  %s\n\n"+
 			"Either give the statement a flat one-placeholder-per-column VALUES with a\n"+
 			"matching argument list, or teach the parser the shape.",
 			len(unparsed), strings.Join(unparsed, "\n  "))
 	}
 
-	sort.Strings(findings)
+	slices.Sort(findings)
 	if len(findings) > 0 {
 		t.Errorf("%d write(s) into a nullable uuid column that do not translate \"\" to NULL:\n  %s\n\n"+
 			"Wrap the argument in database.NullStr. Postgres refuses \"\" as a uuid,\n"+

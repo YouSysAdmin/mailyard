@@ -260,9 +260,9 @@ func headerAddress(raw []byte, name string) string {
 // display name around it.
 func domainOf(addr string) string {
 	addr = strings.TrimSpace(addr)
-	if open := strings.LastIndex(addr, "<"); open >= 0 {
-		if cls := strings.Index(addr[open:], ">"); cls > 0 {
-			addr = addr[open+1 : open+cls]
+	if _, after, ok := strings.CutLast(addr, "<"); ok {
+		if inner, _, ok := strings.Cut(after, ">"); ok {
+			addr = inner
 		}
 	}
 

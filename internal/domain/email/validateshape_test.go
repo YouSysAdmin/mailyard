@@ -35,8 +35,8 @@ func TestValidateShapeRefusesAForgedHeaderWithoutAStore(t *testing.T) {
 	} {
 		r := good()
 		mutate(r)
-		var re *RequestError
-		if err := s.ValidateShape(r); !errors.As(err, &re) {
+		err := s.ValidateShape(r)
+		if _, ok := errors.AsType[*RequestError](err); !ok {
 			t.Errorf("%s: got %v, want a request error", name, err)
 		}
 	}

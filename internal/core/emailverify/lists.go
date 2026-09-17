@@ -52,8 +52,8 @@ func isDisposable(domain string) bool {
 
 func isRoleAccount(local string) bool {
 	// Strip a plus-tag so "support+tag@" is still recognized.
-	if i := strings.Index(local, "+"); i > 0 {
-		local = local[:i]
+	if before, _, ok := strings.Cut(local, "+"); ok && before != "" {
+		local = before
 	}
 
 	_, ok := roleAccounts[strings.ToLower(local)]

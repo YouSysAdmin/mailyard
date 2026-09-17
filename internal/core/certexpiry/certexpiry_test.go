@@ -33,9 +33,7 @@ func (m *fakeMail) Send(_ context.Context, _ []string, subject, _, text string) 
 }
 
 func at(d time.Duration) *certmodel.Certificate {
-	t := time.Now().Add(d)
-
-	return &certmodel.Certificate{Scope: "managed", Name: "web", NotAfter: &t}
+	return &certmodel.Certificate{Scope: "managed", Name: "web", NotAfter: new(time.Now().Add(d))}
 }
 
 func checker(rows []*certmodel.Certificate, mail *fakeMail) *Checker {

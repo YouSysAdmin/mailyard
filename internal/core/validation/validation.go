@@ -48,48 +48,41 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-var (
-	v    *validator.Validate
-	once sync.Once
-)
+// build is the single construction of the validator. OnceValue holds
+// the result, so there is no package-level variable a caller can read
+// before it is written.
+var build = sync.OnceValue(func() *validator.Validate {
+	v := validator.New(validator.WithRequiredStructEnabled())
+
+	// Use the json tag name in error.Field() so error responses
+	// match the JSON the SPA actually sent, not the Go field name.
+	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		tag := fld.Tag.Get("json")
+		if tag == "" || tag == "-" {
+			return fld.Name
+		}
+
+		tag, _, _ = strings.Cut(tag, ",")
+
+		return tag
+	})
+
+	registerCustom(v)
+
+	return v
+})
 
 // Init must be called once at app startup before any handler hits
 // BindAndValidate. cli/serve.go calls this before server.New.
 func Init() *validator.Validate {
-	once.Do(func() {
-		v = validator.New(validator.WithRequiredStructEnabled())
-
-		// Use the json tag name in error.Field() so error responses
-		// match the JSON the SPA actually sent, not the Go field name.
-		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
-			tag := fld.Tag.Get("json")
-			if tag == "" || tag == "-" {
-				return fld.Name
-			}
-
-			if i := strings.IndexByte(tag, ','); i >= 0 {
-				tag = tag[:i]
-			}
-
-			return tag
-		})
-
-		registerCustom(v)
-	})
-
-	return v
+	return build()
 }
 
 // V returns the singleton *validator.Validate, initializing it if
 // the production startup path didn't (e.g. unit tests that exercise
-// a handler without booting cli.serve). sync.Once makes the lazy
-// init safe under concurrent access.
+// a handler without booting cli.serve).
 func V() *validator.Validate {
-	if v == nil {
-		Init()
-	}
-
-	return v
+	return build()
 }
 
 // Normalizer lets DTOs run custom normalization (cross-field

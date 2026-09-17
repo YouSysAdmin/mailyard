@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -105,7 +105,7 @@ func TestEveryFieldErrorKeyIsOneTheServerRefuses(t *testing.T) {
 		t.Fatalf("walk %s: %v", console, err)
 	}
 
-	sort.Strings(findings)
+	slices.Sort(findings)
 
 	if len(findings) > 0 {
 		t.Errorf("%d field error key(s) name something the server never refuses:\n%s\n"+
@@ -225,7 +225,7 @@ func TestEveryFieldErrorKeyIsOneTheFormSends(t *testing.T) {
 		t.Fatalf("walk %s: %v", console, err)
 	}
 
-	sort.Strings(findings)
+	slices.Sort(findings)
 
 	if len(findings) > 0 {
 		t.Errorf("%d field error key(s) name nothing the console sends:\n%s",
@@ -276,7 +276,7 @@ func TestACapturedFieldErrorHasSomewhereToGo(t *testing.T) {
 		t.Fatalf("walk %s: %v", console, err)
 	}
 
-	sort.Strings(findings)
+	slices.Sort(findings)
 
 	if len(findings) > 0 {
 		t.Errorf("%d component(s) call capture() with nowhere to render what it captures:\n  %s\n"+

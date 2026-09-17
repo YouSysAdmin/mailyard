@@ -46,30 +46,26 @@ func From(c fiber.Ctx) Page {
 // the few lists whose rows are much larger or much smaller than
 // average. Pass 0 for either to take the package value.
 //
-// A caller asking for more than max gets max rather than an error:
-// paging parameters are a hint about how much to send, and failing a
-// list request over one is unhelpful.
-func FromWith(c fiber.Ctx, def, max int) Page {
+// A caller asking for more than the ceiling gets the ceiling rather
+// than an error: paging parameters are a hint about how much to send,
+// and failing a list request over one is unhelpful.
+func FromWith(c fiber.Ctx, def, ceiling int) Page {
 	if def <= 0 {
 		def = DefaultLimit
 	}
 
-	if max <= 0 {
-		max = MaxLimit
+	if ceiling <= 0 {
+		ceiling = MaxLimit
 	}
 
-	if def > max {
-		def = max
-	}
+	def = min(def, ceiling)
 
 	limit := fiber.Query[int](c, "limit", def)
 	if limit < 1 {
 		limit = def
 	}
 
-	if limit > max {
-		limit = max
-	}
+	limit = min(limit, ceiling)
 
 	offset := fiber.Query[int](c, "offset", 0)
 	// The original API paged by zero-based page number. Honor it when

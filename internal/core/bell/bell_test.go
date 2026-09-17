@@ -3,7 +3,6 @@
 package bell
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -18,11 +17,9 @@ func TestRingReleasesEveryWaiter(t *testing.T) {
 	var wg sync.WaitGroup
 	rang := make([]bool, 3)
 	for i := range rang {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rang[i] = b.Wait(context.Background(), 5*time.Second)
-		}()
+		wg.Go(func() {
+			rang[i] = b.Wait(t.Context(), 5*time.Second)
+		})
 	}
 
 	time.Sleep(50 * time.Millisecond)
@@ -34,7 +31,7 @@ func TestRingReleasesEveryWaiter(t *testing.T) {
 		}
 	}
 
-	if b.Wait(context.Background(), 20*time.Millisecond) {
+	if b.Wait(t.Context(), 20*time.Millisecond) {
 		t.Error("a wait after the ring was released, want a timeout")
 	}
 }

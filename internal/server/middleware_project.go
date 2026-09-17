@@ -3,6 +3,7 @@
 package server
 
 import (
+	"cmp"
 	"errors"
 	"log/slog"
 
@@ -63,10 +64,7 @@ func stampProject(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 		return false, response.Internal(c, errors.New("request context middleware not installed"))
 	}
 
-	projID := c.Get(ProjectHeader)
-	if projID == "" {
-		projID = c.Query("project_id")
-	}
+	projID := cmp.Or(c.Get(ProjectHeader), c.Query("project_id"))
 
 	if rt.Config.Auth.Disabled {
 		proj, err := resolveOpenProject(c, rt, projID)

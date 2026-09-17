@@ -15,6 +15,7 @@ package dsn
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -181,10 +182,7 @@ func parseDeliveryStatus(content []byte) *Report {
 			}
 		}
 
-		addr := addressOf(h.Get("Final-Recipient"))
-		if addr == "" {
-			addr = addressOf(h.Get("Original-Recipient"))
-		}
+		addr := cmp.Or(addressOf(h.Get("Final-Recipient")), addressOf(h.Get("Original-Recipient")))
 		if addr == "" {
 			continue
 		}
@@ -207,18 +205,12 @@ func parseFeedbackReport(content []byte) *Report {
 	rep := &Report{Kind: KindComplaint}
 	for _, group := range splitGroups(content) {
 		h := readHeaderGroup(group)
-		addr := addressOf(h.Get("Original-Rcpt-To"))
-		if addr == "" {
-			addr = addressOf(h.Get("Removal-Recipient"))
-		}
+		addr := cmp.Or(addressOf(h.Get("Original-Rcpt-To")), addressOf(h.Get("Removal-Recipient")))
 		if addr == "" {
 			continue
 		}
 
-		fbType := strings.ToLower(strings.TrimSpace(h.Get("Feedback-Type")))
-		if fbType == "" {
-			fbType = "abuse"
-		}
+		fbType := cmp.Or(strings.ToLower(strings.TrimSpace(h.Get("Feedback-Type"))), "abuse")
 
 		rep.Recipients = append(rep.Recipients, Recipient{
 			Address:    strings.ToLower(addr),

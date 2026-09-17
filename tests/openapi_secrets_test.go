@@ -3,8 +3,9 @@
 package tests
 
 import (
+	"maps"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -165,13 +166,7 @@ func publishedSchemas(t *testing.T, build func() ([]byte, error)) map[string][]s
 		}
 
 		if props, ok := s["properties"].(map[string]any); ok {
-			fields := make([]string, 0, len(props))
-			for f := range props {
-				fields = append(fields, f)
-			}
-
-			sort.Strings(fields)
-			out[name] = fields
+			out[name] = slices.Sorted(maps.Keys(props))
 		}
 
 		pending = append(pending, schemaRefs(s)...)

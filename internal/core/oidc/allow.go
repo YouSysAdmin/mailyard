@@ -70,14 +70,9 @@ func (p *Provider) Admit(c *Claims) error {
 		// rather than mutating cfg or pre-walking. Most IdPs
 		// (Cognito, Keycloak) ship uppercase role names, so this is
 		// the path that actually fires in practice.
-		matched := false
-		for _, g := range groups {
-			if slices.Contains(cfg.AllowedGroups, strings.ToLower(strings.TrimSpace(g))) {
-				matched = true
-				break
-			}
-		}
-
+		matched := slices.ContainsFunc(groups, func(g string) bool {
+			return slices.Contains(cfg.AllowedGroups, strings.ToLower(strings.TrimSpace(g)))
+		})
 		if !matched {
 			return fmt.Errorf("none of user's groups %v overlap allowed_groups", groups)
 		}

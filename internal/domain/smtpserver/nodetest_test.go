@@ -39,11 +39,9 @@ func sharedTestApp(t *testing.T) (*fiber.App, *SharedStore, *relaynode.Store) {
 func enrolledRow(t *testing.T, shared *SharedStore, nodes *relaynode.Store, mode string) *ssmodel.Shared {
 	t.Helper()
 	srv := &ssmodel.Shared{
-		Server: ssmodel.Server{
-			ID: ids.New(), Name: "node-" + mode, Host: "node.example.com", Port: 587,
-			Encryption: smtpclient.EncryptionSTARTTLS, Status: ssmodel.StatusEnabled,
-			AllowedEmails: []string{}, AllowedDomains: []string{},
-		},
+		ID: ids.New(), Name: "node-" + mode, Host: "node.example.com", Port: 587,
+		Encryption: smtpclient.EncryptionSTARTTLS, Status: ssmodel.StatusEnabled,
+		AllowedEmails: []string{}, AllowedDomains: []string{},
 		SecurityMode: ssmodel.SecurityPermissive,
 	}
 	if err := shared.Put(t.Context(), srv); err != nil {
@@ -108,11 +106,9 @@ func TestAConnectionTestNeverUnapprovesARelayNode(t *testing.T) {
 
 	// The contrast: a plain server that fails its test does go invalid.
 	plain := &ssmodel.Shared{
-		Server: ssmodel.Server{
-			ID: ids.New(), Name: "plain", Host: "127.0.0.1", Port: 1,
-			Encryption: smtpclient.EncryptionNone, Status: ssmodel.StatusEnabled,
-			AllowedEmails: []string{}, AllowedDomains: []string{},
-		},
+		ID: ids.New(), Name: "plain", Host: "127.0.0.1", Port: 1,
+		Encryption: smtpclient.EncryptionNone, Status: ssmodel.StatusEnabled,
+		AllowedEmails: []string{}, AllowedDomains: []string{},
 		SecurityMode: ssmodel.SecurityPermissive,
 	}
 	if err := shared.Put(t.Context(), plain); err != nil {

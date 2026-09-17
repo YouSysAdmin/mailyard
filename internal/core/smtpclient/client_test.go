@@ -155,8 +155,8 @@ func TestValidateAttachments(t *testing.T) {
 func TestSendErrorPermanent(t *testing.T) {
 	base := &textproto.Error{Code: 550, Msg: "5.1.1 user unknown"}
 	err := wrapSendError("RCPT TO", "x@example.com", base)
-	var se *SendError
-	if !errors.As(err, &se) {
+	se, ok := errors.AsType[*SendError](err)
+	if !ok {
 		t.Fatal("expected *SendError")
 	}
 
@@ -165,7 +165,7 @@ func TestSendErrorPermanent(t *testing.T) {
 	}
 
 	transient := wrapSendError("DATA", "", &textproto.Error{Code: 451, Msg: "try later"})
-	errors.As(transient, &se)
+	se, _ = errors.AsType[*SendError](transient)
 	if se.Permanent() {
 		t.Error("451 must not be permanent")
 	}

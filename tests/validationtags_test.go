@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -190,7 +190,7 @@ func TestEveryRuleInUseHasASentence(t *testing.T) {
 		}
 	}
 
-	sort.Strings(missing)
+	slices.Sort(missing)
 	if len(missing) > 0 {
 		t.Errorf("%d rule(s) with no message, so a caller gets validator's own:\n  %s\n\n"+
 			"Add a case to defaultMessage in errors.go.",

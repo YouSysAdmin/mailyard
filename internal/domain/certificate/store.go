@@ -217,8 +217,7 @@ func (s *Store) scanPublic(row scanner) (*certmodel.Certificate, error) {
 	}
 
 	if notAfter.Valid {
-		t := notAfter.Time
-		c.NotAfter = &t
+		c.NotAfter = new(notAfter.Time)
 	}
 
 	return &c, nil
@@ -252,8 +251,7 @@ func notAfterOf(certPEM string) *time.Time {
 		}
 
 		if earliest == nil || crt.NotAfter.Before(*earliest) {
-			t := crt.NotAfter.UTC()
-			earliest = &t
+			earliest = new(crt.NotAfter.UTC())
 		}
 	}
 

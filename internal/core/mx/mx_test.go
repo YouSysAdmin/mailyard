@@ -101,8 +101,8 @@ func TestNullMXIsPermanent(t *testing.T) {
 		"nomail.example": {{Host: ".", Pref: 0}},
 	}}
 	_, err := New(Config{Resolver: r}).Resolve(t.Context(), "nomail.example")
-	var e *Error
-	if !errors.As(err, &e) {
+	e, ok := errors.AsType[*Error](err)
+	if !ok {
 		t.Fatalf("err is %v, want *mx.Error", err)
 	}
 
@@ -155,8 +155,8 @@ func TestAnUnknownDomainIsPermanent(t *testing.T) {
 		hErr:  map[string]error{"gone.example": notFound()},
 	}
 	_, err := New(Config{Resolver: r}).Resolve(t.Context(), "gone.example")
-	var e *Error
-	if !errors.As(err, &e) || !e.Permanent() {
+	e, ok := errors.AsType[*Error](err)
+	if !ok || !e.Permanent() {
 		t.Fatalf("err is %v, want a permanent *mx.Error", err)
 	}
 }
@@ -167,8 +167,8 @@ func TestAnUnknownDomainIsPermanent(t *testing.T) {
 func TestAResolverFailureIsTemporary(t *testing.T) {
 	r := &fakeResolver{mxErr: map[string]error{"example.com": servfail()}}
 	_, err := New(Config{Resolver: r}).Resolve(t.Context(), "example.com")
-	var e *Error
-	if !errors.As(err, &e) {
+	e, ok := errors.AsType[*Error](err)
+	if !ok {
 		t.Fatalf("err is %v, want *mx.Error", err)
 	}
 

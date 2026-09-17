@@ -267,10 +267,7 @@ func MigrationsUp(t *testing.T) []string {
 			t.Fatalf("read %s: %v", name, err)
 		}
 
-		sqlText := string(body)
-		if i := strings.Index(sqlText, "-- +goose Down"); i >= 0 {
-			sqlText = sqlText[:i]
-		}
+		sqlText, _, _ := strings.Cut(string(body), "-- +goose Down")
 
 		out = append(out, sqlText)
 	}

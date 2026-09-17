@@ -101,8 +101,8 @@ func TestSpecBuildsAndDescribesEveryRoute(t *testing.T) {
 	// Every $ref must resolve. A dangling one silently breaks every
 	// generator that reads this.
 	for _, ref := range refsIn(raw) {
-		name := strings.TrimPrefix(ref, "#/components/schemas/")
-		if name == ref {
+		name, ok := strings.CutPrefix(ref, "#/components/schemas/")
+		if !ok {
 			t.Errorf("unexpected ref form %q", ref)
 			continue
 		}

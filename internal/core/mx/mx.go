@@ -17,12 +17,13 @@
 package mx
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -183,10 +184,7 @@ func (l *Lookup) cachedTargets(domain string) ([]Target, bool) {
 
 	// Copy: the caller may shuffle or truncate, and the cache entry is
 	// shared with every other delivery to this domain.
-	out := make([]Target, len(c.targets))
-	copy(out, c.targets)
-
-	return out, true
+	return slices.Clone(c.targets), true
 }
 
 // store keeps its own copy. The slice handed back to the first caller
@@ -194,8 +192,7 @@ func (l *Lookup) cachedTargets(domain string) ([]Target, bool) {
 // directly lets one delivery's reordering rewrite the answer for the
 // whole domain.
 func (l *Lookup) store(domain string, targets []Target) {
-	kept := make([]Target, len(targets))
-	copy(kept, targets)
+	kept := slices.Clone(targets)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.hit[domain] = cached{targets: kept, at: l.clock()}
@@ -269,7 +266,7 @@ func usableTargets(records []*net.MX) []Target {
 	// band while the bands themselves stay ordered - doing it the other
 	// way round would undo one or the other.
 	rand.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Pref < out[j].Pref })
+	slices.SortStableFunc(out, func(a, b Target) int { return cmp.Compare(a.Pref, b.Pref) })
 
 	return out
 }

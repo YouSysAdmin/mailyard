@@ -43,9 +43,7 @@ func TestTheBinaryKnowsItsNewestMigration(t *testing.T) {
 			t.Fatalf("migration %q does not start with a version number", e.Name())
 		}
 
-		if v > want {
-			want = v
-		}
+		want = max(want, v)
 	}
 
 	if files < 40 {

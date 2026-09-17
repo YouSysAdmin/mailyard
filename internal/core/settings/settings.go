@@ -90,13 +90,12 @@ func (s *Service) StartRefresh(ctx context.Context, interval time.Duration) {
 		return
 	}
 
-	t := time.NewTicker(interval)
-	defer t.Stop()
+	t := time.Tick(interval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-t:
 			_ = s.Reload(ctx)
 		}
 	}

@@ -3,9 +3,10 @@
 package apidoc
 
 import (
+	"cmp"
 	"fmt"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -88,14 +89,9 @@ func Build(info Info, routes []Route) (map[string]any, error) {
 	reg := &registry{defs: map[string]Schema{}, seen: map[reflect.Type]string{}}
 	paths := map[string]any{}
 
-	sorted := make([]Route, len(routes))
-	copy(sorted, routes)
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].Path != sorted[j].Path {
-			return sorted[i].Path < sorted[j].Path
-		}
-
-		return sorted[i].Method < sorted[j].Method
+	sorted := slices.Clone(routes)
+	slices.SortFunc(sorted, func(a, b Route) int {
+		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Method, b.Method))
 	})
 
 	for _, rt := range sorted {

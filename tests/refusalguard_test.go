@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -117,7 +117,7 @@ func TestARefusalHelperIsReturnedAndNotTested(t *testing.T) {
 		t.Fatalf("found only %d refusal helpers - the detection is broken, not the code", refuserCount)
 	}
 
-	sort.Strings(findings)
+	slices.Sort(findings)
 	if len(findings) > 0 {
 		t.Errorf("%d call site(s) testing a refusal that is always nil:\n  %s\n\n"+
 			"response.* writes the status and returns nil, so the guard never fires and\n"+

@@ -242,8 +242,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	}
 
 	apply(p, in)
-	now := time.Now().UTC()
-	p.UpdatedAt = &now
+	p.UpdatedAt = new(time.Now().UTC())
 	if err := h.Runtime.Store.Plan.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
@@ -297,8 +296,7 @@ func (h *Handler) Assign(c fiber.Ctx) error {
 	}
 
 	w.PlanID = in.PlanID
-	now := time.Now().UTC()
-	w.UpdatedAt = &now
+	w.UpdatedAt = new(time.Now().UTC())
 	if err := h.Runtime.Store.Project.Put(c.Context(), w); err != nil {
 		return response.Internal(c, err)
 	}

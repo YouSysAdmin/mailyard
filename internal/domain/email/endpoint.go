@@ -341,8 +341,7 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 			return nil, errors.New("send_at must be an RFC 3339 timestamp")
 		}
 
-		utc := t.UTC()
-		req.SendAt = &utc
+		req.SendAt = new(t.UTC())
 	}
 
 	return req, nil

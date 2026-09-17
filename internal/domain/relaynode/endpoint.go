@@ -3,6 +3,7 @@
 package relaynode
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -102,10 +103,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	}
 
 	nodeID := ids.New()
-	name := in.Name
-	if name == "" {
-		name = host
-	}
+	name := cmp.Or(in.Name, host)
 
 	certPEM, caPEM, err := h.CA.SignNode(c.Context(), nodeID, in.CSR, host, []string{host})
 	if err != nil {

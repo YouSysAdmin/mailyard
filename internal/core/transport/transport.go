@@ -18,10 +18,11 @@
 package transport
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
@@ -231,7 +232,7 @@ func Known(provider string) bool {
 // Providers lists what this binary can send through, in a stable order.
 func Providers() []Descriptor {
 	out := descriptors()
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	slices.SortFunc(out, func(a, b Descriptor) int { return cmp.Compare(a.ID, b.ID) })
 
 	return out
 }

@@ -181,8 +181,8 @@ func TestSESRefusesAnOversizedMessageWithoutAskingTheAPI(t *testing.T) {
 		t.Fatal("an oversized message was accepted")
 	}
 
-	var f Failure
-	if !errors.As(err, &f) || !f.Permanent() {
+	f, ok := errors.AsType[Failure](err)
+	if !ok || !f.Permanent() {
 		t.Errorf("err = %v, want a permanent Failure", err)
 	}
 
@@ -214,8 +214,8 @@ func TestSESClassifiesFailures(t *testing.T) {
 		"anything else":       {errors.New("dial tcp: i/o timeout"), false},
 	} {
 		out := classifySES(tc.err)
-		var f Failure
-		if !errors.As(out, &f) {
+		f, ok := errors.AsType[Failure](out)
+		if !ok {
 			t.Errorf("%s: %T does not implement Failure", name, out)
 			continue
 		}

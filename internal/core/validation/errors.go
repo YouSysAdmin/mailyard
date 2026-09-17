@@ -3,9 +3,10 @@
 package validation
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -39,7 +40,7 @@ func Humanize(err error) []FieldError {
 		})
 	}
 
-	sort.Slice(out, func(i, j int) bool { return out[i].Field < out[j].Field })
+	slices.SortFunc(out, func(a, b FieldError) int { return cmp.Compare(a.Field, b.Field) })
 
 	return out
 }
@@ -49,8 +50,8 @@ func Humanize(err error) []FieldError {
 // list, so that is the name it looks the error up under. The message
 // keeps the index and says which entry.
 func listField(name string) string {
-	if i := strings.IndexByte(name, '['); i > 0 {
-		return name[:i]
+	if before, _, ok := strings.Cut(name, "["); ok && before != "" {
+		return before
 	}
 
 	return name

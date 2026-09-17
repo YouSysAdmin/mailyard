@@ -216,7 +216,5 @@ func (s *Service) expiryFor(ctx context.Context, projID string, now time.Time, r
 		return nil
 	}
 
-	t := now.AddDate(0, 0, days)
-
-	return &t
+	return new(now.AddDate(0, 0, days))
 }

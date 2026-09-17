@@ -3,13 +3,15 @@
 package tests
 
 import (
+	"cmp"
 	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -111,8 +113,8 @@ const (
 // standing alone, or a syntax error in a variant assembled out of
 // mutually exclusive fragments - says nothing about the schema.
 func classify(err error) verdict {
-	var pg *pgconn.PgError
-	if !errors.As(err, &pg) {
+	pg, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return verdictUnverified
 	}
 
@@ -157,9 +159,7 @@ func collectQueries(t *testing.T, missed *[]string) []foundQuery {
 			t.Fatalf("parse %s: %v", dir, err)
 		}
 
-		for _, pkg := range pkgs {
-			parsed = append(parsed, pkg)
-		}
+		parsed = slices.AppendSeq(parsed, maps.Values(pkgs))
 	}
 
 	qualified := constStringValues(parsed)
@@ -179,7 +179,7 @@ func collectQueries(t *testing.T, missed *[]string) []foundQuery {
 		}
 	}
 
-	sort.Slice(out, func(i, j int) bool { return out[i].where < out[j].where })
+	slices.SortFunc(out, func(a, b foundQuery) int { return cmp.Compare(a.where, b.where) })
 
 	return out
 }

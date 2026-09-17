@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -52,7 +52,7 @@ func TestTheConsoleCallsRoutesThatExist(t *testing.T) {
 		}
 	}
 
-	sort.Strings(broken)
+	slices.Sort(broken)
 	for _, b := range broken {
 		t.Errorf("the console calls a route the router does not register:\n  %s", b)
 	}

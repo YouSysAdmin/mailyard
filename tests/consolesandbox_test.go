@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -49,8 +49,8 @@ func TestTheConsoleNamesWhatTheSandboxFlagGrants(t *testing.T) {
 		server = append(server, string(p))
 	}
 
-	sort.Strings(console)
-	sort.Strings(server)
+	slices.Sort(console)
+	slices.Sort(server)
 	if strings.Join(console, ",") != strings.Join(server, ",") {
 		t.Errorf("the console says a sandbox key holds %v, ForKey grants %v", console, server)
 	}

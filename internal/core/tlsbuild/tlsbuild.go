@@ -258,9 +258,7 @@ func (b *Builder) acmeOrSelfSigned(self tls.Certificate) func(*tls.ClientHelloIn
 		// with no server name, and a client connecting by IP address
 		// getting a certificate it will warn about beats one getting no
 		// handshake at all.
-		cert := self
-
-		return &cert, nil
+		return new(self), nil
 	}
 }
 
@@ -328,8 +326,7 @@ func (b *Builder) watchACME() {
 	})
 
 	go func() {
-		t := time.NewTicker(acmeCheckInterval)
-		defer t.Stop()
+		t := time.Tick(acmeCheckInterval)
 		for {
 			// Through the MANAGER, never the served config. The served
 			// one falls back to the self-signed pair on any failure, so
@@ -350,7 +347,7 @@ func (b *Builder) watchACME() {
 			select {
 			case <-ctx.Done():
 				return
-			case <-t.C:
+			case <-t:
 			}
 		}
 	}()

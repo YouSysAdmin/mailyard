@@ -85,9 +85,7 @@ func TestTheConsoleUsesItsOwnComponents(t *testing.T) {
 		// Only the template. A scoped style block naming .modal or
 		// .empty-state is styling, which is a separate rule.
 		markup := string(body)
-		if i := strings.Index(markup, "<style"); i >= 0 {
-			markup = markup[:i]
-		}
+		markup, _, _ = strings.Cut(markup, "<style")
 
 		for i, line := range strings.Split(markup, "\n") {
 			for _, r := range rules {
@@ -152,9 +150,7 @@ func TestAFieldsHintGoesThroughFormField(t *testing.T) {
 		}
 
 		markup := string(body)
-		if i := strings.Index(markup, "<style"); i >= 0 {
-			markup = markup[:i]
-		}
+		markup, _, _ = strings.Cut(markup, "<style")
 
 		depth := 0
 		for _, m := range tag.FindAllStringIndex(markup, -1) {
@@ -210,9 +206,7 @@ func twoHints(t *testing.T, root string) []string {
 
 		rel, _ := filepath.Rel(root, path)
 		markup := string(body)
-		if i := strings.Index(markup, "<style"); i >= 0 {
-			markup = markup[:i]
-		}
+		markup, _, _ = strings.Cut(markup, "<style")
 
 		for _, at := range formFieldOpens(markup) {
 			tag := markup[at.open:at.tagEnd]
