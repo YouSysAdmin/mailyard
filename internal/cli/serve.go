@@ -124,6 +124,7 @@ func (r role) String() string {
 // the race for anyone who does not know the flag exists, where off
 // fails loudly on an unmigrated database.
 func withInit(c *cobra.Command) *cobra.Command {
+	c.Args = noArgs
 	c.Flags().Bool("init", false,
 		"apply pending database migrations before starting - exactly one node in a fleet should")
 

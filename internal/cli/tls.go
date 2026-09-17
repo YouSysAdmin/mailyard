@@ -4,9 +4,7 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -48,6 +46,7 @@ func newTLSStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show what each listener terminates and serves",
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, st, closeDB, err := openForTLS(cmd)
 			if err != nil {
@@ -67,7 +66,7 @@ func newTLSStatusCmd() *cobra.Command {
 				return fmt.Errorf("list certificates: %w", err)
 			}
 
-			_, _ = fmt.Fprintf(os.Stdout, "%-12s  %-9s  %s\n", "LISTENER", "TLS", "CERTIFICATE")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-12s  %-9s  %s\n", "LISTENER", "TLS", "CERTIFICATE")
 			for _, l := range []string{
 				certificate.ListenerServer,
 				certificate.ListenerSubmission,
@@ -89,23 +88,23 @@ func newTLSStatusCmd() *cobra.Command {
 					state = "on"
 				}
 
-				_, _ = fmt.Fprintf(os.Stdout, "%-12s  %-9s  %s\n", l, state, what)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-12s  %-9s  %s\n", l, state, what)
 			}
 
 			if len(names) == 0 {
-				_, _ = fmt.Fprintf(os.Stdout, "\nno managed certificates stored\n")
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nno managed certificates stored\n")
 
 				return nil
 			}
 
-			_, _ = fmt.Fprintf(os.Stdout, "\nmanaged certificates:\n")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nmanaged certificates:\n")
 			for _, r := range names {
 				kind := ""
 				if d, derr := certmodel.ParseDetails(r.CertPEM); derr == nil && d != nil && d.IsCA {
 					kind = "  (authority - cannot be assigned to a listener)"
 				}
 
-				_, _ = fmt.Fprintf(os.Stdout, "  %s%s\n", r.Name, kind)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s%s\n", r.Name, kind)
 			}
 
 			return nil
@@ -119,14 +118,15 @@ func newTLSAssignCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "assign",
 		Short: "Point a listener at a stored certificate",
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if certificate.SettingFor(listener) == "" {
-				return fmt.Errorf("--listener must be one of %s, %s, %s",
+				return usage("--listener must be one of %s, %s, %s",
 					certificate.ListenerServer, certificate.ListenerSubmission, certificate.ListenerInbound)
 			}
 
 			if name = strings.TrimSpace(name); name == "" {
-				return errors.New("--certificate is required (use `tls unassign` to clear one)")
+				return usage("--certificate is required (use `tls unassign` to clear one)")
 			}
 
 			cfg, st, closeDB, err := openForTLS(cmd)
@@ -161,17 +161,17 @@ func newTLSAssignCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Fprintf(os.Stderr, "%s now serves %s\n", listener, name)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s now serves %s\n", listener, name)
 			if !certificate.TerminatesTLS(cfg, listener) {
 				// The assignment is recorded and nothing will present it,
 				// which is the whole point of this warning - silently it
 				// reads as a certificate in use.
-				fmt.Fprintf(os.Stderr,
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 					"warning: %s does not terminate TLS, so nothing presents this yet - set %s.tls.enabled\n",
 					listener, listener)
 			}
 
-			fmt.Fprint(os.Stderr, convergenceNote)
+			_, _ = fmt.Fprint(cmd.ErrOrStderr(), convergenceNote)
 
 			return nil
 		},
@@ -193,9 +193,10 @@ func newTLSUnassignCmd() *cobra.Command {
 			"pair - so it keeps serving TLS either way.\n\n" +
 			"This is the recovery path: an assignment that broke the console is\n" +
 			"undone here without one.",
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if certificate.SettingFor(listener) == "" {
-				return fmt.Errorf("--listener must be one of %s, %s, %s",
+				return usage("--listener must be one of %s, %s, %s",
 					certificate.ListenerServer, certificate.ListenerSubmission, certificate.ListenerInbound)
 			}
 
@@ -211,9 +212,9 @@ func newTLSUnassignCmd() *cobra.Command {
 				return fmt.Errorf("clear the assignment: %w", err)
 			}
 
-			fmt.Fprintf(os.Stderr,
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 				"%s is unassigned and falls back to the rest of the chain\n", listener)
-			fmt.Fprint(os.Stderr, convergenceNote)
+			_, _ = fmt.Fprint(cmd.ErrOrStderr(), convergenceNote)
 
 			return nil
 		},

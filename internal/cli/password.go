@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -35,6 +36,7 @@ func newSetPasswordCmd() *cobra.Command {
 			"Use this to recover an installation whose bootstrap password was lost.\n" +
 			"Reads the password from the terminal without echoing it, or from stdin\n" +
 			"with --stdin so it can be piped and kept out of shell history.",
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			cfg, err := env.Load(configPath)
@@ -52,23 +54,23 @@ func newSetPasswordCmd() *cobra.Command {
 
 			email = strings.TrimSpace(strings.ToLower(email))
 			if email == "" {
-				return errors.New("no email given and auth.local.email is empty, pass --email")
+				return usage("no email given and auth.local.email is empty, pass --email")
 			}
 
-			password, err = resolvePassword(password, stdin)
+			password, err = resolvePassword(cmd.ErrOrStderr(), password, stdin)
 			if err != nil {
 				return err
 			}
 
 			if len(password) < 8 {
-				return errors.New("password must be at least 8 characters")
+				return usage("password must be at least 8 characters")
 			}
 
 			// bcrypt refuses anything longer outright. Say so here
 			// rather than letting HashPassword fail with a library
 			// error after the operator has typed it twice.
 			if len(password) > 72 {
-				return errors.New("password must be at most 72 bytes (bcrypt's limit)")
+				return usage("password must be at most 72 bytes (bcrypt's limit)")
 			}
 
 			// A one-shot command against a database somebody else
@@ -105,19 +107,19 @@ func newSetPasswordCmd() *cobra.Command {
 				return fmt.Errorf("save: %w", err)
 			}
 
-			fmt.Fprintf(os.Stderr, "password updated for %s\n", email)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "password updated for %s\n", email)
 			if u.TOTPEnabled {
 				// Deliberately not cleared: a password reset is not a
 				// reason to drop the second factor, and doing it
 				// silently would turn file access into a 2FA bypass.
-				fmt.Fprintf(os.Stderr,
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 					"note: two-factor auth is still enabled on this account, you will be asked for a code\n")
 			}
 
 			// Existing sessions keep working - the JWT is signed and its
 			// session row is untouched. Say so, because somebody
 			// resetting a password usually expects the opposite.
-			fmt.Fprintf(os.Stderr,
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 				"note: existing sessions are NOT revoked, sign them out from the console if that matters\n")
 
 			return nil
@@ -132,7 +134,7 @@ func newSetPasswordCmd() *cobra.Command {
 
 // resolvePassword gets the new password from whichever source the
 // operator chose, preferring the ones that keep it out of history.
-func resolvePassword(flagValue string, fromStdin bool) (string, error) {
+func resolvePassword(prompt io.Writer, flagValue string, fromStdin bool) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
 	}
@@ -153,19 +155,19 @@ func resolvePassword(flagValue string, fromStdin bool) (string, error) {
 
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
-		return "", errors.New("stdin is not a terminal, pass --stdin to read the password from a pipe")
+		return "", usage("stdin is not a terminal, pass --stdin to read the password from a pipe")
 	}
 
-	fmt.Fprint(os.Stderr, "New password: ")
+	_, _ = fmt.Fprint(prompt, "New password: ")
 	first, err := term.ReadPassword(fd)
-	fmt.Fprintln(os.Stderr)
+	_, _ = fmt.Fprintln(prompt)
 	if err != nil {
 		return "", err
 	}
 
-	fmt.Fprint(os.Stderr, "Repeat: ")
+	_, _ = fmt.Fprint(prompt, "Repeat: ")
 	second, err := term.ReadPassword(fd)
-	fmt.Fprintln(os.Stderr)
+	_, _ = fmt.Fprintln(prompt)
 	if err != nil {
 		return "", err
 	}

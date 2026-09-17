@@ -5,15 +5,19 @@
 package main
 
 import (
-	"log/slog"
+	"fmt"
 	"os"
 
 	"github.com/yousysadmin/mailyard/internal/cli"
+	"github.com/yousysadmin/mailyard/pkg"
 )
 
 func main() {
-	if err := cli.NewRoot().Execute(); err != nil {
-		slog.Error("command failed", "err", err)
-		os.Exit(1)
+	err := cli.NewRoot().Execute()
+	if err == nil {
+		return
 	}
+
+	fmt.Fprintf(os.Stderr, "%s: %v\n", pkg.AppName, err)
+	os.Exit(cli.ExitCode(err))
 }

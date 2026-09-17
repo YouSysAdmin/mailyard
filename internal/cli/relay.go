@@ -49,6 +49,7 @@ func newRelayCmd() *cobra.Command {
 			"Outbound port 25 must be open and this host's PTR record must match\n" +
 			"relay_node.hostname, or nothing will be delivered. Both are checked\n" +
 			"at startup.",
+		Args: noArgs,
 		RunE: runRelay,
 	}
 }

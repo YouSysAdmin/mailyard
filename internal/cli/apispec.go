@@ -37,6 +37,7 @@ func newExportAPISpecCmd() *cobra.Command {
 			"       moves with it\n\n" +
 			"With no --out the document goes to stdout, which only works for one\n" +
 			"surface at a time.",
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			wanted, err := surfaces(surface)
 			if err != nil {
@@ -44,7 +45,7 @@ func newExportAPISpecCmd() *cobra.Command {
 			}
 
 			if out == "" && len(wanted) > 1 {
-				return fmt.Errorf("writing several surfaces to stdout would run them together, pass --out or --surface")
+				return usage("writing several surfaces to stdout would run them together, pass --out or --surface")
 			}
 
 			for _, s := range wanted {
@@ -92,7 +93,7 @@ func surfaces(s string) ([]string, error) {
 	case "all", "both":
 		return []string{"api", "app"}, nil
 	default:
-		return nil, fmt.Errorf("unknown surface %q: want api, app or all", s)
+		return nil, usage("unknown surface %q: want api, app or all", s)
 	}
 }
 
