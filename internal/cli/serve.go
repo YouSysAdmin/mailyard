@@ -225,7 +225,8 @@ func runServe(cmd *cobra.Command, r role) error {
 	// registry builds and caches a flow the first time each provider
 	// is used. It needs the public URL to derive redirect URIs,
 	// because the IdP has to reach us by our external name.
-	oauthRegistry := coreoidc.NewRegistry(cfg.Server.PublicURL)
+	oauthRegistry := coreoidc.NewRegistry(cfg.Server.PublicURL,
+		coreoidc.NewHTTPClient(cfg.Auth.OIDC.AllowPrivateTargets))
 	if cfg.Server.PublicURL == "" {
 		log.Warn("auth: server.public_url is empty, so SSO redirect URIs cannot be built - set it before configuring an identity provider")
 	}

@@ -238,6 +238,16 @@ auth:
     # Bootstrap admin, created on first start with an empty users
     # table. The generated password is printed to stderr once.
     email: admin@example.com
+  oidc:
+    # Let SSO reach an identity provider on loopback, RFC 1918 and
+    # other reserved addresses. ON by default, the opposite of
+    # webhook.allow_private_targets: a provider is configured by a
+    # platform admin, not by a project member, and a self-hosted
+    # Keycloak usually is on this network.
+    # Turn it off when the IdP is a public one, and discovery,
+    # the key fetch, the token exchange and the userinfo read are
+    # all refused a private address.
+    allow_private_targets: true
 
 worker:
   concurrency: 4

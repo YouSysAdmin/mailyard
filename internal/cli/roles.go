@@ -39,8 +39,9 @@ func newWorkerCmd() *cobra.Command {
 		Aliases: []string{"sender"},
 		Short:   "Start the delivery worker only, without the API",
 		Long: "Start a delivery-only node - queue, campaigns and maintenance jobs.\n" +
-			"It still binds server.addr, but serves only /healthz, /readyz and\n" +
-			"/metrics, so probes and scraping work without exposing the console.\n" +
+			"It still binds server.addr, but serves only /healthz and /readyz, so\n" +
+			"probes work without exposing the console. The Prometheus scrape has\n" +
+			"its own listener on metrics.addr and every role serves it.\n" +
 			"Add as many as the sending volume needs: claiming is a locking\n" +
 			"statement, so the nodes take disjoint batches.",
 		RunE: func(cmd *cobra.Command, _ []string) error {

@@ -91,6 +91,15 @@ func (p *Provider) Exchange(ctx context.Context, jwtSecret []byte, returnedState
 		return nil, "", errors.New("state mismatch (CSRF guard)")
 	}
 
+	// For the token exchange, which reads its client off the context -
+	// see withClient. This is a fresh request context, so the wrap has
+	// to happen again rather than riding the one discovery used.
+	//
+	// The id-token verify below needs no wrap: the RemoteKeySet behind
+	// the verifier keeps the context it was BUILT with, stripped of
+	// cancellation, so its key fetch already dials the same client.
+	ctx = withClient(ctx, p.client)
+
 	tok, err := p.oauth2.Exchange(ctx, code,
 		oauth2.SetAuthURLParam("code_verifier", pay.CodeVerifier),
 	)
@@ -155,7 +164,13 @@ func (p *Provider) userInfoClaims(ctx context.Context, tok *oauth2.Token) (*Clai
 
 	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	// The one leg that calls the client directly - the other three go
+	// through go-oidc and oauth2, which take it off the context.
+	client := p.client
+	if client == nil {
+		client = &http.Client{Timeout: HTTPTimeout}
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("userinfo request: %w", err)

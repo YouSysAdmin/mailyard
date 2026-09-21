@@ -46,10 +46,11 @@ type Options struct {
 	// share one certificate manager.
 	TLS *tls.Config
 
-	// HealthOnly registers the probes and the metrics scrape and
-	// nothing else. Set by the worker subcommand, where the console
-	// and the API have no reason to be reachable but an orchestrator
-	// still needs somewhere to point a liveness check.
+	// HealthOnly registers the probes and nothing else. Set by the
+	// worker subcommand, where the console and the API have no reason
+	// to be reachable but an orchestrator still needs somewhere to
+	// point a liveness check. The metrics scrape is unaffected - it
+	// binds metrics.addr of its own, so every role serves it.
 	HealthOnly bool
 }
 

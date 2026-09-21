@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -56,6 +57,11 @@ type Registry struct {
 	// redirect URI. The IdP has to reach us by our external name,
 	// which the inbound request's Host may not be behind a proxy.
 	publicURL string
+
+	// client is what every outbound call to an IdP dials through -
+	// see NewHTTPClient. One per process, shared by every provider,
+	// so the connection pool is reused across slugs.
+	client *http.Client
 }
 
 type cached struct {
@@ -63,11 +69,14 @@ type cached struct {
 	stamp    time.Time
 }
 
-// NewRegistry builds a Registry.
-func NewRegistry(publicURL string) *Registry {
+// NewRegistry builds a Registry. client is the guarded, timeout-bounded
+// client from NewHTTPClient - nil falls back to the default transport,
+// which only a test should want.
+func NewRegistry(publicURL string, client *http.Client) *Registry {
 	return &Registry{
 		built:     make(map[string]*cached),
 		publicURL: strings.TrimRight(publicURL, "/"),
+		client:    client,
 	}
 }
 
@@ -110,6 +119,12 @@ func (r *Registry) RedirectURL(slug string) string {
 }
 
 func (r *Registry) build(ctx context.Context, p *opmodel.Provider) (*Provider, error) {
+	// Every outbound leg dials through the one guarded client, and this
+	// is the only place that has to say so: For and Test are build's
+	// only callers, and the Provider carries the client onward for the
+	// token exchange and the userinfo read.
+	ctx = withClient(ctx, r.client)
+
 	// Say this out loud once per build rather than silently accepting
 	// it. The sign-in path links an IdP identity to an existing local
 	// account by email address, so with verification off the IdP is
@@ -166,6 +181,7 @@ func (r *Registry) build(ctx context.Context, p *opmodel.Provider) (*Provider, e
 				cfg:      cfg,
 				oauth2:   oauthConfig(cfg, prov.Endpoint()),
 				verifier: prov.Verifier(&gooidc.Config{ClientID: p.ClientID}),
+				client:   r.client,
 			}, nil
 		}
 
@@ -192,6 +208,7 @@ func (r *Registry) build(ctx context.Context, p *opmodel.Provider) (*Provider, e
 			TokenURL: p.TokenURL,
 		}),
 		userInfoURL: p.UserInfoURL,
+		client:      r.client,
 	}, nil
 }
 

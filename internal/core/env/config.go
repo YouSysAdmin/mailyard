@@ -495,6 +495,24 @@ type AuthConfig struct {
 	PasskeysEnabled bool `mapstructure:"passkeys_enabled"`
 
 	Local AuthLocalConfig `mapstructure:"local"`
+	OIDC  AuthOIDCConfig  `mapstructure:"oidc"`
+}
+
+// AuthOIDCConfig tunes the outbound half of SSO - the calls this
+// process makes TO an identity provider, not the providers themselves,
+// which are rows an admin edits in the console.
+type AuthOIDCConfig struct {
+	// AllowPrivateTargets lets discovery, the JWKS fetch, the token
+	// exchange and the userinfo read reach loopback, RFC 1918 and
+	// other reserved addresses.
+	//
+	// ON by default, which is the opposite of webhook.allow_private_targets and deliberate.
+	// A webhook URL is a project member's choice, so the guard is what stops one being
+	// aimed at the metadata service. A provider row is platform admin only,
+	// which puts it with the shared SMTP pool and relay nodes - an operator placed it,
+	// and a self-hosted Keycloak usually IS on this network.
+	// Turning the guard on suits an installation whose IdP is a public one.
+	AllowPrivateTargets bool `mapstructure:"allow_private_targets"`
 }
 
 // AuthLocalConfig governs password sign-in. Disabling it is how an
@@ -780,6 +798,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("logging.output", "stdout")
 	v.SetDefault("logging.color", true)
 	v.SetDefault("auth.passkeys_enabled", true)
+	v.SetDefault("auth.oidc.allow_private_targets", true)
 
 	// Replica read groups. They do nothing at all until
 	// database.replica_dsns is non-empty, so these cost an

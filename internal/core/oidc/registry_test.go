@@ -6,6 +6,7 @@ import (
 	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,7 +43,10 @@ func discoveryServer(t *testing.T) *httptest.Server {
 func TestDiscoveryForgivesTheTrailingSlash(t *testing.T) {
 	srv := discoveryServer(t)
 
-	r := NewRegistry("https://mail.example.test")
+	// The real client, with the guard off, which is the default - see
+	// auth.oidc.allow_private_targets. httptest listens on loopback, so
+	// this is also the case the default exists for.
+	r := NewRegistry("https://mail.example.test", NewHTTPClient(true))
 	p := &opmodel.Provider{
 		Slug:     "jumpcloud",
 		Type:     opmodel.TypeOIDC,
@@ -60,5 +64,36 @@ func TestDiscoveryForgivesTheTrailingSlash(t *testing.T) {
 
 	if prov.cfg.Issuer != srv.URL+"/" {
 		t.Fatalf("issuer = %q, want the document's own %q", prov.cfg.Issuer, srv.URL+"/")
+	}
+}
+
+// The guard is only worth having if it is actually in the dial path,
+// and the only way to see that from outside is to point a guarded
+// registry at an address it must refuse.
+//
+// httptest listens on loopback, so with allow_private_targets off
+// discovery has to fail here - and fail on the DIAL, naming the
+// address, rather than on a parse or a 404 that would pass for the
+// same thing.
+func TestAGuardedRegistryRefusesAPrivateIssuer(t *testing.T) {
+	srv := discoveryServer(t)
+
+	r := NewRegistry("https://mail.example.test", NewHTTPClient(false))
+	p := &opmodel.Provider{
+		Slug:                 "internal",
+		Type:                 opmodel.TypeOIDC,
+		ClientID:             "cid",
+		Issuer:               srv.URL,
+		RequireEmailVerified: true,
+		UpdatedAt:            time.Now().UTC(),
+	}
+
+	_, err := r.For(t.Context(), p)
+	if err == nil {
+		t.Fatal("a guarded registry discovered an issuer on loopback")
+	}
+
+	if !strings.Contains(err.Error(), "private or reserved range") {
+		t.Fatalf("discovery failed for the wrong reason: %v", err)
 	}
 }

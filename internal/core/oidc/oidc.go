@@ -13,17 +13,19 @@ package oidc
 
 import (
 	"context"
-	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+
+	"github.com/yousysadmin/mailyard/internal/core/safedial"
 )
 
-// Config mirrors the YAML/env-resolved AuthOIDCConfig so the package
-// stays free of imports back into core/env. Construct via FromEnv()
-// at the cli/serve.go startup site.
+// Config is one resolved provider. The package stays free of imports
+// back into core/env, so the Registry is handed what it needs at the
+// cli/serve.go startup site.
 type Config struct {
 	Issuer               string
 	ClientID             string
@@ -48,8 +50,9 @@ const StateCookie = "mailyard_oidc_state"
 const StateCookieTTL = 10 * time.Minute
 
 // Provider bundles the IdP discovery result + an oauth2.Config and an
-// ID-token verifier. Build once at startup and reuse across requests
-// - discovery is a non-trivial cold path.
+// ID-token verifier. Built and cached by the Registry rather than at
+// startup: discovery is a non-trivial cold path, and a provider row is
+// editable at runtime, so the cache is keyed on the row instead.
 type Provider struct {
 	cfg      Config
 	oauth2   *oauth2.Config
@@ -60,6 +63,11 @@ type Provider struct {
 	// verify an ID token against. Exchange reads identity from here
 	// instead. Empty on the discovery path.
 	userInfoURL string
+
+	// client is the guarded client the Registry built - see
+	// NewHTTPClient. Carried on the Provider because Exchange runs
+	// per sign-in, long after the context discovery used is gone.
+	client *http.Client
 }
 
 // Verifies reports whether this provider can validate an ID token
@@ -67,27 +75,61 @@ type Provider struct {
 // from the UserInfo endpoint over an already-authenticated channel.
 func (p *Provider) Verifies() bool { return p.verifier != nil }
 
-// New constructs a Provider against the issuer's discovery document.
-// Returns an error if the issuer is unreachable or returns a malformed
-// configuration - the operator should see this at startup, not at
-// the first SSO attempt.
-func New(ctx context.Context, cfg Config) (*Provider, error) {
-	prov, err := gooidc.NewProvider(ctx, cfg.Issuer)
-	if err != nil {
-		return nil, fmt.Errorf("oidc discovery (%s): %w", cfg.Issuer, err)
+// HTTPTimeout bounds every call this package makes to an identity
+// provider. There was none: all four legs ran on http.DefaultClient,
+// which has no timeout at all, so an IdP that accepted a connection
+// and then went quiet parked the sign-in goroutine indefinitely.
+const HTTPTimeout = 15 * time.Second
+
+// NewHTTPClient is the one client every outbound OIDC call uses -
+// discovery, the JWKS fetch, the token exchange and the userinfo read.
+//
+// Built from safedial.Dialer rather than safedial.Client because that
+// helper also refuses to FOLLOW REDIRECTS, and an issuer answering its
+// discovery URL with a 301 to the canonical spelling is ordinary. The
+// guard lives in the dialer's Control hook, which fires after each
+// name resolves, so following a redirect is safe: every hop pays the
+// check, and a host that resolves publicly once and privately the next
+// time is refused on the dial rather than trusted from an earlier
+// lookup.
+//
+// allowPrivate is auth.oidc.allow_private_targets - see there for why
+// its default is the opposite of the webhook one.
+func NewHTTPClient(allowPrivate bool) *http.Client {
+	d := safedial.Dialer(HTTPTimeout, allowPrivate)
+	d.KeepAlive = 30 * time.Second
+
+	return &http.Client{
+		Timeout: HTTPTimeout,
+		Transport: &http.Transport{
+			DialContext:           d.DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+}
+
+// withClient puts the guarded client where go-oidc and oauth2 both
+// look for it.
+//
+// One wrap covers three of the four legs: gooidc.ClientContext stores
+// it under the oauth2.HTTPClient key, which is the same key
+// oauth2.Config.Exchange reads, and the RemoteKeySet behind
+// Provider.Verifier binds the context it was created with - so
+// discovery, the JWKS fetch and the token exchange all dial through
+// it. The userinfo read is the fourth and calls the client directly.
+//
+// A nil client leaves the context alone, so a test that wants the
+// default transport gets it.
+func withClient(ctx context.Context, client *http.Client) context.Context {
+	if client == nil {
+		return ctx
 	}
 
-	return &Provider{
-		cfg: cfg,
-		oauth2: &oauth2.Config{
-			ClientID:     cfg.ClientID,
-			ClientSecret: cfg.ClientSecret,
-			RedirectURL:  cfg.RedirectURL,
-			Endpoint:     prov.Endpoint(),
-			Scopes:       cfg.Scopes,
-		},
-		verifier: prov.Verifier(&gooidc.Config{ClientID: cfg.ClientID}),
-	}, nil
+	return gooidc.ClientContext(ctx, client)
 }
 
 // Config returns the resolved config - handlers consult it to read

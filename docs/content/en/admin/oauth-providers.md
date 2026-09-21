@@ -111,6 +111,11 @@ That is a weaker check than a verified ID token. Prefer discovery whenever the p
 - The ID token's **signature, audience, expiry, and nonce** are all verified before any claim is trusted.
 - Access and refresh tokens from the provider are **not stored**. Mailyard needs the identity at sign-in and nothing
   afterwards, so keeping them would be a liability with no consumer.
+- Every call Mailyard makes to the provider - discovery, the key fetch, the token exchange and the userinfo read -
+  goes through one bounded HTTP client. Set `auth.oidc.allow_private_targets: false` to also refuse a provider on
+  loopback, RFC 1918 or other reserved addresses. It defaults to `true`, because a provider is configured by a
+  platform administrator rather than by a project member and a self-hosted IdP is usually on the private network.
+  Turn it off when your provider is a public one.
 
 ## API
 
