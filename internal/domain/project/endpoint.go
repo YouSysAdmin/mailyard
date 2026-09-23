@@ -658,6 +658,10 @@ func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 		if role == nil {
 			return response.NotFound(c, "role not found")
 		}
+
+		if resp, refused := refuseDelegating(c, acc, role); refused {
+			return resp
+		}
 	}
 
 	token, err := randomToken()

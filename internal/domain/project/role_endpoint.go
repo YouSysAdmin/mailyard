@@ -283,8 +283,9 @@ func (h *Handler) SetDefaultRole(c fiber.Ctx) error {
 // out, so without this a member trusted just to manage people could own
 // the project in two calls: mint a role carrying the whole catalogue,
 // then assign it to themselves. Assigning an existing powerful role
-// skips even the first call. That is why we check all three ways a role
-// reaches somebody - AddMember, UpdateMember and SetDefaultRole - and
+// skips even the first call. That is why we check all four ways a role
+// reaches somebody - AddMember, UpdateMember, SetDefaultRole and
+// CreateInvitation, whose role is written at accept time unchecked - and
 // why CreateRole and UpdateRole check the same thing against whatever
 // permissions are being written.
 //
