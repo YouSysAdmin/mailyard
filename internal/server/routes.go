@@ -174,8 +174,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// sharing one: draining the reset budget must not lock a user out
 	// of signing in, and vice versa. Mail flooding is capped
 	// separately per account inside the handler.
-	appAPI.Post("/auth/password-reset/request", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), ah.PasswordResetRequest)
-	appAPI.Post("/auth/password-reset/confirm", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), ah.PasswordResetConfirm)
+	appAPI.Post("/auth/password-reset/request", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.PasswordResetRequest)
+	appAPI.Post("/auth/password-reset/confirm", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.PasswordResetConfirm)
 	// Self-signup. Registered only when the operator opted in, so on
 	// the default config the route does not exist at all. Login-tier
 	// rate limit: the endpoint answers whether an address has an
@@ -189,8 +189,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// be able to confirm its link. Both handlers self-check the
 	// feature state and answer uniformly, the limiter keeps the
 	// resend oracle slow.
-	appAPI.Post("/auth/verify-email", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), ah.VerifyEmailConfirm)
-	appAPI.Post("/auth/verify-email/resend", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), ah.VerifyEmailResend)
+	appAPI.Post("/auth/verify-email", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.VerifyEmailConfirm)
+	appAPI.Post("/auth/verify-email/resend", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.VerifyEmailResend)
 	appAPI.Get("/auth/me", requireAuth(rt), ah.Me)
 	// Changing your own password. Rate limited as well as gated by the
 	// session, since it takes the current password and so is a place to
@@ -223,7 +223,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// they are alternative ways to do the same thing, and separate
 	// buckets would hand an attacker three budgets for one goal.
 	appAPI.Post("/auth/passkey/login/begin", loginLimiter, ah.PasskeyLoginBegin)
-	appAPI.Post("/auth/passkey/login/finish", loginLimiter, ah.PasskeyLoginFinish)
+	appAPI.Post("/auth/passkey/login/finish", loginLimiter, requireJSONBody, ah.PasskeyLoginFinish)
 	appAPI.Get("/auth/passkeys", requireAuth(rt), ah.PasskeyList)
 	appAPI.Post("/auth/passkeys/register/begin", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRegisterBegin)
 	appAPI.Post("/auth/passkeys/register/finish", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRegisterFinish)
