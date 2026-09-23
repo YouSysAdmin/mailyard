@@ -177,10 +177,15 @@ func (s *Store) Put(ctx context.Context, e *sbmodel.Email) error {
 }
 
 // Delete removes one captured message from projID.
-func (s *Store) Delete(ctx context.Context, projID, id string) error {
-	_, err := s.Exec(ctx, `DELETE FROM sandbox_emails WHERE project_id = ? AND id = ?`, projID, id)
+func (s *Store) Delete(ctx context.Context, projID, id string) (bool, error) {
+	res, err := s.Exec(ctx, `DELETE FROM sandbox_emails WHERE project_id = ? AND id = ?`, projID, id)
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // Clear empties one project's sandbox. The button a developer reaches

@@ -201,6 +201,26 @@ func TestAnotherProjectSeesNothing(t *testing.T) {
 	}
 }
 
+// Delete says whether it removed anything, so the route can answer a
+// missing or foreign message with a 404 instead of a deletion.
+func TestDeleteReportsWhetherAMessageWent(t *testing.T) {
+	s := testStore(t)
+	mine, theirs := newProject(t, s), newProject(t, s)
+	e := put(t, s, mine, time.Now().UTC(), "private", nil)
+
+	if removed, err := s.Delete(t.Context(), theirs, e.ID); err != nil || removed {
+		t.Fatalf("another project's delete: removed=%v err=%v, want false", removed, err)
+	}
+
+	if removed, err := s.Delete(t.Context(), mine, e.ID); err != nil || !removed {
+		t.Fatalf("delete: removed=%v err=%v, want true", removed, err)
+	}
+
+	if removed, err := s.Delete(t.Context(), mine, e.ID); err != nil || removed {
+		t.Fatalf("a second delete: removed=%v err=%v, want false", removed, err)
+	}
+}
+
 // Trim is what actually bounds the table. A day window does nothing
 // about a CI job writing ten thousand messages in a morning.
 func TestTrimKeepsTheNewest(t *testing.T) {

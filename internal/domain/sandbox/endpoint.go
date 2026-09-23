@@ -163,8 +163,13 @@ func (h *Handler) Attachment(c fiber.Ctx) error {
 // Delete serves DELETE /api/v1/sandbox/:id.
 func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	if err := h.Runtime.Store.Sandbox.Delete(c.Context(), rc.Project.ID, c.Params("id")); err != nil {
+	removed, err := h.Runtime.Store.Sandbox.Delete(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
 		return response.Internal(c, err)
+	}
+
+	if !removed {
+		return response.NotFound(c, "sandbox message not found")
 	}
 
 	return response.NoContent(c)

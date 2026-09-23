@@ -249,9 +249,14 @@ func (h *Handler) AddMember(c fiber.Ctx) error {
 // lists/:id/members/:subscriberId.
 func (h *Handler) RemoveMember(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	if err := h.Runtime.Store.SubscriberList.RemoveMember(c.Context(),
-		rc.Project.ID, c.Params("id"), c.Params("subscriberId")); err != nil {
+	removed, err := h.Runtime.Store.SubscriberList.RemoveMember(c.Context(),
+		rc.Project.ID, c.Params("id"), c.Params("subscriberId"))
+	if err != nil {
 		return response.Internal(c, err)
+	}
+
+	if !removed {
+		return response.NotFound(c, "subscriber is not on this list")
 	}
 
 	return response.NoContent(c)

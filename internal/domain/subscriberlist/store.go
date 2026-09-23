@@ -136,14 +136,19 @@ func (s *Store) AddMember(ctx context.Context, projID, listID, subscriberID stri
 
 // RemoveMember drops a subscriber from a static list. Not an opt-out -
 // see Unsubscribe, which records that the person asked.
-func (s *Store) RemoveMember(ctx context.Context, projID, listID, subscriberID string) error {
-	_, err := s.Exec(ctx, `
+func (s *Store) RemoveMember(ctx context.Context, projID, listID, subscriberID string) (bool, error) {
+	res, err := s.Exec(ctx, `
         DELETE FROM subscriber_list_members
         WHERE list_id = ? AND subscriber_id = ?
           AND EXISTS (SELECT 1 FROM subscriber_lists l WHERE l.id = ? AND l.project_id = ?)
     `, listID, subscriberID, listID, projID)
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // ListMembers pages the static membership with subscriber rows.

@@ -771,7 +771,9 @@ type SubscriberListStore interface {
 	Delete(ctx context.Context, projID, id string) error
 
 	AddMember(ctx context.Context, projID, listID, subscriberID string) error
-	RemoveMember(ctx context.Context, projID, listID, subscriberID string) error
+
+	// RemoveMember reports whether the subscriber was on the list.
+	RemoveMember(ctx context.Context, projID, listID, subscriberID string) (bool, error)
 	ListMembers(ctx context.Context, projID, listID string, limit, offset int) ([]*subscriber.Subscriber, error)
 	CountMembers(ctx context.Context, projID, listID string) (int, error)
 
@@ -957,7 +959,10 @@ type SandboxStore interface {
 	List(ctx context.Context, projID string, f SandboxFilter) ([]*sandbox.Email, error)
 	Count(ctx context.Context, projID string, f SandboxFilter) (int, error)
 	Put(ctx context.Context, e *sandbox.Email) error
-	Delete(ctx context.Context, projID, id string) error
+
+	// Delete reports whether a message was removed, so a missing one
+	// is a 404 rather than a deletion the audit trail records.
+	Delete(ctx context.Context, projID, id string) (bool, error)
 	Clear(ctx context.Context, projID string) (int64, error)
 
 	// Trim keeps at most keep messages, dropping the oldest. Called on
