@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -62,8 +63,10 @@ func newSetPasswordCmd() *cobra.Command {
 				return err
 			}
 
-			if len(password) < 8 {
-				return usage("password must be at least 8 characters")
+			// The same floor the API sets, counted the same way, so the
+			// offline path cannot leave a weaker password behind.
+			if utf8.RuneCountInString(password) < 12 {
+				return usage("password must be at least 12 characters")
 			}
 
 			// bcrypt refuses anything longer outright. Say so here

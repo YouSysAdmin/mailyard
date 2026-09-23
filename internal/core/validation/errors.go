@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -77,6 +78,25 @@ func Summary(fes []FieldError) string {
 	return "validation failed: " + strings.Join(parts, "; ")
 }
 
+// sizeUnit names what min, max and len count. The tag is the same for
+// a number and a length, so the unit comes from the field's kind: a
+// string counts characters, a list counts items, a number is bare.
+func sizeUnit(fe validator.FieldError) string {
+	unit := ""
+	switch fe.Kind() {
+	case reflect.String:
+		unit = " character"
+	case reflect.Slice, reflect.Array, reflect.Map:
+		unit = " item"
+	}
+
+	if unit != "" && fe.Param() != "1" {
+		unit += "s"
+	}
+
+	return unit
+}
+
 func defaultMessage(fe validator.FieldError) string {
 	field := friendlyField(fe.Field())
 	switch fe.Tag() {
@@ -99,17 +119,13 @@ func defaultMessage(fe validator.FieldError) string {
 	case "uuid", "uuid4", "uuid5":
 		return field + " must be a valid UUID"
 	case "min":
-		// Numeric vs string min/max are surfaced with the same tag
-		// in validator/v10 - the parameter is unitless. Keep the
-		// message neutral ("at least N") so it reads both for
-		// counts ("at least 1") and lengths ("at least 1 character").
-		return fmt.Sprintf("%s must be at least %s", field, fe.Param())
+		return fmt.Sprintf("%s must be at least %s%s", field, fe.Param(), sizeUnit(fe))
 	case "max":
-		return fmt.Sprintf("%s must be at most %s", field, fe.Param())
+		return fmt.Sprintf("%s must be at most %s%s", field, fe.Param(), sizeUnit(fe))
 	case "oneof":
 		return fmt.Sprintf("%s must be one of: %s", field, strings.ReplaceAll(fe.Param(), " ", ", "))
 	case "len":
-		return fmt.Sprintf("%s must be exactly %s", field, fe.Param())
+		return fmt.Sprintf("%s must be exactly %s%s", field, fe.Param(), sizeUnit(fe))
 	case "url":
 		return field + " must be a URL"
 	case "fqdn":

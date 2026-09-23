@@ -80,8 +80,8 @@ function openCreateModal() {
 async function createUser() {
   clear()
   if (!newUser.value.email.trim()) return
-  if (newUser.value.password && newUser.value.password.length < 8) {
-    notify.error('Password must be at least 8 characters')
+  if (newUser.value.password && newUser.value.password.length < 12) {
+    notify.error('Password must be at least 12 characters')
     return
   }
   creating.value = true

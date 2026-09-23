@@ -80,8 +80,8 @@ watch(
 
 async function save() {
   clear()
-  if (form.value.password && form.value.password.length < 8) {
-    notify.error('Password must be at least 8 characters')
+  if (form.value.password && form.value.password.length < 12) {
+    notify.error('Password must be at least 12 characters')
 
     return
   }
