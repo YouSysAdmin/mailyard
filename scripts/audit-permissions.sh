@@ -32,6 +32,7 @@ done
 
 go build -o "$WORK/mailyard" ./cmd/mailyard
 go run ./cmd/mailyard export-api-spec --surface api --out "$WORK/openapi.yaml" >/dev/null
+go run ./cmd/mailyard export-api-spec --surface app --out "$WORK/app.yaml" >/dev/null
 
 # Its OWN config file, empty, rather than the ./mailyard.yaml a developer
 # has in the working tree. Everything this audit needs is set below, and a
@@ -40,7 +41,9 @@ echo '{}' >"$WORK/mailyard.yaml"
 
 # The rate limiter buckets per credential and this sends hundreds of
 # requests as a handful of them, so it would answer 429 rather than the
-# authorization the audit is there to read.
+# authorization the audit is there to read. The login budget also caps
+# failed authentications per address, and every probe without a
+# credential is one.
 export MAILYARD_DATABASE_DSN="postgres://postgres:audit@localhost:$PG_PORT/audit?sslmode=disable"
 export MAILYARD_SERVER_ADDR=":$APP_PORT"
 export MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY="0123456789abcdef0123456789abcdef"
@@ -48,6 +51,8 @@ export MAILYARD_AUTH_JWT_SECRET="0123456789abcdef0123456789abcdef0123456789abcde
 export MAILYARD_AUTH_LOCAL_ENABLED="true"
 export MAILYARD_AUTH_LOCAL_EMAIL="admin@example.test"
 export MAILYARD_RATELIMIT_API_PER_MINUTE="1000000"
+export MAILYARD_RATELIMIT_LOGIN_PER_MINUTE="1000000"
+export MAILYARD_METRICS_ADDR=":$((APP_PORT + 1))"
 #
 # --init because the database is empty and a node that was not asked to
 # create a schema refuses to boot.
@@ -71,4 +76,6 @@ fi
 AUDIT_URL="http://localhost:$APP_PORT" \
 AUDIT_ADMIN_PW="$PW" \
 AUDIT_SPEC="$WORK/openapi.yaml" \
+AUDIT_APP_SPEC="$WORK/app.yaml" \
+AUDIT_PG_CONTAINER="$CONTAINER" \
   python3 scripts/audit-permissions.py
