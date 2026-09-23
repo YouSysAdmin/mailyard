@@ -51,6 +51,9 @@ var protectedHeaders = map[string]struct{}{
 	"mime-version": {}, "content-type": {}, "content-transfer-encoding": {},
 	"list-unsubscribe": {}, "list-unsubscribe-post": {}, "return-path": {},
 	"message-id": {}, "received": {}, "dkim-signature": {}, "reply-to": {},
+	// The bounce trail attributes a report by this one, so a second copy
+	// from the caller would leave a parser to pick which message it names.
+	strings.ToLower(smtpclient.HeaderEmailID): {},
 }
 
 // HeaderDisplayTo, HeaderDisplayCc and HeaderReplyTo are the keys

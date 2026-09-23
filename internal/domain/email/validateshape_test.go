@@ -31,6 +31,7 @@ func TestValidateShapeRefusesAForgedHeaderWithoutAStore(t *testing.T) {
 		"reply_to":                func(r *SendRequest) { r.ReplyTo = "a@example.com (x\r\nBcc: e@evil.test)" },
 		"reply_to not an address": func(r *SendRequest) { r.ReplyTo = "not an address" },
 		"reply-to as a header":    func(r *SendRequest) { r.Headers = map[string]string{"Reply-To": "e@evil.test"} },
+		"our email id header":     func(r *SendRequest) { r.Headers = map[string]string{"X-Mailyard-Email-Id": "x"} },
 		"recipient ceiling":       func(r *SendRequest) { r.To = []string{"a@x.test", "b@x.test", "c@x.test"} },
 	} {
 		r := good()
