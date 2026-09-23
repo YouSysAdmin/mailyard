@@ -337,6 +337,28 @@ func (h *Handler) recordPasswordFailure(ctx context.Context, userID string) {
 	}
 }
 
+// reauthenticated confirms the signed-in caller's password for a
+// sensitive change. It spends the same lockout as sign-in, so a stolen
+// session cannot guess the password faster than a stranger can, and a
+// locked account is refused without the password being looked at.
+func (h *Handler) reauthenticated(ctx context.Context, u *usermodel.User, password string) bool {
+	if h.loginLocked(ctx, u.ID) {
+		_ = authenticator.VerifyDummyPassword(password)
+
+		return false
+	}
+
+	if !authenticator.VerifyPassword(u.PasswordHash, password) {
+		h.recordPasswordFailure(ctx, u.ID)
+
+		return false
+	}
+
+	h.clearPasswordFailures(ctx, u.ID)
+
+	return true
+}
+
 // clearPasswordFailures forgets the count after a right password.
 func (h *Handler) clearPasswordFailures(ctx context.Context, userID string) {
 	if err := h.Runtime.Store.User.ClearLoginFailures(ctx, userID); err != nil {

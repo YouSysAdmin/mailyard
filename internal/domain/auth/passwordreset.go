@@ -244,7 +244,7 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 			"this account signs in through an identity provider, change the password there")
 	}
 
-	if !authenticator.VerifyPassword(u.PasswordHash, in.CurrentPassword) {
+	if !h.reauthenticated(c.Context(), u, in.CurrentPassword) {
 		slog.Warn("auth: password change refused", "user_id", u.ID, "client_ip", clientip.From(c))
 		h.Runtime.Audit.Security(c, &amodel.Event{
 			Type:       amodel.TypePasswordChanged,

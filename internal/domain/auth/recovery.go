@@ -13,7 +13,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
@@ -236,7 +235,7 @@ func (h *Handler) RecoveryCodesRegenerate(c fiber.Ctx) error {
 		return resp
 	}
 
-	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
+	if !h.reauthenticated(c.Context(), u, in.Password) {
 		return response.Unauthorized(c, "password is incorrect")
 	}
 

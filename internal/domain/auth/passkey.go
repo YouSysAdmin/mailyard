@@ -15,7 +15,6 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
-	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	corepasskey "github.com/yousysadmin/mailyard/internal/core/passkey"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -259,7 +258,7 @@ func (h *Handler) PasskeyRegisterBegin(c fiber.Ctx) error {
 		return bindResp
 	}
 
-	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
+	if !h.reauthenticated(c.Context(), u, in.Password) {
 		h.Runtime.Audit.Security(c, &amodel.Event{
 			Type: amodel.TypeLoginFailed, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusForbidden,
 			Detail: "wrong password confirming passkey enrolment",
@@ -404,7 +403,7 @@ func (h *Handler) PasskeyDelete(c fiber.Ctx) error {
 		return bindResp
 	}
 
-	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
+	if !h.reauthenticated(c.Context(), u, in.Password) {
 		return response.Forbidden(c, "incorrect password")
 	}
 

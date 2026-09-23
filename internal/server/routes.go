@@ -224,16 +224,19 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// buckets would hand an attacker three budgets for one goal.
 	appAPI.Post("/auth/passkey/login/begin", loginLimiter, ah.PasskeyLoginBegin)
 	appAPI.Post("/auth/passkey/login/finish", loginLimiter, requireJSONBody, ah.PasskeyLoginFinish)
+	// The routes that confirm the caller's password share one budget,
+	// so a stolen session cannot spread its guesses across them.
+	reauthLimiter := perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil)
 	appAPI.Get("/auth/passkeys", requireAuth(rt), ah.PasskeyList)
-	appAPI.Post("/auth/passkeys/register/begin", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRegisterBegin)
+	appAPI.Post("/auth/passkeys/register/begin", requireAuth(rt), maintenanceMode(rt), reauthLimiter, ah.PasskeyRegisterBegin)
 	appAPI.Post("/auth/passkeys/register/finish", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRegisterFinish)
 	appAPI.Patch("/auth/passkeys/:id", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRename)
-	appAPI.Post("/auth/passkeys/:id/delete", requireAuth(rt), maintenanceMode(rt), ah.PasskeyDelete)
+	appAPI.Post("/auth/passkeys/:id/delete", requireAuth(rt), maintenanceMode(rt), reauthLimiter, ah.PasskeyDelete)
 	appAPI.Post("/auth/2fa/setup", requireAuth(rt), maintenanceMode(rt), ah.TOTPSetup)
 	appAPI.Post("/auth/2fa/enable", requireAuth(rt), maintenanceMode(rt), ah.TOTPEnable)
 	appAPI.Post("/auth/2fa/disable", requireAuth(rt), maintenanceMode(rt), ah.TOTPDisable)
 	appAPI.Get("/auth/2fa/recovery-codes", requireAuth(rt), ah.RecoveryCodesStatus)
-	appAPI.Post("/auth/2fa/recovery-codes", requireAuth(rt), maintenanceMode(rt), ah.RecoveryCodesRegenerate)
+	appAPI.Post("/auth/2fa/recovery-codes", requireAuth(rt), maintenanceMode(rt), reauthLimiter, ah.RecoveryCodesRegenerate)
 
 	// SSO start + callback are open by definition (the user has no
 	// session yet) and always registered: providers live in the
