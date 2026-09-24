@@ -30,7 +30,10 @@ const (
 type Attachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type,omitempty"`
-	Size        int64  `json:"size"`
+
+	// ContentID is what the HTML body names in a cid: URL.
+	ContentID string `json:"content_id,omitempty"`
+	Size      int64  `json:"size"`
 }
 
 // Email is one captured message.

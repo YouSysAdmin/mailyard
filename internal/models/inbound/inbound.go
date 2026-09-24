@@ -53,9 +53,12 @@ func (a *Auth) Trusted() bool { return a != nil && a.Aligned }
 type Attachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type,omitempty"`
-	Size        int64  `json:"size"`
-	Content     string `json:"content,omitempty"`
-	StorageKey  string `json:"storage_key,omitempty"`
+
+	// ContentID is what the HTML body names in a cid: URL.
+	ContentID  string `json:"content_id,omitempty"`
+	Size       int64  `json:"size"`
+	Content    string `json:"content,omitempty"`
+	StorageKey string `json:"storage_key,omitempty"`
 }
 
 // Email is one received message.

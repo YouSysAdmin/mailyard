@@ -91,6 +91,7 @@ func (c *collector) take(part *multipart.Part, depth int) error {
 	media, params := mediaType(part.Header.Get("Content-Type"), "application/octet-stream")
 	disposition, dispParams, _ := mime.ParseMediaType(part.Header.Get("Content-Disposition"))
 	encoding := part.Header.Get("Content-Transfer-Encoding")
+	contentID := strings.Trim(strings.TrimSpace(part.Header.Get("Content-ID")), "<>")
 
 	if strings.HasPrefix(media, "multipart/") {
 		// A container with no boundary describes nothing, so there is
@@ -103,8 +104,11 @@ func (c *collector) take(part *multipart.Part, depth int) error {
 		return nil
 	}
 
-	if name := attachmentName(disposition, dispParams, params); name.isAttachment {
-		return c.keep(part, media, encoding, name.filename)
+	// A non-text part with a Content-ID is an embedded image even when
+	// it carries no filename, and reading it as a body would lose it.
+	name := attachmentName(disposition, dispParams, params)
+	if name.isAttachment || (contentID != "" && !strings.HasPrefix(media, "text/")) {
+		return c.keep(part, media, encoding, name.filename, contentID)
 	}
 
 	body, err := readText(part, encoding, params["charset"])
@@ -118,7 +122,7 @@ func (c *collector) take(part *multipart.Part, depth int) error {
 }
 
 // keep decodes a part and files it as an attachment.
-func (c *collector) keep(part *multipart.Part, media, encoding, filename string) error {
+func (c *collector) keep(part *multipart.Part, media, encoding, filename, contentID string) error {
 	raw, err := io.ReadAll(part)
 	if err != nil {
 		return fmt.Errorf("read attachment: %w", err)
@@ -134,6 +138,7 @@ func (c *collector) keep(part *multipart.Part, media, encoding, filename string)
 		// The bare type, without the parameters that came with it: a
 		// charset or a name belongs to the part, not to the file.
 		ContentType: media,
+		ContentID:   contentID,
 		Content:     content,
 		Size:        int64(len(content)),
 	})

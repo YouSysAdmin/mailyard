@@ -302,6 +302,7 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 		att := imodel.Attachment{
 			Filename:    a.Filename,
 			ContentType: a.ContentType,
+			ContentID:   a.ContentID,
 			Size:        a.Size,
 		}
 		if s.Blob != nil {

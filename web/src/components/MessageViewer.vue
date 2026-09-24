@@ -8,7 +8,7 @@
 // fills a fixed pane and carries a Raw tab (it stores the bytes, the
 // log does not), the log is ordinary page content inside a card. fill
 // and the raw slot carry that difference so the form itself stays one.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import HtmlPreview from './HtmlPreview.vue'
 import { humanSize } from '../composables/humanSize'
 
@@ -28,6 +28,8 @@ const deviceWidths: Record<Device, string> = { phone: '375px', tablet: '768px', 
 export interface ViewerAttachment {
   filename?: string
   content_type?: string
+  /** What the HTML body names in a cid: URL to embed this part. */
+  content_id?: string
   size?: number
   url: string
 }
@@ -73,6 +75,56 @@ function setDevice(d: Device) {
   device.value = d
   localStorage.setItem(deviceKey, d)
 }
+
+// Embedded images, fetched here and handed to the preview as data URIs.
+//
+// The frame cannot load them itself: it is an opaque origin, so a
+// request from it carries no session cookie and the attachment route
+// refuses it. Anything over the cap is left out rather than inlined,
+// since the whole document is rebuilt on every toggle.
+const maxInlineImage = 5 * 1024 * 1024
+const inlineImages = ref<Record<string, string>>({})
+
+function asDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
+watch(
+  () => props.attachments,
+  async (list) => {
+    inlineImages.value = {}
+    const wanted = (list ?? []).filter(
+      (a) =>
+        a.content_id &&
+        a.content_type?.toLowerCase().startsWith('image/') &&
+        (a.size ?? 0) <= maxInlineImage,
+    )
+    if (wanted.length === 0) return
+
+    const found: Record<string, string> = {}
+    await Promise.all(
+      wanted.map(async (a) => {
+        try {
+          const res = await fetch(a.url, { credentials: 'same-origin' })
+          if (!res.ok) return
+
+          found[a.content_id!] = await asDataURL(await res.blob())
+        } catch {
+          // The image stays blank, the rest of the message is unaffected.
+        }
+      }),
+    )
+
+    // Another message may have been opened while these were loading.
+    if (list === props.attachments) inlineImages.value = found
+  },
+  { immediate: true },
+)
 
 const headerRows = computed(() => {
   const h = props.headers ?? {}
@@ -212,6 +264,7 @@ function selectTab(next: Tab) {
               :frameless="fill || device !== 'desktop'"
               :min-height="minHeight"
               :tracked-links="trackedLinks"
+              :inline-images="inlineImages"
             />
           </div>
         </div>

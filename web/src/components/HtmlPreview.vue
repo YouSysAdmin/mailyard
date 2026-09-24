@@ -15,7 +15,7 @@
 // the server: an opaque origin makes the pixel request cross-site, so no
 // cookie arrives to recognise it by, and the request looks exactly like
 // a real webmail fetching the same image.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   html: string
@@ -42,6 +42,13 @@ const props = defineProps<{
    * Without it the href is simply removed.
    */
   trackedLinks?: Record<string, string>
+
+  /**
+   * Embedded images as data URIs, keyed by Content-ID. A cid: URL
+   * names a part of the message and resolves nowhere on its own, so the
+   * caller fetches those parts and the preview swaps them in.
+   */
+  inlineImages?: Record<string, string>
 }>()
 
 // Our own tracking markup, removed before the browser can act on it.
@@ -82,6 +89,45 @@ function withoutOurTracking(html: string): string {
   )
 }
 
+// cid: references swapped for the embedded parts they name.
+//
+// The result is a data: URI, which the remote pass below leaves alone,
+// so embedded images render without asking. They are bytes already in
+// the message and loading them tells nobody anything. A cid: with no
+// matching part is left as it is. Inside url() the URI goes unquoted,
+// because the rule may sit in a double-quoted style attribute and a
+// base64 data URI holds neither quotes nor parentheses.
+function withInlineImages(html: string): string {
+  const images = props.inlineImages
+  if (!images || Object.keys(images).length === 0) return html
+
+  const lookup = (ref: string): string | undefined => {
+    let id = ref.trim().replace(/^cid:/i, '')
+    try {
+      id = decodeURIComponent(id)
+    } catch {
+      // A stray percent sign, keep the id as written.
+    }
+
+    return images[id]
+  }
+
+  return html
+    .replace(
+      /((?:\s|(?<=<[a-z][^\s/>]*)\/)src\s*=\s*)(?:"(cid:[^"]*)"|'(cid:[^']*)'|(cid:[^\s>"']+))/gi,
+      (whole, pre, dq, sq, bare) => {
+        const data = lookup(dq ?? sq ?? bare ?? '')
+
+        return data ? `${pre}"${data}"` : whole
+      },
+    )
+    .replace(/url\(\s*(['"]?)\s*(cid:[^)'"]+)\1\s*\)/gi, (whole, _q, ref) => {
+      const data = lookup(ref)
+
+      return data ? `url(${data})` : whole
+    })
+}
+
 // Remote images, held back until the reader asks for them.
 //
 // Fetching a remote image tells whoever hosts it that this message was
@@ -108,21 +154,43 @@ function withoutOurTracking(html: string): string {
 function withoutRemoteImages(html: string): string {
   const remote = (value: string) => !/^\s*(data:|cid:)/i.test(value)
 
+  // An attribute value in any of its three spellings. Unquoted is legal
+  // HTML and what every minifier emits, and a pattern that insists on
+  // quotes lets those images load with no notice offered at all. The
+  // name may also follow a slash straight after the tag name, since
+  // `<img/src=...>` is read as an attribute by every browser. Only
+  // there, so a `/src=` inside some other attribute's URL is left alone.
+  const attr = (name: string) =>
+    new RegExp(
+      `(?:\\s|(?<=<[a-z][^\\s/>]*)/)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`,
+      'gi',
+    )
+
   return (
     html
-      // src on any element: img, and the rarer input type=image and
-      // video poster shapes a mail builder can emit.
-      .replace(/\ssrc\s*=\s*("([^"]*)"|'([^']*)')/gi, (whole, _q, dq, sq) => {
-        const value = dq ?? sq ?? ''
+      // src on any element: img, and the rarer input type=image shape a
+      // mail builder can emit.
+      .replace(attr('src'), (whole, dq, sq, bare) => {
+        const value = dq ?? sq ?? bare ?? ''
 
         return remote(value) ? ` data-blocked-src=${JSON.stringify(value)}` : whole
       })
       // srcset is used in PREFERENCE to src, so blocking one without the
       // other blocks nothing at all.
-      .replace(/\ssrcset\s*=\s*("([^"]*)"|'([^']*)')/gi, (whole, _q, dq, sq) => {
-        const value = dq ?? sq ?? ''
+      .replace(attr('srcset'), (whole, dq, sq, bare) => {
+        const value = dq ?? sq ?? bare ?? ''
 
         return remote(value) ? ` data-blocked-srcset=${JSON.stringify(value)}` : whole
+      })
+      // The legacy background attribute on body, table and td, still how
+      // table-built email sets a backdrop, and video poster. Both fetch
+      // exactly as an img does.
+      .replace(attr('(background|poster)'), (whole, name, dq, sq, bare) => {
+        const value = dq ?? sq ?? bare ?? ''
+
+        return remote(value)
+          ? ` data-blocked-${name.toLowerCase()}=${JSON.stringify(value)}`
+          : whole
       })
       // CSS url() in a style attribute or a <style> block. Background
       // images are how a great deal of real email art-directs itself, and
@@ -137,10 +205,17 @@ function withoutRemoteImages(html: string): string {
 // sender's images is not a standing decision about every other sender.
 const showImages = ref(false)
 
-const stripped = computed(() => withoutOurTracking(props.html ?? ''))
+const stripped = computed(() => withInlineImages(withoutOurTracking(props.html ?? '')))
 const rendered = computed(() =>
   showImages.value ? stripped.value : withoutRemoteImages(stripped.value),
 )
+
+// A fresh frame per document. Changing srcdoc while the frame is still
+// loading the previous one can leave the old document on screen, which
+// is exactly what happens when the embedded images arrive a moment
+// after the body.
+const frameKey = ref(0)
+watch(rendered, () => frameKey.value++)
 
 // Whether there is anything to offer. A body with no remote reference
 // gets no notice bar: offering to load images that do not exist reads as
@@ -173,6 +248,7 @@ const frameStyle = computed(() =>
     </div>
 
     <iframe
+      :key="frameKey"
       :class="frameless ? 'html-preview-frame frameless' : 'html-preview-frame'"
       :style="frameStyle"
       :srcdoc="rendered"

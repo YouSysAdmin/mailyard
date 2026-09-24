@@ -7,6 +7,8 @@ import type { SMTPCredential } from './types'
 export interface SandboxAttachment {
   filename: string
   content_type?: string
+  // content_id is what the HTML body names in a cid: URL.
+  content_id?: string
   size: number
 }
 

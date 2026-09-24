@@ -87,6 +87,10 @@ func (w expect) check(t *testing.T, got *Email) {
 			t.Errorf("attachment %d type = %q, want %q", i, has.ContentType, want.ContentType)
 		}
 
+		if has.ContentID != want.ContentID {
+			t.Errorf("attachment %d content id = %q, want %q", i, has.ContentID, want.ContentID)
+		}
+
 		if string(has.Content) != string(want.Content) {
 			t.Errorf("attachment %d content = %q, want %q", i, has.Content, want.Content)
 		}
@@ -205,12 +209,32 @@ func TestParseReadsAMessage(t *testing.T) {
 			}, "--R\r\nContent-Type: text/html\r\n\r\n<img src=cid:logo>\r\n"+
 				"--R\r\n"+
 				"Content-Type: image/png\r\n"+
-				"Content-Disposition: inline; filename=\"logo.png\"\r\n\r\n"+
+				"Content-Disposition: inline; filename=\"logo.png\"\r\n"+
+				"Content-ID: <logo>\r\n\r\n"+
 				"PNGBYTES\r\n"+
 				"--R--\r\n"),
 			want: expect{
-				html:  "<img src=cid:logo>",
-				files: []Attachment{{Filename: "logo.png", ContentType: "image/png", Content: []byte("PNGBYTES")}},
+				html: "<img src=cid:logo>",
+				files: []Attachment{{
+					Filename: "logo.png", ContentType: "image/png", ContentID: "logo", Content: []byte("PNGBYTES"),
+				}},
+			},
+		},
+		{
+			// The Content-ID alone is what makes it an embedded image.
+			name: "a non-text part with a content id and no filename is a file",
+			raw: message([]string{
+				"From: a@x.com",
+				"Content-Type: multipart/related; boundary=\"R\"",
+			}, "--R\r\nContent-Type: text/html\r\n\r\n<img src=cid:ii_1>\r\n"+
+				"--R\r\n"+
+				"Content-Type: image/png\r\n"+
+				"Content-ID: <ii_1>\r\n\r\n"+
+				"PNGBYTES\r\n"+
+				"--R--\r\n"),
+			want: expect{
+				html:  "<img src=cid:ii_1>",
+				files: []Attachment{{ContentType: "image/png", ContentID: "ii_1", Content: []byte("PNGBYTES")}},
 			},
 		},
 		{

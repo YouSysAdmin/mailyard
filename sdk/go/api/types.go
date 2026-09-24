@@ -779,6 +779,7 @@ type ImportResponse struct {
 type InboundAttachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type,omitempty"`
+	ContentID   string `json:"content_id,omitempty"`
 	Size        int64  `json:"size"`
 	Content     string `json:"content,omitempty"`
 	StorageKey  string `json:"storage_key,omitempty"`
@@ -1472,6 +1473,7 @@ type RoleResponse struct {
 type SandboxAttachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type,omitempty"`
+	ContentID   string `json:"content_id,omitempty"`
 	Size        int64  `json:"size"`
 }
 

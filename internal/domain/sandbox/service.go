@@ -108,6 +108,7 @@ func (s *Service) Capture(ctx context.Context, req *Request) (*sbmodel.Email, er
 			e.Attachments = append(e.Attachments, sbmodel.Attachment{
 				Filename:    a.Filename,
 				ContentType: a.ContentType,
+				ContentID:   a.ContentID,
 				Size:        size,
 			})
 		}

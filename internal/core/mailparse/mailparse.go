@@ -31,8 +31,12 @@ const contentTypeTextPlain = "text/plain"
 type Attachment struct {
 	Filename    string
 	ContentType string
-	Content     []byte
-	Size        int64
+
+	// ContentID is the part's Content-ID without brackets, what an HTML
+	// body names in a cid: URL to embed the part as an image.
+	ContentID string
+	Content   []byte
+	Size      int64
 }
 
 // Email is the normalized shape Parse produces.
