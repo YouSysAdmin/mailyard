@@ -277,6 +277,43 @@ func (h *Handler) Attachment(c fiber.Ctx) error {
 	return response.Attachment(c, a.Filename, a.ContentType, raw)
 }
 
+// EML serves GET /api/v1/emails/:id/eml, the message as an .eml file.
+//
+// Built by the same code that builds it for delivery, so the file is
+// what the recipient was sent - short of the DKIM signature, which is
+// applied on the way out, and the Message-ID, minted per attempt and
+// not stored, so the file carries a stable one of its own. Dated when
+// it was sent, or when it was accepted while it still waits.
+func (h *Handler) EML(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	e, err := h.Runtime.Store.Email.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if e == nil {
+		return response.NotFound(c, "email not found")
+	}
+
+	attachments, err := rehydrate(c.Context(), h.Runtime.Blob, e)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	msg := newMessage(e, attachments)
+	msg.Date = e.CreatedAt
+	if e.SentAt != nil {
+		msg.Date = *e.SentAt
+	}
+
+	// Stable across downloads, so a mail client sees one message and
+	// not one per download, and under a reserved domain because this
+	// id was never on the wire - the sent one is minted per attempt.
+	msg.MessageID = e.ID + "@outbound.invalid"
+
+	return response.Attachment(c, e.ID+".eml", "message/rfc822", msg.Build())
+}
+
 // Status is the cheap polling endpoint: just the delivery state.
 func (h *Handler) Status(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)

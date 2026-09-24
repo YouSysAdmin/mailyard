@@ -642,6 +642,13 @@ func (c *Client) GetEmailAttachment(ctx context.Context, id string, idx string, 
 	return doRaw(ctx, c, "GET", fmt.Sprintf("/emails/%s/attachments/%s", escape(id), escape(idx)), opts)
 }
 
+// GetEmailEml EML.
+//
+// GET /emails/:id/eml
+func (c *Client) GetEmailEml(ctx context.Context, id string, opts ...RequestOption) ([]byte, error) {
+	return doRaw(ctx, c, "GET", fmt.Sprintf("/emails/%s/eml", escape(id)), opts)
+}
+
 // RetryEmail Requeue a failed email.
 //
 // POST /emails/:id/retry
@@ -741,11 +748,11 @@ func (c *Client) GetInboundEmailAttachment(ctx context.Context, id string, idx s
 	return doRaw(ctx, c, "GET", fmt.Sprintf("/inbound-emails/%s/attachments/%s", escape(id), escape(idx)), opts)
 }
 
-// GetInboundEmailRaw Raw.
+// GetInboundEmailEml EML.
 //
-// GET /inbound-emails/:id/raw
-func (c *Client) GetInboundEmailRaw(ctx context.Context, id string, opts ...RequestOption) ([]byte, error) {
-	return doRaw(ctx, c, "GET", fmt.Sprintf("/inbound-emails/%s/raw", escape(id)), opts)
+// GET /inbound-emails/:id/eml
+func (c *Client) GetInboundEmailEml(ctx context.Context, id string, opts ...RequestOption) ([]byte, error) {
+	return doRaw(ctx, c, "GET", fmt.Sprintf("/inbound-emails/%s/eml", escape(id)), opts)
 }
 
 // RetryInboundEmail Retry.
@@ -1027,6 +1034,13 @@ func (c *Client) GetSandbox(ctx context.Context, id string, opts ...RequestOptio
 // GET /sandbox/:id/attachments/:idx
 func (c *Client) GetSandboxAttachment(ctx context.Context, id string, idx string, opts ...RequestOption) ([]byte, error) {
 	return doRaw(ctx, c, "GET", fmt.Sprintf("/sandbox/%s/attachments/%s", escape(id), escape(idx)), opts)
+}
+
+// GetSandboxEml EML.
+//
+// GET /sandbox/:id/eml
+func (c *Client) GetSandboxEml(ctx context.Context, id string, opts ...RequestOption) ([]byte, error) {
+	return doRaw(ctx, c, "GET", fmt.Sprintf("/sandbox/%s/eml", escape(id)), opts)
 }
 
 // GetSandboxRaw Raw.

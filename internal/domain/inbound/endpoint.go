@@ -84,11 +84,10 @@ func (h *Handler) Get(c fiber.Ctx) error {
 	return response.Success(c, GetResponse{InboundEmail: e})
 }
 
-// Raw streams the stored wire bytes. Raw is only retained when MIME
-// parsing failed (see service.go) - for a cleanly parsed message the
-// answer is an honest 404 rather than a reconstruction pretending to
-// be the original.
-func (h *Handler) Raw(c fiber.Ctx) error {
+// EML serves GET /api/v1/inbound-emails/:id/eml, the message as an
+// .eml file: the wire bytes when they were kept, otherwise rebuilt from
+// the stored parts - see rebuild.
+func (h *Handler) EML(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	e, err := h.Runtime.Store.Inbound.Get(c.Context(), rc.Project.ID, c.Params("id"))
 	if err != nil {
@@ -99,14 +98,22 @@ func (h *Handler) Raw(c fiber.Ctx) error {
 		return response.NotFound(c, "inbound email not found")
 	}
 
-	if len(e.Raw) == 0 {
-		return response.NotFound(c, "raw bytes are retained only for messages that failed to parse")
+	raw := e.Raw
+	if len(raw) == 0 {
+		// A refused message is kept as its envelope and the reason, and
+		// the content sweep empties an old one down to the same. A file
+		// built from that is an empty shell, not the message.
+		if e.TextBody == "" && e.HTMLBody == "" && len(e.Attachments) == 0 {
+			return response.NotFound(c, "nothing of this message's content is stored")
+		}
+
+		raw, err = rebuild(c.Context(), h.Runtime.Blob, e)
+		if err != nil {
+			return response.Internal(c, err)
+		}
 	}
 
-	c.Set(fiber.HeaderContentType, "message/rfc822")
-	c.Set(fiber.HeaderContentDisposition, `attachment; filename="`+e.ID+`.eml"`)
-
-	return c.Send(e.Raw)
+	return response.Attachment(c, e.ID+".eml", "message/rfc822", raw)
 }
 
 // Retry re-fires the inbound.received webhook for one message, so an

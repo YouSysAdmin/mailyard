@@ -134,14 +134,17 @@ parse, which nothing re-runs.
 [delivery tracking](/docs/webhooks/delivery-tracking) for that.
 {{< /callout >}}
 
-## Download the Raw Message
+## Download the Message as .eml
 
 ```
-GET /api/v1/inbound-emails/{id}/raw
+GET /api/v1/inbound-emails/{id}/eml
 ```
 
-Streams the raw RFC 5322 message as `message/rfc822` with a `.eml` filename. Returns `404` if the raw bytes were not
-stored.
+Answers the message as `message/rfc822` with a `.eml` filename. For a message that failed to parse this is the
+original wire bytes, kept for exactly this. For every other message it is rebuilt from the stored headers, bodies and
+attachments: embedded images keep their `Content-ID`, signatures computed over the original bytes (`DKIM-Signature`,
+`ARC-*`) are left out, and the multipart structure is ours rather than the sender's. Returns `404` when nothing of the
+content is stored, as after the content retention sweep.
 
 ## Download an Attachment
 

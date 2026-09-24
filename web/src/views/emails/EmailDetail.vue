@@ -178,6 +178,9 @@ async function retryEmail() {
         >
           {{ retrying ? 'Retrying...' : 'Retry' }}
         </button>
+        <a v-if="email" class="btn btn-secondary" :href="browserURL(`/emails/${email.id}/eml`)">
+          Download .eml
+        </a>
         <button class="btn btn-secondary" @click="router.push('/emails')">Back to Emails</button>
       </div>
     </PageHeader>

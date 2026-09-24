@@ -387,6 +387,10 @@ class API:
         "Attachment"
         return self._t.request("GET", f"/emails/{_esc(id)}/attachments/{_esc(idx)}", body=None, query=query, raw=True)
 
+    def get_email_eml(self, id, **query: Any) -> bytes:
+        "EML"
+        return self._t.request("GET", f"/emails/{_esc(id)}/eml", body=None, query=query, raw=True)
+
     def retry_email(self, id, **query: Any) -> Any:
         "Requeue a failed email Needs emails:write."
         return self._t.request("POST", f"/emails/{_esc(id)}/retry", body=None, query=query)
@@ -443,9 +447,9 @@ class API:
         "Attachment"
         return self._t.request("GET", f"/inbound-emails/{_esc(id)}/attachments/{_esc(idx)}", body=None, query=query, raw=True)
 
-    def get_inbound_email_raw(self, id, **query: Any) -> bytes:
-        "Raw"
-        return self._t.request("GET", f"/inbound-emails/{_esc(id)}/raw", body=None, query=query, raw=True)
+    def get_inbound_email_eml(self, id, **query: Any) -> bytes:
+        "EML"
+        return self._t.request("GET", f"/inbound-emails/{_esc(id)}/eml", body=None, query=query, raw=True)
 
     def retry_inbound_email(self, id, **query: Any) -> Any:
         "Retry"
@@ -602,6 +606,10 @@ class API:
     def get_sandbox_attachment(self, id, idx, **query: Any) -> bytes:
         "Attachment"
         return self._t.request("GET", f"/sandbox/{_esc(id)}/attachments/{_esc(idx)}", body=None, query=query, raw=True)
+
+    def get_sandbox_eml(self, id, **query: Any) -> bytes:
+        "EML"
+        return self._t.request("GET", f"/sandbox/{_esc(id)}/eml", body=None, query=query, raw=True)
 
     def get_sandbox_raw(self, id, **query: Any) -> bytes:
         "Raw"

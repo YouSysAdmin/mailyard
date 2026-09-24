@@ -120,6 +120,23 @@ func (h *Handler) Raw(c fiber.Ctx) error {
 	return c.Send(raw)
 }
 
+// EML serves GET /api/v1/sandbox/:id/eml, the captured bytes as an
+// .eml file. The same bytes Raw answers, offered as a download rather
+// than shown, so they open in a mail client.
+func (h *Handler) EML(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	raw, err := h.Runtime.Store.Sandbox.Raw(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if raw == nil {
+		return response.NotFound(c, "message not found")
+	}
+
+	return response.Attachment(c, c.Params("id")+".eml", "message/rfc822", raw)
+}
+
 // Attachment streams one attachment by index.
 //
 // Reparsed out of the raw message rather than read from a column,

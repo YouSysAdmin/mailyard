@@ -19,6 +19,10 @@ type Attachment struct {
 	Filename    string `json:"filename"`
 	Content     string `json:"content,omitempty"`
 	ContentType string `json:"content_type"`
+
+	// ContentID, when set, makes the part an embedded one: it is written
+	// inline under that id, which is what a cid: URL in the body names.
+	ContentID string `json:"content_id,omitempty"`
 }
 
 // Message is one outbound email, fully rendered. Headers are custom
@@ -218,22 +222,55 @@ func (m *Message) Build() []byte {
 		fmt.Fprintf(&b, "%s: %s\r\n", headerSafe(key), headerSafe(value))
 	}
 
-	if len(m.Attachments) > 0 {
+	var embedded, files []Attachment
+	for _, att := range m.Attachments {
+		if att.ContentID != "" {
+			embedded = append(embedded, att)
+		} else {
+			files = append(files, att)
+		}
+	}
+
+	if len(files) > 0 {
 		mixedBoundary := newBoundary()
 		fmt.Fprintf(&b, "Content-Type: multipart/mixed; boundary=%q\r\n\r\n", mixedBoundary)
 		fmt.Fprintf(&b, "--%s\r\n", mixedBoundary)
-		m.writeBody(&b)
-		for _, att := range m.Attachments {
+		m.writeRelated(&b, embedded)
+		for _, att := range files {
 			fmt.Fprintf(&b, "\r\n--%s\r\n", mixedBoundary)
 			writeAttachment(&b, att)
 		}
 
 		fmt.Fprintf(&b, "\r\n--%s--\r\n", mixedBoundary)
 	} else {
-		m.writeBody(&b)
+		m.writeRelated(&b, embedded)
 	}
 
 	return []byte(b.String())
+}
+
+// writeRelated emits the body, wrapped in multipart/related with the
+// embedded parts when there are any. A cid: URL resolves only inside
+// the related container the body sits in (RFC 2387), so an embedded
+// image written as a plain sibling shows as a broken image and a loose
+// file in clients that follow it.
+func (m *Message) writeRelated(b *strings.Builder, embedded []Attachment) {
+	if len(embedded) == 0 {
+		m.writeBody(b)
+
+		return
+	}
+
+	boundary := newBoundary()
+	fmt.Fprintf(b, "Content-Type: multipart/related; boundary=%q\r\n\r\n", boundary)
+	fmt.Fprintf(b, "--%s\r\n", boundary)
+	m.writeBody(b)
+	for _, att := range embedded {
+		fmt.Fprintf(b, "\r\n--%s\r\n", boundary)
+		writeAttachment(b, att)
+	}
+
+	fmt.Fprintf(b, "\r\n--%s--\r\n", boundary)
 }
 
 // newBoundary mints a random multipart delimiter.
@@ -315,8 +352,23 @@ func writeAttachment(b *strings.Builder, att Attachment) {
 	fmt.Fprintf(b, "Content-Type: %s\r\n",
 		mime.FormatMediaType(contentType, map[string]string{"name": att.Filename}))
 	b.WriteString("Content-Transfer-Encoding: base64\r\n")
+	disposition := "attachment"
+	if att.ContentID != "" {
+		disposition = "inline"
+		// The id goes inside angle brackets, so one carrying a bracket or
+		// a space of its own would end the token early and match nothing.
+		id := strings.Map(func(r rune) rune {
+			if r == '<' || r == '>' || r == ' ' || r == '\t' {
+				return -1
+			}
+
+			return r
+		}, headerSafe(att.ContentID))
+		fmt.Fprintf(b, "Content-ID: <%s>\r\n", id)
+	}
+
 	fmt.Fprintf(b, "Content-Disposition: %s\r\n\r\n",
-		mime.FormatMediaType("attachment", map[string]string{"filename": att.Filename}))
+		mime.FormatMediaType(disposition, map[string]string{"filename": att.Filename}))
 	content := att.Content
 	for len(content) > 76 {
 		b.WriteString(content[:76])

@@ -251,6 +251,7 @@ The sandbox has a console API under `/api/v1/sandbox`, session-authenticated lik
 | `GET /api/v1/sandbox/info`                 | Connection details and the retention settings |
 | `GET /api/v1/sandbox/:id`                  | One message, parsed                           |
 | `GET /api/v1/sandbox/:id/raw`              | The wire bytes as `text/plain`                |
+| `GET /api/v1/sandbox/:id/eml`              | The same bytes as an `.eml` download          |
 | `GET /api/v1/sandbox/:id/attachments/:idx` | One attachment                                |
 | `DELETE /api/v1/sandbox/:id`               | Delete one message                            |
 | `POST /api/v1/sandbox/clear`               | Empty the project's sandbox                   |

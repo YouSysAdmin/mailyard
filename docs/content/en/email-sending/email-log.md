@@ -107,6 +107,7 @@ Related routes on the same message:
 |---------------------------------------------|------------------------------------------------------------|
 | `GET /api/v1/emails/{id}/status`            | Just the delivery state — the cheap poll                   |
 | `GET /api/v1/emails/{id}/attachments/{idx}` | One attachment's bytes, by position                        |
+| `GET /api/v1/emails/{id}/eml`               | The message as an `.eml` file, built the way delivery builds it |
 | `GET /api/v1/emails/{id}/tracked-links`     | The links rewritten for click tracking, with their tallies |
 | `POST /api/v1/emails/{id}/retry`            | Requeue a failed message                                   |
 

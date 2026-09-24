@@ -133,6 +133,69 @@ func (p *Processor) deliver(ctx context.Context, spec transport.Spec, msg *smtpc
 	return t.Send(ctx, msg)
 }
 
+// rehydrate returns the attachments with offloaded content loaded, so
+// the builder sees every one inline.
+func rehydrate(ctx context.Context, bs blob.Store, e *emailmodel.Email) ([]emailmodel.Attachment, error) {
+	attachments := make([]emailmodel.Attachment, len(e.Attachments))
+	copy(attachments, e.Attachments)
+	for i := range attachments {
+		a := &attachments[i]
+		if a.Content != "" || a.StorageKey == "" {
+			continue
+		}
+
+		raw, err := LoadAttachment(ctx, bs, a)
+		if err != nil {
+			return nil, fmt.Errorf("load attachment %q: %w", a.Filename, err)
+		}
+
+		a.Content = base64.StdEncoding.EncodeToString(raw)
+	}
+
+	return attachments, nil
+}
+
+// newMessage renders the stored row as the message the wire carries.
+// ONE builder for delivery and for the .eml download, so what a person
+// downloads is what the recipient was sent.
+func newMessage(e *emailmodel.Email, attachments []emailmodel.Attachment) *smtpclient.Message {
+	text := e.TextBody
+	if text == "" && e.HTMLBody != "" {
+		text = render.HTMLToText(e.HTMLBody)
+	}
+
+	// The client's own To, Cc and Reply-To, if the request stored
+	// them, come out of the header map and into the fields the builder
+	// writes them from - left in the map they would be written twice.
+	headers := e.Headers
+	headerTo, cc, replyTo := headers[HeaderDisplayTo], headers[HeaderDisplayCc], headers[HeaderReplyTo]
+	if headerTo != "" || cc != "" || replyTo != "" {
+		headers = maps.Clone(headers)
+		delete(headers, HeaderDisplayTo)
+		delete(headers, HeaderDisplayCc)
+		delete(headers, HeaderReplyTo)
+	}
+
+	return &smtpclient.Message{
+		From: e.Sender,
+		// EnvelopeFrom is filled per candidate inside the failover
+		// loop, not here - see returnPathFor.
+		EmailID:               e.ID,
+		To:                    e.Recipients,
+		HeaderTo:              headerTo,
+		Cc:                    cc,
+		ReplyTo:               replyTo,
+		Subject:               e.Subject,
+		HTML:                  e.HTMLBody,
+		Text:                  text,
+		Attachments:           toClientAttachments(attachments),
+		Headers:               headers,
+		ListUnsubscribeURL:    e.ListUnsubscribeURL,
+		ListUnsubscribeMailto: e.ListUnsubscribeMailto,
+		ListUnsubscribePost:   e.ListUnsubscribePost,
+	}
+}
+
 // Process delivers one claimed message and reports what the worker
 // should do with it.
 func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outcome {
@@ -157,59 +220,14 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		return queue.Fail(errors.New("no enabled smtp server accepts this sender"))
 	}
 
-	// Rehydrate offloaded attachments. A blob outage is transient -
-	// retry rather than fail the email permanently.
-	attachments := make([]emailmodel.Attachment, len(e.Attachments))
-	copy(attachments, e.Attachments)
-	for i := range attachments {
-		a := &attachments[i]
-		if a.Content != "" || a.StorageKey == "" {
-			continue
-		}
-
-		raw, err := LoadAttachment(ctx, p.Blob, a)
-		if err != nil {
-			return queue.Retry(fmt.Errorf("load attachment %q: %w", a.Filename, err))
-		}
-
-		a.Content = base64.StdEncoding.EncodeToString(raw)
+	// A blob outage is transient - retry rather than fail the email
+	// permanently.
+	attachments, err := rehydrate(ctx, p.Blob, e)
+	if err != nil {
+		return queue.Retry(err)
 	}
 
-	text := e.TextBody
-	if text == "" && e.HTMLBody != "" {
-		text = render.HTMLToText(e.HTMLBody)
-	}
-
-	// The client's own To, Cc and Reply-To, if the request stored
-	// them, come out of the header map and into the fields the builder
-	// writes them from - left in the map they would be written twice.
-	headers := e.Headers
-	headerTo, cc, replyTo := headers[HeaderDisplayTo], headers[HeaderDisplayCc], headers[HeaderReplyTo]
-	if headerTo != "" || cc != "" || replyTo != "" {
-		headers = maps.Clone(headers)
-		delete(headers, HeaderDisplayTo)
-		delete(headers, HeaderDisplayCc)
-		delete(headers, HeaderReplyTo)
-	}
-
-	msg := &smtpclient.Message{
-		From: e.Sender,
-		// EnvelopeFrom is filled per candidate inside the failover
-		// loop, not here - see returnPathFor.
-		EmailID:               e.ID,
-		To:                    e.Recipients,
-		HeaderTo:              headerTo,
-		Cc:                    cc,
-		ReplyTo:               replyTo,
-		Subject:               e.Subject,
-		HTML:                  e.HTMLBody,
-		Text:                  text,
-		Attachments:           toClientAttachments(attachments),
-		Headers:               headers,
-		ListUnsubscribeURL:    e.ListUnsubscribeURL,
-		ListUnsubscribeMailto: e.ListUnsubscribeMailto,
-		ListUnsubscribePost:   e.ListUnsubscribePost,
-	}
+	msg := newMessage(e, attachments)
 
 	// DKIM. A signer is attached only when the sender's domain is
 	// verified to this project AND holds a key - and only when the

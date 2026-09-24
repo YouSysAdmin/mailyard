@@ -122,6 +122,9 @@ watch(() => props.id, load, { immediate: true })
     :message-id="email.id"
   >
     <template #actions>
+      <a class="btn btn-secondary btn-sm" :href="browserURL(`/sandbox/${email.id}/eml`)">
+        Download .eml
+      </a>
       <button v-if="projStore.can('sandbox:delete')" class="btn btn-danger btn-sm" @click="remove">
         Delete
       </button>

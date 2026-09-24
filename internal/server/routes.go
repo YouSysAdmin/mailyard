@@ -636,6 +636,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	emails.Get("/:id", permRead, eh.Get)
 	emails.Get("/:id/tracked-links", permRead, eh.TrackedLinks)
 	emails.Get("/:id/attachments/:idx", permRead, eh.Attachment)
+	emails.Get("/:id/eml", permRead, eh.EML)
 	emails.Get("/:id/status", permRead, eh.Status)
 	emails.Post("/:id/retry", permWrite, eh.Retry)
 
@@ -822,7 +823,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	inb.Get("/", permRead, ih.List)
 	inb.Get("/stats", permRead, ih.Stats)
 	inb.Get("/:id", permRead, ih.Get)
-	inb.Get("/:id/raw", permRead, ih.Raw)
+	inb.Get("/:id/eml", permRead, ih.EML)
 	inb.Get("/:id/attachments/:idx", permRead, ih.Attachment)
 	inb.Post("/:id/retry", permWrite, ih.Retry)
 	inb.Delete("/:id", permDelete, ih.Delete)
@@ -860,6 +861,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	sb.Delete("/inboxes/:id", permDelete, sbh.DeleteInbox)
 	sb.Get("/:id", permRead, sbh.Get)
 	sb.Get("/:id/raw", permRead, sbh.Raw)
+	sb.Get("/:id/eml", permRead, sbh.EML)
 	sb.Get("/:id/attachments/:idx", permRead, sbh.Attachment)
 	sb.Delete("/:id", permDelete, sbh.Delete)
 

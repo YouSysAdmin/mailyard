@@ -57,6 +57,15 @@ func ConsoleDocs() []apidoc.Route {
 		},
 		{
 			Method:      "GET",
+			Path:        "/sandbox/:id/eml",
+			Tag:         "sandbox",
+			Summary:     "EML",
+			Description: "Needs the `sandbox:read` permission.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Responses:   []apidoc.Response{apidoc.OctetStream("The captured wire bytes as an .eml download.")},
+		},
+		{
+			Method:      "GET",
 			Path:        "/sandbox/:id/raw",
 			Tag:         "sandbox",
 			Summary:     "Raw",

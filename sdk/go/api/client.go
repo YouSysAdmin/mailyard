@@ -171,11 +171,10 @@ func do[T any](ctx context.Context, c *Client, method, path string, body any, op
 
 // doRaw performs one request and returns the body UNDECODED.
 //
-// For the routes that answer bytes: a raw RFC 5322 message, a decoded
-// attachment. They used to be generated as ordinary JSON methods, so
-// GetInboundEmailRaw both failed to parse the message AND discarded the
-// payload it exists to fetch - it returned only an error. Nothing about
-// the signature let a caller notice.
+// For the routes that answer bytes: an RFC 5322 message, a decoded
+// attachment. Generated as an ordinary JSON method, such a route fails
+// to decode AND discards the payload it exists to fetch, returning only
+// an error - and nothing about the signature lets a caller notice.
 //
 // No body parameter: every one of these is a GET.
 func doRaw(ctx context.Context, c *Client, method, path string, opts []RequestOption) ([]byte, error) {

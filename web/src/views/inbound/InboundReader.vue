@@ -48,6 +48,15 @@ const authTitle = computed(() =>
     : 'Nothing the From domain vouches for passed, so the sender address may be forged',
 )
 
+// Whether there is anything a .eml could be built from. A refused
+// message is kept as its envelope, and the content sweep empties an old
+// one down to the same - the server refuses the download for both.
+const hasContent = computed(() => {
+  const e = email.value
+
+  return !!e && (e.has_raw || !!e.text_body || !!e.html_body || (e.attachments?.length ?? 0) > 0)
+})
+
 // The download URLs only this caller can build - see ViewerAttachment.
 const viewerAttachments = computed<ViewerAttachment[]>(() => {
   const e = email.value
@@ -149,6 +158,13 @@ watch(() => props.id, load, { immediate: true })
       >
         {{ retrying ? 'Sending...' : 'Re-send webhook' }}
       </button>
+      <a
+        v-if="hasContent"
+        class="btn btn-secondary btn-sm"
+        :href="browserURL(`/inbound-emails/${email.id}/eml`)"
+      >
+        Download .eml
+      </a>
       <button v-if="projStore.can('inbound:delete')" class="btn btn-danger btn-sm" @click="remove">
         Delete
       </button>
@@ -206,17 +222,19 @@ watch(() => props.id, load, { immediate: true })
       <div v-if="email.error_message" class="details-note text-danger">
         {{ email.error_message }}
       </div>
-      <!-- Raw bytes are kept only for messages that failed to parse,
-           which is why this is not a permanent control. -->
+      <!-- The wire bytes are kept only for a message that failed to
+           parse. For every other one the .eml download is a rebuild
+           from the stored parts, and the reader should know which. -->
       <div v-if="email.has_raw" class="details-note">
-        <a
-          class="btn btn-secondary btn-sm"
-          :href="browserURL(`/inbound-emails/${email.id}/raw`)"
-          target="_blank"
-          rel="noopener"
-        >
-          Download the raw message
-        </a>
+        This message failed to parse, so the original wire bytes were kept and the .eml download is
+        those bytes exactly.
+      </div>
+      <div v-else-if="hasContent" class="details-note">
+        The .eml download is rebuilt from the stored headers, bodies and attachments, not the
+        original wire bytes.
+      </div>
+      <div v-else class="details-note">
+        No content is stored for this message, so there is nothing to download.
       </div>
     </template>
 

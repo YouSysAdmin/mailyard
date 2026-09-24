@@ -66,7 +66,7 @@ Received messages are available through the console API:
 ```
 GET    /api/v1/inbound-emails                     list, paginated
 GET    /api/v1/inbound-emails/:id                 one message with parsed bodies
-GET    /api/v1/inbound-emails/:id/raw             the original .eml
+GET    /api/v1/inbound-emails/:id/eml             the message as an .eml file
 GET    /api/v1/inbound-emails/:id/attachments/:idx  stream one attachment
 POST   /api/v1/inbound-emails/:id/retry           re-emit the webhook (editor)
 DELETE /api/v1/inbound-emails/:id                 delete, with its blobs (editor)

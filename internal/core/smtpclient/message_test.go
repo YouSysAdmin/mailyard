@@ -77,3 +77,51 @@ func TestBuildWritesReplyToOnceAndSafely(t *testing.T) {
 		t.Fatal("an empty ReplyTo wrote a header")
 	}
 }
+
+// An embedded image is an inline part under a Content-ID, which is what
+// the cid: URL in the body names. A file without one stays an ordinary
+// attachment, exactly as before.
+func TestBuildWritesAnEmbeddedPartUnderItsContentID(t *testing.T) {
+	m := &Message{
+		From:    "you@example.com",
+		To:      []string{"a@example.com"},
+		Subject: "s",
+		HTML:    `<img src="cid:logo">`,
+		Attachments: []Attachment{
+			{Filename: "logo.png", ContentType: "image/png", Content: "UE5H", ContentID: "logo"},
+			{Filename: "rows.csv", ContentType: "text/csv", Content: "YSxi"},
+		},
+	}
+	raw := string(m.Build())
+	for _, want := range []string{
+		"Content-Type: multipart/mixed;",
+		"Content-Type: multipart/related;",
+		"Content-ID: <logo>\r\n",
+		"Content-Disposition: inline; filename=logo.png",
+		"Content-Disposition: attachment; filename=rows.csv",
+	} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("Build output lacks %q:\n%s", want, raw)
+		}
+	}
+
+	if strings.Count(raw, "Content-ID:") != 1 {
+		t.Errorf("a part without a ContentID must not get one:\n%s", raw)
+	}
+
+	// The embedded part sits inside the related container with the
+	// body, the file outside it: related opens before the image and
+	// closes before the csv.
+	related := strings.Index(raw, "multipart/related")
+	logo := strings.Index(raw, "Content-ID: <logo>")
+	csv := strings.Index(raw, "filename=rows.csv")
+	if !(related < logo && logo < csv) {
+		t.Errorf("parts are out of order, want related < logo < csv:\n%s", raw)
+	}
+
+	// A malformed id cannot end the token early.
+	m.Attachments = []Attachment{{Filename: "x.png", ContentType: "image/png", Content: "UE5H", ContentID: "ab>c d"}}
+	if raw := string(m.Build()); !strings.Contains(raw, "Content-ID: <abcd>\r\n") {
+		t.Errorf("Content-ID was not sanitised:\n%s", raw)
+	}
+}

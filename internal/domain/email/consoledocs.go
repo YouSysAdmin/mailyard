@@ -33,6 +33,15 @@ func ConsoleDocs() []apidoc.Route {
 		},
 		{
 			Method:      "GET",
+			Path:        "/emails/:id/eml",
+			Tag:         "email",
+			Summary:     "EML",
+			Description: "Needs the `emails:read` permission.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Responses:   []apidoc.Response{apidoc.OctetStream("The message as an .eml file, built the way delivery builds it.")},
+		},
+		{
+			Method:      "GET",
 			Path:        "/emails/:id/attachments/:idx",
 			Tag:         "email",
 			Summary:     "Attachment",

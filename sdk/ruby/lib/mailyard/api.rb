@@ -476,6 +476,11 @@ module Mailyard
       @t.request("GET", "/emails/#{esc(id)}/attachments/#{esc(idx)}", body: nil, query: query, raw: true)
     end
 
+    # EML
+    def get_email_eml(id, **query)
+      @t.request("GET", "/emails/#{esc(id)}/eml", body: nil, query: query, raw: true)
+    end
+
     # Requeue a failed email Needs emails:write.
     def retry_email(id, **query)
       @t.request("POST", "/emails/#{esc(id)}/retry", body: nil, query: query)
@@ -546,9 +551,9 @@ module Mailyard
       @t.request("GET", "/inbound-emails/#{esc(id)}/attachments/#{esc(idx)}", body: nil, query: query, raw: true)
     end
 
-    # Raw
-    def get_inbound_email_raw(id, **query)
-      @t.request("GET", "/inbound-emails/#{esc(id)}/raw", body: nil, query: query, raw: true)
+    # EML
+    def get_inbound_email_eml(id, **query)
+      @t.request("GET", "/inbound-emails/#{esc(id)}/eml", body: nil, query: query, raw: true)
     end
 
     # Retry
@@ -744,6 +749,11 @@ module Mailyard
     # Attachment
     def get_sandbox_attachment(id, idx, **query)
       @t.request("GET", "/sandbox/#{esc(id)}/attachments/#{esc(idx)}", body: nil, query: query, raw: true)
+    end
+
+    # EML
+    def get_sandbox_eml(id, **query)
+      @t.request("GET", "/sandbox/#{esc(id)}/eml", body: nil, query: query, raw: true)
     end
 
     # Raw

@@ -51,12 +51,12 @@ func ConsoleDocs() []apidoc.Route {
 		},
 		{
 			Method:      "GET",
-			Path:        "/inbound-emails/:id/raw",
+			Path:        "/inbound-emails/:id/eml",
 			Tag:         "inbound",
-			Summary:     "Raw",
+			Summary:     "EML",
 			Description: "Needs the `inbound:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
-			Responses:   []apidoc.Response{apidoc.OctetStream("The raw RFC 5322 message, exactly as received.")},
+			Responses:   []apidoc.Response{apidoc.OctetStream("The message as an .eml file: the wire bytes when they were kept, otherwise rebuilt from the stored headers, bodies and attachments.")},
 		},
 		{
 			Method:      "POST",
