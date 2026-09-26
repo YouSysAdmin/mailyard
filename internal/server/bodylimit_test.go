@@ -55,8 +55,20 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 	// The hook sees the raw request target, query string included.
 	var h fasthttp.RequestHeader
 	h.SetRequestURI("/api/v1/emails/send?sandbox=true")
+	h.Set(fiber.HeaderAuthorization, "Bearer myk_x")
 	if got := perRequestLimits(&h).MaxRequestBodySize; got != 0 {
 		t.Errorf("perRequestLimits with a query string = %d, want the server's limit", got)
+	}
+
+	// The attachment ceiling is only for a request naming a credential.
+	h.Del(fiber.HeaderAuthorization)
+	if got := perRequestLimits(&h).MaxRequestBodySize; got != apiBodyLimit {
+		t.Errorf("perRequestLimits with no credential = %d, want apiBodyLimit", got)
+	}
+
+	h.SetCookie("mailyard_session", "x")
+	if got := perRequestLimits(&h).MaxRequestBodySize; got != 0 {
+		t.Errorf("perRequestLimits with a session cookie = %d, want the server's limit", got)
 	}
 }
 
@@ -96,9 +108,19 @@ func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 		{env.ConsolePath + "/api/auth/login", 2 * baseBodyLimit, fiber.StatusRequestEntityTooLarge},
 		{env.ConsolePath + "/api/auth/login", baseBodyLimit / 2, fiber.StatusOK},
 	} {
-		if got := post(t, ln.Addr(), tc.path, tc.size); got != tc.want {
+		if got := post(t, ln.Addr(), tc.path, tc.size, "Authorization: Bearer myk_x"); got != tc.want {
 			t.Errorf("%s with %d bytes answered %d, want %d", tc.path, tc.size, got, tc.want)
 		}
+	}
+
+	// The attachment ceiling is for a request that names a credential.
+	// One naming none gets the ordinary API ceiling, on the same path.
+	if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit); got != fiber.StatusRequestEntityTooLarge {
+		t.Errorf("send with no credential and %d bytes answered %d, want 413", 2*apiBodyLimit, got)
+	}
+
+	if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit, "Cookie: mailyard_session=x"); got != fiber.StatusOK {
+		t.Errorf("send with a session cookie and %d bytes answered %d, want 200", 2*apiBodyLimit, got)
 	}
 }
 
@@ -109,7 +131,7 @@ func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 // Content-Length alone and the connection closed, so a client still
 // writing megabytes into it sees a broken pipe - which http.Client
 // reports as the error instead of the response it was given.
-func post(t *testing.T, addr net.Addr, path string, size int) int {
+func post(t *testing.T, addr net.Addr, path string, size int, headers ...string) int {
 	t.Helper()
 
 	conn, err := net.Dial("tcp", addr.String())
@@ -122,7 +144,12 @@ func post(t *testing.T, addr net.Addr, path string, size int) int {
 		t.Fatalf("deadline: %v", err)
 	}
 
-	if _, err := fmt.Fprintf(conn, "POST %s HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", path, size); err != nil {
+	extra := ""
+	for _, h := range headers {
+		extra += h + "\r\n"
+	}
+
+	if _, err := fmt.Fprintf(conn, "POST %s HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n", path, size, extra); err != nil {
 		t.Fatalf("write request: %v", err)
 	}
 

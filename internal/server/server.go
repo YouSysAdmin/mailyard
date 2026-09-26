@@ -25,6 +25,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	authdomain "github.com/yousysadmin/mailyard/internal/domain/auth"
 	"github.com/yousysadmin/mailyard/internal/domain/eventstream"
 )
 
@@ -278,12 +279,31 @@ func perRequestLimits(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		uri = uri[:i]
 	}
 
-	cfg := fasthttp.RequestConfig{MaxRequestBodySize: bodyLimitForPath(uri)}
+	limit := bodyLimitForPath(uri)
+	if limit == 0 && !carriesCredential(h) {
+		limit = apiBodyLimit
+	}
+
+	cfg := fasthttp.RequestConfig{MaxRequestBodySize: limit}
 	if isStreamingPath(uri) {
 		cfg.WriteTimeout = streamWriteTimeout
 	}
 
 	return cfg
+}
+
+// carriesCredential reports whether the request names any credential
+// at all: an Authorization header or the session cookie. The body is
+// buffered before the handler chain runs, so nothing can verify it
+// first, but a request naming none gets the ordinary ceiling. A
+// made-up bearer still costs the per-IP failure budget, and a reverse
+// proxy's body limit is the operator's half.
+func carriesCredential(h *fasthttp.RequestHeader) bool {
+	if len(h.Peek(fiber.HeaderAuthorization)) > 0 {
+		return true
+	}
+
+	return len(h.Cookie(authdomain.SessionCookie)) > 0
 }
 
 // bodyLimitForPath is the body ceiling one request gets, where 0 means
