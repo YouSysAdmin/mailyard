@@ -34,32 +34,32 @@ database:
     encryption_key: 0123456789abcdef0123456789abcdef
 `
 
-// The tracking signer keys on auth.jwt_secret, so public_url without a
-// secret is refused whether auth is on or off. auth.disabled on its own
-// is a supported mode and loads.
-func TestAuthDisabledWithAPublicURLNeedsAJWTSecret(t *testing.T) {
-	_, err := load(t, minimalConfig+`
+// The tracking signer keys on the encryption key, so auth disabled
+// with a public_url needs no jwt_secret. A secret that is given still
+// has to meet the floor.
+func TestAuthDisabledWithAPublicURLNeedsNoJWTSecret(t *testing.T) {
+	if _, err := load(t, minimalConfig+`
 auth:
   disabled: true
 server:
   public_url: https://mail.example.com
-`)
-	if err == nil || !strings.Contains(err.Error(), "auth.jwt_secret required when server.public_url") {
-		t.Fatalf("public_url without a secret: got %v, want a refusal naming the secret", err)
+`); err != nil {
+		t.Fatalf("public_url with auth disabled and no secret must load: %v", err)
 	}
 
 	if _, err := load(t, minimalConfig+"auth:\n  disabled: true\n"); err != nil {
 		t.Fatalf("auth.disabled alone must load: %v", err)
 	}
 
-	if _, err := load(t, minimalConfig+`
+	_, err := load(t, minimalConfig+`
 auth:
   disabled: true
-  jwt_secret: 0123456789abcdef0123456789abcdef
+  jwt_secret: short
 server:
   public_url: https://mail.example.com
-`); err != nil {
-		t.Fatalf("auth.disabled with a secret and a public_url must load: %v", err)
+`)
+	if err == nil || !strings.Contains(err.Error(), "auth.jwt_secret must be at least 32") {
+		t.Fatalf("short secret: got %v, want the floor", err)
 	}
 }
 

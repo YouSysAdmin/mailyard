@@ -487,11 +487,14 @@ func runServe(cmd *cobra.Command, r role) error {
 
 	// Tracking signer: mints the public /tracking/ URLs. Needs the
 	// public base URL to build absolute links - without it campaigns
-	// send untracked. DeriveKey answers "" for an empty jwt_secret, so
-	// a disabled-auth node with no secret gets a disabled signer, and
-	// Validate refuses the one combination (public_url without a
-	// secret) where that would be a surprise.
-	rt.Tracking = coretracking.NewSigner(cfg.Server.PublicURL, crypto.DeriveKey(cfg.Auth.JWTSecret, crypto.KeyTracking))
+	// send untracked.
+	//
+	// Keyed on the encryption key, which is not rotated casually,
+	// because unsubscribe links never expire. The session secret stays
+	// as a verify-only previous key for links minted under it.
+	rt.Tracking = coretracking.NewSigner(cfg.Server.PublicURL,
+		crypto.DeriveKey(cfg.Database.Crypto.EncryptionKey, crypto.KeyTracking),
+		crypto.DeriveKey(cfg.Auth.JWTSecret, crypto.KeyTracking))
 	if !rt.Tracking.Enabled() {
 		log.Warn("tracking: disabled, set server.public_url to enable open/click tracking and hosted unsubscribe pages")
 	}

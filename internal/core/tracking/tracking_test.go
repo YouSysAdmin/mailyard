@@ -271,3 +271,31 @@ func TestLinkHashIsScoped(t *testing.T) {
 		t.Error("the same URL in one scope hashed differently")
 	}
 }
+
+// A link minted under a previous key is still honoured, and a signer
+// without that key refuses it.
+func TestAPreviousKeyStillVerifies(t *testing.T) {
+	old := NewSigner("https://m.example.com", "old-secret-old-secret-old-secret")
+	moved := NewSigner("https://m.example.com", "new-secret-new-secret-new-secret", "old-secret-old-secret-old-secret")
+	stranger := NewSigner("https://m.example.com", "new-secret-new-secret-new-secret")
+
+	tok := strings.TrimPrefix(old.UnsubscribeURL("msg-1"), "https://m.example.com/tracking/unsubscribe/")
+	if id, err := moved.VerifyUnsubscribeToken(tok); err != nil || id != "msg-1" {
+		t.Errorf("moved signer refused the old token: %q, %v", id, err)
+	}
+
+	if _, err := stranger.VerifyUnsubscribeToken(tok); err == nil {
+		t.Error("a signer without the previous key accepted the old token")
+	}
+
+	sig := strings.TrimPrefix(old.OpenURL("msg-1"), "https://m.example.com/tracking/open/msg-1.gif?sig=")
+	if !moved.VerifyOpen("msg-1", sig) || stranger.VerifyOpen("msg-1", sig) {
+		t.Error("open signature under the previous key: moved must accept, stranger must refuse")
+	}
+
+	// New links are minted under the new key only.
+	fresh := strings.TrimPrefix(moved.UnsubscribeURL("msg-2"), "https://m.example.com/tracking/unsubscribe/")
+	if _, err := old.VerifyUnsubscribeToken(fresh); err == nil {
+		t.Error("the old signer accepted a token minted under the new key")
+	}
+}

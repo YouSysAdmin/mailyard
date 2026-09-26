@@ -31,13 +31,25 @@ const WebViewTTL = 90 * 24 * time.Hour
 type Signer struct {
 	baseURL string
 	key     []byte
+
+	// previous are keys that only verify, so links minted under an
+	// earlier key keep working after it stops signing.
+	previous [][]byte
 }
 
-// NewSigner builds a Signer.
-func NewSigner(baseURL, secret string) *Signer {
+// NewSigner builds a Signer. secret signs and verifies, each of
+// previous verifies only. An empty secret disables the signer whatever
+// previous holds, and an empty previous entry is skipped.
+func NewSigner(baseURL, secret string, previous ...string) *Signer {
 	s := &Signer{baseURL: strings.TrimRight(baseURL, "/")}
 	if secret != "" {
 		s.key = []byte(secret)
+	}
+
+	for _, p := range previous {
+		if p != "" && p != secret {
+			s.previous = append(s.previous, []byte(p))
+		}
 	}
 
 	return s
@@ -108,14 +120,14 @@ func (s *Signer) WebViewURL(emailID string) string {
 // messageID. The pixel is unauthenticated, so this is the only thing
 // standing between a stranger and a forged open.
 func (s *Signer) VerifyOpen(messageID, sig string) bool {
-	return hmac.Equal([]byte(sig), []byte(s.sign("open:"+messageID)))
+	return s.verify("open:"+messageID, sig)
 }
 
 // VerifyClick reports whether sig covers messageID and the link hash
 // together - the hash is in the signature so a redirect cannot be
 // repointed.
 func (s *Signer) VerifyClick(messageID, hash, sig string) bool {
-	return hmac.Equal([]byte(sig), []byte(s.sign("click:"+messageID+":"+hash)))
+	return s.verify("click:"+messageID+":"+hash, sig)
 }
 
 // VerifyUnsubscribeToken returns the campaign message id the token
@@ -166,7 +178,28 @@ func (s *Signer) VerifyWebViewToken(tok string) (string, error) {
 
 // sign returns a short URL-safe MAC over payload.
 func (s *Signer) sign(payload string) string {
-	mac := hmac.New(sha256.New, s.key)
+	return signWith(s.key, payload)
+}
+
+// verify reports whether sig is a MAC over payload under the signing
+// key or any previous one. Every key is tried in constant time each.
+func (s *Signer) verify(payload, sig string) bool {
+	if len(s.key) == 0 {
+		return false
+	}
+
+	ok := hmac.Equal([]byte(sig), []byte(signWith(s.key, payload)))
+	for _, k := range s.previous {
+		if hmac.Equal([]byte(sig), []byte(signWith(k, payload))) {
+			ok = true
+		}
+	}
+
+	return ok
+}
+
+func signWith(key []byte, payload string) string {
+	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(payload))
 
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)[:16])
@@ -190,7 +223,7 @@ func (s *Signer) open(tok string) (string, error) {
 		return "", errors.New("invalid token encoding")
 	}
 
-	if !hmac.Equal([]byte(sig), []byte(s.sign(string(payload)))) {
+	if !s.verify(string(payload), sig) {
 		return "", errors.New("invalid token signature")
 	}
 
