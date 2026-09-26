@@ -26,6 +26,10 @@ import (
 // endpoint is unauthenticated and must not be a mail cannon.
 const maxVerifyMailsPerHour = 3
 
+// maxVerifyMailsPerHourPerAccount is the ceiling over every address,
+// for the reason on maxResetsPerHourPerAccount.
+const maxVerifyMailsPerHourPerAccount = 15
+
 // sendVerificationMail mints a token and mails the confirm link.
 // Shared by Register and VerifyEmailResend so the two cannot drift on
 // TTL or link shape.
@@ -171,12 +175,13 @@ func (h *Handler) VerifyEmailResend(c fiber.Ctx) error {
 	}
 
 	now := time.Now().UTC()
-	recent, err := h.Runtime.Store.SignupVerify.CountRecentForUser(c.Context(), u.ID, now.Add(-time.Hour))
+	throttled, err := h.mailBudgetSpent(c, u.ID, now, maxVerifyMailsPerHour, maxVerifyMailsPerHourPerAccount,
+		h.Runtime.Store.SignupVerify.CountRecentForUserFromIP, h.Runtime.Store.SignupVerify.CountRecentForUser)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if recent >= maxVerifyMailsPerHour {
+	if throttled {
 		slog.Warn("auth: verification resend throttled", "user_id", u.ID, "client_ip", clientip.From(c))
 
 		return accepted()

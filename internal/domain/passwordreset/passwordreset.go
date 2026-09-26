@@ -101,6 +101,16 @@ func (s *Store) CountRecentForUser(ctx context.Context, userID string, since tim
 	return n, err
 }
 
+// CountRecentForUserFromIP counts the requests one address made for
+// the account since a moment, which is the budget a stranger spends.
+func (s *Store) CountRecentForUserFromIP(ctx context.Context, userID, ip string, since time.Time) (int, error) {
+	var n int
+	err := s.QueryRow(ctx, `SELECT COUNT(*) FROM password_resets WHERE user_id = ? AND request_ip = ? AND created_at >= ?`,
+		userID, ip, since).Scan(&n)
+
+	return n, err
+}
+
 // DeleteExpired purges spent and stale rows. Called by the retention
 // job.
 func (s *Store) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {

@@ -3,6 +3,7 @@
 package auth
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 	"time"
@@ -25,6 +26,11 @@ import (
 // Without it, anyone who knows an operator's address can flood that
 // mailbox from an unauthenticated endpoint.
 const maxResetsPerHour = 3
+
+// maxResetsPerHourPerAccount is the ceiling over every address at
+// once: the per-address budget is what a stranger spends, this bounds
+// the mail the owner receives.
+const maxResetsPerHourPerAccount = 15
 
 // PasswordResetRequest mails a single-use reset link.
 //
@@ -71,12 +77,13 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 	}
 
 	now := time.Now().UTC()
-	recent, err := h.Runtime.Store.PasswordReset.CountRecentForUser(c.Context(), u.ID, now.Add(-time.Hour))
+	throttled, err := h.mailBudgetSpent(c, u.ID, now, maxResetsPerHour, maxResetsPerHourPerAccount,
+		h.Runtime.Store.PasswordReset.CountRecentForUserFromIP, h.Runtime.Store.PasswordReset.CountRecentForUser)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if recent >= maxResetsPerHour {
+	if throttled {
 		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", clientip.From(c))
 
 		return accepted()
@@ -307,4 +314,29 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 	return response.Success(c, MessageResponse{
 		Message: "Password updated. Other sessions have been signed out.",
 	})
+}
+
+// mailBudgetSpent decides whether one more link may be mailed for the
+// account: the calling address has its own budget, and the account a
+// larger one over all addresses.
+func (h *Handler) mailBudgetSpent(c fiber.Ctx, userID string, now time.Time, perIP, perAccount int,
+	countFromIP func(context.Context, string, string, time.Time) (int, error),
+	countAll func(context.Context, string, time.Time) (int, error),
+) (bool, error) {
+	since := now.Add(-time.Hour)
+	fromIP, err := countFromIP(c.Context(), userID, clientip.From(c), since)
+	if err != nil {
+		return false, err
+	}
+
+	if fromIP >= perIP {
+		return true, nil
+	}
+
+	all, err := countAll(c.Context(), userID, since)
+	if err != nil {
+		return false, err
+	}
+
+	return all >= perAccount, nil
 }
