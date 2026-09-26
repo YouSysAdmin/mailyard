@@ -502,7 +502,8 @@ func (h *Handler) PasskeyLoginFinish(c fiber.Ctx) error {
 			return nil, err
 		}
 
-		if u == nil || u.Disabled {
+		// The same admission password sign-in makes.
+		if u == nil || u.Disabled || !u.EmailVerified {
 			return nil, fmt.Errorf("account unavailable")
 		}
 
