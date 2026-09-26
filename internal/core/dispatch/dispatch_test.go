@@ -171,3 +171,54 @@ func TestFilterMatching(t *testing.T) {
 		}
 	}
 }
+
+// A project holds at most maxPerProject slots, so another project's
+// delivery goes through while this one's endpoint hangs.
+func TestATarpitProjectDoesNotStallTheOthers(t *testing.T) {
+	release := make(chan struct{})
+	tarpit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer tarpit.Close()
+	defer close(release)
+
+	delivered := make(chan struct{}, 16)
+	healthy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		delivered <- struct{}{}
+	}))
+	defer healthy.Close()
+
+	// A sink whose List answers by project, so the two projects hold
+	// different hooks.
+	sink := &projectSink{hooks: map[string][]*whmodel.Webhook{
+		"slow": {{ID: "36e3a1c2-0a5b-4b0a-9d1e-6f1e0c9b3a11", ProjectID: "slow", URL: tarpit.URL, Secret: "s", Events: []string{whmodel.EventEmailSent}}},
+		"fast": {{ID: "7a9f0d21-2b4c-4c1d-8e2f-1a2b3c4d5e66", ProjectID: "fast", URL: healthy.URL, Secret: "s", Events: []string{whmodel.EventEmailSent}}},
+	}}
+	d := New(sink, Config{
+		Timeout: 30 * time.Second, MaxAttempts: 1, RetryDelay: time.Millisecond, AllowPrivateTargets: true,
+	}, slog.New(slog.DiscardHandler))
+
+	// More tarpit deliveries than the global slot count.
+	for range maxConcurrent + 2 {
+		d.Emit(t.Context(), "slow", whmodel.EventEmailSent, "a@b.co", map[string]any{})
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	d.Emit(t.Context(), "fast", whmodel.EventEmailSent, "a@b.co", map[string]any{})
+	select {
+	case <-delivered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the healthy project's delivery waited behind the tarpit")
+	}
+}
+
+type projectSink struct {
+	memSink
+	hooks map[string][]*whmodel.Webhook
+}
+
+func (s *projectSink) List(_ context.Context, projID string) ([]*whmodel.Webhook, error) {
+	return s.hooks[projID], nil
+}

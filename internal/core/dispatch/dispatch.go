@@ -38,6 +38,14 @@ import (
 // maxConcurrent bounds parallel deliveries across all webhooks.
 const maxConcurrent = 8
 
+// maxPerProject bounds how many of those slots one project may hold
+// at once, so one stalled endpoint cannot hold every slot.
+const maxPerProject = 2
+
+// maxPending bounds deliveries waiting for a slot, per project. Past
+// it an event is dropped with a logged warning.
+const maxPending = 256
+
 // Sink is the persistence the dispatcher needs, implemented by the
 // webhook domain store.
 type Sink interface {
@@ -82,6 +90,11 @@ type Dispatcher struct {
 	// see zero or observes closed and refuses.
 	mu     sync.Mutex
 	closed bool
+
+	// pending counts deliveries spawned and not yet finished, and
+	// slots the ones holding a delivery slot, both per project.
+	pending map[string]int
+	slots   map[string]chan struct{}
 }
 
 // New builds a Dispatcher over sink. Deliveries run on their own
@@ -95,6 +108,9 @@ func New(sink Sink, cfg Config, log *slog.Logger) *Dispatcher {
 		client: safedial.Client(cfg.Timeout, cfg.AllowPrivateTargets),
 		sem:    make(chan struct{}, maxConcurrent),
 		quit:   make(chan struct{}),
+
+		pending: map[string]int{},
+		slots:   map[string]chan struct{}{},
 	}
 }
 
@@ -139,8 +155,67 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 			continue
 		}
 
-		d.wg.Go(func() { d.deliver(h, event, body) })
+		if d.pending[projID] >= maxPending {
+			d.log.Warn("dispatch: too many deliveries waiting for this project, event dropped",
+				"event", event, "project_id", projID, "webhook_id", h.ID, "pending", d.pending[projID])
+
+			continue
+		}
+
+		d.pending[projID]++
+		d.wg.Go(func() {
+			defer d.finished(projID)
+			d.deliver(h, event, body)
+		})
 	}
+}
+
+// finished releases the pending count one delivery held.
+func (d *Dispatcher) finished(projID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.pending[projID]--
+	if d.pending[projID] <= 0 {
+		delete(d.pending, projID)
+	}
+}
+
+// slot is the project's own bound on concurrent deliveries, made on
+// first use and never removed.
+func (d *Dispatcher) slot(projID string) chan struct{} {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	s, ok := d.slots[projID]
+	if !ok {
+		s = make(chan struct{}, maxPerProject)
+		d.slots[projID] = s
+	}
+
+	return s
+}
+
+// acquire takes the project's slot and then a global one, or reports
+// false when the dispatcher quit first.
+func (d *Dispatcher) acquire(projID string) (release func(), ok bool) {
+	own := d.slot(projID)
+	select {
+	case own <- struct{}{}:
+	case <-d.quit:
+		return nil, false
+	}
+
+	select {
+	case d.sem <- struct{}{}:
+	case <-d.quit:
+		<-own
+
+		return nil, false
+	}
+
+	return func() {
+		<-d.sem
+		<-own
+	}, true
 }
 
 // Close waits for in-flight deliveries - retries included - bounded by
@@ -172,17 +247,27 @@ func (d *Dispatcher) Close(timeout time.Duration) {
 
 // deliver POSTs with retries, recording every attempt. Uses a
 // background context: the originating request is long gone.
+//
+// A slot is held for one attempt at a time and released across the
+// retry sleep.
 func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 	// wg.Go owns the Done, so a panic here still releases the waiter
 	// Close is blocked on.
 	defer safego.Recover(d.log, "dispatch: deliver", "webhook_id", h.ID, "event", event)
-	d.sem <- struct{}{}
-	defer func() { <-d.sem }()
 
 	ctx := context.Background()
 	var lastFailure string
 	for attempt := 1; attempt <= d.cfg.MaxAttempts; attempt++ {
+		release, ok := d.acquire(h.ProjectID)
+		if !ok {
+			d.log.Warn("dispatch: shutting down, abandoning delivery",
+				"webhook_id", h.ID, "event", event, "attempt", attempt)
+
+			return
+		}
+
 		status, err := d.post(ctx, h, event, body)
+		release()
 		del := &whmodel.Delivery{
 			WebhookID:  h.ID,
 			ProjectID:  h.ProjectID,
