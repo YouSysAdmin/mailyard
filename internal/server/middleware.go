@@ -167,14 +167,17 @@ func requireProjectCreation(rt *env.Runtime) fiber.Handler {
 	}
 }
 
-// extractToken pulls the session token from the cookie first, then
-// falls back to a Bearer header for CLI / curl callers.
+// extractToken pulls the session token from a Bearer header when one
+// is present, and from the cookie otherwise. The bearer wins because
+// refuseCrossSite exempts any request carrying Authorization: a
+// request that names a bearer is judged on the bearer, never on the
+// ambient cookie.
 func extractToken(c fiber.Ctx) string {
-	if v := c.Cookies(authdomain.SessionCookie); v != "" {
+	if v := bearerToken(c); v != "" {
 		return v
 	}
 
-	return bearerToken(c)
+	return c.Cookies(authdomain.SessionCookie)
 }
 
 // requirePageAuth is requireAuth for a browser-facing page rather

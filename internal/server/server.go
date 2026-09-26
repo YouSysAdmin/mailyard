@@ -194,7 +194,8 @@ func New(opts Options) (*Server, error) {
 
 	// script-src is built once, from the hashes of whatever inline scripts
 	// the embedded documentation actually contains.
-	app.Use(securityHeaders(scriptSrcFor(docsite.FS())))
+	app.Use(securityHeaders(scriptSrcFor(docsite.FS()),
+		strings.HasPrefix(strings.ToLower(opts.Runtime.Config.Server.PublicURL), "https://")))
 	app.Use(cachePolicy)
 	app.Use(skipPaths(
 		// redactURLs first: the paths whose URL is itself a credential
@@ -484,7 +485,7 @@ func cachePolicy(c fiber.Ctx) error {
 //
 // Fonts are bundled and served from this origin. 'unsafe-eval' is off,
 // so bundling that needs it has to opt in deliberately.
-func securityHeaders(scriptSrc string) fiber.Handler {
+func securityHeaders(scriptSrc string, publicHTTPS bool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// HSTS, but only on a connection that really arrived over TLS.
 		// Without it a browser has nothing telling it to refuse the
@@ -507,7 +508,12 @@ func securityHeaders(scriptSrc string) fiber.Handler {
 		// No preload and no includeSubDomains. Both are promises about
 		// hostnames this process does not own, and preload is hard to
 		// undo.
-		if c.Scheme() == "https" {
+		//
+		// OR an https public_url, the same predicate the Secure cookie
+		// uses: behind a TLS-terminating proxy c.Scheme() is "http"
+		// until server.trusted_proxies names the proxy. A browser
+		// ignores the header over plain HTTP.
+		if c.Scheme() == "https" || publicHTTPS {
 			c.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 
@@ -529,6 +535,10 @@ func securityHeaders(scriptSrc string) fiber.Handler {
 		c.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 		c.Set("Content-Security-Policy",
 			"default-src 'self'; "+
+				// Stated rather than inherited from default-src: 'self'
+				// would let an attachment download be re-served as an
+				// <object>.
+				"object-src 'none'; "+
 				"script-src "+scriptSrc+"; "+
 				"style-src 'self' 'unsafe-inline'; "+
 
