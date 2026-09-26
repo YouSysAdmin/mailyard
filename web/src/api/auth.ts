@@ -48,7 +48,7 @@ export const authApi = {
       { email, password },
     ),
   // Redeeming the emailed link also signs the account in.
-  verifyEmail: (token: string) => appApi.post<{ user: User }>('/auth/verify-email', { token }),
+  verifyEmail: (token: string) => appApi.post<{ message: string }>('/auth/verify-email', { token }),
   verifyEmailResend: (email: string) =>
     appApi.post<{ message: string }>('/auth/verify-email/resend', { email }),
   totpSetup: () => appApi.post<{ secret: string; otpauth_url: string }>('/auth/2fa/setup'),

@@ -928,6 +928,11 @@ tbody tr:hover td {
   color: var(--warning-fg);
   border: 1px solid color-mix(in srgb, var(--warning-500) 25%, transparent);
 }
+.alert-success {
+  background: color-mix(in srgb, var(--success-500) 10%, transparent);
+  color: var(--success-fg);
+  border: 1px solid color-mix(in srgb, var(--success-500) 25%, transparent);
+}
 /* A form's own submit button, full width. */
 .btn-block {
   width: 100%;

@@ -58,9 +58,11 @@ func (h *Handler) sendVerificationMail(ctx context.Context, u *usermodel.User, c
 	return nil
 }
 
-// VerifyEmailConfirm redeems a verification token, marks the account
-// verified, and signs it in - clicking the link proves the mailbox,
-// which is a stronger claim than the password typed minutes earlier.
+// VerifyEmailConfirm redeems a verification token and marks the
+// account verified. It does not sign the account in: the link proves
+// the mailbox, and the password on the row was typed by whoever
+// registered the address, so the password is proved at sign-in - the
+// same split the OIDC path makes.
 func (h *Handler) VerifyEmailConfirm(c fiber.Ctx) error {
 	if !h.Runtime.Config.Auth.Local.Enabled {
 		return response.BadRequest(c, "local login is disabled")
@@ -128,15 +130,7 @@ func (h *Handler) VerifyEmailConfirm(c fiber.Ctx) error {
 		Status:     fiber.StatusOK,
 	})
 
-	if err := h.startSession(c, u, ""); err != nil {
-		return response.Internal(c, err)
-	}
-
-	if err := h.Runtime.Store.User.TouchLastLogin(c.Context(), u.Email); err != nil {
-		slog.Warn("auth: touch last login failed", "user_id", u.ID, "err", err)
-	}
-
-	return response.Success(c, UserResponse{User: u})
+	return response.Success(c, MessageResponse{Message: "your email address is confirmed, sign in to continue"})
 }
 
 // VerifyEmailResend mails a fresh verification link.
