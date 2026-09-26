@@ -24,6 +24,7 @@ import (
 	"io"
 	"strings"
 	texttmpl "text/template"
+	"text/template/parse"
 
 	"github.com/vanng822/go-premailer/premailer"
 )
@@ -126,7 +127,17 @@ func plainTemplate(src string, data map[string]any, onMissing string) (string, e
 		return "", fmt.Errorf("template parse error: %w", err)
 	}
 
-	return execute(t, data)
+	trees := map[string]*parse.Tree{}
+	for _, tt := range t.Templates() {
+		trees[tt.Name()] = tt.Tree
+	}
+
+	funcs, err := plant(trees)
+	if err != nil {
+		return "", fmt.Errorf("template parse error: %w", err)
+	}
+
+	return execute(t.Funcs(funcs), data)
 }
 
 // escapingTemplate renders markup, with html/template's contextual
@@ -137,7 +148,17 @@ func escapingTemplate(src string, data map[string]any, onMissing string) (string
 		return "", fmt.Errorf("template parse error: %w", err)
 	}
 
-	return execute(t, data)
+	trees := map[string]*parse.Tree{}
+	for _, tt := range t.Templates() {
+		trees[tt.Name()] = tt.Tree
+	}
+
+	funcs, err := plant(trees)
+	if err != nil {
+		return "", fmt.Errorf("template parse error: %w", err)
+	}
+
+	return execute(t.Funcs(funcs), data)
 }
 
 // MaxOutputBytes bounds what one template may render to. Four times
@@ -173,7 +194,7 @@ func (w *limitWriter) Write(p []byte) (int, error) {
 func execute(t runnable, data map[string]any) (string, error) {
 	var out limitWriter
 	if err := t.Execute(&out, data); err != nil {
-		if errors.Is(err, ErrOutputTooLarge) {
+		if errors.Is(err, ErrOutputTooLarge) || errors.Is(err, ErrTooManyIterations) {
 			return "", err
 		}
 

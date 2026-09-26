@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalize(t *testing.T) {
@@ -156,5 +157,79 @@ func TestRenderRefusesUnboundedOutput(t *testing.T) {
 	out, err := r.Render(&Input{Subject: "hi {{.n}}", HTML: "<p>{{.n}}</p>"}, map[string]any{"n": "x"})
 	if err != nil || out.HTML != "<p>x</p>" {
 		t.Fatalf("plain render: %q %v", out, err)
+	}
+}
+
+// A range whose body writes nothing never meets the output cap, so
+// the iteration budget has to stop it. A literal integer range needs
+// no data at all and is the same case.
+func TestRenderRefusesUnboundedIteration(t *testing.T) {
+	wide := make([]any, 20000)
+	for i := range wide {
+		wide[i] = i
+	}
+
+	data := map[string]any{"a": wide}
+	r := &Renderer{}
+	for name, in := range map[string]*Input{
+		"nested text": {Subject: "s", Text: "{{range .a}}{{range $.a}}{{end}}{{end}}"},
+		"nested html": {Subject: "s", HTML: "{{range .a}}{{range $.a}}{{end}}{{end}}"},
+		"literal":     {Subject: "{{range 3000000}}{{end}}"},
+		"defined":     {Subject: `{{define "r"}}{{range $.a}}{{end}}{{end}}{{range .a}}{{template "r" $}}{{end}}`},
+	} {
+		start := time.Now()
+		_, err := r.Render(in, data)
+		if !errors.Is(err, ErrTooManyIterations) {
+			t.Errorf("%s: err = %v, want ErrTooManyIterations", name, err)
+		}
+
+		if took := time.Since(start); took > 5*time.Second {
+			t.Errorf("%s: refused only after %s", name, took)
+		}
+	}
+}
+
+// The planted counter must not change what an ordinary template
+// renders, including a defined template called from two escaping
+// contexts, which is the path where html/template copies nodes.
+func TestRenderCountsWithoutChangingOutput(t *testing.T) {
+	r := &Renderer{}
+	out, err := r.Render(&Input{
+		Subject: "{{range .xs}}{{.}}{{end}}",
+		HTML:    `{{define "n"}}{{range .xs}}{{.}}{{end}}{{end}}<p>{{template "n" .}}</p><a title="{{template "n" .}}">x</a>`,
+		Text:    "{{range .xs}}{{.}},{{else}}none{{end}}",
+	}, map[string]any{"xs": []any{1, 2, 3}})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	if out.Subject != "123" || out.HTML != `<p>123</p><a title="123">x</a>` || out.Text != "1,2,3," {
+		t.Errorf("subject=%q html=%q text=%q", out.Subject, out.HTML, out.Text)
+	}
+
+	out, err = r.Render(&Input{Subject: "{{range .xs}}{{.}}{{else}}none{{end}}"}, map[string]any{"xs": []any{}})
+	if err != nil || out.Subject != "none" {
+		t.Errorf("empty range: %q, %v", out.Subject, err)
+	}
+}
+
+// fmt allocates the padding before writing, so the verb is refused
+// at parse.
+func TestRenderRefusesWideFormats(t *testing.T) {
+	r := &Renderer{}
+	for _, src := range []string{
+		`{{printf "%999999999d" 1}}`,
+		`{{printf "%.999999999f" 1.0}}`,
+		`{{printf "%*d" 5 1}}`,
+		`{{if true}}{{printf "%-99999s" "x"}}{{end}}`,
+	} {
+		if _, err := r.Render(&Input{Subject: src}, nil); !errors.Is(err, ErrFormatWidth) {
+			t.Errorf("%s: err = %v, want ErrFormatWidth", src, err)
+		}
+	}
+
+	out, err := r.Render(&Input{Subject: `{{printf "%05d|%8.2f" 42 3.14159}}`}, nil)
+	if err != nil || out.Subject != "00042|    3.14" {
+		t.Errorf("ordinary printf: %q, %v", out.Subject, err)
 	}
 }
