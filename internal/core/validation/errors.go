@@ -110,6 +110,8 @@ func defaultMessage(fe validator.FieldError) string {
 		return field + " must be a valid email"
 	case "ipcidr":
 		return field + " must be an IP address or CIDR block"
+	case "ip":
+		return field + " must be an IP address"
 	case "alpha":
 		return field + " must be letters only"
 	case "certname":

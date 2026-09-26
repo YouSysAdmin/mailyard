@@ -51,7 +51,7 @@ type registerInput struct {
 type heartbeatInput struct {
 	NodeID  string `json:"node_id" validate:"required"`
 	Token   string `json:"token" validate:"required"`
-	Version string `json:"version" normalize:"trim"`
+	Version string `json:"version" validate:"omitempty,max=64" normalize:"trim"`
 	// InboundDomainsETag is the fingerprint of the accept list this
 	// node already holds. Sending it back is what keeps the list off
 	// the wire on the heartbeats where nothing changed, which is
@@ -80,8 +80,8 @@ type inboundInput struct {
 	// ClientIP and HELO are what the NODE saw. They cannot be
 	// recovered from the bytes, and SPF is computed from them - see
 	// Inbound for what that means about trusting a node.
-	ClientIP string `json:"client_ip" normalize:"trim"`
-	HELO     string `json:"helo" normalize:"trim"`
+	ClientIP string `json:"client_ip" validate:"omitempty,ip" normalize:"trim"`
+	HELO     string `json:"helo" validate:"omitempty,max=253" normalize:"trim"`
 	// RawB64 is the message exactly as the node received it. Base64
 	// because this rides the same JSON control channel as everything
 	// else a node says, and a second transport for one endpoint would

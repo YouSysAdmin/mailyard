@@ -62,8 +62,11 @@ func (w *WorkerIdentity) WorkerTLS(ctx context.Context, host string) (*tls.Confi
 		// authority's record. A removed node keeps a leaf that verifies
 		// for up to 90 days, and this is what makes removal mean
 		// something before then - see Authority.Issued.
-		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-			if len(rawCerts) == 0 || !issued[sha256.Sum256(rawCerts[0])] {
+		//
+		// VerifyConnection, not VerifyPeerCertificate: the latter is
+		// skipped on a resumed session.
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			if len(cs.PeerCertificates) == 0 || !issued[sha256.Sum256(cs.PeerCertificates[0].Raw)] {
 				return errors.New("relay node certificate is not on the authority's record - the node was removed")
 			}
 
