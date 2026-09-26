@@ -905,26 +905,26 @@ func runServe(cmd *cobra.Command, r role) error {
 	case s := <-sigCh:
 		log.Info("shutdown requested", "signal", s.String())
 
-		// Order matters: listeners, then the campaign runner, then the
-		// queue worker, then the dispatcher - all before the HTTP
-		// server and the deferred db.Close.
+		// Order: stop the scheduling, end the event streams (or the
+		// drain runs to its full timeout on every open console tab),
+		// drain the requests, then stop the SMTP listeners, the runner,
+		// the worker and the jobs, and only then close the consumers
+		// they all write into - a closed recorder drops what handlers
+		// still record. db.Close is deferred and runs last.
 		//
 		// stopWorker runs here and not only in the defer, which cannot
 		// fire until this function returns - and it is about to block
 		// on shutdown, so scheduled jobs kept firing for the whole
 		// drain.
 		stopWorker(fmt.Errorf("signal %s", s))
+		rt.Events.Close()
+		shutdownErr := srv.Shutdown(shutdownTimeout)
 		stopSMTPListeners(10 * time.Second)
 		runner.Stop(10 * time.Second)
 		worker.Stop(30 * time.Second)
+		rt.Cron.Wait(30 * time.Second)
 		dispatcher.Close(10 * time.Second)
 		rt.Audit.Close(5 * time.Second)
-
-		// Ends every open SSE stream. Without this the streams keep
-		// their connections active and the server wait below runs to
-		// its full timeout on every shutdown that had a console tab
-		// attached.
-		rt.Events.Close()
 
 		// Logged rather than returned: a scrape must not decide the
 		// exit status of a clean shutdown.
@@ -932,24 +932,27 @@ func runServe(cmd *cobra.Command, r role) error {
 			log.Warn("metrics shutdown", "err", err)
 		}
 
-		return srv.Shutdown(shutdownTimeout)
+		return shutdownErr
 	case err := <-errCh:
 		stopWorker(fmt.Errorf("listener failed: %w", err))
-		stopSMTPListeners(5 * time.Second)
-		runner.Stop(5 * time.Second)
-		worker.Stop(5 * time.Second)
-		dispatcher.Close(5 * time.Second)
-		rt.Audit.Close(5 * time.Second)
+		rt.Events.Close()
 
 		// One listener failing takes the OTHER down with it, rather than
 		// leaving a survivor serving under a config just reported
 		// broken. Both are no-ops on the one that already stopped.
-		if merr := metricsSrv.Shutdown(5 * time.Second); merr != nil {
-			log.Warn("metrics shutdown", "err", merr)
-		}
-
+		// Same order as the clean path.
 		if serr := srv.Shutdown(5 * time.Second); serr != nil {
 			log.Warn("server shutdown", "err", serr)
+		}
+
+		stopSMTPListeners(5 * time.Second)
+		runner.Stop(5 * time.Second)
+		worker.Stop(5 * time.Second)
+		rt.Cron.Wait(5 * time.Second)
+		dispatcher.Close(5 * time.Second)
+		rt.Audit.Close(5 * time.Second)
+		if merr := metricsSrv.Shutdown(5 * time.Second); merr != nil {
+			log.Warn("metrics shutdown", "err", merr)
 		}
 
 		return err

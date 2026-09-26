@@ -120,6 +120,9 @@ type Manager struct {
 
 	stopped chan struct{}
 	once    sync.Once
+
+	// running counts jobs in flight, so shutdown can wait for them.
+	running sync.WaitGroup
 }
 
 // New builds an empty manager.
@@ -190,7 +193,7 @@ func (m *Manager) runDue(ctx context.Context) {
 	for _, st := range due {
 		// The return value is for RunNow. Here the outcome is already
 		// logged and recorded on the job state by execute itself.
-		go func() { _ = m.execute(ctx, st) }()
+		m.running.Go(func() { _ = m.execute(ctx, st) })
 	}
 }
 
@@ -285,10 +288,25 @@ func (m *Manager) Statuses() []Status {
 	return out
 }
 
-// Wait blocks until the scheduler loop has exited.
+// Wait blocks until the scheduler loop has exited and every job in
+// flight has returned, bounded by timeout. A job cut mid-sweep can
+// leave rows naming blobs that are gone.
 func (m *Manager) Wait(timeout time.Duration) {
+	deadline := time.After(timeout)
 	select {
 	case <-m.stopped:
-	case <-time.After(timeout):
+	case <-deadline:
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		m.running.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-deadline:
+		m.log.Warn("cron: jobs still running at shutdown, not waiting any longer")
 	}
 }
