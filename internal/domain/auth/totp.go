@@ -35,12 +35,18 @@ import (
 // account, so a stolen admin session cannot use it to strip its own
 // second factor.
 //
-// Disabling is gated by a CODE, which proves possession, and that is the
-// half where proof matters.
+// Disabling is gated by a CODE, which proves possession. Enrolling is
+// gated by the PASSWORD, as passkey enrolment is, so a hijacked
+// session cannot enrol a factor the owner does not hold.
 func (h *Handler) TOTPSetup(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc == nil || rc.User == nil {
 		return response.Unauthorized(c, "not authenticated")
+	}
+
+	in, resp, ok := validation.Bind[totpSetupInput](c)
+	if !ok {
+		return resp
 	}
 
 	u, err := h.Runtime.Store.User.GetByID(c.Context(), rc.User.ID)
@@ -66,6 +72,15 @@ func (h *Handler) TOTPSetup(c fiber.Ctx) error {
 
 	if u.TOTPEnabled {
 		return response.Conflict(c, "two-factor auth is already enabled, disable it first")
+	}
+
+	if !h.reauthenticated(c.Context(), u, in.Password) {
+		h.Runtime.Audit.Security(c, &amodel.Event{
+			Type: amodel.TypeLoginFailed, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusForbidden,
+			Detail: "wrong password confirming two-factor enrolment",
+		})
+
+		return response.Forbidden(c, "wrong password")
 	}
 
 	key, err := totp.Generate(totp.GenerateOpts{

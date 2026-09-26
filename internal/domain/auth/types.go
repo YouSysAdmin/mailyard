@@ -95,6 +95,12 @@ type totpCodeInput struct {
 	Code string `json:"code" validate:"required,len=6,numeric"`
 }
 
+// totpSetupInput proves the password before a second factor is
+// enrolled, the way passkey enrolment does.
+type totpSetupInput struct {
+	Password string `json:"password" validate:"required,min=1,max=256" normalize:"trim"`
+}
+
 // ----------------------------------------------------------------------------
 // Responses
 // ----------------------------------------------------------------------------

@@ -232,7 +232,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	appAPI.Post("/auth/passkeys/register/finish", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRegisterFinish)
 	appAPI.Patch("/auth/passkeys/:id", requireAuth(rt), maintenanceMode(rt), ah.PasskeyRename)
 	appAPI.Post("/auth/passkeys/:id/delete", requireAuth(rt), maintenanceMode(rt), reauthLimiter, ah.PasskeyDelete)
-	appAPI.Post("/auth/2fa/setup", requireAuth(rt), maintenanceMode(rt), ah.TOTPSetup)
+	appAPI.Post("/auth/2fa/setup", requireAuth(rt), maintenanceMode(rt), reauthLimiter, ah.TOTPSetup)
 	appAPI.Post("/auth/2fa/enable", requireAuth(rt), maintenanceMode(rt), ah.TOTPEnable)
 	appAPI.Post("/auth/2fa/disable", requireAuth(rt), maintenanceMode(rt), ah.TOTPDisable)
 	appAPI.Get("/auth/2fa/recovery-codes", requireAuth(rt), ah.RecoveryCodesStatus)

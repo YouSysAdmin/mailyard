@@ -54,7 +54,8 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/auth/2fa/setup",
 			Tag:         "auth",
 			Summary:     "T o t p setup",
-			Description: "Any signed-in member.",
+			Description: "Any signed-in member, proving the password.",
+			Request:     totpSetupInput{},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", TOTPSetupResponse{})},
 		},
 		{

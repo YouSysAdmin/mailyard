@@ -51,7 +51,8 @@ export const authApi = {
   verifyEmail: (token: string) => appApi.post<{ message: string }>('/auth/verify-email', { token }),
   verifyEmailResend: (email: string) =>
     appApi.post<{ message: string }>('/auth/verify-email/resend', { email }),
-  totpSetup: () => appApi.post<{ secret: string; otpauth_url: string }>('/auth/2fa/setup'),
+  totpSetup: (password: string) =>
+    appApi.post<{ secret: string; otpauth_url: string }>('/auth/2fa/setup', { password }),
   changePassword: (currentPassword: string, password: string) =>
     appApi.post<{ message: string }>('/auth/password', {
       current_password: currentPassword,

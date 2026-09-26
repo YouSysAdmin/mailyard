@@ -36,6 +36,9 @@ const shownCodes = ref<string[] | null>(null)
 const regenerating = ref(false)
 const password = ref('')
 
+// Enrolling proves the password first, as passkey enrolment does.
+const setupPassword = ref('')
+
 async function loadRemaining() {
   if (!on.value) {
     remaining.value = null
@@ -82,9 +85,12 @@ async function refresh() {
 }
 
 async function start() {
+  if (!setupPassword.value) return
+
   busy.value = true
   try {
-    const res = await authApi.totpSetup()
+    const res = await authApi.totpSetup(setupPassword.value)
+    setupPassword.value = ''
     pending.value = {
       secret: res.data.secret,
       // Drawn in the browser: the otpauth URL carries the secret, so
@@ -229,10 +235,23 @@ function cancel() {
       <template v-else-if="!pending">
         <p class="note">
           A second step at sign-in: a six digit code from an authenticator app on your phone.
+          Confirm your password to begin.
         </p>
-        <button class="btn btn-primary" :disabled="busy" @click="start">
-          {{ busy ? 'Preparing...' : 'Set it up' }}
-        </button>
+        <form class="code-row" @submit.prevent="start">
+          <FormField label="Your password" for="totp-setup-password">
+            <input
+              id="totp-setup-password"
+              v-model="setupPassword"
+              class="form-input"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </FormField>
+          <button class="btn btn-primary" type="submit" :disabled="busy || !setupPassword">
+            {{ busy ? 'Preparing...' : 'Set it up' }}
+          </button>
+        </form>
       </template>
 
       <template v-else>
