@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -377,3 +378,118 @@ func TestAFailureRecordsNoDeliveringServer(t *testing.T) {
 		t.Errorf("a failed message recorded %q as its delivering server", via)
 	}
 }
+
+// A delivery still running when Stop's grace period is spent is cut
+// and requeued, not left in processing.
+func TestStopAbortsAnInFlightDelivery(t *testing.T) {
+	src := newMemSource(queuedEmail("slow"))
+	started := make(chan struct{})
+	proc := ctxProcessor(func(ctx context.Context, _ *emailmodel.Email) Outcome {
+		close(started)
+		<-ctx.Done()
+
+		return Retry(ctx.Err())
+	})
+
+	w := NewWorker(src, proc, testConfig(), slog.New(slog.DiscardHandler))
+	go w.Start(t.Context())
+	<-started
+
+	done := make(chan struct{})
+	go func() {
+		w.Stop(50 * time.Millisecond)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return after aborting the attempt")
+	}
+
+	if got := src.statusOf("slow"); got != emailmodel.StatusQueued {
+		t.Errorf("aborted row status = %q, want queued", got)
+	}
+}
+
+// An attempt has a deadline of its own. The processor sees it expire
+// and the row is requeued rather than held.
+func TestAnAttemptIsBoundedByTheAttemptTimeout(t *testing.T) {
+	src := newMemSource(queuedEmail("stalled"))
+	proc := ctxProcessor(func(ctx context.Context, _ *emailmodel.Email) Outcome {
+		<-ctx.Done()
+
+		return Retry(ctx.Err())
+	})
+
+	cfg := testConfig()
+	cfg.AttemptTimeout = 20 * time.Millisecond
+	w := NewWorker(src, proc, cfg, slog.New(slog.DiscardHandler))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Start(ctx)
+	deadline := time.Now().Add(5 * time.Second)
+	for src.statusOf("stalled") != emailmodel.StatusQueued {
+		if time.Now().After(deadline) {
+			w.Stop(time.Second)
+			t.Fatal("stalled attempt was never cut")
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	w.Stop(time.Second)
+}
+
+// The poll claims only what an idle goroutine can start now. Four
+// goroutines and twenty due rows: nothing is claimed beyond the first
+// four until one of them frees up.
+func TestThePollClaimsOnlyWhatCanStart(t *testing.T) {
+	var rows []*emailmodel.Email
+	for i := range 20 {
+		rows = append(rows, queuedEmail(string(rune('a'+i))))
+	}
+
+	src := newMemSource(rows...)
+	release := make(chan struct{})
+	var inFlight atomic.Int32
+	proc := funcProcessor(func(_ *emailmodel.Email) Outcome {
+		inFlight.Add(1)
+		<-release
+
+		return Done()
+	})
+
+	w := NewWorker(src, proc, testConfig(), slog.New(slog.DiscardHandler))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Start(ctx)
+	deadline := time.Now().Add(5 * time.Second)
+	for inFlight.Load() < 4 {
+		if time.Now().After(deadline) {
+			t.Fatal("pool never filled")
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	src.mu.Lock()
+	processing := 0
+	for _, r := range src.rows {
+		if r.Status == emailmodel.StatusProcessing {
+			processing++
+		}
+	}
+
+	src.mu.Unlock()
+	if processing != 4 {
+		t.Errorf("%d rows claimed with 4 goroutines, want 4", processing)
+	}
+
+	close(release)
+	w.Stop(time.Second)
+}
+
+type ctxProcessor func(ctx context.Context, job *emailmodel.Email) Outcome
+
+func (f ctxProcessor) Process(ctx context.Context, job *emailmodel.Email) Outcome { return f(ctx, job) }

@@ -50,8 +50,10 @@ fires meanwhile, and the poll loop remains the actual guarantee. A worker also r
 connects, so a backlog that built up while it was down drains on boot rather than on the next tick.
 
 **Crash recovery.** A worker that dies mid-send leaves its rows in `processing`. Any node that polls after
-`worker.claim_timeout` (default 5m) returns them to the queue. Keep that value comfortably above your slowest SMTP
-delivery, or a slow send is re-queued while it is still running.
+`worker.claim_timeout` (default 15m) returns them to the queue. One attempt is itself bounded by
+`worker.attempt_timeout` (default 10m), and a peer that goes quiet for two minutes is cut before that, so the claim
+timeout only has to sit above the attempt timeout, which the server checks at boot. Set them together if you raise
+either: a claim taken back while its attempt is still running is a message delivered twice.
 
 ## The emails table is partitioned
 

@@ -32,18 +32,16 @@ func openSMTP(spec Spec) (Transport, error) {
 	}}, nil
 }
 
-// Send takes no context, because smtpclient.Send has no hook for one -
-// net/smtp is synchronous with its own timeouts. Accepting one here and
-// ignoring it is honest about the interface and dishonest about this
-// implementation, so the parameter is named and dropped rather than
-// wrapped in a goroutine that would leak a connection on cancellation.
-func (t *smtpTransport) Send(_ context.Context, msg *smtpclient.Message) error {
-	return smtpclient.Send(t.cfg, msg)
+// Send bounds the conversation by ctx. net/smtp has no timeouts of
+// its own, so the deadline and the idle cut live on the connection -
+// see smtpclient.IdleTimeout.
+func (t *smtpTransport) Send(ctx context.Context, msg *smtpclient.Message) error {
+	return smtpclient.Send(ctx, t.cfg, msg)
 }
 
 // Test probes the configuration without sending mail.
-func (t *smtpTransport) Test(_ context.Context) error {
-	return smtpclient.TestConnection(t.cfg)
+func (t *smtpTransport) Test(ctx context.Context) error {
+	return smtpclient.TestConnection(ctx, t.cfg)
 }
 
 func smtpDescriptor() Descriptor {

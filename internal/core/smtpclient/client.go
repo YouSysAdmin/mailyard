@@ -8,6 +8,7 @@
 package smtpclient
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -129,8 +130,8 @@ func wrapSendError(stage, recipient string, err error) error {
 
 // TestConnection verifies that the server is reachable and, when
 // credentials are configured, that authentication succeeds.
-func TestConnection(cfg ServerConfig) error {
-	client, err := dial(cfg)
+func TestConnection(ctx context.Context, cfg ServerConfig) error {
+	client, err := dial(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -148,8 +149,10 @@ func TestConnection(cfg ServerConfig) error {
 
 // Send delivers msg through the server. Returns a *SendError for
 // stage failures so the caller can branch on Permanent().
-func Send(cfg ServerConfig, msg *Message) error {
-	client, err := dial(cfg)
+//
+// The conversation is bounded by ctx and by IdleTimeout - see bound.
+func Send(ctx context.Context, cfg ServerConfig, msg *Message) error {
+	client, err := dial(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -161,7 +164,7 @@ func Send(cfg ServerConfig, msg *Message) error {
 
 // dial opens the connection in the configured encryption mode and
 // returns a ready SMTP client.
-func dial(cfg ServerConfig) (*smtp.Client, error) {
+func dial(ctx context.Context, cfg ServerConfig) (*smtp.Client, error) {
 	tlsConfig := cfg.TLS
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{ServerName: cfg.Host}
@@ -176,8 +179,15 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 	dialer := safedial.Dialer(dialTimeout, !cfg.GuardPrivate)
 	switch cfg.Encryption {
 	case EncryptionSSL:
-		conn, err := tls.DialWithDialer(dialer, "tcp", cfg.addr(), tlsConfig)
+		raw, err := dialer.DialContext(ctx, "tcp", cfg.addr())
 		if err != nil {
+			return nil, fmt.Errorf("ssl dial failed: %w", err)
+		}
+
+		conn := tls.Client(bound(ctx, raw), tlsConfig)
+		if err := conn.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+
 			return nil, fmt.Errorf("ssl dial failed: %w", err)
 		}
 
@@ -190,7 +200,7 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 
 		return client, nil
 	case EncryptionSTARTTLS:
-		client, err := dialPlain(dialer, cfg)
+		client, err := dialPlain(ctx, dialer, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +213,7 @@ func dial(cfg ServerConfig) (*smtp.Client, error) {
 
 		return client, nil
 	default:
-		return dialPlain(dialer, cfg)
+		return dialPlain(ctx, dialer, cfg)
 	}
 }
 
@@ -214,12 +224,13 @@ const dialTimeout = 15 * time.Second
 
 // dialPlain opens the TCP connection with the bounded dialer and wraps
 // it in an SMTP client, which is what smtp.Dial does minus the bound.
-func dialPlain(dialer *net.Dialer, cfg ServerConfig) (*smtp.Client, error) {
-	conn, err := dialer.Dial("tcp", cfg.addr())
+func dialPlain(ctx context.Context, dialer *net.Dialer, cfg ServerConfig) (*smtp.Client, error) {
+	raw, err := dialer.DialContext(ctx, "tcp", cfg.addr())
 	if err != nil {
 		return nil, fmt.Errorf("smtp dial failed: %w", err)
 	}
 
+	conn := bound(ctx, raw)
 	client, err := smtp.NewClient(conn, cfg.Host)
 	if err != nil {
 		_ = conn.Close()

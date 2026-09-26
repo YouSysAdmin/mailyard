@@ -310,15 +310,12 @@ func dialDirect(ctx context.Context, cfg DirectConfig, host string) (*smtp.Clien
 
 func helloTo(ctx context.Context, cfg DirectConfig, host string) (*smtp.Client, error) {
 	addr := net.JoinHostPort(host, fmt.Sprint(cfg.port()))
-	conn, err := cfg.dial(ctx, addr)
+	raw, err := cfg.dial(ctx, addr)
 	if err != nil {
 		return nil, fmt.Errorf("dial %s: %w", addr, err)
 	}
 
-	if dl, ok := ctx.Deadline(); ok {
-		_ = conn.SetDeadline(dl)
-	}
-
+	conn := bound(ctx, raw)
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		_ = conn.Close()

@@ -408,6 +408,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		RetryBaseDelay: cfg.Worker.RetryBaseDelay,
 		RetryMaxDelay:  cfg.Worker.RetryMaxDelay,
 		ClaimTimeout:   cfg.Worker.ClaimTimeout,
+		AttemptTimeout: cfg.Worker.AttemptTimeout,
 	}, log)
 	worker.OnFinal = func(job *emailmodel.Email, status, errMsg string) {
 		metrics.EmailsFinalized.WithLabelValues(status).Inc()

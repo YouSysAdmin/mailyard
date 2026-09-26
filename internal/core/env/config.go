@@ -398,8 +398,13 @@ type WorkerConfig struct {
 	RetryMaxDelay  time.Duration `mapstructure:"retry_max_delay"`
 
 	// ClaimTimeout re-queues processing rows older than this (crash
-	// recovery). Keep it comfortably above the slowest SMTP delivery.
+	// recovery). Must be longer than AttemptTimeout, or a running
+	// attempt is requeued and sent twice.
 	ClaimTimeout time.Duration `mapstructure:"claim_timeout"`
+
+	// AttemptTimeout bounds one delivery attempt end to end, the
+	// failover walk included.
+	AttemptTimeout time.Duration `mapstructure:"attempt_timeout"`
 }
 
 // SendingConfig bounds what a single send may carry.
@@ -858,7 +863,8 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("worker.max_attempts", 5)
 	v.SetDefault("worker.retry_base_delay", "30s")
 	v.SetDefault("worker.retry_max_delay", "1h")
-	v.SetDefault("worker.claim_timeout", "5m")
+	v.SetDefault("worker.claim_timeout", "15m")
+	v.SetDefault("worker.attempt_timeout", "10m")
 	v.SetDefault("sending.max_recipients", 50)
 	v.SetDefault("sending.max_attachment_size", 10*1024*1024)
 	v.SetDefault("sending.max_total_attachment_size", 25*1024*1024)
@@ -1154,8 +1160,12 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Worker.PollInterval <= 0 || c.Worker.RetryBaseDelay <= 0 ||
-		c.Worker.RetryMaxDelay <= 0 || c.Worker.ClaimTimeout <= 0 {
-		return fmt.Errorf("worker durations (poll_interval, retry_base_delay, retry_max_delay, claim_timeout) must be positive")
+		c.Worker.RetryMaxDelay <= 0 || c.Worker.ClaimTimeout <= 0 || c.Worker.AttemptTimeout <= 0 {
+		return fmt.Errorf("worker durations (poll_interval, retry_base_delay, retry_max_delay, claim_timeout, attempt_timeout) must be positive")
+	}
+
+	if c.Worker.ClaimTimeout <= c.Worker.AttemptTimeout {
+		return fmt.Errorf("worker.claim_timeout must be longer than worker.attempt_timeout, or a running attempt is requeued and sent twice")
 	}
 
 	if c.Sending.MaxRecipients < 1 {

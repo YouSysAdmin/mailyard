@@ -25,6 +25,10 @@ type Config struct {
 	RetryBaseDelay time.Duration
 	RetryMaxDelay  time.Duration
 	ClaimTimeout   time.Duration
+
+	// AttemptTimeout bounds one delivery attempt end to end. Zero means
+	// unbounded, for tests. ClaimTimeout must sit above it.
+	AttemptTimeout time.Duration
 }
 
 // Worker drains the email queue: one poll loop feeding Concurrency
@@ -50,18 +54,32 @@ type Worker struct {
 	wg      sync.WaitGroup
 	once    sync.Once
 	started atomic.Bool
+
+	// idle counts pool goroutines waiting for a job, which is how many
+	// rows a poll may claim without one aging in the channel.
+	idle atomic.Int32
+
+	// abortCtx is cancelled by Stop once its grace period is spent,
+	// cutting every in-flight attempt so its outcome is written before
+	// the database closes.
+	abortCtx context.Context
+	abort    context.CancelFunc
 }
 
 // NewWorker builds a Worker.
 func NewWorker(src Source, proc Processor, cfg Config, log *slog.Logger) *Worker {
+	abortCtx, abort := context.WithCancel(context.Background())
+
 	return &Worker{
-		src:  src,
-		proc: proc,
-		cfg:  cfg,
-		log:  log,
-		wake: make(chan struct{}, 1),
-		jobs: make(chan *emailmodel.Email),
-		stop: make(chan struct{}),
+		src:      src,
+		proc:     proc,
+		cfg:      cfg,
+		abortCtx: abortCtx,
+		abort:    abort,
+		log:      log,
+		wake:     make(chan struct{}, 1),
+		jobs:     make(chan *emailmodel.Email),
+		stop:     make(chan struct{}),
 	}
 }
 
@@ -154,14 +172,28 @@ func (w *Worker) Stop(timeout time.Duration) {
 	select {
 	case <-done:
 		w.log.Info("queue: worker stopped")
+
+		return
 	case <-time.After(timeout):
+	}
+
+	// Grace period spent: cut the attempts and let the outcomes land.
+	w.log.Warn("queue: in-flight deliveries did not finish, aborting them")
+	w.abort()
+	select {
+	case <-done:
+		w.log.Info("queue: worker stopped after aborting in-flight deliveries")
+	case <-time.After(abortGrace):
 		w.log.Warn("queue: worker stop timed out, in-flight rows will be crash-recovered on next start")
 	}
 }
 
+// abortGrace is how long Stop waits for aborted attempts to record
+// their outcome.
+const abortGrace = 10 * time.Second
+
 // pollOnce recovers stuck rows, claims due work, and hands it to the
-// pool. Dispatch blocks when every worker is busy, which is exactly
-// the backpressure we want - the claim batch stays small.
+// pool. It claims only as many rows as there are goroutines waiting.
 func (w *Worker) pollOnce(ctx context.Context) {
 	now := time.Now().UTC()
 
@@ -171,7 +203,12 @@ func (w *Worker) pollOnce(ctx context.Context) {
 		w.log.Warn("queue: recovered stuck emails", "count", n)
 	}
 
-	claimed, err := w.src.ClaimDue(ctx, now, w.cfg.Concurrency*2)
+	free := int(w.idle.Load())
+	if free <= 0 {
+		return
+	}
+
+	claimed, err := w.src.ClaimDue(ctx, now, free)
 	if err != nil {
 		w.log.Error("queue: claim due", "err", err)
 
@@ -193,7 +230,14 @@ func (w *Worker) pollOnce(ctx context.Context) {
 
 // deliver is one pool goroutine: process a job, route the outcome.
 func (w *Worker) deliver(ctx context.Context) {
-	for job := range w.jobs {
+	for {
+		w.idle.Add(1)
+		job, ok := <-w.jobs
+		w.idle.Add(-1)
+		if !ok {
+			return
+		}
+
 		w.deliverOne(ctx, job)
 	}
 }
@@ -209,9 +253,22 @@ func (w *Worker) deliver(ctx context.Context) {
 // pool goroutine for good: nothing respawns it, so the pool silently
 // shrinks and, after Concurrency panics, delivery stops entirely with
 // the process still up and reporting healthy.
+//
+// The attempt runs under its own deadline and is cut when Stop
+// aborts. The outcome is written under ctx, so a cancelled attempt
+// is still requeued.
 func (w *Worker) deliverOne(ctx context.Context, job *emailmodel.Email) {
 	defer safego.Recover(w.log, "queue: finish", "email_id", job.ID, "project_id", job.ProjectID)
-	w.finish(ctx, job, w.process(ctx, job))
+
+	attempt, cancel := context.WithCancel(ctx)
+	if w.cfg.AttemptTimeout > 0 {
+		attempt, cancel = context.WithTimeout(ctx, w.cfg.AttemptTimeout)
+	}
+
+	defer cancel()
+	defer context.AfterFunc(w.abortCtx, cancel)()
+
+	w.finish(ctx, job, w.process(attempt, job))
 }
 
 // process runs the delivery leg, turning a panic into a permanent

@@ -2,6 +2,7 @@ package smtpclient
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"errors"
 	"net"
@@ -251,7 +252,7 @@ func TestSendPlainEndToEnd(t *testing.T) {
 
 	cfg := ServerConfig{Host: "127.0.0.1", Port: tcp.Port, Encryption: EncryptionNone}
 	msg := &Message{From: "s@example.com", To: []string{"r@example.com"}, Subject: "e2e", Text: "hello"}
-	if err := Send(cfg, msg); err != nil {
+	if err := Send(context.Background(), cfg, msg); err != nil {
 		t.Fatalf("send: %v", err)
 	}
 
