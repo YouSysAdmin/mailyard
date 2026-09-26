@@ -71,4 +71,3 @@ func TestEveryOpenConsolePostRequiresAJSONBody(t *testing.T) {
 		t.Fatal("found no appAPI.Post(\"/auth/login\") - the walk is not reaching the router")
 	}
 }
-
