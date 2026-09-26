@@ -48,8 +48,10 @@ Setting an individual value to `0` disables that limiter while leaving the other
 
 The login limiter is per client address. The account counts its own failures too: ten wrong passwords in a row lock
 sign-in for that account for fifteen minutes, whatever addresses they came from, and the answer during the lockout is the
-same `invalid credentials` a wrong password gets. A right password clears the count. Passkey and SSO sign-in are not
-subject to it - neither takes a password to guess.
+same `invalid credentials` a wrong password gets. The lock is held against the addresses that earned it: one that has
+not failed a password for the account is admitted to a single attempt, and a wrong one puts it under the lock too. That
+is what keeps a stranger who knows an administrator's address from locking the administrator out. A right password
+clears the count. Passkey and SSO sign-in are not subject to it - neither takes a password to guess.
 
 The last three are paced by other software rather than by a person at a keyboard, which is why they sit an order of
 magnitude higher. SNS retries hard and for hours, so throttling it loses bounces. A hundred nodes reporting every two

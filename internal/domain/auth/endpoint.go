@@ -6,11 +6,13 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
@@ -36,6 +38,11 @@ type Handler struct {
 
 	// providers memoizes the login page's provider list - see Info.
 	providers *memo.Value[[]LoginProvider]
+
+	// addressFailures remembers which addresses failed a password for
+	// which account inside the lockout window - see failedFrom.
+	addressFailures *iplimit.Limiter
+	addressOnce     sync.Once
 }
 
 // infoMemo is how long the provider list stands. Five seconds keeps
@@ -78,7 +85,14 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	// A locked account answers like a wrong password, and BEFORE the
 	// password is looked at, so a right guess during the lockout learns
 	// nothing. The dummy verify keeps the timing of the other legs.
-	if h.loginLocked(c.Context(), u.ID) {
+	//
+	// The lock is held against the addresses that earned it: one that
+	// has not failed a password for this account is admitted to one
+	// attempt, and a wrong one puts it under the lock too. Keyed on
+	// the account alone it is a denial of service against any known
+	// address.
+	ip := clientip.From(c)
+	if h.loginLocked(c.Context(), u.ID) && h.failedFrom(u.ID, ip) {
 		_ = authenticator.VerifyDummyPassword(in.Password)
 		h.recordLoginFailure(c, u, in.Email, "account locked")
 
@@ -88,6 +102,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
 		h.recordLoginFailure(c, u, in.Email, "wrong password")
 		h.recordPasswordFailure(c.Context(), u.ID)
+		h.chargeAddress(u.ID, ip)
 
 		return response.Unauthorized(c, "invalid credentials")
 	}
@@ -335,6 +350,25 @@ func (h *Handler) recordPasswordFailure(ctx context.Context, userID string) {
 		slog.Warn("auth: account locked after repeated wrong passwords",
 			"user_id", userID, "failures", loginMaxFailures, "for", loginLockout)
 	}
+}
+
+// failedFrom reports whether ip has failed a password for the account
+// inside the lockout window. Per process, like every limiter here.
+func (h *Handler) failedFrom(userID, ip string) bool {
+	return h.perAddress().Exceeded(userID + "|" + ip)
+}
+
+// chargeAddress records one wrong password from ip for the account.
+func (h *Handler) chargeAddress(userID, ip string) {
+	h.perAddress().Allow(userID + "|" + ip)
+}
+
+// perAddress is the address memory, built on first use because the
+// handler is a literal.
+func (h *Handler) perAddress() *iplimit.Limiter {
+	h.addressOnce.Do(func() { h.addressFailures = iplimit.New(1, loginLockout) })
+
+	return h.addressFailures
 }
 
 // reauthenticated confirms the signed-in caller's password for a
