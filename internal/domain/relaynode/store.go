@@ -308,7 +308,7 @@ func (s *Store) DeleteAssignment(ctx context.Context, nodeID, emailID string) (b
 // bytes - the caller requeues the email rows and deletes these.
 func (s *Store) ExpiredAssignments(ctx context.Context, now time.Time, limit int) ([]*nodemodel.Assignment, error) {
 	rows, err := s.Query(ctx, `
-		SELECT email_id, node_id, server_id, email_created_at
+		SELECT email_id, node_id, server_id, email_created_at, created_at
 		FROM relay_assignments
 		WHERE expires_at <= ?
 		ORDER BY expires_at ASC
@@ -321,7 +321,7 @@ func (s *Store) ExpiredAssignments(ctx context.Context, now time.Time, limit int
 	out := []*nodemodel.Assignment{}
 	for rows.Next() {
 		var a nodemodel.Assignment
-		if err := rows.Scan(&a.EmailID, &a.NodeID, &a.ServerID, &a.EmailCreatedAt); err != nil {
+		if err := rows.Scan(&a.EmailID, &a.NodeID, &a.ServerID, &a.EmailCreatedAt, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 

@@ -243,3 +243,56 @@ func TestClaimDueNeverHandsOneRowToTwoNodes(t *testing.T) {
 		t.Errorf("highest attempts is %d, want 1", maxAttempts)
 	}
 }
+
+// When the recovery sweep takes a row back mid-attempt and a peer
+// claims it, the first node's outcome carries the old claim and
+// matches nothing. The peer's own, under the new claim, lands.
+func TestAnOutcomeUnderAStaleClaimIsRefused(t *testing.T) {
+	s := newClaimStore(t)
+	peer := peerStore(t)
+	now := time.Now().UTC()
+	id := "b1f0d3f5-6d0c-4c34-9a67-3d3f2d2f7d11"
+	insertQueued(t, s, id, emailmodel.StatusQueued, now.Add(-time.Minute))
+
+	first, err := s.ClaimDue(t.Context(), now, 1)
+	if err != nil || len(first) != 1 {
+		t.Fatalf("first claim: %v, %d rows", err, len(first))
+	}
+
+	// The sweep, with a horizon in the future, treats the claim as
+	// abandoned and hands the row back to the queue.
+	if n, err := peer.RecoverStuck(t.Context(), now.Add(time.Hour)); err != nil || n != 1 {
+		t.Fatalf("recover: %v, %d rows", err, n)
+	}
+
+	second, err := peer.ClaimDue(t.Context(), now.Add(time.Second), 1)
+	if err != nil || len(second) != 1 {
+		t.Fatalf("second claim: %v, %d rows", err, len(second))
+	}
+
+	sent := now.Add(2 * time.Second)
+	ok, err := s.Finalize(t.Context(), id, first[0].CreatedAt, first[0].ClaimedAt, emailmodel.StatusSent, "", "", &sent)
+	if err != nil || ok {
+		t.Fatalf("stale finalize: ok=%v err=%v, want refused", ok, err)
+	}
+
+	ok, err = s.Requeue(t.Context(), id, first[0].CreatedAt, first[0].ClaimedAt, sent, "stale")
+	if err != nil || ok {
+		t.Fatalf("stale requeue: ok=%v err=%v, want refused", ok, err)
+	}
+
+	got, err := peer.GetAny(t.Context(), id)
+	if err != nil || got.Status != emailmodel.StatusProcessing {
+		t.Fatalf("after stale writes: status=%q err=%v, want processing", got.Status, err)
+	}
+
+	ok, err = peer.Finalize(t.Context(), id, second[0].CreatedAt, second[0].ClaimedAt, emailmodel.StatusSent, "", "", &sent)
+	if err != nil || !ok {
+		t.Fatalf("live finalize: ok=%v err=%v, want written", ok, err)
+	}
+
+	got, err = peer.GetAny(t.Context(), id)
+	if err != nil || got.Status != emailmodel.StatusSent {
+		t.Fatalf("after live finalize: status=%q err=%v", got.Status, err)
+	}
+}

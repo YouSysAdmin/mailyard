@@ -427,33 +427,67 @@ func (s *Store) ClaimDue(ctx context.Context, now time.Time, limit int) ([]*emai
 // it: without it Postgres has to visit every live partition to find
 // one row. The worker holds the row it claimed, so it costs nothing
 // to say which week the row is in.
-func (s *Store) Requeue(ctx context.Context, id string, createdAt time.Time, next time.Time, errMsg string) error {
-	_, err := s.Exec(ctx, `
+//
+// claimedAt is the fence: the recovery sweep may take a row back
+// mid-attempt, so the outcome is written only while the row is still
+// processing under the claim that produced it, and the caller learns
+// whether it was.
+func (s *Store) Requeue(ctx context.Context, id string, createdAt time.Time, claimedAt *time.Time, next time.Time, errMsg string) (bool, error) {
+	res, err := s.Exec(ctx, `
         UPDATE emails
         SET status = ?, next_attempt_at = ?, error_message = ?, claimed_at = NULL
-        WHERE id = ? AND created_at = ?
-    `, emailmodel.StatusQueued, next, errMsg, id, createdAt)
+        WHERE id = ? AND created_at = ? AND status = ? AND claimed_at = ?
+    `, emailmodel.StatusQueued, next, errMsg, id, createdAt, emailmodel.StatusProcessing, database.NullTime(claimedAt))
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// RequeueHanded returns a row that was handed to a relay node and
+// never reported on, fenced on the hand-off: a claim newer than
+// handedAt is another node's and is left alone.
+func (s *Store) RequeueHanded(ctx context.Context, id string, createdAt, handedAt time.Time, next time.Time, errMsg string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE emails
+        SET status = ?, next_attempt_at = ?, error_message = ?, claimed_at = NULL
+        WHERE id = ? AND created_at = ? AND status = ? AND claimed_at <= ?
+    `, emailmodel.StatusQueued, next, errMsg, id, createdAt, emailmodel.StatusProcessing, handedAt)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // Finalize writes the terminal state. See Requeue for why created_at
-// is in the predicate.
+// and claimedAt are in the predicate.
 //
 // delivered_via is written with COALESCE-style care: an empty value
 // leaves whatever is there rather than clearing it. A message that
 // succeeded and was then finalized again - a retry path, a recovery
 // sweep - must not lose the record of which server carried it.
-func (s *Store) Finalize(ctx context.Context, id string, createdAt time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) error {
-	_, err := s.Exec(ctx, `
+func (s *Store) Finalize(ctx context.Context, id string, createdAt time.Time, claimedAt *time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) (bool, error) {
+	res, err := s.Exec(ctx, `
         UPDATE emails
         SET status = ?, error_message = ?, sent_at = ?,
             delivered_via = CASE WHEN ? = '' THEN delivered_via ELSE ? END,
             claimed_at = NULL, next_attempt_at = NULL
-        WHERE id = ? AND created_at = ?
-    `, status, errMsg, database.NullTime(sentAt), deliveredVia, deliveredVia, id, createdAt)
+        WHERE id = ? AND created_at = ? AND status = ? AND claimed_at = ?
+    `, status, errMsg, database.NullTime(sentAt), deliveredVia, deliveredVia, id, createdAt,
+		emailmodel.StatusProcessing, database.NullTime(claimedAt))
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // RecoverStuck returns messages abandoned mid-flight - a node that

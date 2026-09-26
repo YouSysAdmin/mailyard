@@ -339,9 +339,16 @@ func ReleaseExpired(ctx context.Context, rt *env.Runtime) (int, error) {
 			continue
 		}
 
-		if err := rt.Store.Email.Requeue(ctx, a.EmailID, a.EmailCreatedAt, now,
-			"relay node "+a.NodeID+" stopped claiming the message"); err != nil {
+		// Fenced on the hand-off: a claim newer than the assignment is
+		// another worker's.
+		ok, err := rt.Store.Email.RequeueHanded(ctx, a.EmailID, a.EmailCreatedAt, a.CreatedAt, now,
+			"relay node "+a.NodeID+" stopped claiming the message")
+		if err != nil {
 			return released, err
+		}
+
+		if !ok {
+			continue
 		}
 
 		released++

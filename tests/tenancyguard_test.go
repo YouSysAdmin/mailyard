@@ -156,6 +156,7 @@ var crossProjectByDesign = map[string]string{
 	// mean an id-only lookup across every live partition.
 	"internal/domain/email/store.go Requeue":                "the worker holds the claimed row, pruned by created_at",
 	"internal/domain/email/store.go Finalize":               "the worker holds the claimed row, pruned by created_at",
+	"internal/domain/email/store.go RequeueHanded":          "the assignment sweep holds the handed row, pruned by created_at",
 	"internal/domain/apikey/apikey.go TouchLastUsed":        "the key was just resolved by its own hash",
 	"internal/domain/smtpcredential/store.go TouchLastUsed": "the credential was just resolved by its own hash",
 	"internal/domain/relaynode/store.go Heartbeat":          "the node proved the id with its enrolment token",

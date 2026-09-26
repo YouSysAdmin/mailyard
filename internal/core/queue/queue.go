@@ -106,17 +106,20 @@ type Source interface {
 	// The worker already holds the row it claimed, so the value is
 	// free here and turns the update back into a single-partition
 	// write.
-	Requeue(ctx context.Context, id string, createdAt time.Time, next time.Time, errMsg string) error
+	//
+	// claimedAt is the claim this outcome belongs to: the write lands
+	// only while the row is still processing under it, and false means
+	// the recovery sweep took the row back.
+	Requeue(ctx context.Context, id string, createdAt time.Time, claimedAt *time.Time, next time.Time, errMsg string) (bool, error)
 
-	// Finalize writes a terminal status.
 	// Finalize writes the terminal state. deliveredVia names the
 	// server that carried it and is empty for everything that never
 	// left - it is not the pinned smtp_server_id, which means the
 	// server the sender ASKED for and must keep meaning that across
 	// retries.
-	// createdAt prunes to one partition - see Requeue. This is the
-	// hottest write in the product, once per message.
-	Finalize(ctx context.Context, id string, createdAt time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) error
+	// createdAt and claimedAt as on Requeue. This is the hottest write
+	// in the product, once per message.
+	Finalize(ctx context.Context, id string, createdAt time.Time, claimedAt *time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) (bool, error)
 
 	// RecoverStuck re-queues processing rows claimed before olderThan
 	// (a previous process crashed mid-send). Returns the count.

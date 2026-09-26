@@ -643,11 +643,16 @@ type EmailStore interface {
 	CountAllByStatus(ctx context.Context) (map[string]int, error)
 
 	ClaimDue(ctx context.Context, now time.Time, limit int) ([]*email.Email, error)
-	Requeue(ctx context.Context, id string, createdAt time.Time, next time.Time, errMsg string) error
 
-	// createdAt prunes to one partition of the weekly-partitioned
-	// emails table - see the store method.
-	Finalize(ctx context.Context, id string, createdAt time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) error
+	// Requeue and Finalize write only while the row is still processing
+	// under claimedAt, and report whether it was - see the store method.
+	// createdAt prunes to one partition of the partitioned emails table.
+	Requeue(ctx context.Context, id string, createdAt time.Time, claimedAt *time.Time, next time.Time, errMsg string) (bool, error)
+	Finalize(ctx context.Context, id string, createdAt time.Time, claimedAt *time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) (bool, error)
+
+	// RequeueHanded takes back a row handed to a relay node, fenced on
+	// the hand-off time rather than the claim.
+	RequeueHanded(ctx context.Context, id string, createdAt, handedAt time.Time, next time.Time, errMsg string) (bool, error)
 	RecoverStuck(ctx context.Context, olderThan time.Time) (int, error)
 
 	// Retention sweep, unscoped by project.

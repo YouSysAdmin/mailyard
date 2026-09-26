@@ -51,7 +51,7 @@ func (s *memSource) ClaimDue(_ context.Context, now time.Time, limit int) ([]*em
 	return out, nil
 }
 
-func (s *memSource) Requeue(_ context.Context, id string, _ time.Time, next time.Time, errMsg string) error {
+func (s *memSource) Requeue(_ context.Context, id string, _ time.Time, _ *time.Time, next time.Time, errMsg string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r := s.rows[id]
@@ -59,10 +59,10 @@ func (s *memSource) Requeue(_ context.Context, id string, _ time.Time, next time
 	r.NextAttemptAt = &next
 	r.ErrorMessage = errMsg
 
-	return nil
+	return true, nil
 }
 
-func (s *memSource) Finalize(_ context.Context, id string, _ time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) error {
+func (s *memSource) Finalize(_ context.Context, id string, _ time.Time, _ *time.Time, status, errMsg, deliveredVia string, sentAt *time.Time) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r := s.rows[id]
@@ -75,7 +75,7 @@ func (s *memSource) Finalize(_ context.Context, id string, _ time.Time, status, 
 
 	s.final[id] = status
 
-	return nil
+	return true, nil
 }
 
 func (s *memSource) RecoverStuck(context.Context, time.Time) (int, error) { return 0, nil }

@@ -311,9 +311,8 @@ func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome)
 		w.log.Info("queue: handed to a relay node", "email_id", job.ID, "project_id", job.ProjectID)
 	case KindDone:
 		now := time.Now().UTC()
-		if err := w.src.Finalize(ctx, job.ID, job.CreatedAt, emailmodel.StatusSent, "", out.ServerID, &now); err != nil {
-			w.log.Error("queue: finalize sent", "email_id", job.ID, "err", err)
-
+		ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusSent, "", out.ServerID, &now)
+		if !w.write(job, "finalize sent", ok, err) {
 			return
 		}
 
@@ -327,9 +326,8 @@ func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome)
 		}
 
 		if job.Attempts >= maxi {
-			if err := w.src.Finalize(ctx, job.ID, job.CreatedAt, emailmodel.StatusFailed, errMsg, "", nil); err != nil {
-				w.log.Error("queue: finalize failed", "email_id", job.ID, "err", err)
-
+			ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusFailed, errMsg, "", nil)
+			if !w.write(job, "finalize failed", ok, err) {
 				return
 			}
 
@@ -340,31 +338,48 @@ func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome)
 		}
 
 		next := time.Now().UTC().Add(w.backoff(job.Attempts))
-		if err := w.src.Requeue(ctx, job.ID, job.CreatedAt, next, errMsg); err != nil {
-			w.log.Error("queue: requeue", "email_id", job.ID, "err", err)
-
+		ok, err := w.src.Requeue(ctx, job.ID, job.CreatedAt, job.ClaimedAt, next, errMsg)
+		if !w.write(job, "requeue", ok, err) {
 			return
 		}
 
 		w.log.Info("queue: retry scheduled", "email_id", job.ID, "attempts", job.Attempts, "next_attempt_at", next, "err", errMsg)
 	case KindSuppressed:
-		if err := w.src.Finalize(ctx, job.ID, job.CreatedAt, emailmodel.StatusSuppressed, errMsg, "", nil); err != nil {
-			w.log.Error("queue: finalize suppressed", "email_id", job.ID, "err", err)
-
+		ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusSuppressed, errMsg, "", nil)
+		if !w.write(job, "finalize suppressed", ok, err) {
 			return
 		}
 
 		w.notify(job, emailmodel.StatusSuppressed, errMsg)
 	default: // KindFail
-		if err := w.src.Finalize(ctx, job.ID, job.CreatedAt, emailmodel.StatusFailed, errMsg, "", nil); err != nil {
-			w.log.Error("queue: finalize failed", "email_id", job.ID, "err", err)
-
+		ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusFailed, errMsg, "", nil)
+		if !w.write(job, "finalize failed", ok, err) {
 			return
 		}
 
 		w.log.Warn("queue: permanent failure", "email_id", job.ID, "err", errMsg)
 		w.notify(job, emailmodel.StatusFailed, errMsg)
 	}
+}
+
+// write reports one outcome write. A write that matched nothing means
+// the recovery sweep took the claim back mid-attempt: the outcome is
+// dropped and logged, since the attempt outran worker.claim_timeout.
+func (w *Worker) write(job *emailmodel.Email, what string, ok bool, err error) bool {
+	if err != nil {
+		w.log.Error("queue: "+what, "email_id", job.ID, "err", err)
+
+		return false
+	}
+
+	if !ok {
+		w.log.Warn("queue: claim was taken back before the outcome was written, outcome dropped",
+			"email_id", job.ID, "project_id", job.ProjectID, "outcome", what)
+
+		return false
+	}
+
+	return true
 }
 
 func (w *Worker) notify(job *emailmodel.Email, status, errMsg string) {
