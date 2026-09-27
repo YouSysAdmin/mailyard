@@ -371,6 +371,14 @@ class API:
         "Get"
         return self._t.request("GET", f"/domains/{_esc(id)}", body=None, query=query)
 
+    def delete_domain_dkim_rotate(self, id, **query: Any) -> Any:
+        "Cancel DKIM rotation"
+        return self._t.request("DELETE", f"/domains/{_esc(id)}/dkim/rotate", body=None, query=query)
+
+    def dkim_rotate_domain(self, id, **query: Any) -> Any:
+        "Rotate DKIM key"
+        return self._t.request("POST", f"/domains/{_esc(id)}/dkim/rotate", body=None, query=query)
+
     def verify_domain(self, id, **query: Any) -> Any:
         "Verify"
         return self._t.request("POST", f"/domains/{_esc(id)}/verify", body=None, query=query)

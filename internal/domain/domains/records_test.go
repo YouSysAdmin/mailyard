@@ -3,6 +3,7 @@
 package domains
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"testing"
@@ -98,5 +99,58 @@ func TestARecordWithoutAValueIsEmptyNotPlaceholder(t *testing.T) {
 
 	if dkimRec := recordOfKind(t, Records(d, ""), "dkim"); dkimRec.Value != "" {
 		t.Errorf("DKIM suggests %q before a key exists", dkimRec.Value)
+	}
+}
+
+// A pending rotation adds the new record beside the current one, and
+// verify cuts over only once that record is published.
+func TestARotationPublishesBesideAndCutsOverWhenSeen(t *testing.T) {
+	d := sample()
+	d.DKIMPrivateKey = "old-pem"
+	kinds := func() []string {
+		var out []string
+		for _, r := range Records(d, "") {
+			out = append(out, r.Kind)
+		}
+
+		return out
+	}
+	if strings.Join(kinds(), ",") != "ownership,spf,dkim,dmarc" {
+		t.Fatalf("records before rotation = %v", kinds())
+	}
+
+	d.DKIMNextSelector, d.DKIMNextPrivateKey, d.DKIMNextPublicKey = "mailyard2", "new-pem", "NEWKEY"
+	if strings.Join(kinds(), ",") != "ownership,spf,dkim,dkim_next,dmarc" {
+		t.Fatalf("records during rotation = %v", kinds())
+	}
+
+	published := map[string][]string{
+		"example.com":                     {"mailyard-verification=tok"},
+		"mailyard._domainkey.example.com": {"v=DKIM1; k=rsa; p=MIIBIjAN"},
+	}
+	lookup := func(_ context.Context, name string) ([]string, error) { return published[name], nil }
+
+	res := CheckAll(t.Context(), lookup, d)
+	if !res.DKIM || res.DKIMNext {
+		t.Fatalf("before publishing: dkim=%v next=%v", res.DKIM, res.DKIMNext)
+	}
+
+	if cutOver(d, res) || d.DKIMSelector != "mailyard" {
+		t.Fatal("cut over before the new record was published")
+	}
+
+	published["mailyard2._domainkey.example.com"] = []string{"v=DKIM1; k=rsa; p=NEWKEY"}
+	res = CheckAll(t.Context(), lookup, d)
+	if !res.DKIMNext {
+		t.Fatal("published new record not seen")
+	}
+
+	if !cutOver(d, res) {
+		t.Fatal("did not cut over")
+	}
+
+	if d.DKIMSelector != "mailyard2" || d.DKIMPrivateKey != "new-pem" || d.DKIMPublicKey != "NEWKEY" || d.Rotating() {
+		t.Errorf("after cutover: selector=%q key=%q public=%q rotating=%v",
+			d.DKIMSelector, d.DKIMPrivateKey, d.DKIMPublicKey, d.Rotating())
 	}
 }

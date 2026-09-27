@@ -36,6 +36,10 @@ type CheckResult struct {
 	SPF       bool
 	DKIM      bool
 	DMARC     bool
+
+	// DKIMNext is whether the record of a pending rotation is
+	// published. False when no rotation is pending.
+	DKIMNext bool
 }
 
 // CheckAll runs every DNS check for a domain.
@@ -53,6 +57,7 @@ func CheckAll(ctx context.Context, lookup LookupTXT, d *dmodel.Domain) CheckResu
 		SPF:       CheckSPF(ctx, lookup, d.Domain),
 		DKIM:      CheckDKIM(ctx, lookup, d),
 		DMARC:     CheckDMARC(ctx, lookup, d.Domain),
+		DKIMNext:  d.Rotating() && publishedKey(ctx, lookup, d.Domain, d.DKIMNextSelector, d.DKIMNextPublicKey),
 	}
 }
 
@@ -89,17 +94,22 @@ func CheckSPF(ctx context.Context, lookup LookupTXT, name string) bool {
 // as success would be worse than reporting nothing, because the
 // operator would stop looking.
 func CheckDKIM(ctx context.Context, lookup LookupTXT, d *dmodel.Domain) bool {
-	if d.DKIMPublicKey == "" || d.DKIMSelector == "" {
+	return publishedKey(ctx, lookup, d.Domain, d.DKIMSelector, d.DKIMPublicKey)
+}
+
+// publishedKey reports whether the record at selector carries public.
+func publishedKey(ctx context.Context, lookup LookupTXT, name, selector, public string) bool {
+	if public == "" || selector == "" {
 		return false
 	}
 
-	records, err := lookup(ctx, dkim.TXTHost(d.DKIMSelector, d.Domain))
+	records, err := lookup(ctx, dkim.TXTHost(selector, name))
 	if err != nil {
 		return false
 	}
 
 	for _, txt := range records {
-		if published := dkimPublicKeyOf(txt); published != "" && published == d.DKIMPublicKey {
+		if published := dkimPublicKeyOf(txt); published != "" && published == public {
 			return true
 		}
 	}
@@ -205,6 +215,18 @@ func Records(d *dmodel.Domain, spfInclude string) []Record {
 	}
 
 	out = append(out, dkimRec)
+
+	if d.Rotating() {
+		out = append(out, Record{
+			Kind:     "dkim_next",
+			Type:     "TXT",
+			Host:     dkim.TXTHost(d.DKIMNextSelector, d.Domain),
+			Value:    dkim.TXTValue(d.DKIMNextPublicKey),
+			Required: false,
+			Verified: false,
+			Detail:   "The new signing key. Publish it beside the current record, then click Verify to switch signing to it. The old record can be removed a few days later, once mail signed with the old key has been delivered.",
+		})
+	}
 
 	out = append(out, Record{
 		Kind:     "dmarc",

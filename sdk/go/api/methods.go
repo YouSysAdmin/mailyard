@@ -614,6 +614,20 @@ func (c *Client) GetDomain(ctx context.Context, id string, opts ...RequestOption
 	return do[DetailResponse](ctx, c, "GET", fmt.Sprintf("/domains/%s", escape(id)), nil, opts)
 }
 
+// DeleteDomainDkimRotate Cancel DKIM rotation.
+//
+// DELETE /domains/:id/dkim/rotate
+func (c *Client) DeleteDomainDkimRotate(ctx context.Context, id string, opts ...RequestOption) (DetailResponse, error) {
+	return do[DetailResponse](ctx, c, "DELETE", fmt.Sprintf("/domains/%s/dkim/rotate", escape(id)), nil, opts)
+}
+
+// DkimRotateDomain Rotate DKIM key.
+//
+// POST /domains/:id/dkim/rotate
+func (c *Client) DkimRotateDomain(ctx context.Context, id string, opts ...RequestOption) (DetailResponse, error) {
+	return do[DetailResponse](ctx, c, "POST", fmt.Sprintf("/domains/%s/dkim/rotate", escape(id)), nil, opts)
+}
+
 // VerifyDomain Verify.
 //
 // POST /domains/:id/verify

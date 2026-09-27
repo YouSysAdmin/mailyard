@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   ownership: 'Ownership',
   spf: 'SPF',
   dkim: 'DKIM',
+  dkim_next: 'DKIM (new key)',
   dmarc: 'DMARC',
 }
 

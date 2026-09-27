@@ -456,6 +456,16 @@ module Mailyard
       @t.request("GET", "/domains/#{esc(id)}", body: nil, query: query)
     end
 
+    # Cancel DKIM rotation
+    def delete_domain_dkim_rotate(id, **query)
+      @t.request("DELETE", "/domains/#{esc(id)}/dkim/rotate", body: nil, query: query)
+    end
+
+    # Rotate DKIM key
+    def dkim_rotate_domain(id, **query)
+      @t.request("POST", "/domains/#{esc(id)}/dkim/rotate", body: nil, query: query)
+    end
+
     # Verify
     def verify_domain(id, **query)
       @t.request("POST", "/domains/#{esc(id)}/verify", body: nil, query: query)

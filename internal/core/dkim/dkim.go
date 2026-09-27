@@ -38,6 +38,19 @@ import (
 // setting - see Domain.DKIMSelector.
 const DefaultSelector = "mailyard"
 
+// RotatedSelector is the other name a rotation alternates with, so the
+// new record can be published beside the current one.
+const RotatedSelector = "mailyard2"
+
+// NextSelector is the selector a rotation from current publishes under.
+func NextSelector(current string) string {
+	if current == DefaultSelector || current == "" {
+		return RotatedSelector
+	}
+
+	return DefaultSelector
+}
+
 // keyBits is the RSA modulus size.
 //
 // 2048 rather than Ed25519 (RFC 8463): Ed25519 keys are shorter and

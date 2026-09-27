@@ -44,6 +44,14 @@ type Domain struct {
 	// Public by definition.
 	DKIMPublicKey string `json:"dkim_public_key,omitempty"`
 
+	// The next key of a rotation in progress, published beside the
+	// current record and cut over by verify once its record is seen.
+	// Empty when no rotation is pending. The private half is sealed
+	// like the current one and never leaves through a response.
+	DKIMNextSelector   string `json:"dkim_next_selector,omitempty"`
+	DKIMNextPrivateKey string `json:"-"`
+	DKIMNextPublicKey  string `json:"dkim_next_public_key,omitempty"`
+
 	// The three record checks, each refreshed by POST
 	// /api/domains/:id/verify. Separate from Verified, which is
 	// ownership alone: a domain can be provably yours and still have
@@ -72,4 +80,9 @@ func (d *Domain) TXTRecordValue() string {
 // right and DNS has not caught up.
 func (d *Domain) CanSign() bool {
 	return d.Verified && d.DKIMPrivateKey != "" && d.DKIMSelector != ""
+}
+
+// Rotating reports whether a DKIM key rotation is pending.
+func (d *Domain) Rotating() bool {
+	return d.DKIMNextPublicKey != "" && d.DKIMNextSelector != ""
 }

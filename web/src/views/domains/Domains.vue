@@ -127,6 +127,50 @@ function closeDnsModal() {
   dnsModalRecords.value = []
 }
 
+const rotating = ref(false)
+
+// Starts a DKIM rotation: the new record appears in the modal, and
+// Verify switches signing to it once the record is published.
+async function rotateDkim(d: InboundDomain) {
+  const ok = await confirm({
+    title: 'Rotate DKIM key',
+    message: `Generate a new signing key for ${d.domain}? Mail keeps being signed with the current key until you publish the new record and click Verify.`,
+    confirmText: 'Generate',
+  })
+  if (!ok) return
+
+  rotating.value = true
+  try {
+    const res = await domainsApi.rotateDkim(d.id)
+    applyPayload(res.data)
+    notify.success('New DKIM key generated - publish its record, then verify')
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to rotate the DKIM key'))
+  } finally {
+    rotating.value = false
+  }
+}
+
+async function cancelDkimRotation(d: InboundDomain) {
+  rotating.value = true
+  try {
+    const res = await domainsApi.cancelDkimRotation(d.id)
+    applyPayload(res.data)
+    notify.success('Rotation cancelled, the current key stays')
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to cancel the rotation'))
+  } finally {
+    rotating.value = false
+  }
+}
+
+function applyPayload(payload: { domain: InboundDomain; dns_records: DNSRecord[] }) {
+  const idx = domains.value.findIndex((x) => x.id === payload.domain.id)
+  if (idx !== -1) domains.value[idx] = payload.domain
+  dnsModalDomain.value = payload.domain
+  dnsModalRecords.value = payload.dns_records ?? []
+}
+
 async function verifyDomain(d: InboundDomain) {
   if (verifyingId.value) return
   verifyingId.value = d.id
@@ -322,6 +366,26 @@ async function deleteDomain(d: InboundDomain) {
       </template>
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="closeDnsModal">Close</button>
+        <template v-if="projStore.can('domains:write') && dnsModalDomain.dkim_public_key">
+          <button
+            v-if="dnsModalDomain.dkim_next_public_key"
+            type="button"
+            class="btn btn-secondary"
+            :disabled="rotating"
+            @click="cancelDkimRotation(dnsModalDomain)"
+          >
+            Cancel rotation
+          </button>
+          <button
+            v-else
+            type="button"
+            class="btn btn-secondary"
+            :disabled="rotating"
+            @click="rotateDkim(dnsModalDomain)"
+          >
+            Rotate DKIM key
+          </button>
+        </template>
         <button
           v-if="projStore.can('domains:write')"
           type="button"

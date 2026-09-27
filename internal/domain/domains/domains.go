@@ -52,6 +52,7 @@ func NewStore(db *sql.DB, cr *crypto.Service) *Store {
 const domainSelect = `
 SELECT id, project_id, created_by, domain, verification_token, verified, verified_at, created_at,
        dkim_selector, dkim_private_key, dkim_public_key,
+       dkim_next_selector, dkim_next_private_key, dkim_next_public_key,
        spf_verified, dkim_verified, dmarc_verified, checked_at
 FROM domains`
 
@@ -215,37 +216,74 @@ func (s *Store) Put(ctx context.Context, d *dmodel.Domain) error {
 	// key stays empty rather than becoming the encryption of "" -
 	// otherwise CanSign would see a non-empty column for a domain that
 	// has no key at all.
-	sealed := ""
-	if d.DKIMPrivateKey != "" {
-		var err error
-		sealed, err = s.crypto.Encrypt(d.DKIMPrivateKey)
-		if err != nil {
-			return fmt.Errorf("domains: seal dkim key: %w", err)
-		}
+	sealed, err := s.seal(d.DKIMPrivateKey)
+	if err != nil {
+		return err
 	}
 
-	_, err := s.Exec(ctx, `
+	sealedNext, err := s.seal(d.DKIMNextPrivateKey)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Exec(ctx, `
         INSERT INTO domains (id, project_id, created_by, domain, verification_token, verified, verified_at, created_at,
                              dkim_selector, dkim_private_key, dkim_public_key,
+                             dkim_next_selector, dkim_next_private_key, dkim_next_public_key,
                              spf_verified, dkim_verified, dmarc_verified, checked_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
-            domain           = excluded.domain,
-            verified         = excluded.verified,
-            verified_at      = excluded.verified_at,
-            dkim_selector    = excluded.dkim_selector,
-            dkim_private_key = excluded.dkim_private_key,
-            dkim_public_key  = excluded.dkim_public_key,
-            spf_verified     = excluded.spf_verified,
-            dkim_verified    = excluded.dkim_verified,
-            dmarc_verified   = excluded.dmarc_verified,
-            checked_at       = excluded.checked_at
+            domain                = excluded.domain,
+            verified              = excluded.verified,
+            verified_at           = excluded.verified_at,
+            dkim_selector         = excluded.dkim_selector,
+            dkim_private_key      = excluded.dkim_private_key,
+            dkim_public_key       = excluded.dkim_public_key,
+            dkim_next_selector    = excluded.dkim_next_selector,
+            dkim_next_private_key = excluded.dkim_next_private_key,
+            dkim_next_public_key  = excluded.dkim_next_public_key,
+            spf_verified          = excluded.spf_verified,
+            dkim_verified         = excluded.dkim_verified,
+            dmarc_verified        = excluded.dmarc_verified,
+            checked_at            = excluded.checked_at
     `, d.ID, d.ProjectID, d.CreatedBy, strings.ToLower(d.Domain),
 		d.VerificationToken, d.Verified, database.NullTime(d.VerifiedAt), d.CreatedAt,
 		d.DKIMSelector, sealed, d.DKIMPublicKey,
+		d.DKIMNextSelector, sealedNext, d.DKIMNextPublicKey,
 		d.SPFVerified, d.DKIMVerified, d.DMARCVerified, database.NullTime(d.CheckedAt))
 
 	return err
+}
+
+// seal encrypts a private key for the row. An empty key stays empty
+// rather than becoming the encryption of "", or CanSign would see a
+// key where there is none.
+func (s *Store) seal(pem string) (string, error) {
+	if pem == "" {
+		return "", nil
+	}
+
+	sealed, err := s.crypto.Encrypt(pem)
+	if err != nil {
+		return "", fmt.Errorf("domains: seal dkim key: %w", err)
+	}
+
+	return sealed, nil
+}
+
+// unseal is the reverse, loud on failure: a row read with an empty
+// key would send mail unsigned, which is the failure hardest to notice.
+func (s *Store) unseal(name, sealed string) (string, error) {
+	if sealed == "" {
+		return "", nil
+	}
+
+	plain, err := s.crypto.Decrypt(sealed)
+	if err != nil {
+		return "", fmt.Errorf("domains: unseal dkim key for %q: %w", name, err)
+	}
+
+	return plain, nil
 }
 
 // SetVerified flips the verification flag and stamps when. The only
@@ -279,24 +317,22 @@ func (s *Store) Count(ctx context.Context, projID string) (int, error) {
 // Callers therefore always receive PEM and never ciphertext.
 func (s *Store) scanDomain(r interface{ Scan(...any) error }) (*dmodel.Domain, error) {
 	var d dmodel.Domain
-	var sealed string
+	var sealed, sealedNext string
 	if err := r.Scan(&d.ID, &d.ProjectID, &d.CreatedBy, &d.Domain,
 		&d.VerificationToken, &d.Verified, &d.VerifiedAt, &d.CreatedAt,
 		&d.DKIMSelector, &sealed, &d.DKIMPublicKey,
+		&d.DKIMNextSelector, &sealedNext, &d.DKIMNextPublicKey,
 		&d.SPFVerified, &d.DKIMVerified, &d.DMARCVerified, &d.CheckedAt); err != nil {
 		return nil, err
 	}
 
-	if sealed != "" {
-		plain, err := s.crypto.Decrypt(sealed)
-		if err != nil {
-			// Loud, not silent. Returning the row with an empty key
-			// would leave CanSign false and mail would quietly go out
-			// unsigned, which is the failure mode hardest to notice.
-			return nil, fmt.Errorf("domains: unseal dkim key for %q: %w", d.Domain, err)
-		}
+	var err error
+	if d.DKIMPrivateKey, err = s.unseal(d.Domain, sealed); err != nil {
+		return nil, err
+	}
 
-		d.DKIMPrivateKey = plain
+	if d.DKIMNextPrivateKey, err = s.unseal(d.Domain, sealedNext); err != nil {
+		return nil, err
 	}
 
 	return &d, nil
@@ -467,8 +503,9 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 		d.VerifiedAt = &now
 	}
 
+	rotated := cutOver(d, res)
 	d.SPFVerified = res.SPF
-	d.DKIMVerified = res.DKIM
+	d.DKIMVerified = res.DKIM || rotated
 	d.DMARCVerified = res.DMARC
 	d.CheckedAt = &now
 
@@ -479,6 +516,87 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 	if minted {
 		slog.Info("domains: dkim key generated",
 			"domain", d.Domain, "project_id", d.ProjectID, "selector", d.DKIMSelector)
+	}
+
+	if rotated {
+		slog.Info("domains: dkim key rotated",
+			"domain", d.Domain, "project_id", d.ProjectID, "selector", d.DKIMSelector)
+	}
+
+	return response.Success(c, h.domainPayload(d))
+}
+
+// cutOver makes the pending key the signing key once its record is
+// published, and reports whether it did. The old record can come
+// down once mail signed under it has been delivered.
+func cutOver(d *dmodel.Domain, res CheckResult) bool {
+	if !d.Rotating() || !res.DKIMNext {
+		return false
+	}
+
+	d.DKIMSelector, d.DKIMPrivateKey, d.DKIMPublicKey = d.DKIMNextSelector, d.DKIMNextPrivateKey, d.DKIMNextPublicKey
+	d.DKIMNextSelector, d.DKIMNextPrivateKey, d.DKIMNextPublicKey = "", "", ""
+
+	return true
+}
+
+// RotateDKIM serves POST /api/v1/domains/:id/dkim/rotate: mints the
+// next keypair under the other selector. Signing stays on the current
+// key until verify sees the new record. Calling it again replaces a
+// pending key that was never published.
+func (h *Handler) RotateDKIM(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	d, err := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if d == nil {
+		return response.NotFound(c, "domain not found")
+	}
+
+	if !d.CanSign() {
+		return response.Conflict(c, "the domain has no signing key to rotate - verify ownership first")
+	}
+
+	priv, pub, err := dkim.GenerateKey()
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	d.DKIMNextSelector = dkim.NextSelector(d.DKIMSelector)
+	d.DKIMNextPrivateKey = priv
+	d.DKIMNextPublicKey = pub
+	if err := h.Runtime.Store.Domain.Put(c.Context(), d); err != nil {
+		return response.Internal(c, err)
+	}
+
+	slog.Info("domains: dkim rotation started",
+		"domain", d.Domain, "project_id", d.ProjectID, "selector", d.DKIMNextSelector)
+
+	return response.Success(c, h.domainPayload(d))
+}
+
+// CancelDKIMRotation serves DELETE /api/v1/domains/:id/dkim/rotate:
+// discards a pending key. The current key is untouched.
+func (h *Handler) CancelDKIMRotation(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	d, err := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if d == nil {
+		return response.NotFound(c, "domain not found")
+	}
+
+	if !d.Rotating() {
+		return response.NotFound(c, "no rotation is pending")
+	}
+
+	d.DKIMNextSelector, d.DKIMNextPrivateKey, d.DKIMNextPublicKey = "", "", ""
+	if err := h.Runtime.Store.Domain.Put(c.Context(), d); err != nil {
+		return response.Internal(c, err)
 	}
 
 	return response.Success(c, h.domainPayload(d))

@@ -115,6 +115,24 @@ sent it**, so one tenant cannot sign as another tenant's domain by naming it in 
 Keys are RSA-2048. Ed25519 (RFC 8463) is shorter and faster but receiver support is still patchy enough that signing
 with one alone means some receivers see no valid signature at all, which is worse than not signing.
 
+### Rotating the key
+
+```
+POST /api/v1/domains/:id/dkim/rotate
+```
+
+Mints a new keypair under the other selector (`mailyard2` when the current one is `mailyard`, and back again next
+time) and returns the domain with a `dkim_next` record to publish. Nothing changes on the wire yet: mail keeps being
+signed with the current key, and the current record must stay published.
+
+Publish the new record beside the old one, then verify the domain. On the first pass where the new record is seen,
+signing switches to the new key and the `dkim_next` record disappears from the list. The old record can be removed a
+few days later, once mail signed with the old key has been delivered - a receiver checks the signature when the message
+arrives, not later.
+
+`DELETE /api/v1/domains/:id/dkim/rotate` discards a pending key that was never published. Calling rotate again while
+one is pending replaces it. In the console both live in the DNS records dialog of a verified domain.
+
 ## 3. SPF (recommended)
 
 | Type | Host             | Value                                       |

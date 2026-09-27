@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/database/dbtest"
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
@@ -142,5 +143,55 @@ func TestVerifiedNamesIsTheAcceptListAndIsStable(t *testing.T) {
 	want := []string{"alpha.example.com", "zeta.example.com"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("VerifiedNames() = %v, want %v", got, want)
+	}
+}
+
+// The pending key of a rotation is sealed and unsealed like the
+// current one, and clearing it leaves the columns empty rather than
+// holding the encryption of "".
+func TestThePendingDKIMKeySurvivesARoundTrip(t *testing.T) {
+	db := dbtest.Open(t)
+	dbtest.Migrate(t, db)
+	dbtest.Schema(t, db, `
+        INSERT INTO projects (id, name, slug, default_language, created_at)
+        VALUES ('e66e7a4d-9e6c-4884-869a-cf9ffcf22181', 'One', 'one', 'en', now())`)
+	s := NewStore(db, crypto.New("0123456789abcdef0123456789abcdef"))
+
+	d := &dmodel.Domain{
+		ID: "8d2c5b6a-1e4f-4a7b-9c3d-2e1f0a9b8c7d", ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181",
+		Domain: "example.com", VerificationToken: "tok", Verified: true,
+		DKIMSelector: "mailyard", DKIMPrivateKey: "old-pem", DKIMPublicKey: "OLD",
+		DKIMNextSelector: "mailyard2", DKIMNextPrivateKey: "new-pem", DKIMNextPublicKey: "NEW",
+	}
+	if err := s.Put(t.Context(), d); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.Get(t.Context(), d.ProjectID, d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.DKIMPrivateKey != "old-pem" || got.DKIMNextPrivateKey != "new-pem" || !got.Rotating() {
+		t.Fatalf("round trip: key=%q next=%q rotating=%v", got.DKIMPrivateKey, got.DKIMNextPrivateKey, got.Rotating())
+	}
+
+	var sealed string
+	if err := db.QueryRowContext(t.Context(), s.Q(`SELECT dkim_next_private_key FROM domains WHERE id = ?`), d.ID).Scan(&sealed); err != nil {
+		t.Fatal(err)
+	}
+
+	if sealed == "" || sealed == "new-pem" {
+		t.Fatalf("pending key stored as %q, want sealed", sealed)
+	}
+
+	got.DKIMNextSelector, got.DKIMNextPrivateKey, got.DKIMNextPublicKey = "", "", ""
+	if err := s.Put(t.Context(), got); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ = s.Get(t.Context(), d.ProjectID, d.ID)
+	if got.Rotating() || got.DKIMNextPrivateKey != "" {
+		t.Error("cleared pending key came back")
 	}
 }

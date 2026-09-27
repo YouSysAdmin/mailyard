@@ -17,6 +17,10 @@ export interface InboundDomain {
   // be published in DNS.
   dkim_selector?: string
   dkim_public_key?: string
+  // A rotation in progress: the next key, published beside the
+  // current record and cut over by verify() once it is seen.
+  dkim_next_selector?: string
+  dkim_next_public_key?: string
   // The three record checks, refreshed by verify(). Separate from
   // `verified`, which is ownership alone.
   spf_verified: boolean
@@ -28,7 +32,7 @@ export interface InboundDomain {
 // DNSRecord is one record the operator must publish, assembled
 // server-side in internal/domain/domains/records.go.
 export interface DNSRecord {
-  // kind is 'ownership' | 'spf' | 'dkim' | 'dmarc'.
+  // kind is 'ownership' | 'spf' | 'dkim' | 'dkim_next' | 'dmarc'.
   kind: string
   type: string
   host: string
@@ -54,5 +58,9 @@ export const domainsApi = {
   // Runs a live DNS TXT check - the returned verified flag reflects
   // the outcome and a lost record un-verifies the domain again.
   verify: (id: string) => api.post<DomainPayload>(`/domains/${id}/verify`),
+  // Mints the next DKIM key. Signing switches to it when verify() sees
+  // the new record published.
+  rotateDkim: (id: string) => api.post<DomainPayload>(`/domains/${id}/dkim/rotate`),
+  cancelDkimRotation: (id: string) => api.delete<DomainPayload>(`/domains/${id}/dkim/rotate`),
   remove: (id: string) => api.delete(`/domains/${id}`),
 }

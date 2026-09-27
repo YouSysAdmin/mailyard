@@ -514,6 +514,8 @@ type Domain struct {
 	CreatedAt         time.Time  `json:"created_at"`
 	DKIMSelector      string     `json:"dkim_selector,omitempty"`
 	DKIMPublicKey     string     `json:"dkim_public_key,omitempty"`
+	DKIMNextSelector  string     `json:"dkim_next_selector,omitempty"`
+	DKIMNextPublicKey string     `json:"dkim_next_public_key,omitempty"`
 	SPFVerified       bool       `json:"spf_verified"`
 	DKIMVerified      bool       `json:"dkim_verified"`
 	DMARCVerified     bool       `json:"dmarc_verified"`
