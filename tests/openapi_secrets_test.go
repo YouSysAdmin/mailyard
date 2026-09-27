@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/yousysadmin/mailyard/internal/openapi"
 )
 
 // secretish names a field that has no business coming back.
-var secretish = regexp.MustCompile(`(?i)password|secret|token|hash|private_key|totp`)
+var secretish = regexp.MustCompile(`(?i)password|secret|token|hash|private_key|totp|signing_key|pem|dsn`)
 
 // allowedSecretFields are the ones that are supposed to come back.
 //
@@ -37,6 +37,9 @@ var allowedSecretFields = map[string]bool{
 	// code. Sealed at rest by the crypto service and never readable
 	// again through any endpoint.
 	"TOTPSetupResponse.secret": true,
+	// The PUBLIC half of a certificate, which is what a PEM download
+	// is for. The private half is sealed and reaches no response.
+	"PEMResponse.pem": true,
 
 	// Not a credential at all: the DNS TXT value the project has to
 	// publish to prove it controls the zone. Useless to anyone who

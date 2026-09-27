@@ -5,7 +5,7 @@ package openapi
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/yousysadmin/mailyard/internal/domain/analytics"
 	"github.com/yousysadmin/mailyard/internal/domain/apikey"
