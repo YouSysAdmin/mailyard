@@ -3,6 +3,7 @@
 package smtpclient
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -123,5 +124,30 @@ func TestBuildWritesAnEmbeddedPartUnderItsContentID(t *testing.T) {
 	m.Attachments = []Attachment{{Filename: "x.png", ContentType: "image/png", Content: "UE5H", ContentID: "ab>c d"}}
 	if raw := string(m.Build()); !strings.Contains(raw, "Content-ID: <abcd>\r\n") {
 		t.Errorf("Content-ID was not sanitised:\n%s", raw)
+	}
+}
+
+// An attachment type carrying a parameter keeps it on the wire, and
+// a type that does not parse is refused up front.
+func TestAttachmentContentTypeParametersSurvive(t *testing.T) {
+	msg := &Message{
+		From: "s@example.com", To: []string{"r@example.com"}, Subject: "s", Text: "t",
+		Attachments: []Attachment{{
+			Filename: "a.txt", ContentType: "text/plain; charset=utf-8",
+			Content: base64.StdEncoding.EncodeToString([]byte("hello")),
+		}},
+	}
+	raw := string(msg.Build())
+	if !strings.Contains(raw, "Content-Type: text/plain; charset=utf-8; name=a.txt") {
+		t.Errorf("attachment content type lost its parameter:\n%s", raw)
+	}
+
+	if strings.Contains(raw, "Content-Type: \r\n") {
+		t.Errorf("an empty Content-Type went out:\n%s", raw)
+	}
+
+	err := ValidateAttachments([]Attachment{{Filename: "a.txt", ContentType: "not a type", Content: "aGk="}}, 1<<20, 1<<20)
+	if err == nil {
+		t.Error("an unparseable content type was accepted")
 	}
 }

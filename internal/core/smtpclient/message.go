@@ -344,13 +344,16 @@ func writeTextPart(b *strings.Builder, mediaType, body string) {
 // writeAttachment emits one base64 attachment part, re-wrapping the
 // already-encoded content at 76 columns per RFC 2045.
 func writeAttachment(b *strings.Builder, att Attachment) {
-	contentType := att.ContentType
-	if contentType == "" {
-		contentType = "application/octet-stream"
+	// FormatMediaType wants a bare type and answers "" for one carrying
+	// a parameter, so the type is parsed first and the name added to
+	// its parameters.
+	mediaType, params, err := mime.ParseMediaType(att.ContentType)
+	if err != nil || mediaType == "" {
+		mediaType, params = "application/octet-stream", map[string]string{}
 	}
 
-	fmt.Fprintf(b, "Content-Type: %s\r\n",
-		mime.FormatMediaType(contentType, map[string]string{"name": att.Filename}))
+	params["name"] = att.Filename
+	fmt.Fprintf(b, "Content-Type: %s\r\n", mime.FormatMediaType(mediaType, params))
 	b.WriteString("Content-Transfer-Encoding: base64\r\n")
 	disposition := "attachment"
 	if att.ContentID != "" {
@@ -398,6 +401,12 @@ func ValidateAttachments(attachments []Attachment, maxAttachmentSize, maxTotalSi
 	for _, att := range attachments {
 		if att.Filename == "" {
 			return fmt.Errorf("attachment filename is required")
+		}
+
+		if att.ContentType != "" {
+			if _, _, err := mime.ParseMediaType(att.ContentType); err != nil {
+				return fmt.Errorf("attachment %q has an invalid content type %q", att.Filename, att.ContentType)
+			}
 		}
 
 		decoded, err := base64.StdEncoding.DecodeString(att.Content)

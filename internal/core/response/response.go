@@ -8,6 +8,7 @@ package response
 import (
 	"fmt"
 	"log/slog"
+	"mime"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -173,7 +174,8 @@ func Internal(c fiber.Ctx, err error) error {
 // Callers pass the raw filename: sanitizing it is this function's
 // job, not something three endpoints should each remember.
 func Attachment(c fiber.Ctx, filename, contentType string, raw []byte) error {
-	if contentType == "" {
+	// A type that does not parse is served as bytes.
+	if _, _, err := mime.ParseMediaType(contentType); err != nil {
 		contentType = fiber.MIMEOctetStream
 	}
 
