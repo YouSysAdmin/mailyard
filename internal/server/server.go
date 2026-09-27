@@ -304,7 +304,7 @@ func carriesCredential(h *fasthttp.RequestHeader) bool {
 		return true
 	}
 
-	return len(h.Cookie(authdomain.SessionCookie)) > 0
+	return len(h.Cookie(authdomain.SessionCookieHost)) > 0 || len(h.Cookie(authdomain.SessionCookie)) > 0
 }
 
 // bodyLimitForPath is the body ceiling one request gets, where 0 means

@@ -41,8 +41,10 @@ natural expiry, so a recent "signed out everywhere" is still visible in the list
 
 ## The cookie
 
-The session rides in `mailyard_session`: `HttpOnly`, `Path=/`, `SameSite=Strict`, and
-`Secure` when `server.public_url` starts with `https://`.
+The session rides in `__Host-mailyard_session` over HTTPS and in `mailyard_session` on a plain-HTTP installation:
+`HttpOnly`, `Path=/`, `SameSite=Strict`, and `Secure` when `server.public_url` starts with `https://`. The `__Host-`
+prefix is what stops a page on a sibling host from setting a same-named cookie over ours. Both names are read, so a
+session minted before the prefix keeps working, and signing out clears both.
 
 `Secure` is decided by that setting rather than by the scheme of the request, so a reverse proxy that terminates TLS and
 speaks plain HTTP upstream still gets the flag. The cost is that the two have to agree:

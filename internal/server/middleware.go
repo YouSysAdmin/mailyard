@@ -177,7 +177,7 @@ func extractToken(c fiber.Ctx) string {
 		return v
 	}
 
-	return c.Cookies(authdomain.SessionCookie)
+	return authdomain.SessionCookieValue(c)
 }
 
 // requirePageAuth is requireAuth for a browser-facing page rather

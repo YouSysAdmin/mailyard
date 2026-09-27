@@ -12,7 +12,7 @@ same everywhere.
 | Surface           | Prefix         | Authentication                                            | Project                                                     |
 |-------------------|----------------|-----------------------------------------------------------|-------------------------------------------------------------|
 | **Product**       | `/api/v1/...`  | `Authorization: Bearer myk_...` **or** the session cookie | Implied by the key, else the `X-Mailyard-Project-Id` header |
-| **Console's own** | `/app/api/...` | Session cookie `mailyard_session`                         | `X-Mailyard-Project-Id` header                              |
+| **Console's own** | `/app/api/...` | Session cookie `__Host-mailyard_session` (`mailyard_session` over plain HTTP) | `X-Mailyard-Project-Id` header                              |
 
 They are split by what an operation **is**, not by who calls it.
 
@@ -72,8 +72,9 @@ curl -c cookies.txt -X POST http://localhost:3000/app/api/auth/login \
 cookies.txt` request is authenticated until the session expires.
 
 {{< callout type="warning" title="The login response contains no token" >}}
-The reply body is `{"user": {...}}` and nothing else. The session JWT is delivered **only** as the `mailyard_session`
-cookie, which is `HttpOnly` - there is no token field to copy out of the JSON. This is why the console examples use a
+The reply body is `{"user": {...}}` and nothing else. The session JWT is delivered **only** as the session cookie
+(`__Host-mailyard_session` over HTTPS, `mailyard_session` over plain HTTP), which is `HttpOnly` - there is no token
+field to copy out of the JSON. This is why the console examples use a
 cookie jar rather than an
 `Authorization` header.
 

@@ -273,7 +273,7 @@ func (h *Handler) Logout(c fiber.Ctx) error {
 		})
 	}
 
-	c.Cookie(buildSessionCookie(c, h.Runtime, "", -time.Hour))
+	clearSessionCookies(c, h.Runtime)
 
 	return response.NoContent(c)
 }
@@ -282,7 +282,7 @@ func (h *Handler) Logout(c fiber.Ctx) error {
 // cookie or bearer token. Returns nil for anything unusable - a
 // logout with no valid token still clears the cookie and succeeds.
 func (h *Handler) currentSession(c fiber.Ctx) (*sessmodel.Session, string) {
-	raw := c.Cookies(SessionCookie)
+	raw := SessionCookieValue(c)
 	if raw == "" {
 		raw, _ = strings.CutPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")
 	}
@@ -513,14 +513,25 @@ func sessionTTL(rt *env.Runtime) time.Duration {
 // Secure comes from server.public_url OR the connection - see
 // cookieSecure for why it takes both.
 func buildSessionCookie(c fiber.Ctx, rt *env.Runtime, value string, ttl time.Duration) *fiber.Cookie {
+	secure := cookieSecure(c, rt)
+
 	return &fiber.Cookie{
-		Name:     SessionCookie,
+		Name:     sessionCookieName(secure),
 		Value:    value,
 		Path:     "/",
 		HTTPOnly: true,
 		SameSite: "Strict",
-		Secure:   cookieSecure(c, rt),
+		Secure:   secure,
 		Expires:  time.Now().Add(ttl),
+	}
+}
+
+// clearSessionCookies expires the session cookie under both names.
+func clearSessionCookies(c fiber.Ctx, rt *env.Runtime) {
+	for _, name := range []string{SessionCookieHost, SessionCookie} {
+		ck := buildSessionCookie(c, rt, "", -time.Hour)
+		ck.Name = name
+		c.Cookie(ck)
 	}
 }
 

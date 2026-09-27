@@ -64,7 +64,7 @@ func refuseCrossSite(rt *env.Runtime) fiber.Handler {
 			return c.Next()
 		}
 
-		if c.Get(fiber.HeaderAuthorization) != "" || c.Cookies(authdomain.SessionCookie) == "" {
+		if c.Get(fiber.HeaderAuthorization) != "" || authdomain.SessionCookieValue(c) == "" {
 			return c.Next()
 		}
 
