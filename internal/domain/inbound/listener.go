@@ -60,6 +60,10 @@ type session struct {
 	backend *Backend
 	ip      string
 
+	// refused counts recipients answered 550 in this session. Past
+	// maxRefusedRcpt the rest are refused without a lookup.
+	refused int
+
 	// helo is what the client announced. SPF falls back to it when the
 	// envelope sender is null, which is how bounces arrive.
 	helo string
@@ -96,6 +100,10 @@ func (s *session) Mail(from string, _ *smtp.MailOptions) error {
 	return nil
 }
 
+// maxRefusedRcpt is how many unknown recipients one session may name
+// before the rest are refused unasked.
+const maxRefusedRcpt = 10
+
 // Rcpt refuses recipients whose domain no project has verified,
 // failing before DATA so unwanted mail costs no bandwidth.
 func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
@@ -105,6 +113,10 @@ func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 	}
 
 	addr = strings.ToLower(strings.TrimSpace(addr))
+
+	if s.refused >= maxRefusedRcpt {
+		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "relay not permitted"}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -116,6 +128,8 @@ func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 	}
 
 	if d == nil {
+		s.refused++
+
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "relay not permitted"}
 	}
 

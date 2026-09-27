@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -63,6 +64,10 @@ type Service struct {
 	Domains      store.DomainStore
 	Inbound      store.InboundStore
 	Suppressions store.SuppressionStore
+
+	// memo remembers ResolveDomain answers per host - see there.
+	memoMu sync.Mutex
+	memo   map[string]domainMemo
 
 	// Emails and Bounces serve the DSN pipeline: a report carrying a
 	// sending id becomes bounce records and suppressions instead of
@@ -133,13 +138,51 @@ func NewService(rt *env.Runtime) *Service {
 
 // ResolveDomain returns the verified domain owning the recipient
 // address, or nil when no project claims it.
+//
+// Remembered per host for domainMemoTTL, because the MX listener asks
+// this on every RCPT from anyone on the internet.
 func (s *Service) ResolveDomain(ctx context.Context, rcpt string) (*dmodel.Domain, error) {
 	_, host, ok := strings.CutLast(rcpt, "@")
 	if !ok || host == "" {
 		return nil, nil
 	}
 
-	return s.Domains.GetVerifiedCovering(ctx, host)
+	now := time.Now()
+	s.memoMu.Lock()
+	if s.memo == nil || len(s.memo) > domainMemoMax {
+		s.memo = map[string]domainMemo{}
+	}
+
+	if m, ok := s.memo[host]; ok && now.Before(m.until) {
+		s.memoMu.Unlock()
+
+		return m.domain, nil
+	}
+
+	s.memoMu.Unlock()
+
+	d, err := s.Domains.GetVerifiedCovering(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+
+	s.memoMu.Lock()
+	s.memo[host] = domainMemo{domain: d, until: now.Add(domainMemoTTL)}
+	s.memoMu.Unlock()
+
+	return d, nil
+}
+
+// domainMemoTTL is how long one host's answer stands.
+const domainMemoTTL = 30 * time.Second
+
+// domainMemoMax bounds the memo. Past it the memo is started again,
+// since the entries are cheap to recompute.
+const domainMemoMax = 4096
+
+type domainMemo struct {
+	domain *dmodel.Domain
+	until  time.Time
 }
 
 // Conn carries what the transport knew and the bytes cannot say.
