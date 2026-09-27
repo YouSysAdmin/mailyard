@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
@@ -101,16 +102,25 @@ func newSetPasswordCmd() *cobra.Command {
 				return err
 			}
 
-			u.PasswordHash = hash
-
-			// A disabled account cannot sign in whatever its password
-			// is, and somebody running this is trying to get back in.
-			u.Disabled = false
-			if err := st.User.Put(ctx, u); err != nil {
+			// A targeted write: Put would rewrite the whole row from a
+			// stale read.
+			if err := st.User.SetPassword(ctx, u.ID, hash); err != nil {
 				return fmt.Errorf("save: %w", err)
 			}
 
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "password updated for %s\n", email)
+
+			// A disabled account cannot sign in whatever its password
+			// is, and somebody running this is trying to get back in.
+			if u.Disabled {
+				u.Disabled = false
+				if err := st.User.Put(ctx, u); err != nil {
+					return fmt.Errorf("enable: %w", err)
+				}
+
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "account enabled\n")
+			}
+
 			if u.TOTPEnabled {
 				// Deliberately not cleared: a password reset is not a
 				// reason to drop the second factor, and doing it
@@ -119,11 +129,20 @@ func newSetPasswordCmd() *cobra.Command {
 					"note: two-factor auth is still enabled on this account, you will be asked for a code\n")
 			}
 
-			// Existing sessions keep working - the JWT is signed and its
-			// session row is untouched. Say so, because somebody
-			// resetting a password usually expects the opposite.
+			// Like every other password change: end the old sessions
+			// and any outstanding reset link.
+			now := time.Now().UTC()
+			if err := st.PasswordReset.InvalidateForUser(ctx, u.ID, now); err != nil {
+				return fmt.Errorf("invalidate reset links: %w", err)
+			}
+
+			n, err := st.Session.RevokeAllForUser(ctx, u.ID)
+			if err != nil {
+				return fmt.Errorf("revoke sessions: %w", err)
+			}
+
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-				"note: existing sessions are NOT revoked, sign them out from the console if that matters\n")
+				"revoked %d session(s) and every outstanding reset link\n", n)
 
 			return nil
 		},
