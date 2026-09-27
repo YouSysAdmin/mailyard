@@ -11,12 +11,14 @@ package eventstream
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/eventbus"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/domain"
 )
 
@@ -84,6 +86,9 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 	// runs after the handler returns. Everything the loop needs is
 	// captured here.
 	return c.SendStreamWriter(func(w *bufio.Writer) {
+		// The closure runs after the handler returns, outside the
+		// server's recover middleware.
+		defer safego.Recover(slog.Default(), "eventstream: stream", "project_id", projectID)
 		defer sub.Close()
 
 		deadline := time.NewTimer(MaxStreamLife)
