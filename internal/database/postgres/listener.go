@@ -31,6 +31,10 @@ const (
 	// ChannelRelayAssign says a message was assigned to a pull relay
 	// node, so a long-poll waiting for that node can answer.
 	ChannelRelayAssign = "mailyard_relay_assign"
+
+	// ChannelSessions says a session was revoked somewhere, and every
+	// node's session cache is stale until it drops what it holds.
+	ChannelSessions = "mailyard_sessions"
 )
 
 const (

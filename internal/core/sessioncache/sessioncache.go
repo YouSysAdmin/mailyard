@@ -38,6 +38,10 @@ type Cache struct {
 
 	// lastSweep bounds how often eviction walks the map.
 	lastSweep time.Time
+
+	// Broadcast, when set, tells the other nodes to drop their caches.
+	// Set before the server starts serving.
+	Broadcast func()
 }
 
 // New builds an empty, usable Cache. The zero value is not - writing
@@ -92,8 +96,8 @@ func (c *Cache) Store(id, userID string, sessionExpiry, now time.Time) {
 	}
 }
 
-// Invalidate drops a session so the next request re-reads it. Called
-// on revoke by the node that served it.
+// Invalidate drops a session so the next request re-reads it, here
+// and, through Broadcast, on every other node.
 func (c *Cache) Invalidate(id string) {
 	if c == nil || id == "" {
 		return
@@ -102,11 +106,20 @@ func (c *Cache) Invalidate(id string) {
 	c.mu.Lock()
 	delete(c.entries, id)
 	c.mu.Unlock()
+	c.broadcast()
 }
 
 // InvalidateAll clears the whole cache, for a change that affects
-// many sessions at once.
+// many sessions at once, here and on every other node.
 func (c *Cache) InvalidateAll() {
+	c.InvalidateAllLocal()
+	c.broadcast()
+}
+
+// InvalidateAllLocal clears this node's cache only. The cross-node
+// relay subscribes with it: a notification carries no id, and
+// InvalidateAll would rebroadcast what was just received.
+func (c *Cache) InvalidateAllLocal() {
 	if c == nil {
 		return
 	}
@@ -114,6 +127,12 @@ func (c *Cache) InvalidateAll() {
 	c.mu.Lock()
 	c.entries = map[string]entry{}
 	c.mu.Unlock()
+}
+
+func (c *Cache) broadcast() {
+	if c != nil && c.Broadcast != nil {
+		c.Broadcast()
+	}
 }
 
 func (c *Cache) evictLocked(now time.Time) {

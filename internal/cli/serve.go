@@ -531,6 +531,11 @@ func runServe(cmd *cobra.Command, r role) error {
 	rt.RelayBell = &bell.Bell{}
 	listener.Subscribe(postgres.ChannelRelayAssign, rt.RelayBell.Ring)
 
+	// A revoke on one node clears every node's cache. Subscribed with
+	// the LOCAL clear so the broadcast does not rebroadcast itself.
+	rt.Sessions.Broadcast = func() { listener.Notify(postgres.ChannelSessions) }
+	listener.Subscribe(postgres.ChannelSessions, rt.Sessions.InvalidateAllLocal)
+
 	// The pull-node seam: a candidate that is a node in pull mode is
 	// assigned to rather than dialled, and the assignment rings every
 	// claim long-poll through the same LISTEN/NOTIFY relay the queue
