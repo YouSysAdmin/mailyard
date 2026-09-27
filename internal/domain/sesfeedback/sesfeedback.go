@@ -19,8 +19,10 @@ import (
 	"context"
 	"encoding/json/v2"
 	"log/slog"
+	"maps"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -43,6 +45,12 @@ type Handler struct {
 	Runtime   *env.Runtime
 	Allowlist *sestopics.Allowlist
 	verifier  *snsmsg.Verifier
+
+	// seen holds notification ids inside the verification window, so
+	// a captured notification cannot be filed twice - see firstSighting.
+	seenMu    sync.Mutex
+	seen      map[string]time.Time
+	seenSwept time.Time
 }
 
 // New builds the handler with an SSRF-guarded client for fetching
@@ -115,6 +123,16 @@ func (h *Handler) Receive(c fiber.Ctx) error {
 			"topic", msg.TopicARN, "client_ip", clientip.From(c), "err", err)
 
 		return c.SendStatus(fiber.StatusForbidden)
+	}
+
+	// A signed notification is valid for MaxAge, and a captured one
+	// replays as itself inside that window. A repeat is answered 200
+	// and filed once.
+	if !h.firstSighting(msg.MessageID) {
+		h.log().Debug("ses: notification already processed, ignoring the repeat",
+			"topic", msg.TopicARN, "message_id", msg.MessageID)
+
+		return c.SendStatus(fiber.StatusOK)
 	}
 
 	switch msg.Type {
@@ -347,3 +365,35 @@ func (h *Handler) topicOfServer(ctx context.Context, serverID string) (string, e
 }
 
 func (h *Handler) log() *slog.Logger { return h.Runtime.Log }
+
+// firstSighting records the notification id and reports whether it
+// was new. Held for the verifier's MaxAge and swept on the way through.
+func (h *Handler) firstSighting(id string) bool {
+	if id == "" {
+		return true
+	}
+
+	now := time.Now()
+	h.seenMu.Lock()
+	defer h.seenMu.Unlock()
+	if h.seen == nil {
+		h.seen = map[string]time.Time{}
+	}
+
+	if now.Sub(h.seenSwept) > time.Minute {
+		maps.DeleteFunc(h.seen, func(_ string, until time.Time) bool { return now.After(until) })
+		h.seenSwept = now
+	}
+
+	if until, ok := h.seen[id]; ok && now.Before(until) {
+		return false
+	}
+
+	h.seen[id] = now.Add(h.verifier.MaxAge + futureSkewAllowance)
+
+	return true
+}
+
+// futureSkewAllowance covers a notification stamped slightly ahead of
+// our clock, which the verifier admits.
+const futureSkewAllowance = 5 * time.Minute
