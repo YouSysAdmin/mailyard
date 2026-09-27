@@ -29,6 +29,11 @@ import (
 type Handler struct {
 	Runtime *env.Runtime
 
+	// enrolMu serialises Register on this node: hostname uniqueness is
+	// checked across two tables, which no index can span. Two nodes
+	// enrolling the same host at once remain a race.
+	enrolMu sync.Mutex
+
 	// CA signs and forgets node identities. NIL is an ordinary state,
 	// not a broken one: an installation that cannot enrol nodes has no
 	// authority, and every method that needs one says so rather than
