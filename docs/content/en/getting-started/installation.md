@@ -90,6 +90,7 @@ The console is then at `http://localhost:3000/app`.
 
 {{< callout type="tip" >}}
 Lost the bootstrap password? `mailyard set-password` resets it from the command line against the same database.
+Need a new encryption key? `mailyard rekey` re-encrypts every sealed column under it, with the nodes stopped.
 {{< /callout >}}
 
 ## TLS

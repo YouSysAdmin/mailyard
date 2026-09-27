@@ -157,6 +157,12 @@ func newSetPasswordCmd() *cobra.Command {
 // resolvePassword gets the new password from whichever source the
 // operator chose, preferring the ones that keep it out of history.
 func resolvePassword(prompt io.Writer, flagValue string, fromStdin bool) (string, error) {
+	return resolveSecret(prompt, "New password", flagValue, fromStdin)
+}
+
+// resolveSecret is resolvePassword for any secret typed at the
+// terminal, labelled for the prompt.
+func resolveSecret(prompt io.Writer, label, flagValue string, fromStdin bool) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
 	}
@@ -180,7 +186,7 @@ func resolvePassword(prompt io.Writer, flagValue string, fromStdin bool) (string
 		return "", usage("stdin is not a terminal, pass --stdin to read the password from a pipe")
 	}
 
-	_, _ = fmt.Fprint(prompt, "New password: ")
+	_, _ = fmt.Fprint(prompt, label+": ")
 	first, err := term.ReadPassword(fd)
 	_, _ = fmt.Fprintln(prompt)
 	if err != nil {
@@ -195,7 +201,7 @@ func resolvePassword(prompt io.Writer, flagValue string, fromStdin bool) (string
 	}
 
 	if string(first) != string(second) {
-		return "", errors.New("passwords do not match")
+		return "", errors.New("the two entries do not match")
 	}
 
 	return string(first), nil

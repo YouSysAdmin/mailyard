@@ -45,7 +45,7 @@ func NewRoot() *cobra.Command {
 	)
 	add(root, groupNode, newServeCmd())
 	add(root, groupNode, nodeCommands()...)
-	add(root, groupRecover, newSetPasswordCmd(), newTLSCmd())
+	add(root, groupRecover, newSetPasswordCmd(), newRekeyCmd(), newTLSCmd())
 	add(root, groupInspect, newVersionCmd(), newExportAPISpecCmd())
 
 	return root
