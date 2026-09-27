@@ -301,24 +301,18 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 	// The first user of the installation gets admin so whoever set the
 	// IdP up can administer the app. Everyone after that is a plain
 	// user - satisfying an allowlist must never be a privilege grant.
-	count, err := h.Runtime.Store.User.Count(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	admin := count == 0
-
+	// PutFirst decides "first" under a lock.
+	//
 	// Verified by construction: the IdP asserted this email, which is
 	// a stronger proof of the mailbox than our own confirmation link.
 	fresh := &usermodel.User{
 		ID:            ids.New(),
 		Email:         email,
 		AccountType:   usermodel.AccountOIDC,
-		Admin:         admin,
 		CreatedAt:     time.Now().UTC(),
 		EmailVerified: true,
 	}
-	if err := h.Runtime.Store.User.Put(ctx, fresh); err != nil {
+	if _, err := h.Runtime.Store.User.PutFirst(ctx, fresh, false); err != nil {
 		return nil, err
 	}
 

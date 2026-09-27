@@ -57,6 +57,15 @@ func (s *Store) GetByID(ctx context.Context, id string) (*usermodel.User, error)
 // as SQL NULL rather than an empty string, so an OIDC-only account
 // holds no value that a comparison could ever match.
 func (s *Store) Put(ctx context.Context, u *usermodel.User) error {
+	return s.put(ctx, s.DB(), u)
+}
+
+// execer is the half of *sql.DB and *sql.Tx that put needs.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func (s *Store) put(ctx context.Context, db execer, u *usermodel.User) error {
 	if u.CreatedAt.IsZero() {
 		u.CreatedAt = time.Now().UTC()
 	}
@@ -65,7 +74,7 @@ func (s *Store) Put(ctx context.Context, u *usermodel.User) error {
 		u.AccountType = usermodel.AccountLocal
 	}
 
-	_, err := s.Exec(ctx, `
+	_, err := db.ExecContext(ctx, s.Q(`
         INSERT INTO users (
             id, email, password_hash, account_type, admin, disabled,
             email_verified, totp_secret, totp_enabled, created_at, last_login_at
@@ -80,7 +89,7 @@ func (s *Store) Put(ctx context.Context, u *usermodel.User) error {
             totp_secret     = excluded.totp_secret,
             totp_enabled    = excluded.totp_enabled,
             last_login_at   = excluded.last_login_at
-    `,
+    `),
 		u.ID, u.Email,
 		database.NullStr(u.PasswordHash),
 		int(u.AccountType), u.Admin, u.Disabled, u.EmailVerified,
@@ -88,6 +97,101 @@ func (s *Store) Put(ctx context.Context, u *usermodel.User) error {
 	)
 
 	return err
+}
+
+// ErrLastAdmin is PutKeepingAnAdmin refusing to leave the installation
+// with nobody who can administer it.
+var ErrLastAdmin = errors.New("this is the last enabled administrator")
+
+// PutKeepingAnAdmin writes the row like Put, unless doing so would
+// leave no enabled administrator. The administrators are locked first,
+// so two demotions at once cannot both succeed. Compare lockOwners in
+// the project store.
+func (s *Store) PutKeepingAnAdmin(ctx context.Context, u *usermodel.User) error {
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	others, err := s.otherActiveAdmins(ctx, tx, u.ID)
+	if err != nil {
+		return err
+	}
+
+	if others == 0 && (!u.Admin || u.Disabled) {
+		return ErrLastAdmin
+	}
+
+	if err := s.put(ctx, tx, u); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// otherActiveAdmins locks the enabled administrators and counts the
+// ones that are not exceptID.
+func (s *Store) otherActiveAdmins(ctx context.Context, tx *sql.Tx, exceptID string) (int, error) {
+	rows, err := tx.QueryContext(ctx, s.Q(`
+        SELECT id FROM users WHERE admin AND NOT disabled FOR UPDATE
+    `))
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	others := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+
+		if id != exceptID {
+			others++
+		}
+	}
+
+	return others, rows.Err()
+}
+
+// PutFirst inserts u under a lock that makes "first" mean exactly
+// one, as an administrator when no user exists yet, and reports
+// whether u was first. With onlyIfFirst nothing is written once users
+// exist (bootstrap), without it u is written either way (an identity
+// provider's auto-registration).
+func (s *Store) PutFirst(ctx context.Context, u *usermodel.User, onlyIfFirst bool) (bool, error) {
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	// One lock for the whole table, held to commit.
+	if _, err := tx.ExecContext(ctx, s.Q(`SELECT pg_advisory_xact_lock(hashtext('users.first'))`)); err != nil {
+		return false, err
+	}
+
+	var n int
+	if err := tx.QueryRowContext(ctx, s.Q(`SELECT COUNT(*) FROM users`)).Scan(&n); err != nil {
+		return false, err
+	}
+
+	first := n == 0
+	if !first && onlyIfFirst {
+		return false, nil
+	}
+
+	u.Admin = first
+	if err := s.put(ctx, tx, u); err != nil {
+		return false, err
+	}
+
+	return first, tx.Commit()
 }
 
 // MarkEmailVerified flips the verification flag in place. A dedicated

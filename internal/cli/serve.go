@@ -1007,11 +1007,17 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 		Email:         rt.Config.Auth.Local.Email,
 		PasswordHash:  hash,
 		AccountType:   usermodel.AccountLocal,
-		Admin:         true,
 		EmailVerified: true,
 	}
-	if err := rt.Store.User.Put(ctx, u); err != nil {
+
+	// The count above is the cheap answer, this is the locked one.
+	first, err := rt.Store.User.PutFirst(ctx, u, true)
+	if err != nil {
 		return fmt.Errorf("put user: %w", err)
+	}
+
+	if !first {
+		return nil
 	}
 
 	// No project is created here. The first admin signs in, lands on the

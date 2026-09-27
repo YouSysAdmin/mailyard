@@ -306,6 +306,14 @@ type UserStore interface {
 	Get(ctx context.Context, email string) (*user.User, error)
 	GetByID(ctx context.Context, id string) (*user.User, error)
 	Put(ctx context.Context, u *user.User) error
+
+	// PutKeepingAnAdmin is Put refusing to leave the installation with
+	// no enabled administrator - see the store method.
+	PutKeepingAnAdmin(ctx context.Context, u *user.User) error
+
+	// PutFirst inserts the first user as an administrator under a lock,
+	// reporting whether it was first - see the store method.
+	PutFirst(ctx context.Context, u *user.User, onlyIfFirst bool) (bool, error)
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context) ([]*user.User, error)
 	Count(ctx context.Context) (int, error)

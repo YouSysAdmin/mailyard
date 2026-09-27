@@ -4,6 +4,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -153,6 +154,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		u.Admin = *in.Admin
 	}
 
+	wasAdmin := u.Admin && !u.Disabled
 	if in.Disabled != nil {
 		u.Disabled = *in.Disabled
 	}
@@ -171,7 +173,17 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	// remaining exposure here is narrow and known: an admin saving this
 	// form at the instant the account owner enrols a second factor writes
 	// the pre-enrolment totp columns back.
-	if err := h.Runtime.Store.User.Put(c.Context(), u); err != nil {
+	//
+	// A change that demotes or disables an administrator goes through
+	// the guarded write, which locks the administrators and refuses to
+	// leave none.
+	if wasAdmin && (!u.Admin || u.Disabled) {
+		if err := h.Runtime.Store.User.PutKeepingAnAdmin(c.Context(), u); errors.Is(err, ErrLastAdmin) {
+			return response.Conflict(c, "this is the last enabled administrator - promote somebody else first")
+		} else if err != nil {
+			return response.Internal(c, err)
+		}
+	} else if err := h.Runtime.Store.User.Put(c.Context(), u); err != nil {
 		return response.Internal(c, err)
 	}
 
