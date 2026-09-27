@@ -3,6 +3,7 @@
 package user
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -225,6 +226,16 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	return response.NoContent(c)
 }
 
+// endSessions revokes every session of the account: a reset of a
+// second factor must not leave a hijacker signed in.
+func (h *Handler) endSessions(ctx context.Context, userID, why string) {
+	if _, err := h.Runtime.Store.Session.RevokeAllForUser(ctx, userID); err != nil {
+		slog.Warn("users: revoking sessions failed", "user_id", userID, "after", why, "err", err)
+	}
+
+	h.Runtime.Sessions.InvalidateAll()
+}
+
 // ResetTOTP removes a user's second factor, for the operator whose
 // user lost their phone. Refused on your own account: the self-service
 // path (profile, 2FA disable) proves possession with a code, and this
@@ -260,6 +271,8 @@ func (h *Handler) ResetTOTP(c fiber.Ctx) error {
 	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, "", false); err != nil {
 		return response.Internal(c, err)
 	}
+
+	h.endSessions(c.Context(), u.ID, "second factor reset")
 
 	if err := h.Runtime.Store.User.DeleteRecoveryCodes(c.Context(), u.ID); err != nil {
 		return response.Internal(c, err)
@@ -312,6 +325,8 @@ func (h *Handler) ResetPasskeys(c fiber.Ctx) error {
 	if n == 0 {
 		return response.BadRequest(c, "this user has no passkeys")
 	}
+
+	h.endSessions(c.Context(), u.ID, "passkeys reset")
 
 	rc := domain.GetRequestContext(c)
 	ev := &amodel.Event{

@@ -173,3 +173,14 @@ func (h *Handler) RevokeOtherSessions(c fiber.Ctx) error {
 
 	return response.Success(c, RevokedResponse{Revoked: n})
 }
+
+// endOtherSessions revokes every session of the account except the
+// one making the change. A second-factor change answers a session the
+// owner did not start, so it ends the others.
+func (h *Handler) endOtherSessions(c fiber.Ctx, keepID, userID string) {
+	if _, err := h.Runtime.Store.Session.RevokeOthers(c.Context(), userID, keepID); err != nil {
+		slog.Warn("auth: revoking the other sessions failed", "user_id", userID, "err", err)
+	}
+
+	h.Runtime.Sessions.InvalidateAll()
+}

@@ -148,6 +148,10 @@ func (h *Handler) TOTPEnable(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	// Every other session ends here: a second factor is turned on in
+	// response to a session the owner did not start.
+	h.endOtherSessions(c, rc.SessionID, u.ID)
+
 	// The way back in when the phone is gone, minted with the factor
 	// and shown exactly once, here.
 	codes, err := h.issueRecoveryCodes(c.Context(), u.ID)
@@ -205,6 +209,8 @@ func (h *Handler) TOTPDisable(c fiber.Ctx) error {
 	if err := h.Runtime.Store.User.SetTOTP(c.Context(), u.ID, "", false); err != nil {
 		return response.Internal(c, err)
 	}
+
+	h.endOtherSessions(c, rc.SessionID, u.ID)
 
 	// The codes go with the factor: one left behind is a password
 	// bypass with nothing to recover.
