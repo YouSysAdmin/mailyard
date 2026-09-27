@@ -81,6 +81,12 @@ const (
 
 // CheckSend enforces the hourly and daily email volume limits for
 // one new send.
+//
+// A read followed, later in the request, by the insert that counts,
+// so N sends arriving together at limit-1 all pass. The overrun is
+// bounded by sends in flight. Closing it takes a transaction spanning
+// this check and the email insert, and a plan is a soft ceiling rather
+// than a per-message contract.
 func CheckSend(ctx context.Context, st *store.Store, projID string, obs Observer) error {
 	p, err := planFor(ctx, st, projID)
 	if err != nil {
