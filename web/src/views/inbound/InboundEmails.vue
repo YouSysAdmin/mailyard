@@ -25,6 +25,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import MessageListRow from '../../components/MessageListRow.vue'
+import MessageSearch, { type MessageSearchTerms } from '../../components/MessageSearch.vue'
 import InboundReader from './InboundReader.vue'
 
 const PAGE_SIZE = 25
@@ -39,6 +40,9 @@ const loading = ref(true)
 const loadingMore = ref(false)
 const emails = ref<InboundEmail[]>([])
 const status = ref('')
+// The applied envelope search, which every page of the list is read with.
+const sender = ref('')
+const recipient = ref('')
 const counts = ref<Record<string, number>>({})
 // Server keyset paging over received_at: a full page means there may be
 // more rows before the last cursor.
@@ -79,10 +83,25 @@ function select(id: string) {
   router.replace(`/inbound-emails/${id}`)
 }
 
+function filterParams() {
+  return {
+    status: status.value || undefined,
+    sender: sender.value || undefined,
+    recipient: recipient.value || undefined,
+  }
+}
+
+const searching = computed(() => sender.value !== '' || recipient.value !== '')
+
+function search(terms: MessageSearchTerms) {
+  sender.value = terms.sender
+  recipient.value = terms.recipient
+}
+
 async function load(quiet = false) {
   if (!quiet) loading.value = true
   try {
-    const res = await inboundApi.list({ status: status.value || undefined, limit: PAGE_SIZE })
+    const res = await inboundApi.list({ ...filterParams(), limit: PAGE_SIZE })
     emails.value = res.data.inbound_emails ?? []
     hasMore.value = emails.value.length === PAGE_SIZE
   } catch (e) {
@@ -110,7 +129,7 @@ async function loadMore() {
   loadingMore.value = true
   try {
     const res = await inboundApi.list({
-      status: status.value || undefined,
+      ...filterParams(),
       limit: PAGE_SIZE,
       before: last.received_at,
       before_id: last.id,
@@ -198,7 +217,7 @@ watch(
   { immediate: true },
 )
 
-watch(status, () => {
+watch([status, sender, recipient], () => {
   pagedBack.value = false
   // The rows AND the selection belong to the PREVIOUS filter, and both
   // go before the load. The selection, so the auto-select watch can
@@ -255,11 +274,13 @@ onMounted(() => loadAll())
              nothing else, and as a separate row it took height from the
              thing being read. -->
         <div class="list-filter">
-          <select v-model="status" class="form-select" aria-label="Status">
-            <option v-for="o in statusOptions" :key="o.value" :value="o.value">
-              {{ o.label }}
-            </option>
-          </select>
+          <MessageSearch :sender="sender" :recipient="recipient" @apply="search">
+            <select v-model="status" class="form-select" aria-label="Status">
+              <option v-for="o in statusOptions" :key="o.value" :value="o.value">
+                {{ o.label }}
+              </option>
+            </select>
+          </MessageSearch>
         </div>
 
         <MessageListRow
@@ -293,7 +314,7 @@ onMounted(() => loadAll())
       <div class="reader-pane">
         <InboundReader v-if="selectedId" :id="selectedId" @delete="deleteEmail" />
         <EmptyState v-else-if="emails.length === 0" title="No inbound emails">
-          <p v-if="status">No messages with this status yet. Try another filter.</p>
+          <p v-if="status || searching">No messages match this filter. Try another one.</p>
           <p v-else>Messages received for your verified domains will appear here.</p>
         </EmptyState>
         <EmptyState v-else title="Nothing selected">

@@ -47,7 +47,12 @@ func (h *Handler) List(c fiber.Ctx) error {
 		MaxMessages:   h.maxMessagesFor(c, rc.Project.ID),
 	}
 
-	f := store.SandboxFilter{Limit: p.Limit, Offset: p.Offset}
+	f := store.SandboxFilter{
+		Sender:    paging.Search(c, "sender"),
+		Recipient: paging.Search(c, "recipient"),
+		Limit:     p.Limit,
+		Offset:    p.Offset,
+	}
 	if id := c.Query("inbox"); id != "" {
 		in, err := h.Runtime.Store.SandboxInbox.Get(c.Context(), rc.Project.ID, id)
 		if err != nil {

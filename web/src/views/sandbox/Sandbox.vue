@@ -29,6 +29,7 @@ import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import MessageListRow from '../../components/MessageListRow.vue'
+import MessageSearch, { type MessageSearchTerms } from '../../components/MessageSearch.vue'
 import SandboxReader from './SandboxReader.vue'
 import SandboxConnection from './SandboxConnection.vue'
 import SandboxInboxes from './SandboxInboxes.vue'
@@ -54,6 +55,18 @@ const showClear = ref(false)
 
 const credentials = ref<SMTPCredential[]>([])
 const inboxes = ref<SandboxInbox[]>([])
+
+// The applied envelope search. ANDed with the inbox, and kept in the
+// page rather than the URL: it is a question asked while reading, not a
+// view somebody links to.
+const sender = ref('')
+const recipient = ref('')
+const searching = computed(() => sender.value !== '' || recipient.value !== '')
+
+function search(terms: MessageSearchTerms) {
+  sender.value = terms.sender
+  recipient.value = terms.recipient
+}
 
 const hasMore = computed(() => emails.value.length < total.value)
 
@@ -130,6 +143,8 @@ async function load(quiet = false) {
       limit: PAGE_SIZE,
       offset: 0,
       inbox: inbox.value || undefined,
+      sender: sender.value || undefined,
+      recipient: recipient.value || undefined,
     })
     emails.value = res.data.sandbox_emails ?? []
     total.value = res.data.total ?? emails.value.length
@@ -188,6 +203,8 @@ async function loadMore() {
       limit: PAGE_SIZE,
       offset: emails.value.length,
       inbox: inbox.value || undefined,
+      sender: sender.value || undefined,
+      recipient: recipient.value || undefined,
     })
     emails.value = emails.value.concat(res.data.sandbox_emails ?? [])
     pagedBack.value = true
@@ -278,7 +295,7 @@ watch(
 // A new filter is a new list. The selection is dropped only when the
 // page that comes back does not hold it, which is what lets a switch to
 // the inbox the open message belongs to keep it open.
-watch(inbox, async () => {
+watch([inbox, sender, recipient], async () => {
   pagedBack.value = false
   await load()
   if (selectedId.value && !emails.value.some((e) => e.id === selectedId.value)) go('')
@@ -294,28 +311,7 @@ onMounted(() => {
 
 <template>
   <div class="reader-page">
-    <PageHeader>
-      <!-- The filter sits beside the title, not among the actions: it
-           says WHICH mail the page shows, the way a folder name does in
-           a mail client, and the buttons on the right act on it. Shown
-           once there is something to pick - "All mail" alone is a
-           control with one setting, and the Inboxes button is where the
-           first one gets made. -->
-      <template #title>
-        <div class="title-row">
-          <h1>Inbound Sandbox</h1>
-          <select
-            v-if="inboxes.length > 0"
-            :value="inbox"
-            class="form-select inbox-filter"
-            aria-label="Filter by inbox"
-            @change="setInbox(($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">All mail</option>
-            <option v-for="box in inboxes" :key="box.id" :value="box.id">{{ box.name }}</option>
-          </select>
-        </div>
-      </template>
+    <PageHeader title="Inbound Sandbox">
       <RefreshControl
         :every-seconds="everySeconds"
         :refreshing="refreshing"
@@ -348,6 +344,24 @@ onMounted(() => {
          panes' parent scrolls. -->
     <div v-else class="card reader-split">
       <div class="list-pane">
+        <div class="list-filter">
+          <MessageSearch :sender="sender" :recipient="recipient" @apply="search">
+            <!-- Which mail the list shows, the way the status select does on
+                 the inbound page. Always shown: "All mail" alone still says
+                 what the list is, and the Inboxes button is where the first
+                 one gets made. -->
+            <select
+              :value="inbox"
+              class="form-select"
+              aria-label="Filter by inbox"
+              @change="setInbox(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">All mail</option>
+              <option v-for="box in inboxes" :key="box.id" :value="box.id">{{ box.name }}</option>
+            </select>
+          </MessageSearch>
+        </div>
+
         <MessageListRow
           v-for="em in emails"
           :key="em.id"
@@ -372,6 +386,9 @@ onMounted(() => {
 
       <div class="reader-pane">
         <SandboxReader v-if="selectedId" :id="selectedId" @deleted="forget" />
+        <EmptyState v-else-if="emails.length === 0 && searching" title="No matching captures">
+          <p>Nothing here matches the From and To searched for. Clear them to see more.</p>
+        </EmptyState>
         <EmptyState
           v-else-if="emails.length === 0 && inbox"
           :title="`Nothing from ${inboxName || 'this inbox'} yet`"
@@ -421,21 +438,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* The heading and the filter share one line. The shared select is
-   full-width because every other one sits in a form, so it gets a
-   width of its own here or it takes the whole row. */
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.inbox-filter {
-  width: auto;
-  min-width: 160px;
-  max-width: 260px;
-}
-
 /* The button says something is unset before it is pressed - no
    credential to send with, or a listener that is off. */
 .attn-dot {

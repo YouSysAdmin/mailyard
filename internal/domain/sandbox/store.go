@@ -89,6 +89,35 @@ func (s *Store) Raw(ctx context.Context, projID, id string) ([]byte, error) {
 // the statement text is one constant whatever the list's length.
 const senderIn = ` AND lower(e.sender) = ANY(?::text[])`
 
+// senderLike and recipientLike are the envelope searches. recipients is
+// a JSON array in a TEXT column, so a substring of its text is a
+// substring of one of the addresses.
+const (
+	senderLike    = ` AND e.sender ILIKE ? ESCAPE '\'`
+	recipientLike = ` AND e.recipients ILIKE ? ESCAPE '\'`
+)
+
+// narrow appends f's conditions to sb and their values to args, for
+// List and Count alike.
+func narrow(sb *strings.Builder, args []any, f store.SandboxFilter) []any {
+	if len(f.Addresses) > 0 {
+		sb.WriteString(senderIn)
+		args = append(args, f.Addresses)
+	}
+
+	if f.Sender != "" {
+		sb.WriteString(senderLike)
+		args = append(args, "%"+database.EscapeLike(f.Sender)+"%")
+	}
+
+	if f.Recipient != "" {
+		sb.WriteString(recipientLike)
+		args = append(args, "%"+database.EscapeLike(f.Recipient)+"%")
+	}
+
+	return args
+}
+
 // List returns one page, newest first, narrowed by f.
 func (s *Store) List(ctx context.Context, projID string, f store.SandboxFilter) ([]*sbmodel.Email, error) {
 	limit := f.Limit
@@ -99,12 +128,7 @@ func (s *Store) List(ctx context.Context, projID string, f store.SandboxFilter) 
 	var sb strings.Builder
 	sb.WriteString(sandboxSelect)
 	sb.WriteString(` WHERE e.project_id = ?`)
-	args := []any{projID}
-	if len(f.Addresses) > 0 {
-		sb.WriteString(senderIn)
-		args = append(args, f.Addresses)
-	}
-
+	args := narrow(&sb, []any{projID}, f)
 	sb.WriteString(` ORDER BY e.received_at DESC LIMIT ? OFFSET ?`)
 	args = append(args, limit, f.Offset)
 
@@ -131,11 +155,7 @@ func (s *Store) List(ctx context.Context, projID string, f store.SandboxFilter) 
 func (s *Store) Count(ctx context.Context, projID string, f store.SandboxFilter) (int, error) {
 	var sb strings.Builder
 	sb.WriteString(`SELECT COUNT(*) FROM sandbox_emails e WHERE e.project_id = ?`)
-	args := []any{projID}
-	if len(f.Addresses) > 0 {
-		sb.WriteString(senderIn)
-		args = append(args, f.Addresses)
-	}
+	args := narrow(&sb, []any{projID}, f)
 
 	var n int
 	err := s.ReadQueryRow(ctx, sb.String(), args...).Scan(&n)

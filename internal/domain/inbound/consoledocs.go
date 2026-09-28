@@ -20,7 +20,12 @@ func ConsoleDocs() []apidoc.Route {
 			Tag:         "inbound",
 			Summary:     "List",
 			Description: "Needs the `inbound:read` permission.",
-			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
+			Query: []apidoc.Param{
+				{Name: "status"},
+				{Name: "sender", Description: "Part of the envelope sender, case-insensitive."},
+				{Name: "recipient", Description: "Part of any envelope recipient, Bcc included, case-insensitive."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
 			Method:      "DELETE",

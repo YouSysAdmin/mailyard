@@ -20,12 +20,16 @@ func ConsoleDocs() []apidoc.Route {
 			Tag:         "sandbox",
 			Summary:     "List",
 			Description: "Needs the `sandbox:read` permission.",
-			Query: []apidoc.Param{{
-				Name:        "inbox",
-				Type:        "string",
-				Format:      "uuid",
-				Description: "Narrow the page to captures whose envelope sender is on this inbox's list.",
-			}},
+			Query: []apidoc.Param{
+				{
+					Name:        "inbox",
+					Type:        "string",
+					Format:      "uuid",
+					Description: "Narrow the page to captures whose envelope sender is on this inbox's list.",
+				},
+				{Name: "sender", Description: "Part of the envelope sender, case-insensitive."},
+				{Name: "recipient", Description: "Part of any envelope recipient, Bcc included, case-insensitive."},
+			},
 			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{

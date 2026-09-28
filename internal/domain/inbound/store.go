@@ -61,6 +61,19 @@ func (s *Store) List(ctx context.Context, projID string, f store.InboundFilter) 
 		args = append(args, f.Status)
 	}
 
+	// Envelope searches, a case-insensitive substring each. recipients
+	// is a JSON array in a TEXT column, so a substring of its text is a
+	// substring of one of the addresses.
+	if f.Sender != "" {
+		sb.WriteString(` AND sender ILIKE ? ESCAPE '\'`)
+		args = append(args, "%"+database.EscapeLike(f.Sender)+"%")
+	}
+
+	if f.Recipient != "" {
+		sb.WriteString(` AND recipients ILIKE ? ESCAPE '\'`)
+		args = append(args, "%"+database.EscapeLike(f.Recipient)+"%")
+	}
+
 	// `(received_at, id)`, one row-value comparison. received_at alone
 	// SKIPS every row tied with the last one on the page - see
 	// store.InboundFilter. BeforeID may be absent, which leaves the older

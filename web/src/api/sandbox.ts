@@ -90,7 +90,15 @@ export interface SandboxInfo {
 }
 
 export const sandboxApi = {
-  list: (params: { limit?: number; offset?: number; inbox?: string } = {}) =>
+  list: (
+    params: {
+      limit?: number
+      offset?: number
+      inbox?: string
+      sender?: string
+      recipient?: string
+    } = {},
+  ) =>
     api.get<{ sandbox_emails: SandboxEmail[]; total: number; settings: SandboxSettings }>(
       '/sandbox/',
       { params },

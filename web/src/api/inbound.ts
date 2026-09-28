@@ -57,6 +57,9 @@ export interface InboundAuth {
 
 export interface InboundListParams {
   status?: string
+  // Part of the envelope sender, or of any envelope recipient.
+  sender?: string
+  recipient?: string
   limit?: number
   // RFC 3339 keyset cursor over received_at, whose other half is
   // before_id - the timestamp alone drops rows that share it with the

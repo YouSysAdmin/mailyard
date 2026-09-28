@@ -28,8 +28,10 @@ type Handler struct {
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	f := store.InboundFilter{
-		Status: c.Query("status"),
-		Limit:  paging.From(c).Limit,
+		Status:    c.Query("status"),
+		Sender:    paging.Search(c, "sender"),
+		Recipient: paging.Search(c, "recipient"),
+		Limit:     paging.From(c).Limit,
 	}
 	if before := c.Query("before"); before != "" {
 		t, err := time.Parse(time.RFC3339, before)

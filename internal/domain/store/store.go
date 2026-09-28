@@ -998,8 +998,14 @@ type SandboxStore interface {
 // capture's envelope sender has to be one of them. Empty means every
 // capture - an inbox with NO addresses is the handler's business, since
 // the store cannot tell "no filter" from "a filter nothing satisfies".
+//
+// Sender and Recipient are search terms over the envelope, matched as a
+// case-insensitive substring and ANDed with each other and with the
+// inbox. Empty means no condition.
 type SandboxFilter struct {
 	Addresses []string
+	Sender    string
+	Recipient string
 	Limit     int
 	Offset    int
 }
@@ -1021,11 +1027,16 @@ type SandboxInboxStore interface {
 // EmailFilter for why the timestamp alone drops rows rather than
 // repeating them, which here means received mail that appears on no page
 // of the inbound log.
+//
+// Sender and Recipient are search terms over the envelope, the same
+// reading as on SandboxFilter.
 type InboundFilter struct {
-	Status   string
-	Limit    int
-	Before   *time.Time
-	BeforeID string
+	Status    string
+	Sender    string
+	Recipient string
+	Limit     int
+	Before    *time.Time
+	BeforeID  string
 }
 
 // LanguageStore persists the per-project language registry.

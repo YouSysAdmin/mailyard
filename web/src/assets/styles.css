@@ -1199,6 +1199,42 @@ tbody tr:hover td {
   border-bottom: 1px solid var(--border-primary);
 }
 
+.message-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* A slotted control takes the room, the toggle keeps its own width. */
+.message-search-bar > .form-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-search-toggle {
+  flex-shrink: 0;
+}
+
+.message-search-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary-600);
+  color: var(--text-on-primary);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.message-search-fields {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .list-more {
   padding: 12px;
   text-align: center;

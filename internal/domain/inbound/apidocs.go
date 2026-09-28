@@ -17,6 +17,8 @@ func APIDocs() []apidoc.Route {
 			Summary:    "List mail received by the MX listener",
 			Query: []apidoc.Param{
 				{Name: "status"},
+				{Name: "sender", Description: "Part of the envelope sender, case-insensitive."},
+				{Name: "recipient", Description: "Part of any envelope recipient, Bcc included, case-insensitive."},
 				{Name: "before", Format: "date-time"},
 				{Name: "before_id", Description: "The id of the last row on the previous page. " +
 					"Pass it with `before`, or rows sharing a received_at with the last one are skipped."},

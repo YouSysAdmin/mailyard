@@ -378,3 +378,53 @@ func TestClearRemovesOnlyTheChosenSenders(t *testing.T) {
 		t.Error("clearing one project's inbox reached another project")
 	}
 }
+
+// The envelope searches are substrings without regard to case, ANDed
+// with each other and with the inbox, and a wildcard in the term is a
+// literal. The page and the count beside it answer the same set.
+func TestTheSandboxSearchesTheEnvelope(t *testing.T) {
+	s := testStore(t)
+	mine, theirs := newProject(t, s), newProject(t, s)
+	app := putFrom(t, s, mine, "App@Example.test")
+	putFrom(t, s, mine, "cron@other.test")
+	putFrom(t, s, theirs, "app@example.test")
+	if _, err := s.Exec(t.Context(), `UPDATE sandbox_emails SET recipients = ? WHERE id = ?`,
+		`["qa@team.test","ops@team.test"]`, app.ID); err != nil {
+		t.Fatalf("set recipients: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		f    store.SandboxFilter
+		want int
+	}{
+		{"sender substring", store.SandboxFilter{Sender: "example"}, 1},
+		{"sender case", store.SandboxFilter{Sender: "APP@"}, 1},
+		{"recipient substring", store.SandboxFilter{Recipient: "OPS@"}, 1},
+		{"both", store.SandboxFilter{Sender: "app", Recipient: "qa@"}, 1},
+		{"both, one misses", store.SandboxFilter{Sender: "cron", Recipient: "qa@"}, 0},
+		{"with inbox", store.SandboxFilter{Addresses: []string{"cron@other.test"}, Sender: "app"}, 0},
+		{"wildcard is literal", store.SandboxFilter{Sender: "%"}, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := s.List(t.Context(), mine, tc.f)
+			if err != nil {
+				t.Fatalf("list: %v", err)
+			}
+
+			n, err := s.Count(t.Context(), mine, tc.f)
+			if err != nil {
+				t.Fatalf("count: %v", err)
+			}
+
+			if len(got) != tc.want || n != tc.want {
+				t.Errorf("listed %d, counted %d, want %d", len(got), n, tc.want)
+			}
+
+			if tc.want == 1 && got[0].ID != app.ID {
+				t.Errorf("listed %s, want %s", got[0].Sender, app.Sender)
+			}
+		})
+	}
+}
