@@ -1546,23 +1546,3 @@ details.cs-side-collapsible[open] > ul {
 [data-theme='light'] .cs-reference {
   --scalar-color-accent: var(--brand-800);
 }
-/* tokens.css styles bare pre, code and kbd for the prose, and Scalar's
-   markup is made of the same elements: its pre is deliberately w-fit
-   inside a block that paints the background, so our background on the
-   pre itself reads as a code block two thirds wide, and our code colour
-   paints over its syntax tokens. Hand every one of those properties
-   back. The :root form is there for specificity: the light
-   theme keeps the prose's code blocks dark through
-   `:root[data-theme="light"] pre`, which outranks a plain class. */
-.cs-reference :is(pre, code, kbd),
-:root[data-theme='light'] .cs-reference :is(pre, code, kbd) {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  color: inherit;
-  font-size: inherit;
-  letter-spacing: inherit;
-  line-height: inherit;
-}
