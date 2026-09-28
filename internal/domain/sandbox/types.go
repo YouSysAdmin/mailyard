@@ -33,6 +33,13 @@ type inboxCreateInput struct {
 	Addresses   []string `json:"addresses"   validate:"required,min=1,max=50,dive,email"    normalize:"normalize"`
 }
 
+// clearInput narrows Clear to captures from these envelope senders,
+// lowercased the way an inbox's list is. An empty list, or no body at
+// all, empties the whole sandbox.
+type clearInput struct {
+	Senders []string `json:"senders" validate:"omitempty,max=500,dive,email" normalize:"normalize"`
+}
+
 type inboxUpdateInput struct {
 	Name        string   `json:"name"        validate:"omitempty,min=1,max=100"             normalize:"trim"`
 	Description *string  `json:"description" validate:"omitzero,max=500"`

@@ -41,7 +41,7 @@ func (f *fakeStore) List(context.Context, string, store.SandboxFilter) ([]*sbmod
 }
 func (f *fakeStore) Count(context.Context, string, store.SandboxFilter) (int, error) { return 0, nil }
 func (f *fakeStore) Delete(context.Context, string, string) (bool, error)            { return false, nil }
-func (f *fakeStore) Clear(context.Context, string) (int64, error)                    { return 0, nil }
+func (f *fakeStore) Clear(context.Context, string, []string) (int64, error)          { return 0, nil }
 func (f *fakeStore) PurgeExpired(context.Context, time.Time) (int64, error)          { return 0, nil }
 
 // fakeLoader feeds the settings cache without a database.

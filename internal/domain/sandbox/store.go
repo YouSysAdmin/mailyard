@@ -191,8 +191,16 @@ func (s *Store) Delete(ctx context.Context, projID, id string) (bool, error) {
 // Clear empties one project's sandbox. The button a developer reaches
 // for after a confusing test run, and the reason nothing here is worth
 // a confirmation beyond the one in the console.
-func (s *Store) Clear(ctx context.Context, projID string) (int64, error) {
-	res, err := s.Exec(ctx, `DELETE FROM sandbox_emails WHERE project_id = ?`, projID)
+func (s *Store) Clear(ctx context.Context, projID string, addresses []string) (int64, error) {
+	var sb strings.Builder
+	sb.WriteString(`DELETE FROM sandbox_emails e WHERE e.project_id = ?`)
+	args := []any{projID}
+	if len(addresses) > 0 {
+		sb.WriteString(senderIn)
+		args = append(args, addresses)
+	}
+
+	res, err := s.Exec(ctx, sb.String(), args...)
 	if err != nil {
 		return 0, err
 	}

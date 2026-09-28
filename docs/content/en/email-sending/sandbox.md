@@ -105,8 +105,8 @@ An inbox holds no mail. It is a saved filter, decided every time the list is rea
 
 - Editing the address list changes what the inbox shows immediately, captures already held included.
 - Deleting an inbox deletes no message. Everything it showed is still under **All mail**.
-- **Empty sandbox** empties the whole project's sandbox, not the inbox selected in the dropdown. The confirmation
-  says so.
+- **Empty sandbox** asks what to remove: every capture in the project, or only the mail of the inboxes you tick. Mail
+  whose sender is in no inbox is only removed with everything.
 
 Inboxes are sandbox configuration and are gated on the same permissions as the captures: `sandbox:read` to see them,
 `sandbox:write` to create and edit, `sandbox:delete` to remove.
@@ -254,7 +254,7 @@ The sandbox has a console API under `/api/v1/sandbox`, session-authenticated lik
 | `GET /api/v1/sandbox/:id/eml`              | The same bytes as an `.eml` download          |
 | `GET /api/v1/sandbox/:id/attachments/:idx` | One attachment                                |
 | `DELETE /api/v1/sandbox/:id`               | Delete one message                            |
-| `POST /api/v1/sandbox/clear`               | Empty the project's sandbox                   |
+| `POST /api/v1/sandbox/clear`               | Empty the project's sandbox. With a body of `senders`, only captures from those addresses |
 | `GET /api/v1/sandbox/inboxes`              | Every inbox in the project                    |
 | `POST /api/v1/sandbox/inboxes`             | Create an inbox: `name`, `description`, `addresses` |
 | `GET /api/v1/sandbox/inboxes/:id`          | One inbox                                     |

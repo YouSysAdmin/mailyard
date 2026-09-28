@@ -623,9 +623,9 @@ class API:
         "Raw"
         return self._t.request("GET", f"/sandbox/{_esc(id)}/raw", body=None, query=query, raw=True)
 
-    def clear_sandbox(self, **query: Any) -> Any:
+    def clear_sandbox(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
         "Clear"
-        return self._t.request("POST", "/sandbox/clear", body=None, query=query)
+        return self._t.request("POST", "/sandbox/clear", body=body, query=query)
 
     def list_sandbox_credentials(self, **query: Any) -> Any:
         "List credentials"

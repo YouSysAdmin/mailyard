@@ -22,7 +22,6 @@ import type { SMTPCredential } from '../../api/types'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
-import { useConfirm } from '../../composables/useConfirm'
 import { formatTimeParts } from '../../composables/formatDate'
 import { useAutoRefresh } from '../../composables/useAutoRefresh'
 import RefreshControl from '../../components/RefreshControl.vue'
@@ -33,6 +32,7 @@ import MessageListRow from '../../components/MessageListRow.vue'
 import SandboxReader from './SandboxReader.vue'
 import SandboxConnection from './SandboxConnection.vue'
 import SandboxInboxes from './SandboxInboxes.vue'
+import SandboxClear from './SandboxClear.vue'
 
 const PAGE_SIZE = 25
 
@@ -40,7 +40,6 @@ const route = useRoute()
 const router = useRouter()
 const notify = useNotificationStore()
 const projStore = useProjectStore()
-const { confirm } = useConfirm()
 
 const loading = ref(true)
 const loadingMore = ref(false)
@@ -51,7 +50,7 @@ const total = ref(0)
 const pagedBack = ref(false)
 const info = ref<SandboxInfo | null>(null)
 const deletingId = ref<string | null>(null)
-const clearing = ref(false)
+const showClear = ref(false)
 
 const credentials = ref<SMTPCredential[]>([])
 const inboxes = ref<SandboxInbox[]>([])
@@ -225,35 +224,23 @@ async function deleteEmail(em: SandboxEmail) {
   }
 }
 
-async function clearAll() {
-  // The count on screen is the filtered one, so the sentence says what
-  // the button actually does when an inbox is selected: everything goes.
-  const ok = await confirm({
-    title: 'Empty the sandbox',
-    message: inbox.value
-      ? 'Delete every captured message in this project, not only the ones in this inbox? Nothing here was ever delivered, so this affects no recipient.'
-      : `Delete all ${total.value} captured messages? Nothing here was ever delivered, so this affects no recipient.`,
-    confirmText: 'Delete all',
-    variant: 'danger',
-  })
-  if (!ok) return
-  clearing.value = true
-  try {
-    const res = await sandboxApi.clear()
-    notify.success(`Deleted ${res.data.deleted} messages`)
-    // Emptied locally rather than refetched. The server just told us
-    // it deleted everything, so a reload asks a question whose answer
-    // we hold - and when this list is served by a read replica, that
-    // question can briefly come back with the rows we were just told
-    // are gone.
+// After the dialog emptied something. Emptied locally rather than
+// refetched when the answer is known: the server just said everything
+// went, or everything this inbox shows did - and when this list is
+// served by a read replica, a reload can briefly come back with the
+// rows we were just told are gone. Other inboxes leave rows this page
+// may not hold, so that case reloads.
+function cleared(inboxIds: string[]) {
+  showClear.value = false
+  if (inboxIds.length === 0 || inboxIds.includes(inbox.value)) {
     emails.value = []
     total.value = 0
     if (selectedId.value) go('')
-  } catch (e) {
-    notify.error(apiErrorMessage(e, 'Failed to empty the sandbox'))
-  } finally {
-    clearing.value = false
+
+    return
   }
+
+  load()
 }
 
 // A captured message is minutes to days old, never years, so the full
@@ -343,9 +330,7 @@ onMounted(() => {
       </button>
       <button class="btn btn-secondary" @click="showInboxes = true">Inboxes</button>
       <template v-if="emails.length > 0 && projStore.can('sandbox:delete')">
-        <button class="btn btn-danger" :disabled="clearing" @click="clearAll">
-          {{ clearing ? 'Deleting...' : 'Empty sandbox' }}
-        </button>
+        <button class="btn btn-danger" @click="showClear = true">Empty sandbox</button>
       </template>
     </PageHeader>
 
@@ -422,6 +407,15 @@ onMounted(() => {
       :inboxes="inboxes"
       @changed="inboxesChanged"
       @close="showInboxes = false"
+    />
+
+    <SandboxClear
+      v-if="showClear"
+      :inboxes="inboxes"
+      :total="total"
+      :current="inbox"
+      @cleared="cleared"
+      @close="showClear = false"
     />
   </div>
 </template>

@@ -772,8 +772,8 @@ module Mailyard
     end
 
     # Clear
-    def clear_sandbox(**query)
-      @t.request("POST", "/sandbox/clear", body: nil, query: query)
+    def clear_sandbox(body: nil, **query)
+      @t.request("POST", "/sandbox/clear", body: body, query: query)
     end
 
     # List credentials

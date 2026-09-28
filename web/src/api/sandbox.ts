@@ -99,7 +99,11 @@ export const sandboxApi = {
   get: (id: string) => api.get<{ sandbox_email: SandboxEmail }>(`/sandbox/${id}`),
   raw: (id: string) => api.get<string>(`/sandbox/${id}/raw`, { responseType: 'text' }),
   remove: (id: string) => api.delete(`/sandbox/${id}`),
-  clear: () => api.post<{ deleted: number }>('/sandbox/clear'),
+  // No senders, no body: that empties the whole sandbox. With senders,
+  // only captures from those addresses go - an inbox's address list is
+  // what the console passes, since an inbox is nothing more than that.
+  clear: (senders: string[] = []) =>
+    api.post<{ deleted: number }>('/sandbox/clear', senders.length > 0 ? { senders } : undefined),
   attachmentUrl: (id: string, idx: number) => browserURL(`/sandbox/${id}/attachments/${idx}`),
 
   // Sandbox credentials live under /api/sandbox rather than

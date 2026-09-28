@@ -1067,8 +1067,8 @@ func (c *Client) GetSandboxRaw(ctx context.Context, id string, opts ...RequestOp
 // ClearSandbox Clear.
 //
 // POST /sandbox/clear
-func (c *Client) ClearSandbox(ctx context.Context, opts ...RequestOption) (SandboxDeletedResponse, error) {
-	return do[SandboxDeletedResponse](ctx, c, "POST", "/sandbox/clear", nil, opts)
+func (c *Client) ClearSandbox(ctx context.Context, body ClearInput, opts ...RequestOption) (SandboxDeletedResponse, error) {
+	return do[SandboxDeletedResponse](ctx, c, "POST", "/sandbox/clear", body, opts)
 }
 
 // ListSandboxCredentials List credentials.

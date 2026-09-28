@@ -11,6 +11,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
@@ -192,15 +193,34 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	return response.NoContent(c)
 }
 
-// Clear empties the project's sandbox.
+// Clear empties the project's sandbox, or the senders a body names.
 //
 // Available to a developer, unlike every other destructive route in
 // the product. Nothing here was ever delivered and nothing depends on
 // it, so the person testing against it is the right person to decide
 // when the noise stops being useful.
+//
+// The body is optional. A bare POST empties everything, which is what
+// every client sent before inboxes existed and still the common case
+// between test runs. With senders the captures removed are the ones
+// whose envelope sender is in the list - addresses rather than inbox
+// ids, because an inbox is only a saved list of addresses and a test
+// run knows what it sent from without looking one up. The console
+// hands over the addresses of the inboxes ticked.
 func (h *Handler) Clear(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	n, err := h.Runtime.Store.Sandbox.Clear(c.Context(), rc.Project.ID)
+
+	var senders []string
+	if len(c.Body()) > 0 {
+		in, resp, ok := validation.Bind[clearInput](c)
+		if !ok {
+			return resp
+		}
+
+		senders = in.Senders
+	}
+
+	n, err := h.Runtime.Store.Sandbox.Clear(c.Context(), rc.Project.ID, senders)
 	if err != nil {
 		return response.Internal(c, err)
 	}

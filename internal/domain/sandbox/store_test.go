@@ -335,7 +335,7 @@ func TestClearEmptiesOneProject(t *testing.T) {
 	put(t, s, mine, time.Now().UTC(), "b", nil)
 	kept := put(t, s, theirs, time.Now().UTC(), "c", nil)
 
-	n, err := s.Clear(t.Context(), mine)
+	n, err := s.Clear(t.Context(), mine, nil)
 	if err != nil {
 		t.Fatalf("clear: %v", err)
 	}
@@ -346,5 +346,35 @@ func TestClearEmptiesOneProject(t *testing.T) {
 
 	if got, _ := s.Get(t.Context(), theirs, kept.ID); got == nil {
 		t.Error("clearing one project emptied another")
+	}
+}
+
+// Emptying one inbox is a delete narrowed by the same sender list the
+// listing uses, so what the page showed under that inbox is exactly
+// what goes. Mail outside the list stays, and so does the other
+// project's.
+func TestClearRemovesOnlyTheChosenSenders(t *testing.T) {
+	s := testStore(t)
+	mine, theirs := newProject(t, s), newProject(t, s)
+	putFrom(t, s, mine, "a@example.test")
+	putFrom(t, s, mine, "A@Example.TEST")
+	kept := putFrom(t, s, mine, "b@example.test")
+	other := putFrom(t, s, theirs, "a@example.test")
+
+	n, err := s.Clear(t.Context(), mine, []string{"a@example.test"})
+	if err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+
+	if n != 2 {
+		t.Errorf("cleared %d, want 2", n)
+	}
+
+	if got, _ := s.Get(t.Context(), mine, kept.ID); got == nil {
+		t.Error("a sender outside the list was removed")
+	}
+
+	if got, _ := s.Get(t.Context(), theirs, other.ID); got == nil {
+		t.Error("clearing one project's inbox reached another project")
 	}
 }

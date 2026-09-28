@@ -978,7 +978,11 @@ type SandboxStore interface {
 	// Delete reports whether a message was removed, so a missing one
 	// is a 404 rather than a deletion the audit trail records.
 	Delete(ctx context.Context, projID, id string) (bool, error)
-	Clear(ctx context.Context, projID string) (int64, error)
+
+	// Clear removes every capture whose envelope sender is in addresses,
+	// or every capture in the project when the list is empty - the same
+	// reading of an empty list as SandboxFilter.
+	Clear(ctx context.Context, projID string, addresses []string) (int64, error)
 
 	// Trim keeps at most keep messages, dropping the oldest. Called on
 	// every capture, so it must stay one statement.

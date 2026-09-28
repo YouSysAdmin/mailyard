@@ -301,6 +301,11 @@ type Checks struct {
 	SMTP        string `json:"smtp"`
 }
 
+// ClearInput is the request body.
+type ClearInput struct {
+	Senders []string `json:"senders"`
+}
+
 // Contact is the wire body.
 type Contact struct {
 	ID           string     `json:"id"`

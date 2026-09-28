@@ -78,7 +78,8 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/sandbox/clear",
 			Tag:         "sandbox",
 			Summary:     "Clear",
-			Description: "Needs the `sandbox:delete` permission.",
+			Description: "Needs the `sandbox:delete` permission. Without a body, or with an empty `senders`, every capture in the project is removed. With `senders`, only captures whose envelope sender is one of those addresses - an inbox's `addresses` list, for instance.",
+			Request:     clearInput{},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", DeletedResponse{})},
 		},
 		{
