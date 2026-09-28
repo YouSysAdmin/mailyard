@@ -18,6 +18,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 )
 
 // newSetPasswordCmd builds `mailyard set-password`, the way back into
@@ -87,64 +88,12 @@ func newSetPasswordCmd() *cobra.Command {
 
 			defer func() { _ = db.Close() }()
 
-			ctx := context.Background()
-			u, err := st.User.Get(ctx, email)
-			if err != nil {
-				return fmt.Errorf("look up %s: %w", email, err)
-			}
-
-			if u == nil {
-				return fmt.Errorf("no user with email %s", email)
-			}
-
 			hash, err := authenticator.HashPassword(password)
 			if err != nil {
 				return err
 			}
 
-			// A targeted write: Put would rewrite the whole row from a
-			// stale read.
-			if err := st.User.SetPassword(ctx, u.ID, hash); err != nil {
-				return fmt.Errorf("save: %w", err)
-			}
-
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "password updated for %s\n", email)
-
-			// A disabled account cannot sign in whatever its password
-			// is, and somebody running this is trying to get back in.
-			if u.Disabled {
-				u.Disabled = false
-				if err := st.User.Put(ctx, u); err != nil {
-					return fmt.Errorf("enable: %w", err)
-				}
-
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "account enabled\n")
-			}
-
-			if u.TOTPEnabled {
-				// Deliberately not cleared: a password reset is not a
-				// reason to drop the second factor, and doing it
-				// silently would turn file access into a 2FA bypass.
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-					"note: two-factor auth is still enabled on this account, you will be asked for a code\n")
-			}
-
-			// Like every other password change: end the old sessions
-			// and any outstanding reset link.
-			now := time.Now().UTC()
-			if err := st.PasswordReset.InvalidateForUser(ctx, u.ID, now); err != nil {
-				return fmt.Errorf("invalidate reset links: %w", err)
-			}
-
-			n, err := st.Session.RevokeAllForUser(ctx, u.ID)
-			if err != nil {
-				return fmt.Errorf("revoke sessions: %w", err)
-			}
-
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-				"revoked %d session(s) and every outstanding reset link\n", n)
-
-			return nil
+			return applyPassword(context.Background(), st, email, hash, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVar(&email, "email", "", "user to update (defaults to auth.local.email)")
@@ -152,6 +101,64 @@ func newSetPasswordCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&stdin, "stdin", false, "read the password from stdin")
 
 	return cmd
+}
+
+// applyPassword writes hash as the account's password, enables the
+// account, and ends its sessions and reset links, reporting each step
+// to out.
+func applyPassword(ctx context.Context, st *store.Store, email, hash string, out io.Writer) error {
+	u, err := st.User.Get(ctx, email)
+	if err != nil {
+		return fmt.Errorf("look up %s: %w", email, err)
+	}
+
+	if u == nil {
+		return fmt.Errorf("no user with email %s", email)
+	}
+
+	// A targeted write: Put would rewrite the whole row from a stale
+	// read.
+	if err := st.User.SetPassword(ctx, u.ID, hash); err != nil {
+		return fmt.Errorf("save: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(out, "password updated for %s\n", email)
+
+	// A disabled account cannot sign in whatever its password is, and
+	// somebody running this is trying to get back in. Put writes the
+	// whole row, so it carries the new hash too.
+	if u.Disabled {
+		u.Disabled = false
+		u.PasswordHash = hash
+		if err := st.User.Put(ctx, u); err != nil {
+			return fmt.Errorf("enable: %w", err)
+		}
+
+		_, _ = fmt.Fprintf(out, "account enabled\n")
+	}
+
+	if u.TOTPEnabled {
+		// Deliberately not cleared: a password reset is not a reason
+		// to drop the second factor, and doing it silently would turn
+		// file access into a 2FA bypass.
+		_, _ = fmt.Fprintf(out,
+			"note: two-factor auth is still enabled on this account, you will be asked for a code\n")
+	}
+
+	// Like every other password change: end the old sessions and any
+	// outstanding reset link.
+	if err := st.PasswordReset.InvalidateForUser(ctx, u.ID, time.Now().UTC()); err != nil {
+		return fmt.Errorf("invalidate reset links: %w", err)
+	}
+
+	n, err := st.Session.RevokeAllForUser(ctx, u.ID)
+	if err != nil {
+		return fmt.Errorf("revoke sessions: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(out, "revoked %d session(s) and every outstanding reset link\n", n)
+
+	return nil
 }
 
 // resolvePassword gets the new password from whichever source the
