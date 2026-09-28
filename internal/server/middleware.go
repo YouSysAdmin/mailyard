@@ -172,12 +172,12 @@ func requireProjectCreation(rt *env.Runtime) fiber.Handler {
 // refuseCrossSite exempts any request carrying Authorization: a
 // request that names a bearer is judged on the bearer, never on the
 // ambient cookie.
-func extractToken(c fiber.Ctx) string {
+func extractToken(c fiber.Ctx, rt *env.Runtime) string {
 	if v := bearerToken(c); v != "" {
 		return v
 	}
 
-	return authdomain.SessionCookieValue(c)
+	return authdomain.SessionCookieValue(c, rt)
 }
 
 // requirePageAuth is requireAuth for a browser-facing page rather
@@ -232,7 +232,7 @@ func pageSessionIsLive(c fiber.Ctx, rt *env.Runtime) bool {
 // ok=false means the caller must reject. claims is returned even then
 // when the token itself parsed, so a caller can log who was refused.
 func resolveSession(c fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims, ok bool) {
-	raw := extractToken(c)
+	raw := extractToken(c, rt)
 	if raw == "" {
 		return nil, false
 	}

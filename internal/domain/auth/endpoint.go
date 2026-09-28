@@ -288,7 +288,7 @@ func (h *Handler) Logout(c fiber.Ctx) error {
 // cookie or bearer token. Returns nil for anything unusable - a
 // logout with no valid token still clears the cookie and succeeds.
 func (h *Handler) currentSession(c fiber.Ctx) (*sessmodel.Session, string) {
-	raw := SessionCookieValue(c)
+	raw := SessionCookieValue(c, h.Runtime)
 	if raw == "" {
 		raw, _ = strings.CutPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")
 	}

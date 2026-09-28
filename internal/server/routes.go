@@ -287,7 +287,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 			return "k:" + hex.EncodeToString(sum[:8])
 		}
 
-		if cookie := auth.SessionCookieValue(c); cookie != "" {
+		if cookie := auth.SessionCookieValue(c, rt); cookie != "" {
 			sum := sha256.Sum256([]byte(cookie))
 
 			return "s:" + hex.EncodeToString(sum[:8])

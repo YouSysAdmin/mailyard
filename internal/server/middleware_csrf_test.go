@@ -52,7 +52,7 @@ func TestACookieRequestFromAnotherOriginIsRefused(t *testing.T) {
 	} {
 		req := httptest.NewRequest(tc.method, "http://example.com/x", nil)
 		if tc.cookie {
-			req.AddCookie(&http.Cookie{Name: authdomain.SessionCookie, Value: "s"})
+			req.AddCookie(&http.Cookie{Name: authdomain.SessionCookieHost, Value: "s"})
 		}
 
 		for k, v := range tc.headers {
