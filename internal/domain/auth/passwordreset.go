@@ -78,7 +78,7 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 
 	now := time.Now().UTC()
 	throttled, err := h.mailBudgetSpent(c, u.ID, now, maxResetsPerHour, maxResetsPerHourPerAccount,
-		h.Runtime.Store.PasswordReset.CountRecentForUserFromIP, h.Runtime.Store.PasswordReset.CountRecentForUser)
+		h.Runtime.Store.PasswordReset.RecentRequestIPs)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -318,25 +318,31 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 
 // mailBudgetSpent decides whether one more link may be mailed for the
 // account: the calling address has its own budget, and the account a
-// larger one over all addresses.
+// larger one over all addresses. An IPv6 address is judged by its /64,
+// the way the login lock judges it.
 func (h *Handler) mailBudgetSpent(c fiber.Ctx, userID string, now time.Time, perIP, perAccount int,
-	countFromIP func(context.Context, string, string, time.Time) (int, error),
-	countAll func(context.Context, string, time.Time) (int, error),
+	recent func(context.Context, string, time.Time) ([]string, error),
 ) (bool, error) {
-	since := now.Add(-time.Hour)
-	fromIP, err := countFromIP(c.Context(), userID, clientip.From(c), since)
+	ips, err := recent(c.Context(), userID, now.Add(-time.Hour))
 	if err != nil {
 		return false, err
 	}
 
-	if fromIP >= perIP {
-		return true, nil
+	return budgetSpent(ips, clientip.From(c), perIP, perAccount), nil
+}
+
+// budgetSpent is mailBudgetSpent over the addresses already charged.
+func budgetSpent(ips []string, caller string, perIP, perAccount int) bool {
+	if len(ips) >= perAccount {
+		return true
 	}
 
-	all, err := countAll(c.Context(), userID, since)
-	if err != nil {
-		return false, err
+	key, fromCaller := addressKey(caller), 0
+	for _, ip := range ips {
+		if addressKey(ip) == key {
+			fromCaller++
+		}
 	}
 
-	return all >= perAccount, nil
+	return fromCaller >= perIP
 }

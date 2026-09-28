@@ -58,3 +58,25 @@ func TestTheLockCannotBeWalkedPastByRotatingAddresses(t *testing.T) {
 		t.Error("one account's allowance was spent by another's")
 	}
 }
+
+// The mail budgets judge an address the way the lock does: one IPv6
+// subscriber spends one budget however it rotates through its /64, and
+// the account's own ceiling holds over every address.
+func TestTheMailBudgetJudgesIPv6ByItsSlash64(t *testing.T) {
+	spent := []string{"2001:db8:1:2::1", "2001:db8:1:2::2", "2001:db8:1:2:ffff::3"}
+	if !budgetSpent(spent, "2001:db8:1:2::99", 3, 15) {
+		t.Error("a fresh address in the same /64 was given a budget of its own")
+	}
+
+	if budgetSpent(spent, "2001:db8:1:3::1", 3, 15) {
+		t.Error("the next /64 was charged for another's requests")
+	}
+
+	if budgetSpent([]string{"203.0.113.5", "203.0.113.5"}, "203.0.113.5", 3, 15) {
+		t.Error("an address under its budget was refused")
+	}
+
+	if !budgetSpent(spent, "198.51.100.7", 3, 3) {
+		t.Error("the account ceiling did not hold for a fresh address")
+	}
+}

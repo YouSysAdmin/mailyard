@@ -84,24 +84,30 @@ func (s *Store) InvalidateForUser(ctx context.Context, userID string, at time.Ti
 	return err
 }
 
-// CountRecentForUser reports how many tokens a user has been issued
-// since t. Caps how often one account can be mailed a link.
-func (s *Store) CountRecentForUser(ctx context.Context, userID string, since time.Time) (int, error) {
-	var n int
-	err := s.QueryRow(ctx, `SELECT COUNT(*) FROM signup_verifications WHERE user_id = ? AND created_at >= ?`,
-		userID, since).Scan(&n)
+// RecentRequestIPs returns the address behind each verification link the
+// account was issued since a moment. The caller judges the addresses,
+// because an IPv6 one is judged by its /64 and that is not a string
+// comparison. Bounded by the per-account budget, since nothing past it
+// is issued.
+func (s *Store) RecentRequestIPs(ctx context.Context, userID string, since time.Time) ([]string, error) {
+	rows, err := s.Query(ctx, `SELECT request_ip FROM signup_verifications WHERE user_id = ? AND created_at >= ?`, userID, since)
+	if err != nil {
+		return nil, err
+	}
 
-	return n, err
-}
+	defer func() { _ = rows.Close() }()
 
-// CountRecentForUserFromIP counts the requests one address made for
-// the account since a moment, which is the budget a stranger spends.
-func (s *Store) CountRecentForUserFromIP(ctx context.Context, userID, ip string, since time.Time) (int, error) {
-	var n int
-	err := s.QueryRow(ctx, `SELECT COUNT(*) FROM signup_verifications WHERE user_id = ? AND request_ip = ? AND created_at >= ?`,
-		userID, ip, since).Scan(&n)
+	var out []string
+	for rows.Next() {
+		var ip string
+		if err := rows.Scan(&ip); err != nil {
+			return nil, err
+		}
 
-	return n, err
+		out = append(out, ip)
+	}
+
+	return out, rows.Err()
 }
 
 // DeleteExpired purges spent and stale rows. Called by the retention

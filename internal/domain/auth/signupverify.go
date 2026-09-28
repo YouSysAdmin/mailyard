@@ -176,7 +176,7 @@ func (h *Handler) VerifyEmailResend(c fiber.Ctx) error {
 
 	now := time.Now().UTC()
 	throttled, err := h.mailBudgetSpent(c, u.ID, now, maxVerifyMailsPerHour, maxVerifyMailsPerHourPerAccount,
-		h.Runtime.Store.SignupVerify.CountRecentForUserFromIP, h.Runtime.Store.SignupVerify.CountRecentForUser)
+		h.Runtime.Store.SignupVerify.RecentRequestIPs)
 	if err != nil {
 		return response.Internal(c, err)
 	}

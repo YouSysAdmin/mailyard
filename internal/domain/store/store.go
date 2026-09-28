@@ -250,8 +250,7 @@ type PasswordResetStore interface {
 	// proceeding on a token somebody else already spent.
 	MarkUsed(ctx context.Context, id string, at time.Time) (bool, error)
 	InvalidateForUser(ctx context.Context, userID string, at time.Time) error
-	CountRecentForUser(ctx context.Context, userID string, since time.Time) (int, error)
-	CountRecentForUserFromIP(ctx context.Context, userID, ip string, since time.Time) (int, error)
+	RecentRequestIPs(ctx context.Context, userID string, since time.Time) ([]string, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
@@ -265,8 +264,7 @@ type SignupVerifyStore interface {
 	// token - see PasswordResetStore.MarkUsed.
 	MarkUsed(ctx context.Context, id string, at time.Time) (bool, error)
 	InvalidateForUser(ctx context.Context, userID string, at time.Time) error
-	CountRecentForUser(ctx context.Context, userID string, since time.Time) (int, error)
-	CountRecentForUserFromIP(ctx context.Context, userID, ip string, since time.Time) (int, error)
+	RecentRequestIPs(ctx context.Context, userID string, since time.Time) ([]string, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
