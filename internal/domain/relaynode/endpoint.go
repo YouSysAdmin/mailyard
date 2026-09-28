@@ -65,9 +65,6 @@ func (h *Handler) Register(c fiber.Ctx) error {
 		return resp
 	}
 
-	h.enrolMu.Lock()
-	defer h.enrolMu.Unlock()
-
 	// Two ways in, and they enrol two different kinds of node.
 	//
 	// The platform token joins the shared pool: one secret the
@@ -80,6 +77,10 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	if !ok {
 		return resp
 	}
+
+	// Taken after the token, so a caller without one waits on nobody.
+	h.enrolMu.Lock()
+	defer h.enrolMu.Unlock()
 
 	host, herr := validHost(in.Hostname)
 	if herr != nil {
