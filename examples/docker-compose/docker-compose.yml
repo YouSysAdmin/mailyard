@@ -33,8 +33,10 @@ services:
       - "443:443"
       # ACME HTTP-01. Only needed when the CA cannot reach our TLS
       # handshake, which here it can - so this is commented out. Open it
-      # if you put a TLS-TERMINATING proxy in front, and set
-      # MAILYARD_ACME_CHALLENGE_ADDR=:80 with it.
+      # only if this process is what answers port 80, with
+      # MAILYARD_ACME_CHALLENGE_ADDR=:80. Behind a TLS-TERMINATING proxy
+      # see ../caddy instead: the responder binds an unpublished port and
+      # the proxy forwards the challenge path to it.
       # - "80:80"
       # SMTP submission, for applications that speak SMTP rather than the
       # API. Drop this line if none do.

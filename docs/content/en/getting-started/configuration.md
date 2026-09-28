@@ -477,6 +477,11 @@ One key is here, because it binds a port:
 |--------------------------------|---------|------------------------------------------------------------------------|
 | `MAILYARD_ACME_CHALLENGE_ADDR` | empty   | HTTP-01 responder. Empty means `tls-alpn-01` only, which needs no port |
 
+Empty is right whenever the CA can reach this process's own TLS handshake. Behind a proxy that terminates TLS, set it to
+an address the proxy forwards `/.well-known/acme-challenge/*` to - see
+[Certificates](/docs/admin/certificates#behind-a-proxy-that-terminates-tls). The port is bound at startup whether ACME
+is on or not.
+
 A name that is not in `acme_hosts` falls through to the self-signed pair rather than failing the handshake. That is the
 ordinary state of an MX: the list is what somebody typed for the console, and the mail listeners may answer under a
 different hostname.

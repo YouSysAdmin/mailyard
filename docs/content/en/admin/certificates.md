@@ -251,24 +251,79 @@ firewall rule beyond the one already letting clients in. It works when the hands
 directly, or through a TCP-passthrough proxy.
 
 **`http-01`** — for a proxy that *terminates* TLS. It answers the handshake itself, so ALPN validation never arrives.
-Set `acme.challenge_addr` (empty by default, usually
-`:80`) in the config file and make that port reachable. This is the one thing about ACME still in yaml, because it binds
-a port.
-
-It is also the one step here with an order to it. That listener is bound at startup and only when ACME is already on, so
-turn `acme_enabled` on first and restart after. A restart with the address set and ACME still off says so and carries on
-without it:
-
-```
-acme.challenge_addr is set but ACME is off, so no challenge listener was bound
- - turn ACME on and restart if you need http-01
-```
+Set `acme.challenge_addr` (empty by default) in the config file. This is the one thing about ACME in yaml, because it
+binds a port - at startup, whether or not ACME is on, so turning ACME on later needs no restart. `:80` when this
+process is what answers port 80, any other address when a proxy forwards the challenge path to it, see below.
 
 `GET /api/v1/admin/certificates/acme` reports which case you are in as
 `tls_terminated_here`, and the console warns before you press Order when neither route is open.
 
 Both challenge types put their token in the shared cache, so validation works on more than one node: the CA can be
 answered by whichever node it is routed to, not only the one that ordered.
+
+### Behind a proxy that terminates TLS
+
+The common deployment: Caddy, nginx or Traefik holds ports 80 and 443 with a certificate of its own for the console, and
+Mailyard's SMTP ports are published straight from the container. The CA can never reach Mailyard's handshake, so
+`tls-alpn-01` is out, and STARTTLS on 587 and 25 would be left with the self-signed pair. `http-01` through the proxy is
+the answer, and it takes one setting and one proxy route.
+
+1. Bind the responder on a port the proxy can reach and nothing else needs to. It is not published:
+
+   ```yaml
+   environment:
+     MAILYARD_ACME_CHALLENGE_ADDR: ":8080"
+   ```
+
+2. In the proxy, forward the challenge path for the mail hostname to it, ahead of the route that carries the console. A
+   Caddyfile site block:
+
+   ```
+   mail.example.com {
+       handle /.well-known/acme-challenge/* {
+           reverse_proxy mailyard:8080
+       }
+
+       reverse_proxy mailyard:3000
+   }
+   ```
+
+   The same site as [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy) labels on the Mailyard
+   service, where the numeric prefix orders the two routes:
+
+   ```yaml
+   labels:
+     caddy: mail.example.com
+     caddy.0_handle: /.well-known/acme-challenge/*
+     caddy.0_handle.reverse_proxy: "{{upstreams 8080}}"
+     caddy.1_reverse_proxy: "{{upstreams 3000}}"
+   ```
+
+3. Sign in over the proxy, turn `acme_enabled` on, add the hostname to `acme_hosts` and press **Order**. Nothing
+   restarts: the port was bound at boot and asks the settings on every request.
+
+A complete compose file with the Caddyfile is in `examples/docker-compose/caddy` in the repository.
+
+Two things make this work, and both are worth knowing when the proxy is not Caddy:
+
+- **The proxy's own challenges come first.** Caddy answers a challenge it is solving itself and hands every other one
+  down the route, so Caddy and Mailyard each hold a certificate for the same name and neither knows about the other.
+- **The `Host` header is passed through unchanged.** Mailyard refuses a token request for a name outside `acme_hosts`,
+  and it reads that name from the request. Caddy's `reverse_proxy` keeps it by default, nginx needs
+  `proxy_set_header Host $host`.
+
+The CA follows a redirect from port 80 to 443, so a proxy that redirects plain HTTP to HTTPS needs no separate plain-HTTP
+site: the request arrives over the proxy's own certificate and the route above still applies. A mail hostname that
+differs from the console's needs a site block of its own in the proxy, with the same challenge route.
+
+`server.tls.enabled` stays off in this shape. The chain is walked by every listener that terminates TLS, so the
+certificate ordered this way lands on the STARTTLS listeners, which is where it was missing.
+
+An order behind a proxy takes a little longer than one that is not, and the reason is worth knowing when reading the
+CA's account page: the ACME client tries `tls-alpn-01` first, that attempt reaches the proxy and fails, and only then
+does it open a fresh order over `http-01`. Let's Encrypt counts the first attempt against its failed-validation limit,
+five per hostname per hour, which a renewal every two months never reaches - a session of pressing **Order** to debug
+something else might, so use the staging directory for that.
 
 ### Ordering
 

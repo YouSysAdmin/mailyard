@@ -1,0 +1,18 @@
+# Mailyard behind Caddy.
+#
+# Caddy orders its own certificate for this name and answers its own
+# challenges before any route here is consulted, so the handle below
+# only ever sees Mailyard's - the orders for the STARTTLS certificate on
+# 587 and 25, which the CA cannot validate against a handshake Caddy
+# answers. The Host header is passed through unchanged, which Mailyard
+# requires: a token request for a name outside acme_hosts is refused.
+#
+# The CA follows Caddy's redirect from 80 to 443, so no plain-HTTP site
+# is needed for the challenge path.
+mail.example.com {
+	handle /.well-known/acme-challenge/* {
+		reverse_proxy mailyard:8080
+	}
+
+	reverse_proxy mailyard:3000
+}

@@ -1,0 +1,131 @@
+# Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+#
+# The single-node deployment behind Caddy: Caddy holds 80 and 443,
+# terminates TLS for the console with a certificate of its own, and
+# speaks plain HTTP to Mailyard on 3000. The SMTP ports are published
+# straight from the Mailyard container, so the STARTTLS certificate on
+# them has to be ordered by Mailyard - and the CA cannot reach Mailyard's
+# own handshake through Caddy. The http-01 responder on :8080 here plus
+# the challenge route in the Caddyfile beside this file is what makes
+# that order succeed.
+#
+# Copy both files beside a .env holding the secrets (see ../.env.example),
+# put your hostname in the Caddyfile and in MAILYARD_SERVER_PUBLIC_URL,
+# then:
+#
+#   docker compose up -d
+#   docker compose logs mailyard | grep -i password    # read it ONCE
+#
+# The console is at https://mail.example.com/app. Under
+# Administration -> Certificates turn acme_enabled on, add the hostname
+# to acme_hosts and press Order. Nothing restarts.
+
+name: mailyard
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Caddy's own certificates and ACME account. Losing this volume
+      # costs an order against the CA's rate limit, nothing more.
+      - caddy_data:/data
+      - caddy_config:/config
+
+  mailyard:
+    image: ghcr.io/yousysadmin/mailyard:latest
+    restart: unless-stopped
+    depends_on:
+      mailyard-db:
+        condition: service_healthy
+
+    # --init applies the schema. Exactly ONE node in a fleet carries it,
+    # and a single node always does.
+    command: ["serve", "--init"]
+
+    ports:
+      # Only the SMTP listeners. 3000 and 8080 stay on the container
+      # network, where Caddy is the only thing that needs to reach them.
+      - "587:587"
+      - "25:25"
+
+    environment:
+      # --- Required ---
+      MAILYARD_DATABASE_DSN: postgres://mailyard:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@mailyard-db:5432/mailyard?sslmode=disable
+      # Both at least 32 characters: openssl rand -hex 32
+      MAILYARD_AUTH_JWT_SECRET: ${MAILYARD_AUTH_JWT_SECRET:?set MAILYARD_AUTH_JWT_SECRET}
+      MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: ${MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY:?set MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY}
+
+      # https, because that is what the browser sees: Caddy terminates
+      # it, and the Secure flag on the session cookie follows this URL.
+      MAILYARD_SERVER_PUBLIC_URL: https://mail.example.com
+
+      # Caddy is the proxy whose X-Forwarded-For is believed. This is
+      # the range compose hands its networks by default - narrow it to
+      # the one network Caddy is actually on.
+      MAILYARD_SERVER_TRUSTED_PROXIES: 172.16.0.0/12
+
+      # --- Sign-in ---
+      MAILYARD_AUTH_LOCAL_ENABLED: "true"
+      MAILYARD_AUTH_LOCAL_EMAIL: admin@example.com
+
+      # --- TLS ---
+      # The console's TLS is Caddy's, so the HTTP listener stays plain on
+      # 3000 (the default). The two SMTP listeners terminate TLS
+      # themselves (also the default) and walk the certificate chain,
+      # and the ACME step of that chain is what this responder is for:
+      # the CA validates over http-01 through the Caddyfile route rather
+      # than against a handshake it cannot reach.
+      MAILYARD_ACME_CHALLENGE_ADDR: ":8080"
+
+      # --- SMTP listeners, both off by default ---
+      MAILYARD_SUBMISSION_ENABLED: "true"
+      MAILYARD_INBOUND_ENABLED: "true"
+
+      # --- Attachments ---
+      MAILYARD_STORAGE_BACKEND: fs
+      MAILYARD_STORAGE_FS_PATH: /data/attachments
+
+      # --- Observability ---
+      MAILYARD_LOGGING_FORMAT: json
+      MAILYARD_METRICS_ENABLED: "true"
+      MAILYARD_METRICS_TOKEN: ${MAILYARD_METRICS_TOKEN:-}
+
+    volumes:
+      - mailyard_data:/data
+
+    healthcheck:
+      # Plain HTTP on 3000. Caddy terminates TLS, so probing 443 here
+      # would keep the container unhealthy forever. /healthz rather than
+      # /readyz: a restart probe must not restart every node on a brief
+      # database blip.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  mailyard-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mailyard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: mailyard
+    volumes:
+      - mailyard_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mailyard_data:
+  mailyard_db:
+  caddy_data:
+  caddy_config:
