@@ -111,6 +111,10 @@ type Builder struct {
 	// built with. Rebuilt when those change - see manager.
 	acmeMgr *autocert.Manager
 	acmeKey string
+
+	// challengeAddr is where the http-01 responder actually listens,
+	// which differs from ChallengeAddr when that named port 0.
+	challengeAddr string
 }
 
 // Build resolves what one listener presents. Not enabled returns
@@ -191,15 +195,12 @@ func (b *Builder) build() (*tls.Config, error) {
 	}
 
 	// Bound at boot or not at all, because it takes a port. Only when
-	// the operator asked for one: tls-alpn-01 needs none.
+	// the operator asked for one: tls-alpn-01 needs none. Whether ACME
+	// is on is asked per request, so turning it on later needs no
+	// restart.
 	if b.ChallengeAddr != "" {
-		if m := b.manager(b.acme()); m != nil {
-			if err := b.startChallengeListener(m, b.ChallengeAddr); err != nil {
-				return nil, err
-			}
-		} else {
-			slog.Warn("acme.challenge_addr is set but ACME is off, so no challenge listener was bound - turn ACME on and restart if you need http-01",
-				"addr", b.ChallengeAddr)
+		if err := b.startChallengeListener(b.ChallengeAddr); err != nil {
+			return nil, err
 		}
 	}
 

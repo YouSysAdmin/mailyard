@@ -90,6 +90,14 @@ func (b *Builder) manager(a ACME) *autocert.Manager {
 		m.Client = &acme.Client{DirectoryURL: a.DirectoryURL}
 	}
 
+	// A manager offers http-01 only once HTTPHandler has been called on
+	// it, and managers are rebuilt here. The listener is bound once and
+	// dispatches to whichever manager is current, so the willingness is
+	// set on every one built, not on the one that existed at boot.
+	if b.ChallengeAddr != "" {
+		m.HTTPHandler(nil)
+	}
+
 	b.acmeMgr, b.acmeKey = m, key
 
 	return m
@@ -131,18 +139,22 @@ func normalizeHost(h string) string {
 // installation that terminates TLS here needs nothing: the CA validates
 // over tls-alpn-01 against the listener that is already up. This is for
 // the deployment where it cannot - a proxy that TERMINATES TLS answers
-// the handshake itself, so ALPN validation never reaches us.
+// the handshake itself, so ALPN validation never reaches us, and the
+// proxy forwards the challenge path to this address instead.
 //
 // Bound before anything is served, so a taken port fails the boot rather
-// than being discovered at the first order.
-func (b *Builder) startChallengeListener(m *autocert.Manager, addr string) error {
+// than being discovered at the first order. Bound whether or not ACME is
+// on: the port is the only part that needs the boot, and which manager
+// answers is decided per request.
+func (b *Builder) startChallengeListener(addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("acme challenge listener on %s: %w", addr, err)
 	}
 
+	b.challengeAddr = ln.Addr().String()
 	srv := &http.Server{
-		Handler:           m.HTTPHandler(http.HandlerFunc(redirectToHTTPS)),
+		Handler:           http.HandlerFunc(b.serveChallenge),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -156,6 +168,24 @@ func (b *Builder) startChallengeListener(m *autocert.Manager, addr string) error
 	b.onShutdown(srv.Shutdown)
 
 	return nil
+}
+
+// serveChallenge answers an http-01 request from the manager in force.
+//
+// Looked up per request rather than captured when the port was bound.
+// The manager is rebuilt after a failed order and when the account
+// details change, and a handler holding the first one would go on
+// answering out of a client nothing orders through any more. With ACME
+// off there is no manager and the request goes where any other does.
+func (b *Builder) serveChallenge(w http.ResponseWriter, r *http.Request) {
+	m := b.manager(b.acme())
+	if m == nil {
+		redirectToHTTPS(w, r)
+
+		return
+	}
+
+	m.HTTPHandler(http.HandlerFunc(redirectToHTTPS)).ServeHTTP(w, r)
 }
 
 // redirectToHTTPS is the fallback behind autocert's challenge listener.

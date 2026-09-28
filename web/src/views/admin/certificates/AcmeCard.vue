@@ -181,9 +181,9 @@ async function saveSettings() {
       >
         <p>
           This process does not terminate TLS, so the CA cannot validate by connecting to it. Either
-          turn on <code>server.tls.enabled</code>, or set <code>acme.challenge_addr</code> (usually
-          <code>:80</code>) so an HTTP-01 challenge can be answered. Ordering will fail until one of
-          those is true.
+          turn on <code>server.tls.enabled</code>, or set <code>acme.challenge_addr</code> and have
+          the proxy forward <code>/.well-known/acme-challenge/</code> to it, so an HTTP-01 challenge
+          can be answered. Ordering will fail until one of those is true.
         </p>
       </Notice>
 

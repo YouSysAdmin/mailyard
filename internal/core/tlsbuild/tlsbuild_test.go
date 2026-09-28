@@ -14,6 +14,7 @@ import (
 	"encoding/pem"
 	"io"
 	"net/http"
+	"reflect"
 	"slices"
 
 	"math/big"
@@ -627,3 +628,144 @@ func TestABrowserCanOpenTheConsoleWithACMEOn(t *testing.T) {
 // staticACME is a settings provider that never changes, for the tests
 // that are not about a change taking effect.
 func staticACME(a ACME) func() ACME { return func() ACME { return a } }
+
+// autocert offers http-01 only on a manager HTTPHandler was called on,
+// and the manager is rebuilt after a failed order and when the account
+// details change. Calling it once, on the manager that existed at boot,
+// meant that behind a proxy which terminates TLS one failed order left
+// every later one offering tls-alpn-01 alone, against a port the proxy
+// answers, until a restart.
+//
+// The flag is autocert's unexported tryHTTP01, read by reflection. The
+// library gives no other way to ask, and ordering from a CA to find out
+// would be testing the CA. The empty-address case proves the flag is
+// what the challenge address changes, not something autocert sets on
+// its own.
+func TestARebuiltManagerStillOffersHTTP01(t *testing.T) {
+	a := ACME{Enabled: true, Hosts: []string{"mail.example.com"}}
+
+	for _, tc := range []struct {
+		addr string
+		want bool
+	}{
+		{addr: "127.0.0.1:0", want: true},
+		{addr: "", want: false},
+	} {
+		b := &Builder{Store: &recordingStore{}, ACME: staticACME(a), ChallengeAddr: tc.addr}
+
+		first := b.manager(a)
+		if first == nil {
+			t.Fatalf("addr %q: no manager with ACME on", tc.addr)
+		}
+
+		if got := triesHTTP01(t, first); got != tc.want {
+			t.Errorf("addr %q: first manager offers http-01 = %v, want %v", tc.addr, got, tc.want)
+		}
+
+		b.forgetManager()
+		second := b.manager(a)
+		if second == first {
+			t.Fatalf("addr %q: forgetManager did not rebuild the manager", tc.addr)
+		}
+
+		if got := triesHTTP01(t, second); got != tc.want {
+			t.Errorf("addr %q: rebuilt manager offers http-01 = %v, want %v", tc.addr, got, tc.want)
+		}
+	}
+}
+
+func triesHTTP01(t *testing.T, m *autocert.Manager) bool {
+	t.Helper()
+	f := reflect.ValueOf(m).Elem().FieldByName("tryHTTP01")
+	if !f.IsValid() || f.Kind() != reflect.Bool {
+		t.Fatal("autocert.Manager no longer carries tryHTTP01 - find how the library now decides to offer http-01")
+	}
+
+	return f.Bool()
+}
+
+// The challenge port is bound whether or not ACME is on, and the
+// request is answered by whatever the settings say at the time. This
+// used to need ACME on BEFORE the restart that bound the port, which
+// put a restart in the middle of a workflow that otherwise has none.
+//
+// A token is served out of the shared store, under the key autocert
+// writes it to, so this is also the path a second node answers on when
+// the CA is routed to it.
+func TestTheChallengeListenerIsBoundWithACMEOff(t *testing.T) {
+	const host = "mail.example.com"
+
+	var (
+		mu    sync.Mutex
+		state ACME
+	)
+	store := &recordingStore{rows: map[string]string{}}
+	b := &Builder{
+		Store:         store,
+		Host:          host,
+		ChallengeAddr: "127.0.0.1:0",
+		ACME: func() ACME {
+			mu.Lock()
+			defer mu.Unlock()
+
+			return state
+		},
+	}
+	t.Cleanup(func() { _ = b.Shutdown(context.Background()) })
+
+	if _, err := b.Build("submission", true); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if b.challengeAddr == "" {
+		t.Fatal("no challenge listener was bound with ACME off")
+	}
+
+	client := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	// The Host header is the CA's, carried through the proxy unchanged:
+	// autocert refuses a token request for a name outside the policy.
+	ask := func() (*http.Response, error) {
+		req, err := http.NewRequest(http.MethodGet, "http://"+b.challengeAddr+"/.well-known/acme-challenge/tok", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.Host = host
+
+		return client.Do(req)
+	}
+
+	res, err := ask()
+	if err != nil {
+		t.Fatalf("with ACME off: %v", err)
+	}
+
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusPermanentRedirect {
+		t.Fatalf("with ACME off the challenge path answered %d, want a redirect to HTTPS", res.StatusCode)
+	}
+
+	mu.Lock()
+	state = ACME{Enabled: true, Hosts: []string{host}}
+	mu.Unlock()
+	store.mu.Lock()
+	store.rows[certmodel.ScopeACME+"/tok+http-01"] = "tok.keyauth"
+	store.mu.Unlock()
+
+	res, err = ask()
+	if err != nil {
+		t.Fatalf("with ACME on: %v", err)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.StatusCode != http.StatusOK || string(body) != "tok.keyauth" {
+		t.Fatalf("with ACME on the challenge path answered %d %q, want the token from the store", res.StatusCode, body)
+	}
+}
