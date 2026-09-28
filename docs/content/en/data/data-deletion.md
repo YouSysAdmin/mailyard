@@ -4,8 +4,7 @@ description: "Bulk erasure of contact and email data"
 weight: 20
 ---
 
-Erasure scoped to the active project. Both endpoints require the project `admin` or
-`owner` role - they are destructive and irreversible.
+Erasure scoped to the active project. Both endpoints require `data:delete` - they are destructive and irreversible.
 
 ## Delete Contact Data
 

@@ -71,20 +71,10 @@ POSTs (`/sandbox/clear`, the two data erasures) say so explicitly.
 The catalogue itself is served by the running binary at
 `GET /api/v1/permissions`, so the console checkboxes cannot offer a permission the server does not enforce.
 
-{{< callout type="note" title="There used to be five built-in roles" >}}
-Owner, admin, editor, viewer and developer, defined in the product. They were measured against the router and opened
-153, 153, 118, 59 and 10 of its 153 gated routes - nesting exactly one inside the next, with owner and admin identical.
-Five names delivering four levels along one axis, which is the single ranking the permission catalogue had been
-introduced to escape.
-
-They are gone. What each install actually means by "editor" is its own business, and a self-hosted product guessing at
-it in the binary was the wrong place for that decision.
-{{< /callout >}}
-
 ### Ownership
 
 **Ownership is not a role**, it is a flag on the membership row. It grants everything in the catalogue plus the two acts
-no permission can name: deleting the project and rewriting its single sign-on policy.
+no permission can name: deleting the project and granting or revoking ownership.
 
 - A project may have **several owners**. Only an existing owner may grant or revoke ownership, even though
   `members:write` hands out roles.

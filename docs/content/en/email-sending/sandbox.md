@@ -281,14 +281,11 @@ sending.
 The delivery log, one message's detail, batch and retry all describe or touch real mail, so a credential whose whole
 purpose is that its mail is not real is turned away from them by name.
 
-{{< callout type="note" title="This used to require emails:write, and that was a hole" >}}
-A sandbox key needed `emails:write` to reach the send route - which also grants
-`POST /emails/{id}/retry`. Retry re-queues an **existing** message, so it honoured no sandbox flag and never could:there
-is nothing to capture, the message was already composed and addressed to a real recipient. A credential handed out
-precisely so it could not send real mail could put a real failed message back on the queue.
-
-Narrowing the resource removes that by construction. A sandbox key now holds no permission on emails at all, so there is
-nothing on that surface for it to spend.
+{{< callout type="note" title="A sandbox key holds nothing on emails" >}}
+`emails:write` also grants `POST /emails/{id}/retry`, which re-queues an **existing** message - one already composed and
+addressed to a real recipient, with nothing left to capture. A credential handed out precisely so it cannot send real
+mail must not be able to put a real failed message back on the queue, so a sandbox key holds no permission on `emails`
+at all and there is nothing on that surface for it to spend.
 {{< /callout >}}
 
 ## Who can see it

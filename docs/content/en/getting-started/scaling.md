@@ -72,11 +72,11 @@ Two things follow that are worth knowing:
   partition for its week.
 - **A partition is only dropped whole when nothing in it is still in flight.** A message scheduled for next month may
   have been created months ago, so its row lives in an old partition. Those partitions are left for the ordinary
-  row-by-row delete, which skips in-flight mail exactly as it always did.
+  row-by-row delete, which skips in-flight mail.
 
 {{< callout type="note" title="Setting retention_days to 0" >}}
-Zero still means keep forever, and it still works - the partitions simply accumulate. It is no longer the default,
-because on a table that gains a row per message "keep everything" is a disk filling while nobody has decided anything.
+Zero means keep forever, and it works - the partitions simply accumulate. It is not the default, because on a table
+that gains a row per message "keep everything" is a disk filling while nobody has decided anything.
 {{< /callout >}}
 
 ## Read replicas

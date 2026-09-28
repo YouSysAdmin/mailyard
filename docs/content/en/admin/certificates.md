@@ -7,15 +7,12 @@ weight: 90
 Every certificate this installation holds lives in the database, not in a directory on one node. A private key in a file
 belongs to the machine that wrote it: no other node can use it, and it does not survive that machine.
 
-That matters as soon as there is more than one node:
+That matters as soon as there is more than one node: every node would order its own ACME certificate against Let's
+Encrypt's limit of five duplicates a week for one name set, and every node would generate a different self-signed pair,
+so a client reaching two nodes would see two certificates under one hostname.
 
-- **ACME** with a per-node cache means each node orders its own certificate. Let's Encrypt allows five duplicates per
-  week for one name set, so the sixth node serves no TLS, and the ones that succeeded renew independently forever.
-- **Self-signed** with a per-node cache means each node generates a different pair, so a client that reaches two nodes
-  sees two certificates under one hostname - which is exactly what pinning a self-signed fingerprint is meant to detect.
-
-Both are one shared row now. Private halves are encrypted with `database.crypto.encryption_key`; the public certificate
-is stored in the clear so the console can show an expiry without the key being involved.
+So both are one shared row. Private halves are encrypted with `database.crypto.encryption_key` and the public
+certificate is stored in the clear, so the console can show an expiry without the key being involved.
 
 ## What a listener serves
 
@@ -27,8 +24,8 @@ page already says.
 Each listener that does terminate TLS walks the same chain, resolved per handshake:
 
 1. **The certificate assigned to it** here, if any.
-2. **ACME**, if `acme.enabled` is set and the name being asked for is in
-   `acme.hosts`.
+2. **ACME**, if `acme_enabled` is set and the name being asked for is in
+   `acme_hosts`.
 3. **The self-signed pair**, generated on first use and shared by every node.
 
 So a listener always has something to present, an assignment takes effect within 30 seconds with no restart, and a name
@@ -71,14 +68,6 @@ carrying only the wildcard fails on the very name you configured.
 
 It is the last step of the chain, so it is what a listener presents when nothing is assigned and ACME is off or does not
 cover the name. Nothing has to be configured for it to exist.
-
-{{< callout type="note" title="Keys that were removed" >}}
-`tls.mode`, `tls.cert`, `tls.key`, `tls.fqdn`, `tls.alg`, `tls.cachedir` and the per-listener `tls.acme.*` blocks are
-gone. A mode duplicated an assignment with nothing reconciling the two, and they disagreed in both directions:
-`mode: none`
-made an assignment silently inert, and an assignment overrode a mode written in a file. The keys still parse, so any you
-have set are named in the boot log rather than ignored in silence.
-{{< /callout >}}
 
 ## Your own certificate authority
 
@@ -239,12 +228,6 @@ setting**, not configuration, so it is turned on and changed in the console with
 | `acme_hosts`         | Hostnames to issue for, one per line in the console and a JSON array over the API |
 | `acme_email`         | Account contact, where the CA sends expiry warnings                               |
 | `acme_directory_url` | A different directory. Empty is Let's Encrypt production                          |
-
-It used to be a yaml block, one per listener, which in every real configuration was three identical copies. What put it
-in a file was the challenge port - and there is no port any more, see below.
-
-There is no `MAILYARD_ACME_ENABLED`. The old config keys are ignored, and the boot log names the ones you set:
-`these settings no longer exist and are ignored`.
 
 **Administration → Certificates** has all of it: a **Settings** button for those four values, a host list you add to and
 remove from, and **Order** beside each host.

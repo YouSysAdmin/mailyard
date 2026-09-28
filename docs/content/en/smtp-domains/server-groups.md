@@ -85,8 +85,8 @@ PATCH  /api/v1/smtp-server-groups/{id}     rename, re-slug, or {make_default: tr
 DELETE /api/v1/smtp-server-groups/{id}     delete, moving its servers to the default
 ```
 
-Reads are open to any project member, writes require the project `admin` role - a group decides where a project's mail
-physically leaves from, which is infrastructure rather than content.
+Reads require `smtp:read`, writes `smtp:write` and a delete `smtp:delete` - a group decides where a project's mail
+physically leaves from, which is infrastructure rather than content, so it shares the permission of the servers in it.
 
 Notes worth knowing:
 

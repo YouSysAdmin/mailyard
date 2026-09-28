@@ -158,16 +158,9 @@ and start URL - never client ids, issuers, or allowlists.
 ## Projects Do Not Pin a Provider
 
 A provider is installation-wide, and that is the whole of it: signing in proves who somebody is, and it never decides
-what they may reach.
+what they may reach. A project cannot name a provider, require one, or admit anyone from an email domain on its own.
 
-A project used to be able to name a provider, require it, and admit anyone from a matching email domain automatically.
-All three are gone. They gave a project control over the *sign-in*, which is not a project's to govern - and the
-consequences showed it. The requirement was only checked for the project named in the request header, so the routes that
-address a project by path went unchecked. A stale project id in the browser could leave a member unable to load their
-own project list. And somebody belonging to two projects that required different providers could not satisfy both,
-because a session records one provider.
-
-What replaces it, in the order a person meets it:
+How a person gets in, in the order they meet it:
 
 1. **Who may sign in at all** is decided here, by this provider's allowlists - see
    [Who Gets In](#who-gets-in). This is the control that matters for a provider with a global user base like Google:

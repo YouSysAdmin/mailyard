@@ -105,15 +105,11 @@ because the settings are stored in the database and editable at runtime. See
 |-------------------------------------------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY` | **required** | Keys the at-rest encryption of secrets stored in the database: tenant SMTP passwords, DKIM private keys, TOTP secrets, OAuth client secrets, certificate private keys. At least 32 characters - generate with `openssl rand -hex 32`. The AES-256 key is derived with HKDF-SHA256, which stretches a short secret without adding entropy to it. To rotate it, stop every node and run `mailyard rekey`, which re-encrypts every sealed column under the new key |
 
-**Required.** Mailyard refuses to start without it. It used to fall back to base64 encoding with a warning at startup,
-which meant an install that missed the warning kept every one of those secrets in a reversible encoding, in columns
-documented as encrypted. Refusing to boot is the honest version of that warning.
+**Required.** Mailyard refuses to start without it.
 
 Changing it later orphans every row already sealed under the old key, so treat it like a database credential.
 
-A stored value is `base64(nonce||ciphertext)` and nothing else. Older releases wrote an `enc:` prefix in front of it to
-mark sealed values apart from the base64 fallback — with the fallback gone the prefix had nothing left to say and it was
-removed. Nothing you do is affected: the bytes underneath are unchanged.
+A stored value is `base64(nonce||ciphertext)` and nothing else.
 
 ## Amazon SES notifications
 
@@ -241,12 +237,8 @@ The platform's own outbound mail: project invitations, password resets and signu
 from the tenant send pipeline, so it never consumes a project's plan quota, appears in a project email log, or needs a
 tenant to have configured an SMTP server.
 
-**There is nothing to configure here.** There used to be a `system_mail` block with its own host, port and credentials —
-it is gone. It meant an operator configured platform SMTP twice, once in the file and once in the console, and the
-console could show neither.
-
-Platform mail now leaves through the **shared SMTP pool**, and the address it sends from is a platform setting rather
-than config:
+**There is nothing to configure here.** Platform mail leaves through the **shared SMTP pool**, and the address it sends
+from is a platform setting rather than config:
 
 | Setting                   | Where                                | Description                                                               |
 |---------------------------|--------------------------------------|---------------------------------------------------------------------------|
@@ -475,21 +467,21 @@ A listener always has something to present, and an unreachable console is recove
 
 ### ACME
 
-One block for the whole installation, covering every listener above.
+Whether to order from Let's Encrypt, for which hosts and under which account are **platform settings** (`acme_enabled`,
+`acme_hosts`, `acme_email`, `acme_directory_url`), set in the console under **Administration → Certificates** and read
+fresh on every handshake and every order. None of them is in this file.
 
-| Variable                       | Default | Description                                                                |
-|--------------------------------|---------|----------------------------------------------------------------------------|
-| `MAILYARD_ACME_ENABLED`        | `false` | Order certificates from Let's Encrypt                                      |
-| `MAILYARD_ACME_HOSTS`          | derived | Hostnames to issue for. Defaults to the host in `server.public_url`        |
-| `MAILYARD_ACME_EMAIL`          | —       | Registration contact, where the CA sends expiry warnings                   |
-| `MAILYARD_ACME_CHALLENGE_ADDR` | `:80`   | HTTP-01 challenge listener, must be reachable as port 80 from the internet |
+One key is here, because it binds a port:
 
-A name that is not in `hosts` falls through to the self-signed pair rather than failing the handshake. That is the
-ordinary state of an MX: `public_url` names the console, so the derived list names the console, and the mail listeners
-answer under a different hostname.
+| Variable                       | Default | Description                                                            |
+|--------------------------------|---------|------------------------------------------------------------------------|
+| `MAILYARD_ACME_CHALLENGE_ADDR` | empty   | HTTP-01 responder. Empty means `tls-alpn-01` only, which needs no port |
 
-There is no cache directory. Issued certificates go into the database, so every node serves the same one and a restart
-re-issues nothing. Renewal happens about 30 days before expiry, and Mailyard touches each configured host at startup and
+A name that is not in `acme_hosts` falls through to the self-signed pair rather than failing the handshake. That is the
+ordinary state of an MX: the list is what somebody typed for the console, and the mail listeners may answer under a
+different hostname.
+
+Issued certificates are stored in the database, so every node serves the same one and a restart re-issues nothing. Renewal happens about 30 days before expiry, and Mailyard touches each configured host at startup and
 hourly after that, so a listener that has seen no traffic still renews.
 
 ## Example environment
@@ -511,11 +503,9 @@ MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY=...
 MAILYARD_AUTH_LOCAL_ENABLED=true
 MAILYARD_AUTH_LOCAL_EMAIL=admin@example.com
 
-# HTTPS here rather than at a proxy. Which certificate is served is
-# chosen in the console, not set here.
+# HTTPS here rather than at a proxy. Which certificate is served, and
+# whether Let's Encrypt is asked for one, is chosen in the console.
 MAILYARD_SERVER_TLS_ENABLED=true
-MAILYARD_ACME_ENABLED=true
-MAILYARD_ACME_EMAIL=ops@example.com
 
 # Optional SMTP listeners, both off unless enabled
 MAILYARD_SUBMISSION_ENABLED=true

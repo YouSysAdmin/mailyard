@@ -53,10 +53,10 @@ curl -X POST http://localhost:3000/api/v1/smtp-servers \
 - **Nothing to say about DKIM.** SES rewrites `Date` and `Message-ID` and signs the result with its own key, and both
   are in Mailyard's signed header set - so a signature applied on the way to it always arrives broken. That is a fact
   about SES rather than a setting, so the choice is not offered on this provider and not read from the row: send
-  `skip_dkim: false` and it is still skipped. The console says so where the checkbox used to be.
+  `skip_dkim: false` and it is still skipped. The console says so in place of the checkbox.
 
-  A broken signature is ignored rather than punished (RFC 6376), which is exactly why this was worth taking away:
-  getting it wrong produced no error anywhere, just mail that quietly stopped being authenticated by us.
+  A broken signature is ignored rather than punished (RFC 6376), which is exactly why the choice is not offered: getting
+  it wrong would produce no error anywhere, just mail that quietly stopped being authenticated by us.
 
 {{< callout type="note" title="SES caps a raw message at 10 MiB" >}}
 Lower than the 25 MiB of attachments an installation accepts by default, so this is reachable with nothing

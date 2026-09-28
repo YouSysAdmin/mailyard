@@ -9,8 +9,7 @@ Mailyard keeps two trails. Both live in one table and are read through different
 ## Project Activity
 
 Configuration changes inside one project: credentials minted or revoked, templates changed, SMTP servers added, webhooks
-edited. Requires the project `admin` or `owner`
-role.
+edited. Requires `audit:read`.
 
 ```
 GET /api/v1/audit-log?limit=50&offset=0

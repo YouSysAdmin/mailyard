@@ -102,8 +102,9 @@ a flag wrong in the message.
 ## Issuing a Credential
 
 SMTP credentials are project-scoped and always require a project - there is no personal/unscoped credential. Create one
-from the dashboard under **Developers -> SMTP Submission** (`/app/smtp-submission`), or directly via the API. Creating,
-revoking and deleting a credential all require the project `admin` role.
+from the dashboard under **Developers -> SMTP Submission** (`/app/smtp-submission`), or directly via the API. Creating
+and revoking a credential require `apikeys:write`, deleting one `apikeys:delete` - an SMTP credential is a machine
+credential like an API key and shares its permission.
 
 ```
 POST /api/v1/smtp-credentials

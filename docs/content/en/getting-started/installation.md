@@ -147,17 +147,8 @@ the self-signed pair.
 
 ### Ordering from Let's Encrypt
 
-**There is no `MAILYARD_ACME_ENABLED`.** ACME is turned on in the console, not in the config file, because none of it
-binds a port any more — see
-[Certificates](/docs/admin/certificates#acme). Setting the old keys is not an error you have to hunt for, but it does
-nothing:
-
-```
-level=WARN msg="these settings no longer exist and are ignored ..."
-  keys="[acme.enabled acme.email]"
-```
-
-The order is:
+ACME is turned on in the console under **Administration → Certificates**, not in the config file — see
+[Certificates](/docs/admin/certificates#acme). The order is:
 
 1. Turn the listener on and restart — `MAILYARD_SERVER_TLS_ENABLED: "true"` on port 443, as above. The `tls-alpn-01`
    handshake **is** the validation, so without a TLS listener there is nothing for the CA to talk to.

@@ -114,14 +114,13 @@ the audit trail or the export.
 | Everything, including resources added later | `*`                                             |
 
 {{< callout type="warning" title="An empty permission list grants nothing" >}}
-A key created with no `permissions` field can do **nothing**. This is a change in direction: an empty list used to mean
-"send", a sensible default back when sending was all a key could do. Now that a key can reach the whole project surface,
-the unstated intent has to fail closed.
+A key created with no `permissions` field can do **nothing**. A key can reach the whole project surface, so an unstated
+intent fails closed.
 {{< /callout >}}
 
-{{< callout type="note" title="Why a key may hold `*` when a custom group may not" >}}
-A [custom group](/docs/projects/members-and-invitations) refuses the wildcard, because a person who should have
-everything is given the admin **role**, where it is visible for what it is. A key has no role behind it, so the wildcard
+{{< callout type="note" title="Why a key may hold `*` when a role may not" >}}
+A [project role](/docs/projects/members-and-invitations) refuses the wildcard, because a person who should have
+everything is made an **owner**, where it is visible for what it is. A key has no role behind it, so the wildcard
 is the only way to say "this is the project's own deployment key" - and it keeps covering the product as resources are
 added, rather than quietly stopping at whatever existed on the day it was minted.
 {{< /callout >}}
@@ -131,7 +130,7 @@ added, rather than quietly stopping at whatever existed on the day it was minted
 Permissions decide the resource. Two things sit above them and are refused to every project key regardless of what it
 holds:
 
-- **Deleting the project** and **changing the SSO policy**. These are owner-tier acts.
+- **Deleting the project** and **granting or revoking ownership**. These are owner acts, and a key is never an owner.
 - **Platform administration** - users, plans, installation settings. See below: that is a different credential, not a
   wider permission list.
 
