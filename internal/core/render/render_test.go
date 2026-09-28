@@ -162,7 +162,8 @@ func TestRenderRefusesUnboundedOutput(t *testing.T) {
 
 // A range whose body writes nothing never meets the output cap, so
 // the iteration budget has to stop it. A literal integer range needs
-// no data at all and is the same case.
+// no data at all and is the same case, and so is a template that calls
+// itself twice, which branches with no range anywhere.
 func TestRenderRefusesUnboundedIteration(t *testing.T) {
 	wide := make([]any, 20000)
 	for i := range wide {
@@ -176,6 +177,10 @@ func TestRenderRefusesUnboundedIteration(t *testing.T) {
 		"nested html": {Subject: "s", HTML: "{{range .a}}{{range $.a}}{{end}}{{end}}"},
 		"literal":     {Subject: "{{range 3000000}}{{end}}"},
 		"defined":     {Subject: `{{define "r"}}{{range $.a}}{{end}}{{end}}{{range .a}}{{template "r" $}}{{end}}`},
+		"recursion": {Subject: `{{define "b"}}{{if .}}{{template "b" (slice . 1)}}{{template "b" (slice . 1)}}{{end}}{{end}}` +
+			`{{template "b" "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}`},
+		"recursion html": {Subject: "s", HTML: `{{define "b"}}{{if .}}{{template "b" (slice . 1)}}{{template "b" (slice . 1)}}{{end}}{{end}}` +
+			`{{template "b" "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}`},
 	} {
 		start := time.Now()
 		_, err := r.Render(in, data)

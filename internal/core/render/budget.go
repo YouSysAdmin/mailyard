@@ -10,11 +10,12 @@ import (
 	"text/template/parse"
 )
 
-// MaxIterations bounds how many times the range bodies of one render
-// may run, summed over every range in every template it invokes. The
-// output cap cannot reach a range that writes nothing and
-// text/template has no per-iteration hook, so every range body is
-// planted with a call that counts and errors once the budget is spent.
+// MaxIterations bounds how many times the range bodies and template
+// bodies of one render may run, summed over everything it invokes. The
+// output cap cannot reach a range or a recursion that writes nothing,
+// and text/template has no per-iteration hook, so every range body and
+// every template body is planted with a call that counts and errors
+// once the budget is spent.
 const MaxIterations = 1_000_000
 
 // ErrTooManyIterations is the render refusing past MaxIterations.
@@ -59,7 +60,9 @@ func (b *budget) tick() (string, error) {
 }
 
 // plant walks every tree a template parsed and prepends the counting
-// call to every range body, checking printf widths on the way. It
+// call to every range body and to the body of every template, checking
+// printf widths on the way. The template body is what bounds a
+// recursion through {{template}}, which needs no range to branch. It
 // returns the function map the template must be given before Execute.
 func plant(trees map[string]*parse.Tree) (map[string]any, error) {
 	b := &budget{left: MaxIterations}
@@ -71,6 +74,8 @@ func plant(trees map[string]*parse.Tree) (map[string]any, error) {
 		if err := plantList(t.Root); err != nil {
 			return nil, err
 		}
+
+		t.Root.Nodes = append([]parse.Node{tickTree.Root.Nodes[0].Copy()}, t.Root.Nodes...)
 	}
 
 	return map[string]any{budgetFunc: b.tick}, nil
