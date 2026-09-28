@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -41,8 +42,11 @@ type Handler struct {
 
 	// addressFailures remembers which addresses failed a password for
 	// which account inside the lockout window - see failedFrom.
-	addressFailures *iplimit.Limiter
-	addressOnce     sync.Once
+	// lockedAdmissions counts the fresh addresses a locked account has
+	// admitted - see admitWhileLocked.
+	addressFailures  *iplimit.Limiter
+	lockedAdmissions *iplimit.Limiter
+	addressOnce      sync.Once
 }
 
 // infoMemo is how long the provider list stands. Five seconds keeps
@@ -90,9 +94,11 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	// has not failed a password for this account is admitted to one
 	// attempt, and a wrong one puts it under the lock too. Keyed on
 	// the account alone it is a denial of service against any known
-	// address.
+	// address. The fresh addresses a locked account admits are capped
+	// in turn, or a guess spread over many addresses would never meet
+	// a lock at all.
 	ip := clientip.From(c)
-	if h.loginLocked(c.Context(), u.ID) && h.failedFrom(u.ID, ip) {
+	if h.loginLocked(c.Context(), u.ID) && (h.failedFrom(u.ID, ip) || !h.admitWhileLocked(u.ID)) {
 		_ = authenticator.VerifyDummyPassword(in.Password)
 		h.recordLoginFailure(c, u, in.Email, "account locked")
 
@@ -355,20 +361,54 @@ func (h *Handler) recordPasswordFailure(ctx context.Context, userID string) {
 // failedFrom reports whether ip has failed a password for the account
 // inside the lockout window. Per process, like every limiter here.
 func (h *Handler) failedFrom(userID, ip string) bool {
-	return h.perAddress().Exceeded(userID + "|" + ip)
+	h.limiters()
+
+	return h.addressFailures.Exceeded(userID + "|" + addressKey(ip))
 }
 
 // chargeAddress records one wrong password from ip for the account.
 func (h *Handler) chargeAddress(userID, ip string) {
-	h.perAddress().Allow(userID + "|" + ip)
+	h.limiters()
+	h.addressFailures.Allow(userID + "|" + addressKey(ip))
 }
 
-// perAddress is the address memory, built on first use because the
-// handler is a literal.
-func (h *Handler) perAddress() *iplimit.Limiter {
-	h.addressOnce.Do(func() { h.addressFailures = iplimit.New(1, loginLockout) })
+// admitWhileLocked spends one of the fresh-address attempts a locked
+// account allows per lockout window, and reports whether one was left.
+func (h *Handler) admitWhileLocked(userID string) bool {
+	h.limiters()
 
-	return h.addressFailures
+	return h.lockedAdmissions.Allow(userID)
+}
+
+// limiters builds the address memory on first use, because the handler
+// is a literal.
+func (h *Handler) limiters() {
+	h.addressOnce.Do(func() {
+		h.addressFailures = iplimit.New(1, loginLockout)
+		h.lockedAdmissions = iplimit.New(loginMaxFailures, loginLockout)
+	})
+}
+
+// addressKey is the unit an address is judged as: an IPv4 address
+// itself, an IPv6 one by its /64, which is what one subscriber is
+// handed and can rotate through freely.
+func addressKey(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ip
+	}
+
+	addr = addr.Unmap()
+	if addr.Is4() {
+		return addr.String()
+	}
+
+	p, err := addr.Prefix(64)
+	if err != nil {
+		return ip
+	}
+
+	return p.String()
 }
 
 // reauthenticated confirms the signed-in caller's password for a
