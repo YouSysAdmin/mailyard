@@ -12,6 +12,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/database"
 )
 
@@ -23,7 +24,7 @@ import (
 // operator then puts the new key in the config and starts the nodes.
 func newRekeyCmd() *cobra.Command {
 	var newKey string
-	var stdin bool
+	var stdin, forgetTracking bool
 
 	cmd := &cobra.Command{
 		Use:   "rekey",
@@ -33,6 +34,10 @@ func newRekeyCmd() *cobra.Command {
 			"key while this runs and cannot read the rows it rewrote. The rows are rewritten\n" +
 			"in one transaction, so a failure leaves the database as it was. Afterwards put\n" +
 			"the new key in the config of every node and start them again.\n\n" +
+			"Unsubscribe links in mail already delivered never expire, so the tracking key\n" +
+			"derived from the old encryption key is kept, sealed, to go on verifying them.\n" +
+			"Web view, open and click links signed under it stop working. Pass\n" +
+			"--forget-tracking when the old key was used to forge unsubscribe links.\n\n" +
 			"Reads the new key from the terminal without echoing it, or from stdin with\n" +
 			"--stdin so it can be piped and kept out of shell history.",
 		Args: noArgs,
@@ -69,13 +74,22 @@ func newRekeyCmd() *cobra.Command {
 
 			defer func() { _ = db.Close() }()
 
-			counts, err := rekeyAll(cmd.Context(), db.DB(), current, crypto.New(newKey))
+			retire := crypto.DeriveKey(cfg.Database.Crypto.EncryptionKey, crypto.KeyTracking)
+			if forgetTracking {
+				retire = ""
+			}
+
+			counts, err := rekeyAll(cmd.Context(), db.DB(), current, crypto.New(newKey), retire)
 			if err != nil {
 				return err
 			}
 
 			for _, c := range sealedColumns {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%-24s %-22s %d row(s)\n", c.table, c.column, counts[c.table+"."+c.column])
+			}
+
+			if forgetTracking {
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "\nthe old tracking key was not kept: every unsubscribe link delivered so far is refused")
 			}
 
 			_, _ = fmt.Fprintln(cmd.ErrOrStderr(),
@@ -87,6 +101,8 @@ func newRekeyCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&newKey, "key", "", "the new key (avoid: lands in shell history, prefer --stdin)")
 	cmd.Flags().BoolVar(&stdin, "stdin", false, "read the new key from stdin")
+	cmd.Flags().BoolVar(&forgetTracking, "forget-tracking", false,
+		"do not keep the old tracking key, so unsubscribe links delivered so far stop working")
 
 	return cmd
 }
@@ -128,11 +144,16 @@ var sealedColumns = []sealedColumn{
 	{"webhooks", "secret", 1,
 		`SELECT id, secret FROM webhooks WHERE secret <> '' FOR UPDATE`,
 		`UPDATE webhooks SET secret = ? WHERE id = ?`},
+	{"tracking_keys", "key", 1,
+		`SELECT id, key FROM tracking_keys FOR UPDATE`,
+		`UPDATE tracking_keys SET key = ? WHERE id = ?`},
 }
 
 // rekeyAll rewrites every sealed column from current to fresh in one
-// transaction and reports the rows rewritten per column.
-func rekeyAll(ctx context.Context, db *sql.DB, current, fresh *crypto.Service) (map[string]int, error) {
+// transaction and reports the rows rewritten per column. A non-empty
+// retire is stored, sealed under fresh, as a tracking key that goes on
+// verifying unsubscribe links.
+func rekeyAll(ctx context.Context, db *sql.DB, current, fresh *crypto.Service, retire string) (map[string]int, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -148,6 +169,20 @@ func rekeyAll(ctx context.Context, db *sql.DB, current, fresh *crypto.Service) (
 		}
 
 		counts[col.table+"."+col.column] = n
+	}
+
+	// After the loop, so the row is sealed once, under fresh.
+	if retire != "" {
+		sealed, err := fresh.Encrypt(retire)
+		if err != nil {
+			return nil, err
+		}
+
+		//sqlconst:allow a literal, Rebind only turns its placeholders into $n
+		if _, err := tx.ExecContext(ctx, database.Rebind(`INSERT INTO tracking_keys (id, key) VALUES (?, ?)`),
+			ids.New(), sealed); err != nil {
+			return nil, fmt.Errorf("tracking_keys: %w", err)
+		}
 	}
 
 	return counts, tx.Commit()

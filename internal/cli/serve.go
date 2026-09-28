@@ -495,6 +495,15 @@ func runServe(cmd *cobra.Command, r role) error {
 	rt.Tracking = coretracking.NewSigner(cfg.Server.PublicURL,
 		crypto.DeriveKey(cfg.Database.Crypto.EncryptionKey, crypto.KeyTracking),
 		crypto.DeriveKey(cfg.Auth.JWTSecret, crypto.KeyTracking))
+
+	// The keys a rekey retired keep delivered unsubscribe links working.
+	// Not fatal: without them only those old links fail.
+	if retired, err := st.TrackingKey.Retired(cmd.Context()); err != nil {
+		log.Warn("tracking: retired keys could not be read, unsubscribe links minted before a rekey will be refused", "err", err)
+	} else {
+		rt.Tracking.Retire(retired...)
+	}
+
 	if !rt.Tracking.Enabled() {
 		log.Warn("tracking: disabled, set server.public_url to enable open/click tracking and hosted unsubscribe pages")
 	}

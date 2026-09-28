@@ -35,6 +35,12 @@ type Signer struct {
 	// previous are keys that only verify, so links minted under an
 	// earlier key keep working after it stops signing.
 	previous [][]byte
+
+	// retired are keys a rekey replaced. They verify unsubscribe links
+	// and nothing else: those never expire and must keep working, while
+	// a web view link opens the message and is not worth handing to
+	// whoever may hold a key that was rotated out.
+	retired [][]byte
 }
 
 // NewSigner builds a Signer. secret signs and verifies, each of
@@ -53,6 +59,16 @@ func NewSigner(baseURL, secret string, previous ...string) *Signer {
 	}
 
 	return s
+}
+
+// Retire adds keys that verify unsubscribe links only - see retired.
+// Called once at boot, before the signer is shared.
+func (s *Signer) Retire(keys ...string) {
+	for _, k := range keys {
+		if k != "" {
+			s.retired = append(s.retired, []byte(k))
+		}
+	}
 }
 
 // Enabled reports whether tracking URLs can be built at all: they are
@@ -89,7 +105,7 @@ func (s *Signer) ListUnsubscribeURL(listID, email string) string {
 // VerifyListUnsubscribeToken returns the list id and recipient the
 // token encodes.
 func (s *Signer) VerifyListUnsubscribeToken(tok string) (listID, email string, err error) {
-	payload, err := s.open(tok)
+	payload, err := s.open(tok, s.retired...)
 	if err != nil {
 		return "", "", err
 	}
@@ -133,7 +149,7 @@ func (s *Signer) VerifyClick(messageID, hash, sig string) bool {
 // VerifyUnsubscribeToken returns the campaign message id the token
 // encodes.
 func (s *Signer) VerifyUnsubscribeToken(tok string) (string, error) {
-	payload, err := s.open(tok)
+	payload, err := s.open(tok, s.retired...)
 	if err != nil {
 		return "", err
 	}
@@ -182,16 +198,19 @@ func (s *Signer) sign(payload string) string {
 }
 
 // verify reports whether sig is a MAC over payload under the signing
-// key or any previous one. Every key is tried in constant time each.
-func (s *Signer) verify(payload, sig string) bool {
+// key, any previous one, or any of also. Every key is tried in
+// constant time each.
+func (s *Signer) verify(payload, sig string, also ...[]byte) bool {
 	if len(s.key) == 0 {
 		return false
 	}
 
 	ok := hmac.Equal([]byte(sig), []byte(signWith(s.key, payload)))
-	for _, k := range s.previous {
-		if hmac.Equal([]byte(sig), []byte(signWith(k, payload))) {
-			ok = true
+	for _, keys := range [][][]byte{s.previous, also} {
+		for _, k := range keys {
+			if hmac.Equal([]byte(sig), []byte(signWith(k, payload))) {
+				ok = true
+			}
 		}
 	}
 
@@ -211,8 +230,9 @@ func (s *Signer) token(payload string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + s.sign(payload)
 }
 
-// open verifies a token and returns its payload.
-func (s *Signer) open(tok string) (string, error) {
+// open verifies a token and returns its payload. also are keys
+// accepted beyond the signing and previous ones.
+func (s *Signer) open(tok string, also ...[]byte) (string, error) {
 	head, sig, found := strings.Cut(tok, ".")
 	if !found {
 		return "", errors.New("invalid token format")
@@ -223,7 +243,7 @@ func (s *Signer) open(tok string) (string, error) {
 		return "", errors.New("invalid token encoding")
 	}
 
-	if !s.verify(string(payload), sig) {
+	if !s.verify(string(payload), sig, also...) {
 		return "", errors.New("invalid token signature")
 	}
 

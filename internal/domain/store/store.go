@@ -89,6 +89,12 @@ type Store struct {
 	OAuthProvider   OAuthProviderStore
 	OAuthIdentity   OAuthIdentityStore
 	Notification    NotificationStore
+	TrackingKey     TrackingKeyStore
+}
+
+// TrackingKeyStore reads the tracking keys a rekey retired.
+type TrackingKeyStore interface {
+	Retired(ctx context.Context) ([]string, error)
 }
 
 // NotificationStore persists in-app notifications. Addressed to a

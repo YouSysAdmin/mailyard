@@ -8,6 +8,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/database/dbtest"
+	"github.com/yousysadmin/mailyard/internal/domain/trackingkey"
 )
 
 // Every sealed column opens under the new key after a rekey and none
@@ -45,7 +46,7 @@ func TestRekeyRewritesEverySealedColumn(t *testing.T) {
 	      VALUES ('8d2c5b6a-1e4f-4a7b-9c3d-2e1f0a9b8c7d', 'e66e7a4d-9e6c-4884-869a-cf9ffcf22181', 'example.com', 'tok', ?, ?)`,
 		seal("dkim-pem"), seal("next-pem"))
 
-	counts, err := rekeyAll(t.Context(), db, old, fresh)
+	counts, err := rekeyAll(t.Context(), db, old, fresh, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,5 +87,46 @@ func TestRekeyRewritesEverySealedColumn(t *testing.T) {
 
 	if got := read(`SELECT totp_secret FROM users WHERE email = 'b@example.com'`); got != "" {
 		t.Errorf("an empty column was rewritten to %q", got)
+	}
+}
+
+// Each rekey keeps the tracking key it retires, and a later rekey
+// reseals the ones kept before, so all of them read under the key in
+// force.
+func TestRekeyKeepsTheRetiredTrackingKeys(t *testing.T) {
+	db := dbtest.Open(t)
+	dbtest.Migrate(t, db)
+	first := crypto.New("first-key-first-key-first-key-first")
+	second := crypto.New("second-key-second-key-second-key-s")
+	third := crypto.New("third-key-third-key-third-key-third")
+
+	if _, err := rekeyAll(t.Context(), db, first, second, "tracking-one"); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := rekeyAll(t.Context(), db, second, third, "tracking-two")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if counts["tracking_keys.key"] != 1 {
+		t.Errorf("resealed %d retired keys, want 1", counts["tracking_keys.key"])
+	}
+
+	got, err := trackingkey.NewStore(db, third).Retired(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 2 || got[0] != "tracking-one" || got[1] != "tracking-two" {
+		t.Errorf("retired keys under the key in force: %q", got)
+	}
+
+	if _, err := rekeyAll(t.Context(), db, third, first, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := trackingkey.NewStore(db, first).Retired(t.Context()); err != nil || len(got) != 2 {
+		t.Errorf("a rekey that forgets keeps nothing new and still reseals the rest: %q, %v", got, err)
 	}
 }

@@ -38,6 +38,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/subscriberlist"
 	"github.com/yousysadmin/mailyard/internal/domain/suppression"
 	"github.com/yousysadmin/mailyard/internal/domain/template"
+	"github.com/yousysadmin/mailyard/internal/domain/trackingkey"
 	"github.com/yousysadmin/mailyard/internal/domain/unsubscribelist"
 	"github.com/yousysadmin/mailyard/internal/domain/user"
 	"github.com/yousysadmin/mailyard/internal/domain/webhook"
@@ -106,5 +107,6 @@ func BindStore(p *Postgres, cr *crypto.Service, reads env.ReplicaReadsConfig) *s
 		OAuthProvider:   oauthprovider.NewStore(p.db, cr),
 		OAuthIdentity:   oauthprovider.NewIdentityStore(p.db),
 		Notification:    notification.NewStore(p.db),
+		TrackingKey:     trackingkey.NewStore(p.db, cr),
 	}
 }

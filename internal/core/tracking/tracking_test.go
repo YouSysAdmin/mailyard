@@ -299,3 +299,36 @@ func TestAPreviousKeyStillVerifies(t *testing.T) {
 		t.Error("the old signer accepted a token minted under the new key")
 	}
 }
+
+// A retired key verifies both kinds of unsubscribe link and nothing
+// else, and never signs.
+func TestARetiredKeyVerifiesUnsubscribeLinksOnly(t *testing.T) {
+	const base = "https://m.example.com"
+	old := NewSigner(base, "old-secret-old-secret-old-secret")
+	now := NewSigner(base, "new-secret-new-secret-new-secret")
+	now.Retire("old-secret-old-secret-old-secret")
+
+	unsub := strings.TrimPrefix(old.UnsubscribeURL("msg-1"), base+"/tracking/unsubscribe/")
+	if id, err := now.VerifyUnsubscribeToken(unsub); err != nil || id != "msg-1" {
+		t.Errorf("campaign unsubscribe under the retired key: %q, %v", id, err)
+	}
+
+	list := strings.TrimPrefix(old.ListUnsubscribeURL("list-1", "a@example.com"), base+"/tracking/unsubscribe/")
+	if l, e, err := now.VerifyListUnsubscribeToken(list); err != nil || l != "list-1" || e != "a@example.com" {
+		t.Errorf("list unsubscribe under the retired key: %q %q, %v", l, e, err)
+	}
+
+	view := strings.TrimPrefix(old.WebViewURL("msg-1"), base+"/tracking/view/")
+	if _, err := now.VerifyWebViewToken(view); err == nil {
+		t.Error("a retired key opened a web view link")
+	}
+
+	sig := strings.TrimPrefix(old.OpenURL("msg-1"), base+"/tracking/open/msg-1.gif?sig=")
+	if now.VerifyOpen("msg-1", sig) {
+		t.Error("a retired key verified an open")
+	}
+
+	if strings.Contains(now.UnsubscribeURL("msg-2"), old.sign("unsub:msg-2")) {
+		t.Error("a retired key signed a new link")
+	}
+}
