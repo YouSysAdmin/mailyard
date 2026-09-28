@@ -39,6 +39,7 @@ func TestACookieRequestFromAnotherOriginIsRefused(t *testing.T) {
 		{"foreign origin", "POST", true, map[string]string{"Origin": "https://evil.example"}, 403},
 		{"no origin but the browser says same-site", "POST", true, map[string]string{"Sec-Fetch-Site": "same-site"}, 403},
 		{"no origin but the browser says cross-site", "POST", true, map[string]string{"Sec-Fetch-Site": "cross-site"}, 403},
+		{"a scheme that is not a bearer", "POST", true, map[string]string{"Origin": "https://evil.example", "Authorization": "Basic eDp5"}, 403},
 
 		{"our public origin", "POST", true, map[string]string{"Origin": "https://mail.example.com"}, 200},
 		{"our public origin, other case", "POST", true, map[string]string{"Origin": "HTTPS://Mail.Example.com"}, 200},

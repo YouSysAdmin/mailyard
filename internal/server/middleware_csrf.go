@@ -41,8 +41,9 @@ import (
 // cookie already needs there, and server.public_url covers it either
 // way.
 //
-// Scoped to the COOKIE: a request carrying an Authorization header is
-// let through. A bearer is not ambient, so there is nothing for a
+// Scoped to the COOKIE: a request carrying a bearer is let through,
+// since extractToken then judges it on the bearer. Any other
+// Authorization scheme is not read, so it does not exempt the cookie. A bearer is not ambient, so there is nothing for a
 // third-party page to ride on, and a browser app holding a key on
 // another origin is exactly the client cors exists for. Reads are let
 // through too - a cross-site GET cannot read the answer without CORS.
@@ -64,7 +65,7 @@ func refuseCrossSite(rt *env.Runtime) fiber.Handler {
 			return c.Next()
 		}
 
-		if c.Get(fiber.HeaderAuthorization) != "" || authdomain.SessionCookieValue(c, rt) == "" {
+		if bearerToken(c) != "" || authdomain.SessionCookieValue(c, rt) == "" {
 			return c.Next()
 		}
 
