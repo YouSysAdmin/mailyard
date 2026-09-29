@@ -96,7 +96,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		createdBy = rc.User.ID
 	}
 
-	groupID := ""
+	groupID, groupSlug, groupName := "", "", ""
 	if in.SMTPGroup != "" {
 		g, err := h.Runtime.Store.SMTPGroup.GetBySlug(c.Context(), rc.Project.ID, in.SMTPGroup)
 		if err != nil {
@@ -107,19 +107,21 @@ func (h *Handler) Create(c fiber.Ctx) error {
 			return response.BadRequest(c, "smtp server group "+in.SMTPGroup+" does not exist")
 		}
 
-		groupID = g.ID
+		groupID, groupSlug, groupName = g.ID, g.Slug, g.Name
 	}
 
 	cred := &scmodel.Credential{
-		ID:           ids.New(),
-		ProjectID:    rc.Project.ID,
-		CreatedBy:    createdBy,
-		Name:         in.Name,
-		Username:     username,
-		PasswordHash: hash,
-		AllowedIPs:   in.AllowedIPs,
-		SMTPGroupID:  groupID,
-		Sandbox:      in.Sandbox,
+		ID:            ids.New(),
+		ProjectID:     rc.Project.ID,
+		CreatedBy:     createdBy,
+		Name:          in.Name,
+		Username:      username,
+		PasswordHash:  hash,
+		AllowedIPs:    in.AllowedIPs,
+		SMTPGroupID:   groupID,
+		SMTPGroup:     groupSlug,
+		SMTPGroupName: groupName,
+		Sandbox:       in.Sandbox,
 	}
 	if cred.AllowedIPs == nil {
 		cred.AllowedIPs = []string{}

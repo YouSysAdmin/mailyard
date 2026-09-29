@@ -129,6 +129,8 @@ export interface RelayNode {
   id: string
   server_id: string
   project_id?: string
+  // project_name names a tenant node's project on the platform listing.
+  project_name?: string
   name: string
   version?: string
   // public_ip is what the control plane observed, not what the node
@@ -405,6 +407,9 @@ export interface SMTPCredential {
   username: string
   allowed_ips: string[]
   smtp_group_id?: string
+  // smtp_group is the slug a write takes, smtp_group_name what to show.
+  smtp_group?: string
+  smtp_group_name?: string
   // sandbox: submissions with this credential are captured into the
   // project sandbox and never delivered.
   sandbox: boolean
@@ -422,7 +427,7 @@ export interface SubmissionInfo {
   starttls: boolean
 }
 
-export type SuppressionKind = 'hard' | 'bounce' | 'complaint' | 'manual'
+export type SuppressionKind = 'bounce' | 'complaint' | 'manual' | 'list_unsubscribe'
 
 export interface Suppression {
   id: string
@@ -436,6 +441,8 @@ export interface Suppression {
    * both - the rows are unique on (project, email, list).
    */
   unsubscribe_list_id?: string
+  // unsubscribe_list_name is the name unsubscribe_list_id points at.
+  unsubscribe_list_name?: string
   created_at: string
 }
 
@@ -537,20 +544,26 @@ export interface Campaign {
   id: string
   project_id: string
   created_by?: string
+  created_by_email?: string
   name: string
   subject?: string
   from_email: string
   from_name?: string
   reply_to?: string
   template_id: string
+  template_name?: string
   language?: string
   template_data?: Record<string, unknown>
   status: CampaignStatus
   list_id: string
+  list_name?: string
   // Which SMTP pool the whole campaign sends through, resolved from the
   // slug the payload takes. The edit form reads the current group back
   // from it, and a save that omits it CLEARS it.
   smtp_group_id?: string
+  // smtp_group is the slug a write takes, smtp_group_name what to show.
+  smtp_group?: string
+  smtp_group_name?: string
   send_rate: number
   send_at_local_time: boolean
   ab_test_enabled: boolean

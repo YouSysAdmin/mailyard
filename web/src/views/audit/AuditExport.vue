@@ -38,14 +38,13 @@ const CSV_HEADERS = [
   'category',
   'type',
   'actor_email',
-  'actor_id',
   'client_ip',
   'user_agent',
   'method',
   'path',
   'status',
   'detail',
-  'project_id',
+  'project',
   'event_id',
 ]
 
@@ -55,14 +54,13 @@ function csvRow(e: AuditEvent): unknown[] {
     e.category,
     e.type,
     e.actor_email,
-    e.actor_id,
     e.client_ip,
     e.user_agent,
     e.method,
     e.path,
     e.status,
     e.detail,
-    e.project_id,
+    e.project_name || (e.project_id ? 'Deleted project' : ''),
     e.id,
   ]
 }

@@ -13,14 +13,18 @@ export interface InboundAttachment {
 
 export type InboundEmailStatus = 'received' | 'rejected' | 'failed'
 
-// InboundEmail mirrors internal/models/inbound (Email). Sender and
-// recipients are the SMTP envelope, the source of truth for routing.
+// InboundEmail mirrors internal/models/inbound (Email). sender is the
+// From header, bounce_address the SMTP MAIL FROM (where bounces go)
+// and recipients the RCPT TO addresses.
 export interface InboundEmail {
   id: string
   project_id: string
   domain_id: string
+  // domain is the name domain_id points at.
+  domain?: string
   message_id?: string
   sender: string
+  bounce_address: string
   recipients: string[]
   subject?: string
   text_body?: string

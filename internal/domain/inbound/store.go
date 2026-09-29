@@ -33,7 +33,9 @@ func NewStore(db *sql.DB, replicas ...*sql.DB) *Store {
 }
 
 const inboundSelect = `
-SELECT id, project_id, domain_id, message_id, dedup_hash, sender, recipients,
+SELECT id, project_id, domain_id,
+       COALESCE((SELECT d.domain FROM domains d WHERE d.id = inbound_emails.domain_id), ''),
+       message_id, dedup_hash, sender, bounce_address, recipients,
        subject, text_body, html_body, headers, attachments, raw, size,
        status, error_message, auth, received_at, created_at
 FROM inbound_emails`
@@ -61,7 +63,7 @@ func (s *Store) List(ctx context.Context, projID string, f store.InboundFilter) 
 		args = append(args, f.Status)
 	}
 
-	// Envelope searches, a case-insensitive substring each. recipients
+	// Address searches, a case-insensitive substring each. recipients
 	// is a JSON array in a TEXT column, so a substring of its text is a
 	// substring of one of the addresses.
 	if f.Sender != "" {
@@ -139,15 +141,15 @@ func (s *Store) Put(ctx context.Context, e *imodel.Email) error {
 
 	_, err := s.Exec(ctx, `
         INSERT INTO inbound_emails (id, project_id, domain_id, message_id, dedup_hash,
-            sender, recipients, subject, text_body, html_body, headers, attachments,
-            raw, size, status, error_message, auth, received_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sender, bounce_address, recipients, subject, text_body, html_body, headers,
+            attachments, raw, size, status, error_message, auth, received_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             status        = excluded.status,
             error_message = excluded.error_message,
             auth          = excluded.auth
     `, e.ID, e.ProjectID, database.NullStr(e.DomainID), e.MessageID, e.DedupHash,
-		e.Sender, string(recipients), e.Subject, e.TextBody, e.HTMLBody,
+		e.Sender, e.BounceAddress, string(recipients), e.Subject, e.TextBody, e.HTMLBody,
 		string(headers), string(attachments), e.Raw, e.Size,
 		e.Status, e.ErrorMessage, string(auth), e.ReceivedAt, e.CreatedAt)
 
@@ -209,8 +211,8 @@ func scanInbound(r interface{ Scan(...any) error }) (*imodel.Email, error) {
 		raw         []byte
 	)
 	var auth string
-	if err := r.Scan(&e.ID, &e.ProjectID, database.Str(&e.DomainID), &e.MessageID, &e.DedupHash,
-		&e.Sender, &recipients, &e.Subject, &e.TextBody, &e.HTMLBody,
+	if err := r.Scan(&e.ID, &e.ProjectID, database.Str(&e.DomainID), &e.Domain, &e.MessageID, &e.DedupHash,
+		&e.Sender, &e.BounceAddress, &recipients, &e.Subject, &e.TextBody, &e.HTMLBody,
 		&headers, &attachments, &raw, &e.Size,
 		&e.Status, &e.ErrorMessage, &auth, &e.ReceivedAt, &e.CreatedAt); err != nil {
 		return nil, err

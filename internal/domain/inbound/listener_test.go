@@ -235,6 +235,34 @@ func TestInboundAcceptsVerifiedDomain(t *testing.T) {
 	}
 }
 
+// The sender is the From header, and the envelope MAIL FROM is kept as
+// the return path. Return-Path records the envelope, replacing any the
+// sender wrote.
+func TestInboundSenderIsTheFromHeaderNotTheEnvelope(t *testing.T) {
+	addr, rows, _ := startListener(t, "")
+	msg := "Return-Path: <forged@remote.example>\r\n" + inboundMsg
+	if err := deliver(addr, "bounces@remote.example", []string{"support@in.example.com"}, msg); err != nil {
+		t.Fatalf("deliver: %v", err)
+	}
+
+	if len(rows.rows) != 1 {
+		t.Fatalf("stored rows = %d, want 1", len(rows.rows))
+	}
+
+	rec := rows.rows[0]
+	if rec.BounceAddress != "bounces@remote.example" {
+		t.Errorf("return path = %q, want the envelope", rec.BounceAddress)
+	}
+
+	if rec.Sender != "Sender <someone@remote.example>" {
+		t.Errorf("sender = %q, want the From header", rec.Sender)
+	}
+
+	if got := rec.Headers["Return-Path"]; got != "<bounces@remote.example>" {
+		t.Errorf("Return-Path = %q, want the envelope", got)
+	}
+}
+
 func TestInboundRejectsUnknownDomain(t *testing.T) {
 	addr, rows, _ := startListener(t, "")
 	err := deliver(addr, "a@remote.example", []string{"x@other.example.com"}, inboundMsg)

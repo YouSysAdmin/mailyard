@@ -125,4 +125,7 @@ type AnalyticsResponse struct {
 // MessageListResponse is the per-recipient rows of one campaign.
 type MessageListResponse struct {
 	Messages []*cmodel.Message `json:"messages"`
+
+	// NextCursor resumes after the last row, empty on the last page.
+	NextCursor string `json:"next_cursor,omitempty"`
 }

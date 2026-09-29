@@ -8,24 +8,23 @@
 // That body is fetched ON OPEN, not with the list. A campaign to twenty
 // thousand people would otherwise pull twenty thousand rendered bodies
 // to show one, and the row already carries everything the table needs.
-import { computed, ref } from 'vue'
+//
+// The list itself is keyset paged by the server and filtered there by
+// status, so a tab counts every message rather than the first page.
+import { ref, watch } from 'vue'
 import type { CampaignMessage, CampaignMessageStatus, Email } from '../../api/types'
+import { campaignsApi } from '../../api/campaigns'
 import { emailsApi } from '../../api/emails'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
-import { useClientPager } from '../../composables/usePagination'
 import { formatDate } from '../../composables/formatDate'
-import Pagination from '../../components/Pagination.vue'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import BaseModal from '../../components/BaseModal.vue'
 import HtmlPreview from '../../components/HtmlPreview.vue'
 
-const props = defineProps<{
-  messages: CampaignMessage[]
-  loading: boolean
-}>()
+const props = defineProps<{ campaignId: string }>()
 
 const notify = useNotificationStore()
 
@@ -40,11 +39,62 @@ const TABS: { label: string; value: CampaignMessageStatus | '' }[] = [
 
 const filter = ref<CampaignMessageStatus | ''>('')
 
-const matching = computed(() =>
-  filter.value ? props.messages.filter((m) => m.status === filter.value) : props.messages,
-)
+const messages = ref<CampaignMessage[]>([])
+const cursor = ref('')
+const loading = ref(true)
+const loadingMore = ref(false)
 
-const { pageable, pageItems, goToPage } = useClientPager(matching, 20)
+// Set once a second page is loaded. A refresh answers with the first
+// page, so it would drop what the reader paged down to.
+const paged = ref(false)
+
+function fetchPage(after: string) {
+  return campaignsApi.messages(props.campaignId, {
+    status: filter.value || undefined,
+    cursor: after || undefined,
+  })
+}
+
+/**
+ * The first page. Quiet keeps the rows on screen and raises no toast,
+ * for the automatic refresh.
+ */
+async function load(quiet = false) {
+  if (quiet && paged.value) return
+
+  if (!quiet) loading.value = true
+  try {
+    const res = await fetchPage('')
+    messages.value = res.data.messages ?? []
+    cursor.value = res.data.next_cursor ?? ''
+    paged.value = false
+  } catch (e) {
+    if (!quiet) notify.error(apiErrorMessage(e, 'Failed to load messages'))
+  } finally {
+    if (!quiet) loading.value = false
+  }
+}
+
+async function more() {
+  if (!cursor.value || loadingMore.value) return
+
+  loadingMore.value = true
+  try {
+    const res = await fetchPage(cursor.value)
+    messages.value = messages.value.concat(res.data.messages ?? [])
+    cursor.value = res.data.next_cursor ?? ''
+    paged.value = true
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to load more messages'))
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+watch(filter, () => load())
+void load()
+
+defineExpose({ load })
 
 // The row that was opened, and the email it produced. Two refs because
 // the row arrives first and the body follows.
@@ -95,7 +145,7 @@ async function open(msg: CampaignMessage) {
     <LoadingBlock v-if="loading" />
 
     <EmptyState
-      v-else-if="matching.length === 0"
+      v-else-if="messages.length === 0"
       :text="filter ? `Nothing ${filter} here.` : 'No messages yet.'"
     />
 
@@ -118,7 +168,7 @@ async function open(msg: CampaignMessage) {
                  pending or skipped one has no body to show, so its row
                  is not offered as clickable. -->
             <tr
-              v-for="m in pageItems"
+              v-for="m in messages"
               :key="m.id"
               :class="{ 'row-clickable': !!m.email_id }"
               @click="open(m)"
@@ -133,9 +183,7 @@ async function open(msg: CampaignMessage) {
                      the raw subscriber_id put a uuid in a column headed
                      Recipient, which says nothing and reads as a
                      rendering fault. -->
-                <span v-else class="text-muted" :title="`subscriber ${m.subscriber_id}`">
-                  deleted subscriber
-                </span>
+                <span v-else class="text-muted">deleted subscriber</span>
               </td>
               <td><StatusBadge :status="m.status" scope="campaignMessage" /></td>
               <td>{{ m.variant || '-' }}</td>
@@ -148,7 +196,11 @@ async function open(msg: CampaignMessage) {
         </table>
       </div>
 
-      <Pagination :pageable="pageable" @page="goToPage" />
+      <div v-if="cursor" class="load-more">
+        <button class="btn btn-secondary" :disabled="loadingMore" @click="more">
+          {{ loadingMore ? 'Loading...' : 'Load more' }}
+        </button>
+      </div>
     </template>
 
     <BaseModal

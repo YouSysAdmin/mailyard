@@ -67,6 +67,10 @@ type Email struct {
 	ProjectID string `json:"project_id"`
 	DomainID  string `json:"domain_id"`
 
+	// Domain is the name of the domain DomainID points at, read with the
+	// row and never stored.
+	Domain string `json:"domain,omitempty"`
+
 	// MessageID is the parsed Message-ID header without brackets.
 	MessageID string `json:"message_id,omitempty"`
 
@@ -75,9 +79,17 @@ type Email struct {
 	// content is not a duplicate. Empty on a row stored before parsing.
 	DedupHash string `json:"-"`
 
-	// Sender and Recipients are the SMTP envelope, the source of
-	// truth for routing (headers are informational).
-	Sender      string            `json:"sender"`
+	// Sender is the From header, display name included: who the
+	// message says it is from. Empty when the message was not parsed.
+	Sender string `json:"sender"`
+
+	// BounceAddress is the SMTP MAIL FROM: where bounces for the
+	// message go, what SPF judges and what the suppression list is
+	// checked against. Often not the sender.
+	BounceAddress string `json:"bounce_address"`
+
+	// Recipients are the SMTP RCPT TO addresses, the source of truth
+	// for routing.
 	Recipients  []string          `json:"recipients"`
 	Subject     string            `json:"subject,omitempty"`
 	TextBody    string            `json:"text_body,omitempty"`

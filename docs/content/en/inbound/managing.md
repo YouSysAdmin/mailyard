@@ -64,8 +64,10 @@ GET /api/v1/inbound-emails/{id}
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "project_id": "81af718e-f0ae-4780-a0d7-9f05b34dabcc",
         "domain_id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+        "domain": "yourdomain.com",
         "message_id": "abc123@example.com",
-        "sender": "sender@example.com",
+        "sender": "Jane Doe <jane@example.com>",
+        "bounce_address": "bounces@example.com",
         "recipients": [
             "inbox@yourdomain.com"
         ],
@@ -97,6 +99,11 @@ GET /api/v1/inbound-emails/{id}
     }
 }
 ```
+
+`sender` is the From header, who the message says it is from, and it is empty when the message could not be parsed.
+`bounce_address` is the SMTP `MAIL FROM` - where bounces for the message go and what SPF is checked against - which is
+often not the sender. The stored headers carry it as `Return-Path`, written at receipt. `domain` is the name of the
+domain the mail arrived for. The `sender` search parameter on the list matches `sender` only.
 
 `auth` carries the SPF, DKIM and DMARC verdicts stamped at ingest. `aligned` is the field worth acting on - a valid
 signature from some other domain is not authentication. See [Receiving](/docs/inbound/receiving).

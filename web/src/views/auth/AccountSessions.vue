@@ -170,7 +170,9 @@ void load()
                 <strong>{{ describe(s) }}</strong>
                 <span v-if="s.current" class="badge badge-success ml-2">This device</span>
               </td>
-              <td>{{ s.auth_provider_id ? 'Single sign-on' : 'Password' }}</td>
+              <td>
+                {{ s.auth_provider_id ? s.auth_provider_name || 'Single sign-on' : 'Password' }}
+              </td>
               <td>
                 <code>{{ s.ip || '-' }}</code>
               </td>

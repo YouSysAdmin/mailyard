@@ -33,7 +33,11 @@ type Campaign struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"project_id"`
 	CreatedBy string `json:"created_by,omitempty"`
-	Name      string `json:"name"`
+
+	// CreatedByEmail is the address CreatedBy points at, read with the
+	// row and never stored, like every *Name field below.
+	CreatedByEmail string `json:"created_by_email,omitempty"`
+	Name           string `json:"name"`
 
 	// Subject is the fallback when the template localization renders
 	// an empty subject.
@@ -45,8 +49,9 @@ type Campaign struct {
 	// sent from a no-reply mailbox names where a reader's answer goes.
 	ReplyTo string `json:"reply_to,omitempty"`
 
-	TemplateID string `json:"template_id"`
-	Language   string `json:"language,omitempty"`
+	TemplateID   string `json:"template_id"`
+	TemplateName string `json:"template_name,omitempty"`
+	Language     string `json:"language,omitempty"`
 
 	// TemplateData is the campaign-level render data. Per subscriber
 	// it is merged with the subscriber's custom fields plus the
@@ -54,12 +59,18 @@ type Campaign struct {
 	TemplateData map[string]any `json:"template_data,omitempty"`
 	Status       string         `json:"status"`
 	ListID       string         `json:"list_id"`
+	ListName     string         `json:"list_name,omitempty"`
 
 	// SMTPGroupID routes the whole campaign to a named server pool.
 	// Empty uses the project's default group. Separating pools is the
 	// usual reason to have them: a campaign burning an IP should not
 	// take transactional mail down with it.
 	SMTPGroupID string `json:"smtp_group_id,omitempty"`
+
+	// SMTPGroup is the group's slug, the handle a write names it by,
+	// so a campaign read back can be sent back unchanged.
+	SMTPGroup     string `json:"smtp_group,omitempty"`
+	SMTPGroupName string `json:"smtp_group_name,omitempty"`
 
 	// SendRate caps throughput in emails per minute. 0 = unthrottled.
 	SendRate int `json:"send_rate"`
@@ -92,6 +103,16 @@ const (
 	MsgFailed  = "failed"
 	MsgSkipped = "skipped"
 )
+
+// ValidMessageStatus reports whether status is a campaign message status.
+func ValidMessageStatus(status string) bool {
+	switch status {
+	case MsgPending, MsgQueued, MsgSent, MsgFailed, MsgSkipped:
+		return true
+	}
+
+	return false
+}
 
 // Message is one recipient of one campaign. OpenedAt and ClickedAt
 // are first-event stamps written by the tracking endpoints.

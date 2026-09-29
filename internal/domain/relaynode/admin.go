@@ -47,6 +47,17 @@ func (h *Handler) List(c fiber.Ctx) error {
 			v.Host, v.Port, v.Status = srv.Host, srv.Port, srv.Status
 		}
 
+		if n.ProjectID != "" {
+			p, err := h.Runtime.Store.Project.Get(c.Context(), n.ProjectID)
+			if err != nil {
+				return response.Internal(c, err)
+			}
+
+			if p != nil {
+				v.ProjectName = p.Name
+			}
+		}
+
 		// Only an approved node's address matters for SPF. Listing a
 		// pending one would have the operator authorize a machine that
 		// is not sending, and quietly leave it authorized if it never

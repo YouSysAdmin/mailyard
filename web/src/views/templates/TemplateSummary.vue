@@ -27,10 +27,11 @@ const activeNumber = computed(() => {
 <template>
   <div class="card">
     <dl class="facts">
-      <dt>Template ID</dt>
+      <!-- What a send names this template by, as template_name. -->
+      <dt>Name</dt>
       <dd>
-        <code class="id">{{ template.id }}</code>
-        <CopyButton :value="template.id" copied-label="Copied!" variant="id-copy" />
+        <code class="id">{{ template.name }}</code>
+        <CopyButton :value="template.name" copied-label="Copied!" variant="id-copy" />
       </dd>
 
       <template v-if="template.description">
@@ -77,7 +78,7 @@ const activeNumber = computed(() => {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius);
   background: var(--bg-tertiary);
-  /* One click selects the whole id, which is what it is copied for. */
+  /* One click selects the whole name, which is what it is copied for. */
   user-select: all;
 }
 

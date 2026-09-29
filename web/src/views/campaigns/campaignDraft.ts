@@ -18,7 +18,7 @@ export interface CampaignDraft {
   language: string
   list_id: string
   send_rate: number
-  /** The pool's SLUG. The stored record holds its id - see fromCampaign. */
+  /** The pool's slug, which is what the endpoint takes. */
   smtp_group: string
   send_at_local_time: boolean
   /** Raw JSON, parsed at submit so a half-typed object is not an error. */
@@ -45,13 +45,7 @@ export function blankDraft(): CampaignDraft {
   }
 }
 
-/**
- * A stored campaign as a draft.
- *
- * `smtp_group` is left empty here on purpose: the record holds the
- * group's ID and the endpoint takes its slug, so only the group list
- * can translate - the form fills it once that has arrived.
- */
+/** A stored campaign as a draft. */
 export function fromCampaign(c: Campaign): CampaignDraft {
   return {
     name: c.name,
@@ -63,7 +57,7 @@ export function fromCampaign(c: Campaign): CampaignDraft {
     language: c.language ?? '',
     list_id: c.list_id,
     send_rate: c.send_rate,
-    smtp_group: '',
+    smtp_group: c.smtp_group ?? '',
     send_at_local_time: c.send_at_local_time,
     template_data: c.template_data ? JSON.stringify(c.template_data, null, 2) : '',
     ab_test_enabled: c.ab_test_enabled,

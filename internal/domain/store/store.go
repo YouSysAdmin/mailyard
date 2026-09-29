@@ -724,6 +724,15 @@ type SuppressionStore interface {
 	DeleteForList(ctx context.Context, projID, email, listID string) (bool, error)
 }
 
+// CampaignMessageFilter pages a campaign's messages in fan-out order.
+// Keyset, because the table gains a row per recipient.
+type CampaignMessageFilter struct {
+	// Status is one of the campaign message statuses, empty for all.
+	Status string
+	Limit  int
+	Cursor keyset.Cursor
+}
+
 // BounceFilter narrows the bounce log. Same keyset reasoning as
 // SuppressionFilter: a few percent of a large send is still a lot of
 // rows a day.
@@ -835,7 +844,7 @@ type CampaignStore interface {
 	UpdateMessage(ctx context.Context, id, status, errMsg, emailID string) error
 	MarkMessageByEmail(ctx context.Context, emailID, status, errMsg string) error
 	SkipPending(ctx context.Context, campaignID, reason string) (int, error)
-	ListMessages(ctx context.Context, projID, campaignID string, limit, offset int) ([]*campaign.Message, error)
+	ListMessages(ctx context.Context, projID, campaignID string, f CampaignMessageFilter) ([]*campaign.Message, error)
 	MessageStats(ctx context.Context, campaignID string) (map[string]int, map[string]map[string]int, error)
 
 	GetMessageAny(ctx context.Context, id string) (*campaign.Message, error)

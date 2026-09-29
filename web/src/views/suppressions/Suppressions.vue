@@ -119,10 +119,8 @@ async function removeSuppression(sup: Suppression) {
 
 function kindBadgeClass(kind: string) {
   switch (kind) {
-    case 'hard':
-      return 'badge badge-danger'
     case 'bounce':
-      return 'badge badge-warning'
+      return 'badge badge-danger'
     case 'complaint':
       return 'badge badge-info'
     default:
@@ -156,10 +154,10 @@ onMounted(load)
       />
       <select v-model="kindFilter" class="form-select w-filter">
         <option value="">All kinds</option>
-        <option value="hard">Hard</option>
         <option value="bounce">Bounce</option>
         <option value="complaint">Complaint</option>
         <option value="manual">Manual</option>
+        <option value="list_unsubscribe">List unsubscribe</option>
       </select>
     </div>
 
@@ -203,7 +201,11 @@ onMounted(load)
                   <span
                     :class="sup.unsubscribe_list_id ? 'badge badge-info' : 'badge badge-neutral'"
                   >
-                    {{ sup.unsubscribe_list_id ? 'List' : 'Global' }}
+                    {{
+                      sup.unsubscribe_list_id
+                        ? sup.unsubscribe_list_name || 'Deleted list'
+                        : 'Global'
+                    }}
                   </span>
                 </td>
                 <td class="truncate w-search">{{ sup.reason || '-' }}</td>
@@ -251,7 +253,6 @@ onMounted(load)
       <FormField label="Kind" :error="fieldErrors.kind">
         <select v-model="addForm.kind" class="form-select">
           <option value="manual">Manual</option>
-          <option value="hard">Hard</option>
           <option value="bounce">Bounce</option>
           <option value="complaint">Complaint</option>
         </select>

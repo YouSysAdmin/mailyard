@@ -29,7 +29,9 @@ func NewStore(db *sql.DB, replicas ...*sql.DB) *Store {
 }
 
 const eventSelect = `
-SELECT id, category, type, project_id, actor_id, actor_email,
+SELECT id, category, type, project_id,
+       COALESCE((SELECT p.name FROM projects p WHERE p.id = audit_events.project_id), ''),
+       actor_id, actor_email,
        client_ip, user_agent, method, path, status, detail, created_at
 FROM audit_events`
 
@@ -175,7 +177,7 @@ func scanEvents(rows *sql.Rows) ([]*amodel.Event, error) {
 	var out []*amodel.Event
 	for rows.Next() {
 		var e amodel.Event
-		if err := rows.Scan(&e.ID, &e.Category, &e.Type, database.Str(&e.ProjectID),
+		if err := rows.Scan(&e.ID, &e.Category, &e.Type, database.Str(&e.ProjectID), &e.ProjectName,
 			database.Str(&e.ActorID), &e.ActorEmail, &e.ClientIP, &e.UserAgent, &e.Method, &e.Path,
 			&e.Status, &e.Detail, &e.CreatedAt); err != nil {
 			return nil, err

@@ -121,7 +121,7 @@ async function updateOwner(member: ProjectMember, owner: boolean) {
 async function remove(member: ProjectMember) {
   const ok = await confirm({
     title: 'Remove Member',
-    message: `Remove ${member.email || member.user_id} from this project?`,
+    message: `Remove ${member.email} from this project?`,
     confirmText: 'Remove',
     variant: 'danger',
   })
@@ -159,7 +159,7 @@ async function remove(member: ProjectMember) {
         </thead>
         <tbody>
           <tr v-for="m in members" :key="m.id">
-            <td class="fw-medium">{{ m.email || m.user_id }}</td>
+            <td class="fw-medium">{{ m.email }}</td>
             <td>
               <!-- An owner's row shows no selector: a role would narrow
                    nothing, since ownership already reaches everything. -->
@@ -189,7 +189,7 @@ async function remove(member: ProjectMember) {
                 v-if="iAmOwner"
                 type="checkbox"
                 :checked="m.owner"
-                :aria-label="`${m.email || m.user_id} owns this project`"
+                :aria-label="`${m.email} owns this project`"
                 title="Owners may delete the project and rewrite its sign-on policy"
                 @change="updateOwner(m, ($event.target as HTMLInputElement).checked)"
               />

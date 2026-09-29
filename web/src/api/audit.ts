@@ -5,6 +5,8 @@ export interface AuditEvent {
   category: 'project' | 'security'
   type: string
   project_id?: string
+  // project_name is the name project_id points at, empty once deleted.
+  project_name?: string
   actor_id?: string
   actor_email?: string
   client_ip?: string

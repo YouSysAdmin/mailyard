@@ -17,7 +17,7 @@ import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
 import { formatDate } from '../../composables/formatDate'
 import { humanSize } from '../../composables/humanSize'
-import { quoteForReply } from './reply'
+import { quoteForReply, replyTo } from './reply'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import MessageReader from '../../components/MessageReader.vue'
@@ -117,7 +117,7 @@ function reply() {
     ? (src.subject as string)
     : `Re: ${src.subject || '(no subject)'}`
 
-  const query: Record<string, string> = { to: src.sender, subject }
+  const query: Record<string, string> = { to: replyTo(src), subject }
   // The envelope may name several recipients. The first is the one this
   // project was addressed at, and guessing further would be inventing an
   // identity to send as.
@@ -170,9 +170,8 @@ watch(() => props.id, load, { immediate: true })
       </button>
     </template>
 
-    <!-- The envelope sender is whatever the connecting host typed, so it
-         is only worth anything beside the verdict on whether the domain
-         actually vouched for it. -->
+    <!-- The From header is whatever the sender wrote, so it is only worth
+         anything beside the verdict on whether its domain vouched for it. -->
     <template #sender>
       <span v-if="email.auth" :class="authClass" :title="authTitle">
         {{ email.auth.aligned ? 'Authenticated' : 'Unauthenticated' }}
@@ -183,6 +182,13 @@ watch(() => props.id, load, { immediate: true })
     </template>
 
     <template #envelope>
+      <!-- The envelope sender, where bounces go and what SPF judges. -->
+      <div v-if="email.bounce_address">
+        <dt>Bounce address</dt>
+        <dd>
+          <code>{{ email.bounce_address }}</code>
+        </dd>
+      </div>
       <div v-if="email.auth">
         <dt>Authentication</dt>
         <dd class="auth-detail">
@@ -205,10 +211,10 @@ watch(() => props.id, load, { immediate: true })
       <!-- Absent on a message refused before a recipient was resolved,
            which is every rejection at RCPT. An empty <code> box there
            reads as a value that failed to load. -->
-      <div v-if="email.domain_id">
+      <div v-if="email.domain">
         <dt>Domain</dt>
         <dd>
-          <code>{{ email.domain_id }}</code>
+          <code>{{ email.domain }}</code>
         </dd>
       </div>
       <div>

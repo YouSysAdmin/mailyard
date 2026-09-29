@@ -228,17 +228,22 @@ type Campaign struct {
 	ID              string         `json:"id"`
 	ProjectID       string         `json:"project_id"`
 	CreatedBy       string         `json:"created_by,omitempty"`
+	CreatedByEmail  string         `json:"created_by_email,omitempty"`
 	Name            string         `json:"name"`
 	Subject         string         `json:"subject,omitempty"`
 	FromEmail       string         `json:"from_email"`
 	FromName        string         `json:"from_name,omitempty"`
 	ReplyTo         string         `json:"reply_to,omitempty"`
 	TemplateID      string         `json:"template_id"`
+	TemplateName    string         `json:"template_name,omitempty"`
 	Language        string         `json:"language,omitempty"`
 	TemplateData    map[string]any `json:"template_data,omitempty"`
 	Status          string         `json:"status"`
 	ListID          string         `json:"list_id"`
+	ListName        string         `json:"list_name,omitempty"`
 	SMTPGroupID     string         `json:"smtp_group_id,omitempty"`
+	SMTPGroup       string         `json:"smtp_group,omitempty"`
+	SMTPGroupName   string         `json:"smtp_group_name,omitempty"`
 	SendRate        int64          `json:"send_rate"`
 	SendAtLocalTime bool           `json:"send_at_local_time"`
 	ABTestEnabled   bool           `json:"ab_test_enabled"`
@@ -360,17 +365,19 @@ type CreatedResponse struct {
 
 // Credential is the wire body.
 type Credential struct {
-	ID          string     `json:"id"`
-	ProjectID   string     `json:"project_id"`
-	CreatedBy   string     `json:"created_by,omitempty"`
-	Name        string     `json:"name"`
-	Username    string     `json:"username"`
-	AllowedIPs  []string   `json:"allowed_ips"`
-	SMTPGroupID string     `json:"smtp_group_id,omitempty"`
-	Sandbox     bool       `json:"sandbox"`
-	Revoked     bool       `json:"revoked"`
-	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID            string     `json:"id"`
+	ProjectID     string     `json:"project_id"`
+	CreatedBy     string     `json:"created_by,omitempty"`
+	Name          string     `json:"name"`
+	Username      string     `json:"username"`
+	AllowedIPs    []string   `json:"allowed_ips"`
+	SMTPGroupID   string     `json:"smtp_group_id,omitempty"`
+	SMTPGroup     string     `json:"smtp_group,omitempty"`
+	SMTPGroupName string     `json:"smtp_group_name,omitempty"`
+	Sandbox       bool       `json:"sandbox"`
+	Revoked       bool       `json:"revoked"`
+	LastUsedAt    *time.Time `json:"last_used_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // CredentialCreatedResponse is the response body.
@@ -652,19 +659,20 @@ type ErasureResponse struct {
 
 // Event is the wire body.
 type Event struct {
-	ID         string    `json:"id"`
-	Category   string    `json:"category"`
-	Type       string    `json:"type"`
-	ProjectID  string    `json:"project_id,omitempty"`
-	ActorID    string    `json:"actor_id,omitempty"`
-	ActorEmail string    `json:"actor_email,omitempty"`
-	ClientIP   string    `json:"client_ip,omitempty"`
-	UserAgent  string    `json:"user_agent,omitempty"`
-	Method     string    `json:"method,omitempty"`
-	Path       string    `json:"path,omitempty"`
-	Status     int64     `json:"status,omitzero"`
-	Detail     string    `json:"detail,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Category    string    `json:"category"`
+	Type        string    `json:"type"`
+	ProjectID   string    `json:"project_id,omitempty"`
+	ProjectName string    `json:"project_name,omitempty"`
+	ActorID     string    `json:"actor_id,omitempty"`
+	ActorEmail  string    `json:"actor_email,omitempty"`
+	ClientIP    string    `json:"client_ip,omitempty"`
+	UserAgent   string    `json:"user_agent,omitempty"`
+	Method      string    `json:"method,omitempty"`
+	Path        string    `json:"path,omitempty"`
+	Status      int64     `json:"status,omitzero"`
+	Detail      string    `json:"detail,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // EventResponse is the response body.
@@ -794,24 +802,26 @@ type InboundAttachment struct {
 
 // InboundEmail is the wire body.
 type InboundEmail struct {
-	ID           string              `json:"id"`
-	ProjectID    string              `json:"project_id"`
-	DomainID     string              `json:"domain_id"`
-	MessageID    string              `json:"message_id,omitempty"`
-	Sender       string              `json:"sender"`
-	Recipients   []string            `json:"recipients"`
-	Subject      string              `json:"subject,omitempty"`
-	TextBody     string              `json:"text_body,omitempty"`
-	HTMLBody     string              `json:"html_body,omitempty"`
-	Headers      map[string]string   `json:"headers,omitempty"`
-	Attachments  []InboundAttachment `json:"attachments,omitempty"`
-	HasRaw       bool                `json:"has_raw,omitzero"`
-	Size         int64               `json:"size"`
-	Auth         *Auth               `json:"auth,omitempty"`
-	Status       string              `json:"status"`
-	ErrorMessage string              `json:"error_message,omitempty"`
-	ReceivedAt   time.Time           `json:"received_at"`
-	CreatedAt    time.Time           `json:"created_at"`
+	ID            string              `json:"id"`
+	ProjectID     string              `json:"project_id"`
+	DomainID      string              `json:"domain_id"`
+	Domain        string              `json:"domain,omitempty"`
+	MessageID     string              `json:"message_id,omitempty"`
+	Sender        string              `json:"sender"`
+	BounceAddress string              `json:"bounce_address"`
+	Recipients    []string            `json:"recipients"`
+	Subject       string              `json:"subject,omitempty"`
+	TextBody      string              `json:"text_body,omitempty"`
+	HTMLBody      string              `json:"html_body,omitempty"`
+	Headers       map[string]string   `json:"headers,omitempty"`
+	Attachments   []InboundAttachment `json:"attachments,omitempty"`
+	HasRaw        bool                `json:"has_raw,omitzero"`
+	Size          int64               `json:"size"`
+	Auth          *Auth               `json:"auth,omitempty"`
+	Status        string              `json:"status"`
+	ErrorMessage  string              `json:"error_message,omitempty"`
+	ReceivedAt    time.Time           `json:"received_at"`
+	CreatedAt     time.Time           `json:"created_at"`
 }
 
 // InboundGetResponse is the response body.
@@ -1138,7 +1148,8 @@ type Message struct {
 
 // MessageListResponse is the response body.
 type MessageListResponse struct {
-	Messages []*Message `json:"messages"`
+	Messages   []*Message `json:"messages"`
+	NextCursor string     `json:"next_cursor,omitempty"`
 }
 
 // MessageResponse is the response body.
@@ -1163,6 +1174,7 @@ type NodeView struct {
 	Host           string     `json:"host"`
 	Port           int64      `json:"port"`
 	Status         string     `json:"status"`
+	ProjectName    string     `json:"project_name,omitempty"`
 	Alive          bool       `json:"alive"`
 }
 
@@ -1971,13 +1983,14 @@ type Summary struct {
 
 // Suppression is the wire body.
 type Suppression struct {
-	ID                string    `json:"id"`
-	ProjectID         string    `json:"project_id"`
-	Email             string    `json:"email"`
-	Kind              string    `json:"kind"`
-	Reason            string    `json:"reason,omitempty"`
-	UnsubscribeListID string    `json:"unsubscribe_list_id,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
+	ID                  string    `json:"id"`
+	ProjectID           string    `json:"project_id"`
+	Email               string    `json:"email"`
+	Kind                string    `json:"kind"`
+	Reason              string    `json:"reason,omitempty"`
+	UnsubscribeListID   string    `json:"unsubscribe_list_id,omitempty"`
+	UnsubscribeListName string    `json:"unsubscribe_list_name,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // SuppressionCreateInput is the request body.

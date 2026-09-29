@@ -87,6 +87,10 @@ type Event struct {
 	// ProjectID is empty for security events.
 	ProjectID string `json:"project_id,omitempty"`
 
+	// ProjectName is the name ProjectID points at, read with the row
+	// and never stored. Empty once the project is deleted.
+	ProjectName string `json:"project_name,omitempty"`
+
 	// ActorID and ActorEmail identify who acted. Both are empty for
 	// an unauthenticated action such as a failed sign-in with an
 	// unknown address.

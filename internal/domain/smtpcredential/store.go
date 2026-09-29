@@ -26,7 +26,9 @@ func NewStore(db *sql.DB) *Store {
 
 const credSelect = `
 SELECT id, project_id, created_by, name, username, password_hash,
-       allowed_ips, smtp_group_id, sandbox, revoked, last_used_at, created_at
+       allowed_ips, smtp_group_id, sandbox, revoked, last_used_at, created_at,
+       COALESCE((SELECT g.slug FROM smtp_server_groups g WHERE g.id = smtp_credentials.smtp_group_id), ''),
+       COALESCE((SELECT g.name FROM smtp_server_groups g WHERE g.id = smtp_credentials.smtp_group_id), '')
 FROM smtp_credentials`
 
 // Get returns one SMTP credential within projID, or nil when there is
@@ -137,7 +139,8 @@ func scanCred(r interface{ Scan(...any) error }) (*scmodel.Credential, error) {
 	var ips string
 	var lastUsed sql.NullTime
 	if err := r.Scan(&c.ID, &c.ProjectID, &c.CreatedBy, &c.Name, &c.Username,
-		&c.PasswordHash, &ips, database.Str(&c.SMTPGroupID), &c.Sandbox, &c.Revoked, &lastUsed, &c.CreatedAt); err != nil {
+		&c.PasswordHash, &ips, database.Str(&c.SMTPGroupID), &c.Sandbox, &c.Revoked, &lastUsed, &c.CreatedAt,
+		&c.SMTPGroup, &c.SMTPGroupName); err != nil {
 		return nil, err
 	}
 

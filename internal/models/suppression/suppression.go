@@ -8,7 +8,8 @@ import "time"
 
 // Kinds record why an address is blocked.
 const (
-	KindHard      = "hard"
+	// KindBounce is a hard bounce, from the delivery attempt or from a
+	// bounce report.
 	KindBounce    = "bounce"
 	KindComplaint = "complaint"
 	KindManual    = "manual"
@@ -25,7 +26,7 @@ const (
 // written by the hosted one-click link, and the list endpoint showed
 // that kind while refusing it as a filter value.
 var ValidKinds = map[string]struct{}{
-	KindHard: {}, KindBounce: {}, KindComplaint: {}, KindManual: {},
+	KindBounce: {}, KindComplaint: {}, KindManual: {},
 	KindListUnsubscribe: {},
 }
 
@@ -41,8 +42,12 @@ type Suppression struct {
 	// means a global block covering every send from the project.
 	// A row is unique on (project, email, list), so an address can
 	// be globally blocked and separately opted out of one list.
-	UnsubscribeListID string    `json:"unsubscribe_list_id,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
+	UnsubscribeListID string `json:"unsubscribe_list_id,omitempty"`
+
+	// UnsubscribeListName is the name UnsubscribeListID points at, read
+	// with the row and never stored.
+	UnsubscribeListName string    `json:"unsubscribe_list_name,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // Global reports whether this row blocks every send rather than one list.

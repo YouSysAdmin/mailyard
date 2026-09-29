@@ -109,6 +109,13 @@ func (h *Handler) RevokeSession(c fiber.Ctx) error {
 	}
 
 	id := c.Params("id")
+
+	// Read first so the audit trail can say which session it was.
+	target, err := h.Runtime.Store.Session.Get(c.Context(), id)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
 	// Scoped by user id, so a session belonging to somebody else is
 	// reported as missing rather than refused.
 	ok, err := h.Runtime.Store.Session.Revoke(c.Context(), rc.User.ID, id)
@@ -126,7 +133,7 @@ func (h *Handler) RevokeSession(c fiber.Ctx) error {
 		ActorID:    rc.User.ID,
 		ActorEmail: rc.User.Email,
 		Status:     fiber.StatusOK,
-		Detail:     "revoked session " + id,
+		Detail:     "revoked " + describeSession(target),
 	})
 	if id == rc.SessionID {
 		clearSessionCookies(c, h.Runtime)
@@ -183,4 +190,19 @@ func (h *Handler) endOtherSessions(c fiber.Ctx, keepID, userID string) {
 	}
 
 	h.Runtime.Sessions.InvalidateAll()
+}
+
+// describeSession names a session the way the sessions page shows it:
+// where it signed in from and when.
+func describeSession(s *sessmodel.Session) string {
+	if s == nil {
+		return "a session"
+	}
+
+	desc := "the session started " + s.CreatedAt.UTC().Format("2006-01-02 15:04 UTC")
+	if s.IP != "" {
+		desc += " from " + s.IP
+	}
+
+	return desc
 }

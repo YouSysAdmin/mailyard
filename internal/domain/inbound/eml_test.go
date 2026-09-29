@@ -20,13 +20,13 @@ import (
 func TestARebuiltMessageParsesBackToWhatWasStored(t *testing.T) {
 	received := time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC)
 	e := &imodel.Email{
-		ID:         "01a0d542-10ee-7f37-a27a-99811d218ebd",
-		Sender:     "bounce@example.com",
-		Recipients: []string{"root@cid.test"},
-		MessageID:  "abc@example.com",
-		Subject:    "Café report",
-		TextBody:   "plain part",
-		HTMLBody:   `<p>hi</p><img src="cid:ii_logo">`,
+		ID:            "01a0d542-10ee-7f37-a27a-99811d218ebd",
+		BounceAddress: "bounce@example.com",
+		Recipients:    []string{"root@cid.test"},
+		MessageID:     "abc@example.com",
+		Subject:       "Café report",
+		TextBody:      "plain part",
+		HTMLBody:      `<p>hi</p><img src="cid:ii_logo">`,
 		Headers: map[string]string{
 			"From":                      "J\u00fcrgen M\u00fcller <someone@example.com>",
 			"To":                        "root@cid.test",
@@ -142,9 +142,9 @@ func TestARebuiltMessageParsesBackToWhatWasStored(t *testing.T) {
 // envelope, and still answers a file rather than an error.
 func TestARebuiltMessageFallsBackToTheEnvelope(t *testing.T) {
 	e := &imodel.Email{
-		Sender:     "bounce@example.com",
-		Recipients: []string{"root@cid.test"},
-		ReceivedAt: time.Now(),
+		BounceAddress: "bounce@example.com",
+		Recipients:    []string{"root@cid.test"},
+		ReceivedAt:    time.Now(),
 	}
 
 	raw, err := rebuild(context.Background(), nil, e)

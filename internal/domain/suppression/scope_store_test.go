@@ -33,7 +33,7 @@ func seedScopes(t *testing.T, s *Store, ctx context.Context, email string) (proj
 	}
 
 	if err := s.Upsert(ctx, &supmodel.Suppression{
-		ProjectID: proj, Email: email, Kind: supmodel.KindHard,
+		ProjectID: proj, Email: email, Kind: supmodel.KindBounce,
 		Reason: "mailbox full",
 	}); err != nil {
 		t.Fatalf("upsert global: %v", err)

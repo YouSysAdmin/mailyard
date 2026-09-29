@@ -62,7 +62,6 @@ async function save() {
         v-model="draft"
         v-model:variants="variants"
         :errors="errors"
-        :group-id="campaign.smtp_group_id"
         @update:ready="ready = $event"
       />
 

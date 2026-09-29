@@ -1332,7 +1332,7 @@ func auditWrites(rt *env.Runtime) fiber.Handler {
 				// Machine callers have no user - name the key so the
 				// trail still says who did it.
 				ev.ActorEmail = "api key " + rc.APIKey.Name
-				ev.Detail = "via api key " + rc.APIKey.ID
+				ev.Detail = "via api key " + rc.APIKey.Name
 			}
 
 			if rc.AdminAPIKey != nil {
@@ -1340,7 +1340,7 @@ func auditWrites(rt *env.Runtime) fiber.Handler {
 				// leaving no trace would be the worst omission in this
 				// whole trail.
 				ev.ActorEmail = "admin api key " + rc.AdminAPIKey.Name
-				ev.Detail = "via admin api key " + rc.AdminAPIKey.ID
+				ev.Detail = "via admin api key " + rc.AdminAPIKey.Name
 			}
 		}
 

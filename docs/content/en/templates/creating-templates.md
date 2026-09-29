@@ -94,8 +94,10 @@ are uneven by nature.
 ## List
 
 ```
-GET /api/v1/templates?limit=20
+GET /api/v1/templates
 ```
+
+Returns every template in the project. The list is not paged.
 
 ## Read one
 

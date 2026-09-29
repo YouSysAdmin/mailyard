@@ -13,11 +13,7 @@ func APIDocs() []apidoc.Route {
 			Tag:        "templates",
 			Permission: "templates:read",
 			Summary:    "List templates",
-			Query: []apidoc.Param{
-				{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped."},
-				{Name: "offset", Type: "integer"},
-			},
-			Responses: []apidoc.Response{apidoc.OK("Every template in the project.", ListResponse{})},
+			Responses:  []apidoc.Response{apidoc.OK("Every template in the project.", ListResponse{})},
 		},
 		{
 			Method:      "GET",

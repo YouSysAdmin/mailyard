@@ -38,6 +38,10 @@ type Session struct {
 	// seeing when reviewing where an account is signed in.
 	AuthProviderID string `json:"auth_provider_id,omitempty"`
 
+	// AuthProviderName is the name AuthProviderID points at, read with
+	// the row and never stored.
+	AuthProviderName string `json:"auth_provider_name,omitempty"`
+
 	// Current marks the session making the request, filled by the
 	// handler so the UI can label it and avoid offering to revoke it
 	// as if it were somebody else's.

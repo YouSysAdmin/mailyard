@@ -94,8 +94,10 @@ Which is the whole question an A/B test asks. To answer it, export the per-recip
 {{< /callout >}}
 
 ```
-GET /api/v1/campaigns/{id}/messages?limit=200
+GET /api/v1/campaigns/{id}/messages?status=sent&limit=200
 ```
+
+The list is keyset paged: pass the `next_cursor` of one page as `cursor` to get the next, until it is absent.
 
 Each row carries `variant` alongside `opened_at` and `clicked_at` — first-event stamps, so a row either has one or does
 not. Counting non-null stamps per variant, over rows whose status is `sent`, gives you the open and click rate per arm.

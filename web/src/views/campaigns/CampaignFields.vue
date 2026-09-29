@@ -21,15 +21,9 @@ import { draftIsReady, type CampaignDraft } from './campaignDraft'
 import FormField from '../../components/FormField.vue'
 import SenderSelect from '../../components/SenderSelect.vue'
 
-const props = defineProps<{
+defineProps<{
   /** Field errors from the last refused save, keyed by json name. */
   errors: Record<string, string>
-  /**
-   * The group the campaign already sends through, by ID. Only the group
-   * list can turn it into the slug the form holds, so it is resolved
-   * here once that list arrives.
-   */
-  groupId?: string
 }>()
 
 const draft = defineModel<CampaignDraft>({ required: true })
@@ -69,10 +63,6 @@ async function loadPickers() {
     lists.value = l.data.subscriber_lists ?? []
     templates.value = t.data.templates ?? []
     groups.value = g.data.smtp_server_groups ?? []
-
-    if (props.groupId) {
-      draft.value.smtp_group = groups.value.find((x) => x.id === props.groupId)?.slug ?? ''
-    }
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load the templates, lists and server groups'))
   }

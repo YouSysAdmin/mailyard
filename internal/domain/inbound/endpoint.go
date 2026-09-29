@@ -133,20 +133,16 @@ func (h *Handler) Retry(c fiber.Ctx) error {
 		return response.NotFound(c, "inbound email not found")
 	}
 
-	domainName := ""
-	if d, derr := h.Runtime.Store.Domain.Get(c.Context(), rc.Project.ID, e.DomainID); derr == nil && d != nil {
-		domainName = d.Domain
-	}
-
 	h.Runtime.Dispatch.Emit(c.Context(), e.ProjectID, webhookmodel.EventInboundReceived, e.Sender, map[string]any{
-		"id":          e.ID,
-		"domain":      domainName,
-		"sender":      e.Sender,
-		"recipients":  e.Recipients,
-		"subject":     e.Subject,
-		"message_id":  e.MessageID,
-		"size":        e.Size,
-		"received_at": e.ReceivedAt,
+		"id":             e.ID,
+		"domain":         e.Domain,
+		"sender":         e.Sender,
+		"bounce_address": e.BounceAddress,
+		"recipients":     e.Recipients,
+		"subject":        e.Subject,
+		"message_id":     e.MessageID,
+		"size":           e.Size,
+		"received_at":    e.ReceivedAt,
 	})
 
 	return response.Success(c, EmittedResponse{Emitted: true})

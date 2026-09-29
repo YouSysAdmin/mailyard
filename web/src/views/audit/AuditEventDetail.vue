@@ -68,20 +68,8 @@ function isFailure(e: AuditEvent): boolean {
       <dt>Detail</dt>
       <dd class="wrap">{{ event.detail || '-' }}</dd>
 
-      <dt>Event ID</dt>
-      <dd>
-        <code class="wrap">{{ event.id }}</code>
-      </dd>
-
-      <dt v-if="event.project_id">Project ID</dt>
-      <dd v-if="event.project_id">
-        <code class="wrap">{{ event.project_id }}</code>
-      </dd>
-
-      <dt v-if="event.actor_id">Actor ID</dt>
-      <dd v-if="event.actor_id">
-        <code class="wrap">{{ event.actor_id }}</code>
-      </dd>
+      <dt v-if="event.project_id">Project</dt>
+      <dd v-if="event.project_id">{{ event.project_name || 'Deleted project' }}</dd>
     </dl>
     <template #footer>
       <button class="btn btn-secondary" @click="emit('close')">Close</button>

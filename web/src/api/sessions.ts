@@ -10,10 +10,9 @@ export interface UserSession {
   expires_at: string
   revoked: boolean
   // Set when the sign-in came through an identity provider, absent for
-  // a password or passkey one. It is the provider's id, so the UI says
-  // WHETHER rather than which - a bare uuid on a security page tells
-  // nobody anything.
+  // a password or passkey one. auth_provider_name is what to show.
   auth_provider_id?: string
+  auth_provider_name?: string
   // Marks the session making the request, so the UI can label it and
   // not offer it as somebody else's to kill.
   current?: boolean

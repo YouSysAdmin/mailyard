@@ -43,7 +43,9 @@ func NewStore(db *sql.DB, replicas ...*sql.DB) *Store {
 }
 
 const supSelect = `
-SELECT id, project_id, email, kind, reason, unsubscribe_list_id, created_at
+SELECT id, project_id, email, kind, reason, unsubscribe_list_id,
+       COALESCE((SELECT l.name FROM unsubscribe_lists l WHERE l.id = suppressions.unsubscribe_list_id), ''),
+       created_at
 FROM suppressions`
 
 // List returns one keyset page, newest first.
@@ -278,7 +280,7 @@ func (s *Store) FilterSuppressedForList(ctx context.Context, projID, listID stri
 func scanSuppression(r interface{ Scan(...any) error }) (*supmodel.Suppression, error) {
 	var sup supmodel.Suppression
 	if err := r.Scan(&sup.ID, &sup.ProjectID, &sup.Email, &sup.Kind,
-		&sup.Reason, database.Str(&sup.UnsubscribeListID), &sup.CreatedAt); err != nil {
+		&sup.Reason, database.Str(&sup.UnsubscribeListID), &sup.UnsubscribeListName, &sup.CreatedAt); err != nil {
 		return nil, err
 	}
 

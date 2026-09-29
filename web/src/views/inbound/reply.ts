@@ -10,6 +10,17 @@ import type { InboundEmail } from '../../api/inbound'
 const MAX_LINES = 200
 
 /**
+ * Where a reply goes: Reply-To, else the sender, as a bare address.
+ * Never the return path, which is a bounce address.
+ */
+export function replyTo(src: InboundEmail): string {
+  const target = src.headers?.['Reply-To']?.trim() || src.sender
+  const m = /<([^<>]+)>\s*$/.exec(target)
+
+  return (m ? m[1] : target).trim()
+}
+
+/**
  * The original rendered as a quotation, or '' when there is nothing to
  * quote.
  *

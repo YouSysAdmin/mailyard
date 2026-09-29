@@ -88,7 +88,7 @@ func rebuild(ctx context.Context, bs blob.Store, e *imodel.Email) ([]byte, error
 		Headers:   map[string]string{},
 	}
 	if msg.From == "" {
-		msg.From = e.Sender
+		msg.From = e.BounceAddress
 	}
 
 	// The builder mints a random Message-ID when given none, and a

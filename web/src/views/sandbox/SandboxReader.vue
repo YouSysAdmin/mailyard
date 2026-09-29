@@ -33,17 +33,17 @@ const raw = ref('')
 const rawLoading = ref(false)
 
 // What the message was sent WITH, as the person knows it: the name they
-// gave the credential, or its username. The id is what the row carries
-// and nobody has ever seen it, so it is shown only when the credential
-// row is gone and there is nothing else left to say.
+// gave the credential, or its username. A credential deleted since has
+// no name left, and saying so beats showing an id nobody has seen.
 const credentialName = computed(() => {
   const e = email.value
   if (!e) return ''
 
-  return e.credential_name || e.api_key_name || ''
-})
+  if (e.credential_name || e.api_key_name) return e.credential_name || e.api_key_name
+  if (e.credential_id || e.api_key_id) return 'Deleted credential'
 
-const credentialID = computed(() => email.value?.credential_id || email.value?.api_key_id || '')
+  return '-'
+})
 
 // The download URLs only this caller can build - see ViewerAttachment.
 const viewerAttachments = computed<ViewerAttachment[]>(() => {
@@ -137,10 +137,7 @@ watch(() => props.id, load, { immediate: true })
       </div>
       <div>
         <dt>Credential</dt>
-        <dd v-if="credentialName">{{ credentialName }}</dd>
-        <dd v-else>
-          <code>{{ credentialID || '-' }}</code>
-        </dd>
+        <dd>{{ credentialName }}</dd>
       </div>
       <div>
         <dt>Client address</dt>

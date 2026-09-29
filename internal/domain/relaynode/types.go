@@ -162,6 +162,10 @@ type nodeView struct {
 	Port   int    `json:"port"`
 	Status string `json:"status"`
 
+	// ProjectName names the project a tenant node belongs to, on the
+	// platform listing only. Empty for a platform node.
+	ProjectName string `json:"project_name,omitempty"`
+
 	// Alive is the same judgement the delivery path makes, computed
 	// here from the same window so the console cannot say a node is
 	// fine while the pool is skipping it.

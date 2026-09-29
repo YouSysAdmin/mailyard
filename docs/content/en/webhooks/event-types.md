@@ -123,7 +123,8 @@ that distinction.
     "data": {
         "id": "7d3f9a12-4b2c-7e81-9a03-5f6d8c1e2b47",
         "domain": "mail.example.com",
-        "sender": "sender@example.com",
+        "sender": "Jane Doe <jane@example.com>",
+        "bounce_address": "bounces@example.com",
         "recipients": [
             "inbox@mail.example.com"
         ],
@@ -139,6 +140,9 @@ Metadata only: **no bodies, no headers and no attachments**. A received message 
 body that size is a delivery that times out rather than a convenience. Fetch what you need with
 `GET /api/v1/inbound-emails/{id}`, which returns the parsed message, and its attachment routes for the content.
 
+`sender` is the From header, who the message says it is from. `bounce_address` is the SMTP `MAIL FROM`, where bounces
+for the message go, which is often not the sender.
+
 `message_id` is the RFC 5322 header from the message itself, not one of ours, and it is empty when the sender did not
 set one.
 
@@ -151,10 +155,9 @@ The field matched is the **sender**, and which address that is depends on the di
 
 - On the email events it is the From address of the message you sent.
 - On the campaign events it is the campaign's own from address.
-- On `inbound.received` it is **the address that mailed you**, which is somebody else's. A filter of `*@example.com` on
-  a webhook subscribed to inbound therefore means "only mail arriving from example.com", not "only mail to my
-  example.com domain".
+- On `inbound.received` it is **the From address of the mail you received**, which is somebody else's. A filter of
+  `*@example.com` on a webhook subscribed to inbound therefore means "only mail arriving from example.com", not "only
+  mail to my example.com domain".
 
-A message with no sender at all - a null return path, which is what a bounce report carries - passes every filter rather
-than none.
+A message with no sender at all - no From header - passes every filter rather than none.
 

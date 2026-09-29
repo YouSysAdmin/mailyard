@@ -16,7 +16,7 @@ func APIDocs() []apidoc.Route {
 				"pruned is a full index scan per page load, for a number nobody acts on. " +
 				"`search` is prefix-anchored so the index serves it.",
 			Query: []apidoc.Param{
-				{Name: "kind", Enum: []string{"hard", "bounce", "complaint", "manual"}},
+				{Name: "kind", Enum: []string{"bounce", "complaint", "manual", "list_unsubscribe"}},
 				{Name: "search", Description: "Prefix match on the address."},
 				{Name: "limit", Type: "integer"},
 				{Name: "cursor", Description: "Opaque cursor from the previous page."},

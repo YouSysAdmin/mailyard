@@ -44,6 +44,11 @@ type Credential struct {
 	// has no way to pass a routing field with the message.
 	SMTPGroupID string `json:"smtp_group_id,omitempty"`
 
+	// SMTPGroup and SMTPGroupName are the group's slug and name, read
+	// with the row and never stored. The slug is what a write takes.
+	SMTPGroup     string `json:"smtp_group,omitempty"`
+	SMTPGroupName string `json:"smtp_group_name,omitempty"`
+
 	// Sandbox makes every message submitted with this credential get
 	// captured into the project sandbox instead of delivered.
 	//

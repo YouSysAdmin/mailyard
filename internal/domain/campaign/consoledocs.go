@@ -93,7 +93,12 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "Messages",
 			Description: "Needs the `campaigns:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
-			Responses:   []apidoc.Response{apidoc.OK("The result.", MessageListResponse{})},
+			Query: []apidoc.Param{
+				{Name: "status", Enum: []string{"pending", "queued", "sent", "failed", "skipped"}},
+				{Name: "limit", Type: "integer"},
+				{Name: "cursor", Description: "The next_cursor of the previous page."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", MessageListResponse{})},
 		},
 		{
 			Method:      "POST",

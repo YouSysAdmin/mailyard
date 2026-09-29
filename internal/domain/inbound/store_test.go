@@ -9,13 +9,15 @@ import (
 	imodel "github.com/yousysadmin/mailyard/internal/models/inbound"
 )
 
-// The envelope searches are substrings without regard to case, ANDed
+// The address searches are substrings without regard to case, ANDed
 // with each other and with the status, and a wildcard in the term is a
-// literal.
-func TestTheInboundLogSearchesTheEnvelope(t *testing.T) {
+// literal. The sender is the From header, and the return path is never
+// searched.
+func TestTheInboundLogSearchesTheSender(t *testing.T) {
 	s, proj, ctx := dedupStore(t)
 	app := arrived(proj, "", "")
-	app.Sender = "App@Example.test"
+	app.Sender = "App <App@Example.test>"
+	app.BounceAddress = "bounces@acme.test"
 	app.Recipients = []string{"qa@acme.test", "ops@acme.test"}
 	cron := arrived(proj, "", "")
 	cron.Sender = "cron@other.test"
@@ -32,6 +34,8 @@ func TestTheInboundLogSearchesTheEnvelope(t *testing.T) {
 	}{
 		{"sender substring", store.InboundFilter{Sender: "example"}, 1},
 		{"sender case", store.InboundFilter{Sender: "APP@"}, 1},
+		{"display name", store.InboundFilter{Sender: "app <"}, 1},
+		{"return path is not searched", store.InboundFilter{Sender: "bounces@"}, 0},
 		{"recipient substring", store.InboundFilter{Recipient: "OPS@"}, 1},
 		{"both", store.InboundFilter{Sender: "app", Recipient: "qa@"}, 1},
 		{"both, one misses", store.InboundFilter{Sender: "cron", Recipient: "qa@"}, 0},

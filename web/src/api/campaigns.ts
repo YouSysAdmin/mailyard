@@ -52,8 +52,10 @@ export const campaignsApi = {
   resume: (id: string) => api.post<{ campaign: Campaign }>(`/campaigns/${id}/resume`),
   cancel: (id: string) => api.post<{ campaign: Campaign }>(`/campaigns/${id}/cancel`),
   duplicate: (id: string) => api.post<{ campaign: Campaign }>(`/campaigns/${id}/duplicate`),
-  messages: (id: string, params: { limit?: number; offset?: number } = {}) =>
-    api.get<{ messages: CampaignMessage[] }>(`/campaigns/${id}/messages`, { params }),
+  messages: (id: string, params: { status?: string; limit?: number; cursor?: string } = {}) =>
+    api.get<{ messages: CampaignMessage[]; next_cursor?: string }>(`/campaigns/${id}/messages`, {
+      params,
+    }),
   analytics: (id: string) => api.get<CampaignAnalytics>(`/campaigns/${id}/analytics`),
 }
 

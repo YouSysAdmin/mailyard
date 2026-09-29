@@ -76,7 +76,7 @@ function mayApprove(node: RelayNode): boolean {
             <div v-if="node.mode === 'pull'" class="text-sm text-muted">{{ node.host }}</div>
             <div v-else class="text-sm text-muted">{{ node.host }}:{{ node.port }}</div>
             <div v-if="showsOtherProjects && node.project_id" class="text-sm text-muted">
-              belongs to a project
+              belongs to {{ node.project_name || 'a deleted project' }}
             </div>
             <div
               v-if="node.inbound_enabled"

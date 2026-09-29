@@ -38,13 +38,13 @@ Manually created suppressions are stored with `kind: "manual"`. Returns `409 Con
 ## List Suppressed Addresses
 
 ```
-GET /api/v1/suppressions?search=ada@&kind=hard&limit=50
+GET /api/v1/suppressions?search=ada@&kind=bounce&limit=50
 ```
 
 | Parameter | Meaning                                                                 |
 |-----------|-------------------------------------------------------------------------|
 | `search`  | Matches the **start** of an address                                     |
-| `kind`    | `hard`, `bounce`, `complaint` or `manual`                               |
+| `kind`    | `bounce`, `complaint`, `manual` or `list_unsubscribe`                   |
 | `limit`   | Rows per page, default 50, capped at 200                                |
 | `cursor`  | Where to resume. Pass back the `next_cursor` from the previous response |
 
@@ -71,13 +71,12 @@ Response:
 
 | Kind | Written by |
 |---|---|
-| `hard` | A permanent SMTP rejection during delivery |
-| `bounce` | A [bounce report](/docs/contacts/bounce-handling) classified hard |
+| `bounce` | A hard bounce: a permanent SMTP rejection during delivery, or a [bounce report](/docs/contacts/bounce-handling) classified hard |
 | `complaint` | A spam complaint from a feedback loop |
 | `manual` | You, through this API or the console |
 | `list_unsubscribe` | A recipient clicking a one-click link scoped to an [unsubscribe list](/docs/contacts/unsubscribe-lists) |
 
-Only the first four can be **created** by a caller. `list_unsubscribe` is written by the hosted unsubscribe page and
+Only the first three can be **created** by a caller. `list_unsubscribe` is written by the hosted unsubscribe page and
 carries an `unsubscribe_list_id`, so it blocks that one scope rather than everything. All five are accepted as a
 `kind` filter on this list.
 

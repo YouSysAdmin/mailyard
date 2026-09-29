@@ -407,6 +407,16 @@ func (h *Handler) PasskeyDelete(c fiber.Ctx) error {
 		return response.Forbidden(c, "incorrect password")
 	}
 
+	// The name is read first so the audit trail can say which one went.
+	name := "a passkey"
+	if keys, lerr := h.Runtime.Store.Passkey.ListForUser(c.Context(), u.ID); lerr == nil {
+		for _, k := range keys {
+			if k.ID == c.Params("id") {
+				name = "passkey " + k.Name
+			}
+		}
+	}
+
 	removed, err := h.Runtime.Store.Passkey.Delete(c.Context(), u.ID, c.Params("id"))
 	if err != nil {
 		return response.Internal(c, err)
@@ -418,7 +428,7 @@ func (h *Handler) PasskeyDelete(c fiber.Ctx) error {
 
 	slog.Info("auth: passkey removed", "user_id", u.ID, "passkey_id", c.Params("id"))
 	h.Runtime.Audit.Security(c, &amodel.Event{
-		Type: amodel.TypePasskeyRemoved, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusOK, Detail: "removed passkey " + c.Params("id"),
+		Type: amodel.TypePasskeyRemoved, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusOK, Detail: "removed " + name,
 	})
 
 	return response.Success(c, RemovedResponse{Removed: true})

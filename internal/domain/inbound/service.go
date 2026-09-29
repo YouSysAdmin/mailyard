@@ -217,24 +217,25 @@ type Conn struct {
 // the listener's per-RCPT checks, since a mixed-domain session is split
 // upstream by the sending MTA retrying per recipient.
 func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom string, envelopeTo []string, raw []byte, conn Conn) (*imodel.Email, error) {
-	sender := strings.ToLower(strings.TrimSpace(envelopeFrom))
+	returnPath := strings.ToLower(strings.TrimSpace(envelopeFrom))
 	now := time.Now().UTC()
 
 	rec := &imodel.Email{
-		ID:         ids.New(),
-		ProjectID:  d.ProjectID,
-		DomainID:   d.ID,
-		Sender:     sender,
-		Recipients: envelopeTo,
-		Size:       int64(len(raw)),
-		Status:     imodel.StatusReceived,
-		ReceivedAt: now,
+		ID:            ids.New(),
+		ProjectID:     d.ProjectID,
+		DomainID:      d.ID,
+		Domain:        d.Domain,
+		BounceAddress: returnPath,
+		Recipients:    envelopeTo,
+		Size:          int64(len(raw)),
+		Status:        imodel.StatusReceived,
+		ReceivedAt:    now,
 	}
 
 	// The project suppression list doubles as an inbound
 	// blocklist. Rejections are persisted for the audit trail.
-	if sender != "" {
-		suppressed, err := s.Suppressions.IsSuppressed(ctx, d.ProjectID, sender)
+	if returnPath != "" {
+		suppressed, err := s.Suppressions.IsSuppressed(ctx, d.ProjectID, returnPath)
 		if err != nil {
 			return nil, err
 		}
@@ -251,9 +252,8 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 	}
 
 	// Authenticate the sender before anything else looks at the
-	// message. Until this ran, "Sender" on a stored inbound row was
-	// whatever the peer typed at MAIL FROM and meant nothing at all.
-	auth := mailauth.Verify(ctx, mailauth.Config{}, conn.IP, sender, conn.HELO, raw)
+	// message.
+	auth := mailauth.Verify(ctx, mailauth.Config{}, conn.IP, returnPath, conn.HELO, raw)
 	rec.Auth = &imodel.Auth{
 		SPF:         auth.SPF,
 		DKIM:        auth.DKIM,
@@ -264,7 +264,7 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 	}
 	if !auth.Aligned {
 		s.Log.Info("inbound: sender not authenticated",
-			"sender", sender, "client_ip", conn.IP,
+			"bounce_address", returnPath, "client_ip", conn.IP,
 			"spf", auth.SPF, "dkim", auth.DKIM, "dmarc", auth.DMARC,
 			"dmarc_policy", auth.DMARCPolicy)
 	}
@@ -300,6 +300,7 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 	}
 
 	rec.MessageID = parsed.MessageID
+	rec.Sender = parsed.Headers["From"]
 	rec.Subject = parsed.Subject
 	rec.TextBody = parsed.TextBody
 	rec.HTMLBody = parsed.HTMLBody
@@ -317,6 +318,11 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 
 	rec.Headers["Authentication-Results"] = mailauth.AuthenticationResults(s.Hostname, auth)
 
+	// Return-Path records the envelope sender, written by the receiver
+	// at delivery as RFC 5321 section 4.4 asks. Any the sender supplied
+	// is replaced. An empty envelope is the null path, written as <>.
+	rec.Headers["Return-Path"] = "<" + returnPath + ">"
+
 	// Idempotency before attachment offload. The other order writes a
 	// duplicate's attachments into the blob store under a fresh id and
 	// then discards the record, orphaning the objects - an MTA retry
@@ -331,7 +337,7 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 	// The id is still in the key, so an MTA retry of the same message
 	// is one row, but a different message under the same id is a
 	// different message.
-	rec.DedupHash = dedupHash(rec.MessageID, sender, envelopeTo, parsed.Subject, rec.Size)
+	rec.DedupHash = dedupHash(rec.MessageID, returnPath, envelopeTo, parsed.Subject, rec.Size)
 	existing, err := s.Inbound.FindByDedupHash(ctx, d.ProjectID, rec.DedupHash)
 	if err != nil {
 		return nil, err
@@ -391,21 +397,22 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 
 	if s.Emit != nil {
 		s.Emit(ctx, rec.ProjectID, webhookmodel.EventInboundReceived, rec.Sender, map[string]any{
-			"id":          rec.ID,
-			"domain":      d.Domain,
-			"sender":      rec.Sender,
-			"recipients":  rec.Recipients,
-			"subject":     rec.Subject,
-			"message_id":  rec.MessageID,
-			"size":        rec.Size,
-			"received_at": rec.ReceivedAt,
+			"id":             rec.ID,
+			"domain":         d.Domain,
+			"sender":         rec.Sender,
+			"bounce_address": rec.BounceAddress,
+			"recipients":     rec.Recipients,
+			"subject":        rec.Subject,
+			"message_id":     rec.MessageID,
+			"size":           rec.Size,
+			"received_at":    rec.ReceivedAt,
 		})
 	}
 
 	metrics.InboundReceived.Inc()
 	s.Log.Info("inbound: message received",
 		"id", rec.ID, "project_id", rec.ProjectID, "domain", d.Domain,
-		"sender", rec.Sender, "size", rec.Size)
+		"sender", rec.Sender, "bounce_address", rec.BounceAddress, "size", rec.Size)
 
 	// After the message is safely stored: if it is a failure report
 	// addressed to the project's bounce address, feed it into the

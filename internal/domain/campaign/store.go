@@ -17,6 +17,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/database"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	cmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 )
 
@@ -37,7 +38,12 @@ const campaignSelect = `
 SELECT id, project_id, created_by, name, subject, from_email, from_name, reply_to,
        template_id, language, template_data, status, list_id, smtp_group_id, send_rate,
        send_at_local_time, ab_test_enabled, ab_variants,
-       scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at
+       scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at,
+       COALESCE((SELECT u.email FROM users u WHERE u.id = NULLIF(campaigns.created_by, '')::uuid), ''),
+       COALESCE((SELECT t.name FROM templates t WHERE t.id = campaigns.template_id), ''),
+       COALESCE((SELECT l.name FROM subscriber_lists l WHERE l.id = campaigns.list_id), ''),
+       COALESCE((SELECT g.slug FROM smtp_server_groups g WHERE g.id = campaigns.smtp_group_id), ''),
+       COALESCE((SELECT g.name FROM smtp_server_groups g WHERE g.id = campaigns.smtp_group_id), '')
 FROM campaigns`
 
 // Get returns one campaign within projID, or nil when there is no such
@@ -492,14 +498,17 @@ func (s *Store) SkipPending(ctx context.Context, campaignID, reason string) (int
 	return int(n), err
 }
 
-// ListMessages pages a campaign's messages for the console. The
-// campaign join enforces the project scope.
-func (s *Store) ListMessages(ctx context.Context, projID, campaignID string, limit, offset int) ([]*cmodel.Message, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
+// ListMessages pages a campaign's messages for the console, oldest
+// first, resuming after the cursor. The campaign join enforces the
+// project scope.
+func (s *Store) ListMessages(ctx context.Context, projID, campaignID string, f store.CampaignMessageFilter) ([]*cmodel.Message, error) {
+	limit := f.Limit
+	if limit < 1 || limit > 201 {
+		limit = 51
 	}
 
-	rows, err := s.Query(ctx, `
+	var q strings.Builder
+	q.WriteString(`
         SELECT m.id, m.campaign_id, m.subscriber_id, m.email_id, m.status, m.error_message,
                m.variant, m.deliver_at, m.sent_at, m.opened_at, m.clicked_at, m.created_at,
                COALESCE(s.email, '')
@@ -509,10 +518,22 @@ func (s *Store) ListMessages(ctx context.Context, projID, campaignID string, lim
         -- message row, and losing the whole row from the list would
         -- hide a send that actually happened.
         LEFT JOIN subscribers s ON s.id = m.subscriber_id
-        WHERE c.project_id = ? AND m.campaign_id = ?
-        ORDER BY m.created_at ASC
-        LIMIT ? OFFSET ?
-    `, projID, campaignID, limit, max(offset, 0))
+        WHERE c.project_id = ? AND m.campaign_id = ?`)
+	args := []any{projID, campaignID}
+	if f.Status != "" {
+		q.WriteString(` AND m.status = ?`)
+		args = append(args, f.Status)
+	}
+
+	if !f.Cursor.IsZero() {
+		q.WriteString(` AND (m.created_at, m.id) > (?, ?)`)
+		args = append(args, f.Cursor.CreatedAt.UTC(), f.Cursor.ID)
+	}
+
+	q.WriteString(` ORDER BY m.created_at ASC, m.id ASC LIMIT ?`)
+	args = append(args, limit)
+
+	rows, err := s.Query(ctx, q.String(), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -562,7 +583,8 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	if err := r.Scan(&c.ID, &c.ProjectID, &c.CreatedBy, &c.Name, &c.Subject,
 		&c.FromEmail, &c.FromName, &c.ReplyTo, &c.TemplateID, &c.Language, &data, &c.Status,
 		&c.ListID, database.Str(&c.SMTPGroupID), &c.SendRate, &c.SendAtLocalTime, &c.ABTestEnabled, &variants,
-		&scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt); err != nil {
+		&scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt,
+		&c.CreatedByEmail, &c.TemplateName, &c.ListName, &c.SMTPGroup, &c.SMTPGroupName); err != nil {
 		return nil, err
 	}
 

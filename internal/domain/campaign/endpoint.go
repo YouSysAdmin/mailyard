@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/keyset"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -14,6 +15,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	cmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 )
 
@@ -223,6 +225,11 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	cam, err := h.reread(c, cam)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
 	return response.Created(c, CampaignResponse{Campaign: cam})
 }
 
@@ -260,6 +267,11 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	updated.CreatedAt = cam.CreatedAt
 	updated.UpdatedAt = new(time.Now().UTC())
 	if err := h.Runtime.Store.Campaign.Put(c.Context(), updated); err != nil {
+		return response.Internal(c, err)
+	}
+
+	updated, err = h.reread(c, updated)
+	if err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -465,7 +477,12 @@ func (h *Handler) Duplicate(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	return response.Created(c, CampaignResponse{Campaign: &dup})
+	fresh, err := h.reread(c, &dup)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Created(c, CampaignResponse{Campaign: fresh})
 }
 
 // Messages serves GET /api/v1/campaigns/:id/messages.
@@ -480,18 +497,30 @@ func (h *Handler) Messages(c fiber.Ctx) error {
 		return response.NotFound(c, "campaign not found")
 	}
 
-	pg := paging.From(c)
-	msgs, err := h.Runtime.Store.Campaign.ListMessages(c.Context(),
-		rc.Project.ID, cam.ID, pg.Limit, pg.Offset)
+	status := c.Query("status")
+	if status != "" && !cmodel.ValidMessageStatus(status) {
+		return response.BadRequest(c, "unknown message status "+status)
+	}
+
+	w := paging.WindowFrom(c)
+	rows, err := h.Runtime.Store.Campaign.ListMessages(c.Context(), rc.Project.ID, cam.ID,
+		store.CampaignMessageFilter{Status: status, Limit: w.Fetch(), Cursor: w.Cursor})
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if msgs == nil {
-		msgs = []*cmodel.Message{}
+	page, more := keyset.Cut(rows, w.Limit)
+	next := ""
+	if more && len(page) > 0 {
+		last := page[len(page)-1]
+		next = keyset.Cursor{CreatedAt: last.CreatedAt, ID: last.ID}.Encode()
 	}
 
-	return response.Success(c, MessageListResponse{Messages: msgs})
+	if page == nil {
+		page = []*cmodel.Message{}
+	}
+
+	return response.Success(c, MessageListResponse{Messages: page, NextCursor: next})
 }
 
 func (h *Handler) transition(c fiber.Ctx, to, conflictMsg string, from ...string) error {
@@ -521,6 +550,17 @@ func (h *Handler) respondWith(c fiber.Ctx, id string) error {
 	}
 
 	return response.Success(c, CampaignResponse{Campaign: cam})
+}
+
+// reread loads a campaign just written, so the response carries the
+// names the store resolves on read.
+func (h *Handler) reread(c fiber.Ctx, cam *cmodel.Campaign) (*cmodel.Campaign, error) {
+	fresh, err := h.Runtime.Store.Campaign.Get(c.Context(), cam.ProjectID, cam.ID)
+	if err != nil || fresh == nil {
+		return cam, err
+	}
+
+	return fresh, nil
 }
 
 func (in *upsertInput) toModel(projID string) *cmodel.Campaign {

@@ -28,7 +28,8 @@ func NewStore(db *sql.DB) *Store {
 
 const sessionSelect = `
 SELECT id, user_id, user_agent, ip, created_at, last_seen_at, expires_at, revoked,
-       auth_provider_id
+       auth_provider_id,
+       COALESCE((SELECT o.name FROM oauth_providers o WHERE o.id = sessions.auth_provider_id), '')
 FROM sessions`
 
 // Get is the auth-path lookup, keyed by the token's jti. Not user
@@ -169,7 +170,7 @@ func scanSession(r interface{ Scan(...any) error }) (*smodel.Session, error) {
 	var m smodel.Session
 	if err := r.Scan(&m.ID, &m.UserID, &m.UserAgent, &m.IP,
 		&m.CreatedAt, &m.LastSeenAt, &m.ExpiresAt, &m.Revoked,
-		database.Str(&m.AuthProviderID)); err != nil {
+		database.Str(&m.AuthProviderID), &m.AuthProviderName); err != nil {
 		return nil, err
 	}
 

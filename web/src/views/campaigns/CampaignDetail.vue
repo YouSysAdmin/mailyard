@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiErrorMessage } from '../../api/client'
 import { campaignsApi, type TrackedLink } from '../../api/campaigns'
-import type { Campaign, CampaignMessage } from '../../api/types'
+import type { Campaign } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'
 import { useCampaignActions } from '../../composables/campaignActions'
 import { useProjectStore } from '../../stores/project'
@@ -36,8 +36,6 @@ const { errors: fieldErrors, capture, clear } = useFieldErrors()
 const loading = ref(true)
 
 // Messages
-const messages = ref<CampaignMessage[]>([])
-const messagesLoading = ref(false)
 
 // Action availability
 const canSend = computed(
@@ -95,16 +93,11 @@ async function loadCampaign(quiet = false) {
 
 const trackedLinks = ref<TrackedLink[]>([])
 
+// The messages card loads itself. The page only asks it to refresh.
+const messagesCard = ref<InstanceType<typeof CampaignMessages> | null>(null)
+
 async function loadMessages(quiet = false) {
-  if (!quiet) messagesLoading.value = true
-  try {
-    const res = await campaignsApi.messages(campaignId)
-    messages.value = res.data.messages ?? []
-  } catch (e) {
-    if (!quiet) notify.error(apiErrorMessage(e, 'Failed to load messages'))
-  } finally {
-    if (!quiet) messagesLoading.value = false
-  }
+  await messagesCard.value?.load(quiet)
 }
 
 // A campaign that is working moves on its own, and the counts are what
@@ -183,11 +176,10 @@ async function deleteCampaign() {
 }
 
 /**
- * Read the campaign and its messages, once, on arrival.
+ * Read the campaign once, on arrival. The messages card loads itself.
  */
 async function start() {
   await loadCampaign()
-  await loadMessages()
   loading.value = false
 }
 
@@ -296,6 +288,20 @@ void start()
               <div>{{ campaign.reply_to }}</div>
             </div>
             <div>
+              <div class="summary-label">Template</div>
+              <div>
+                {{ campaign.template_id ? campaign.template_name || 'Deleted template' : '-' }}
+              </div>
+            </div>
+            <div>
+              <div class="summary-label">List</div>
+              <div>{{ campaign.list_id ? campaign.list_name || 'Deleted list' : '-' }}</div>
+            </div>
+            <div>
+              <div class="summary-label">SMTP Group</div>
+              <div>{{ campaign.smtp_group_name || 'Default' }}</div>
+            </div>
+            <div>
               <div class="summary-label">Language</div>
               <div>{{ campaign.language || '-' }}</div>
             </div>
@@ -355,7 +361,7 @@ void start()
         :links="trackedLinks"
       />
 
-      <CampaignMessages :messages="messages" :loading="messagesLoading" />
+      <CampaignMessages ref="messagesCard" :campaign-id="campaignId" />
     </template>
 
     <CampaignSchedule
