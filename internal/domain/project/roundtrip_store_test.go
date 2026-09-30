@@ -3,6 +3,8 @@
 package project
 
 import (
+	"maps"
+	"slices"
 	"testing"
 	"time"
 
@@ -35,7 +37,10 @@ func distinctProject(id, slug string) *projmodel.Project {
 		StrictSenders:   true,
 		TrackOpens:      true,
 		TrackClicks:     true,
-		CreatedAt:       time.Now().UTC().Truncate(time.Millisecond),
+		DefaultHeaders:  map[string]string{"X-Env": "staging", "X-Team": "ops"},
+
+		SubmissionDropHeaders: []string{"X-Mailer", "X-Priority"},
+		CreatedAt:             time.Now().UTC().Truncate(time.Millisecond),
 	}
 }
 
@@ -64,6 +69,14 @@ func assertSurvived(t *testing.T, want, got *projmodel.Project) {
 		if c.got != c.want {
 			t.Errorf("%s came back %v, want %v", c.field, c.got, c.want)
 		}
+	}
+
+	if !maps.Equal(want.DefaultHeaders, got.DefaultHeaders) {
+		t.Errorf("default_headers came back %v, want %v", got.DefaultHeaders, want.DefaultHeaders)
+	}
+
+	if !slices.Equal(want.SubmissionDropHeaders, got.SubmissionDropHeaders) {
+		t.Errorf("submission_drop_headers came back %v, want %v", got.SubmissionDropHeaders, want.SubmissionDropHeaders)
 	}
 }
 

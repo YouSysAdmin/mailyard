@@ -94,9 +94,23 @@ type Project struct {
 	// Per project because a sandbox is a project's: one team wants a day
 	// of captures and another wants a fortnight, and neither is the
 	// installation's business.
-	SandboxRetentionDays int        `json:"sandbox_retention_days"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            *time.Time `json:"updated_at,omitempty"`
+	SandboxRetentionDays int `json:"sandbox_retention_days"`
+
+	// DefaultHeaders are custom headers laid under every message the
+	// project sends. A message or campaign naming the same header,
+	// in any casing, wins. Checked against the same rules as a
+	// message's own headers when saved, so the send path merges them
+	// without looking again. Never nil on the wire.
+	DefaultHeaders map[string]string `json:"default_headers"`
+
+	// SubmissionDropHeaders are header names the SMTP submission
+	// listener strips from a client's message before forwarding the
+	// rest. Submission only: an API caller who named a header meant
+	// it. Never nil on the wire.
+	SubmissionDropHeaders []string `json:"submission_drop_headers"`
+
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 // Member links a user to a project. Email, RoleName and the resolved

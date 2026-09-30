@@ -42,6 +42,8 @@ The settings that shape behaviour:
 | `track_opens`      | bool   | `false` | Add the open pixel to non-campaign mail. See [Tracking](/docs/tracking/overview)                                    |
 | `track_clicks`     | bool   | `false` | Rewrite links in non-campaign mail                                                                                  |
 | `bounce_address`   | string | —       | Envelope return path for this project's own SMTP servers. See [Bounce handling](/docs/smtp-domains/bounce-handling) |
+| `default_headers`  | object | `{}`    | Custom headers under every message the project sends. A message or campaign naming the same header wins. Up to 20, same rules as a message's [own headers](/docs/email-sending/single-email#three-layers-of-headers) |
+| `submission_drop_headers` | list | `[]` | Header names the [SMTP submission](/docs/security/smtp-submission#which-headers-travel) listener removes from a client's message before forwarding. Submission only |
 
 `PATCH` takes any subset and leaves absent fields unchanged:
 

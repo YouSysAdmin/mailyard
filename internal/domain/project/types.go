@@ -69,6 +69,16 @@ type updateInput struct {
 	// less than its plan allows and never more. Zero means the platform
 	// default.
 	SandboxRetentionDays *int `json:"sandbox_retention_days" validate:"omitzero,min=0,max=365"`
+
+	// DefaultHeaders replaces the project's default header set. An
+	// empty object clears it. Checked against the same rules as a
+	// message's own headers, so the send path merges them unchecked.
+	DefaultHeaders *map[string]string `json:"default_headers" validate:"omitzero,max=20"`
+
+	// SubmissionDropHeaders replaces the list of header names the
+	// SMTP submission listener strips before forwarding. An empty
+	// list clears it.
+	SubmissionDropHeaders *[]string `json:"submission_drop_headers" validate:"omitzero,max=50,dive,max=100"`
 }
 
 // memberInput adds a member by email.

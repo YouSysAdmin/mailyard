@@ -1286,22 +1286,24 @@ type PreviewResponse struct {
 
 // Project is the wire body.
 type Project struct {
-	ID                   string     `json:"id"`
-	Name                 string     `json:"name"`
-	Slug                 string     `json:"slug"`
-	Description          string     `json:"description,omitempty"`
-	OwnerID              string     `json:"owner_id,omitempty"`
-	DefaultLanguage      string     `json:"default_language"`
-	PlanID               string     `json:"plan_id,omitempty"`
-	DefaultRoleID        string     `json:"default_role_id,omitempty"`
-	StrictSenders        bool       `json:"strict_senders"`
-	TrackOpens           bool       `json:"track_opens"`
-	TrackClicks          bool       `json:"track_clicks"`
-	BounceAddress        string     `json:"bounce_address,omitempty"`
-	AlertEmail           string     `json:"alert_email,omitempty"`
-	SandboxRetentionDays int64      `json:"sandbox_retention_days"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            *time.Time `json:"updated_at,omitempty"`
+	ID                    string            `json:"id"`
+	Name                  string            `json:"name"`
+	Slug                  string            `json:"slug"`
+	Description           string            `json:"description,omitempty"`
+	OwnerID               string            `json:"owner_id,omitempty"`
+	DefaultLanguage       string            `json:"default_language"`
+	PlanID                string            `json:"plan_id,omitempty"`
+	DefaultRoleID         string            `json:"default_role_id,omitempty"`
+	StrictSenders         bool              `json:"strict_senders"`
+	TrackOpens            bool              `json:"track_opens"`
+	TrackClicks           bool              `json:"track_clicks"`
+	BounceAddress         string            `json:"bounce_address,omitempty"`
+	AlertEmail            string            `json:"alert_email,omitempty"`
+	SandboxRetentionDays  int64             `json:"sandbox_retention_days"`
+	DefaultHeaders        map[string]string `json:"default_headers"`
+	SubmissionDropHeaders []string          `json:"submission_drop_headers"`
+	CreatedAt             time.Time         `json:"created_at"`
+	UpdatedAt             *time.Time        `json:"updated_at,omitempty"`
 }
 
 // ProjectAccess is the wire body.
@@ -1339,15 +1341,17 @@ type ProjectResponse struct {
 
 // ProjectUpdateInput is the request body.
 type ProjectUpdateInput struct {
-	Name                 string  `json:"name"`
-	Description          *string `json:"description"`
-	DefaultLanguage      string  `json:"default_language"`
-	StrictSenders        *bool   `json:"strict_senders"`
-	TrackOpens           *bool   `json:"track_opens"`
-	TrackClicks          *bool   `json:"track_clicks"`
-	BounceAddress        *string `json:"bounce_address"`
-	AlertEmail           *string `json:"alert_email"`
-	SandboxRetentionDays *int64  `json:"sandbox_retention_days"`
+	Name                  string             `json:"name"`
+	Description           *string            `json:"description"`
+	DefaultLanguage       string             `json:"default_language"`
+	StrictSenders         *bool              `json:"strict_senders"`
+	TrackOpens            *bool              `json:"track_opens"`
+	TrackClicks           *bool              `json:"track_clicks"`
+	BounceAddress         *string            `json:"bounce_address"`
+	AlertEmail            *string            `json:"alert_email"`
+	SandboxRetentionDays  *int64             `json:"sandbox_retention_days"`
+	DefaultHeaders        *map[string]string `json:"default_headers"`
+	SubmissionDropHeaders *[]string          `json:"submission_drop_headers"`
 }
 
 // ProjectsResponse is the response body.

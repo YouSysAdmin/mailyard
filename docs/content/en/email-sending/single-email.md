@@ -87,7 +87,7 @@ with no text alternative scores worse with spam filters than one that has it.
 |---|---|
 | `cc`, `bcc` | The other two recipient lists - see [Who sees whom](#who-sees-whom) |
 | `reply_to` | Where a reply lands when it should not go back to `from`. Any parseable address, verified or not |
-| `headers` | Up to 20 custom headers |
+| `headers` | Up to 20 custom headers, written over the [project's defaults](/docs/projects/settings) - see below |
 | `attachments` | Base64 files — see [Attachments](/docs/email-sending/attachments) |
 | `send_at` | Hold until an RFC 3339 time — see [Scheduled Email](/docs/email-sending/scheduled-email) |
 | `dry_run` | Run every validation and persist nothing |
@@ -100,16 +100,33 @@ with no text alternative scores worse with spam filters than one that has it.
 `dry_run` is the cheapest way to check an integration: it validates the sender, the recipients, the headers, the
 attachment sizes and the routing, then returns without writing a row or spending quota.
 
-{{< callout type="warning" title="Sixteen headers are reserved" >}}
+{{< callout type="warning" title="Reserved headers" >}}
 Anything the message builder owns is refused rather than merged, so a caller cannot forge the envelope or break the
-MIME structure: `From`, `To`, `Cc`, `Bcc`, `Reply-To`, `Subject`, `Date`, `MIME-Version`, `Content-Type`,
-`Content-Transfer-Encoding`, `List-Unsubscribe`, `List-Unsubscribe-Post`, `Return-Path`, `Message-ID`, `Received` and
-`DKIM-Signature`.
+MIME structure: `From`, `To`, `Cc`, `Bcc`, `Reply-To`, `Subject`, `Date`, `MIME-Version`, `List-Unsubscribe`,
+`List-Unsubscribe-Post`, `Return-Path`, `Message-ID`, `Received`, `DKIM-Signature`, every `Content-*` header, and
+everything under the `X-Mailyard-` prefix, which is Mailyard's own control namespace. Three more are refused because
+they let a sender speak for somebody else: `Sender`, and the two read-receipt requests `Disposition-Notification-To`
+and `Return-Receipt-To`, which ask the recipient's client to mail an address of the caller's choosing.
 
 The refusal names the header and, where there is one, the field to use instead — `List-Unsubscribe` points you at
-`list_unsubscribe_url`, `Reply-To` at `reply_to`, `Cc` and `Bcc` at `cc` and `bcc`. Matching is case-insensitive, and a header name or value containing a newline is refused
-outright, which is what stops header injection through a value you interpolated.
+`list_unsubscribe_url`, `Reply-To` at `reply_to`, `Cc` and `Bcc` at `cc` and `bcc`. Matching is case-insensitive. A
+name has to be a plain RFC 5322 field name (printable ASCII, no spaces, no colon, at most 128 characters), and a value
+carrying a line break or any other control character is refused outright, which is what stops header injection through
+a value you interpolated. A value is capped at 4096 characters, room enough for a `References` chain.
 {{< /callout >}}
+
+### Three layers of headers
+
+A message's headers are laid over two other sets, and the nearest one wins, compared by name without regard to case:
+
+1. The project's **default headers**, set under [project settings](/docs/projects/settings). They go on every message
+   the project sends - API, console, SMTP submission and campaigns alike.
+2. A **campaign's headers**, on every message of that campaign.
+3. The message's own `headers`.
+
+So a project default of `X-Env: staging` is what goes out until a message says `x-env: prod`, and then only the
+message's spelling is written. Each layer may hold twenty headers of its own, and each is checked against the reserved
+set when it is saved.
 
 ## What comes back
 

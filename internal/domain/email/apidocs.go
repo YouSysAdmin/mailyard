@@ -26,6 +26,11 @@ func APIDocs() []apidoc.Route {
 				"message is stored, and the returned id is what you poll. " +
 				"Set `dry_run` to validate and render without storing or sending, " +
 				"which answers 200 instead of 201. " +
+				"`headers` carries up to 20 custom headers, written over the " +
+				"project's default headers - one named here wins, case-insensitively. " +
+				"A header the builder owns (From, To, Subject, Date, Message-ID, " +
+				"the X-Mailyard- namespace and the rest) is refused with a 400 " +
+				"naming it and, where there is one, the field to use instead. " +
 				"A SANDBOX credential answers 201 with a different body - " +
 				"`{\"sandbox_email\": {...}, \"sandboxed\": true}` - because the " +
 				"message was captured rather than queued. OpenAPI carries one " +
@@ -47,6 +52,7 @@ func APIDocs() []apidoc.Route {
 			Summary:    "Render a stored template and queue the result",
 			Description: "Name the template by `template_id` or `template_name`. " +
 				"Attachments registered on the template are appended automatically. " +
+				"`headers` behaves as on /emails/send. " +
 				"A SANDBOX credential answers 201 with " +
 				"`{\"sandbox_email\": {...}, \"sandboxed\": true}` instead, for the " +
 				"reason given on /emails/send.",

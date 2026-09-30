@@ -83,6 +83,14 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 		Log:      h.Runtime.Log,
 		All:      h.Runtime.Store,
 	}
+
+	// The project's default headers, so the raw view shows what a
+	// delivery would have carried.
+	sender := NewService(h.Runtime)
+	if err := sender.withProjectDefaults(c.Context(), rc.Project.ID, req); err != nil {
+		return true, response.Internal(c, err)
+	}
+
 	msg := captureMessage(req)
 	apiKeyID := ""
 	if rc.APIKey != nil {

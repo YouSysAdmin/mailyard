@@ -81,6 +81,25 @@ func withDisplayRecipients(req *SendRequest) map[string]string {
 	return out
 }
 
+// withProjectDefaults lays the project's default headers under the
+// request's own, in place. Every path that builds a message crosses
+// this - Send, and the API sandbox capture that runs before it - so a
+// captured message shows the headers that would have gone out. The
+// defaults were validated when the project saved them, so nothing is
+// re-checked here.
+func (s *Service) withProjectDefaults(ctx context.Context, projID string, req *SendRequest) error {
+	proj, err := s.Store.Project.Get(ctx, projID)
+	if err != nil {
+		return err
+	}
+
+	if proj != nil {
+		req.Headers = mailheader.Merge(proj.DefaultHeaders, req.Headers)
+	}
+
+	return nil
+}
+
 // Service is the send pipeline entry: validate, persist as queued or
 // scheduled, wake the worker. Handlers construct it per request from
 // the Runtime (cheap field copies).
@@ -579,6 +598,10 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	// ADDRESS, not to whoever is composing.
 	from, err := s.withRegisteredName(ctx, projID, req.From)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := s.withProjectDefaults(ctx, projID, req); err != nil {
 		return nil, nil, err
 	}
 

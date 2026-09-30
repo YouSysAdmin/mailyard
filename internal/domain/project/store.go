@@ -36,6 +36,7 @@ const wsSelect = `
 SELECT id, name, slug, description, owner_id, default_language,
        plan_id, default_role_id, strict_senders,
        track_opens, track_clicks, bounce_address, alert_email, sandbox_retention_days,
+       default_headers_json, submission_drop_headers_json,
        created_at, updated_at
 FROM projects`
 
@@ -73,8 +74,9 @@ func (s *Store) Put(ctx context.Context, w *projmodel.Project) error {
             id, name, slug, description, owner_id, default_language,
             plan_id, default_role_id, strict_senders,
             track_opens, track_clicks, bounce_address, alert_email, sandbox_retention_days,
-       created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            default_headers_json, submission_drop_headers_json,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name             = excluded.name,
             slug             = excluded.slug,
@@ -89,12 +91,15 @@ func (s *Store) Put(ctx context.Context, w *projmodel.Project) error {
             bounce_address   = excluded.bounce_address,
             alert_email      = excluded.alert_email,
             sandbox_retention_days = excluded.sandbox_retention_days,
+            default_headers_json = excluded.default_headers_json,
+            submission_drop_headers_json = excluded.submission_drop_headers_json,
             updated_at       = excluded.updated_at
     `,
 		w.ID, w.Name, w.Slug, w.Description, database.NullStr(w.OwnerID), w.DefaultLanguage,
 		database.NullStr(w.PlanID), database.NullStr(w.DefaultRoleID),
 		w.StrictSenders, w.TrackOpens,
 		w.TrackClicks, w.BounceAddress, w.AlertEmail, w.SandboxRetentionDays,
+		database.MustJSON(orEmptyMap(w.DefaultHeaders)), database.MustJSON(orEmpty(w.SubmissionDropHeaders)),
 		w.CreatedAt, database.NullTime(w.UpdatedAt),
 	)
 
@@ -619,6 +624,14 @@ func orEmpty(v []string) []string {
 	return v
 }
 
+func orEmptyMap(v map[string]string) map[string]string {
+	if v == nil {
+		return map[string]string{}
+	}
+
+	return v
+}
+
 // ListMembers returns the members in projID.
 func (s *Store) ListMembers(ctx context.Context, projID string) ([]*projmodel.Member, error) {
 	rows, err := s.Query(ctx, memberSelect+` WHERE m.project_id = ? ORDER BY m.created_at ASC`, projID)
@@ -766,13 +779,15 @@ func (s *Store) insertWithOwner(ctx context.Context, w *projmodel.Project, owner
             id, name, slug, description, owner_id, default_language,
             plan_id, default_role_id, strict_senders,
             track_opens, track_clicks, bounce_address, alert_email, sandbox_retention_days,
-       created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            default_headers_json, submission_drop_headers_json,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
 		w.ID, w.Name, w.Slug, w.Description, database.NullStr(w.OwnerID), w.DefaultLanguage,
 		database.NullStr(w.PlanID), database.NullStr(w.DefaultRoleID),
 		w.StrictSenders, w.TrackOpens,
 		w.TrackClicks, w.BounceAddress, w.AlertEmail, w.SandboxRetentionDays,
+		database.MustJSON(orEmptyMap(w.DefaultHeaders)), database.MustJSON(orEmpty(w.SubmissionDropHeaders)),
 		w.CreatedAt, database.NullTime(w.UpdatedAt),
 	); err != nil {
 		return err
@@ -801,12 +816,20 @@ func (s *Store) CreateWithOwner(ctx context.Context, w *projmodel.Project, owner
 func scanProject(r interface{ Scan(...any) error }) (*projmodel.Project, error) {
 	var w projmodel.Project
 	var updated sql.NullTime
+	var defaults, drop string
 	if err := r.Scan(&w.ID, &w.Name, &w.Slug, &w.Description, database.Str(&w.OwnerID),
 		&w.DefaultLanguage, database.Str(&w.PlanID), database.Str(&w.DefaultRoleID),
 		&w.StrictSenders, &w.TrackOpens, &w.TrackClicks, &w.BounceAddress,
-		&w.AlertEmail, &w.SandboxRetentionDays, &w.CreatedAt, &updated); err != nil {
+		&w.AlertEmail, &w.SandboxRetentionDays, &defaults, &drop, &w.CreatedAt, &updated); err != nil {
 		return nil, err
 	}
+
+	// Both answer {} and [] rather than null: the console and three
+	// generated clients read them as collections.
+	database.MustUnmarshalJSON(defaults, &w.DefaultHeaders)
+	w.DefaultHeaders = orEmptyMap(w.DefaultHeaders)
+	database.MustUnmarshalJSON(drop, &w.SubmissionDropHeaders)
+	w.SubmissionDropHeaders = orEmpty(w.SubmissionDropHeaders)
 
 	if updated.Valid {
 		w.UpdatedAt = new(updated.Time)

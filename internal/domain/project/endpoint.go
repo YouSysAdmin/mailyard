@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/mailheader"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
@@ -173,6 +174,11 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		Description:     in.Description,
 		OwnerID:         rc.User.ID,
 		DefaultLanguage: in.DefaultLanguage,
+		// Answered as written, not re-read, so the empty sets are set
+		// here or the response says null where every later read says
+		// {} and [].
+		DefaultHeaders:        map[string]string{},
+		SubmissionDropHeaders: []string{},
 	}
 	if w.DefaultLanguage == "" {
 		w.DefaultLanguage = "en"
@@ -291,6 +297,34 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		}
 
 		w.SandboxRetentionDays = days
+	}
+
+	if in.DefaultHeaders != nil {
+		if herr := mailheader.Validate(*in.DefaultHeaders); herr != nil {
+			return response.BadRequest(c, herr.Error())
+		}
+
+		w.DefaultHeaders = *in.DefaultHeaders
+	}
+
+	if in.SubmissionDropHeaders != nil {
+		// Names only, and a reserved one is allowed: dropping what would
+		// have been dropped anyway costs nothing.
+		names := make([]string, 0, len(*in.SubmissionDropHeaders))
+		for _, name := range *in.SubmissionDropHeaders {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+
+			if !mailheader.ValidName(name) {
+				return response.BadRequest(c, fmt.Sprintf("header %q is not a valid header name", name))
+			}
+
+			names = append(names, name)
+		}
+
+		w.SubmissionDropHeaders = names
 	}
 
 	w.UpdatedAt = new(time.Now().UTC())
