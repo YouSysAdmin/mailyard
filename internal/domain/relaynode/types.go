@@ -25,8 +25,8 @@ type registerInput struct {
 	// Hostname is the name workers will dial. May be an address.
 	Hostname string `json:"hostname" validate:"required" normalize:"trim,lower"`
 	Port     int    `json:"port"`
-	Name     string `json:"name" normalize:"trim"`
-	Version  string `json:"version" normalize:"trim"`
+	Name     string `json:"name" validate:"omitempty,max=100" normalize:"trim"`
+	Version  string `json:"version" validate:"omitempty,max=64" normalize:"trim"`
 	// Mode is listen or pull - see relaynode.Node.Mode. Empty is listen.
 	Mode string `json:"mode" validate:"omitempty,oneof=listen pull" normalize:"trim,lower"`
 	// ServerGroup is the slug of the group a PROJECT node joins.
@@ -59,14 +59,14 @@ type heartbeatInput struct {
 	//
 	// Empty means "I have nothing", so a node that has never asked
 	// gets the list on its first beat.
-	InboundDomainsETag string `json:"inbound_domains_etag" normalize:"trim"`
+	InboundDomainsETag string `json:"inbound_domains_etag" validate:"omitempty,max=128" normalize:"trim"`
 	// Mode, reported on every beat so a node reconfigured from listen
 	// to pull is assigned to rather than dialled from the next message.
 	Mode string `json:"mode" validate:"omitempty,oneof=listen pull" normalize:"trim,lower"`
 	// What the node reports about its receiving half. A CLAIM, unlike
 	// the address we saw it connect from - see relaynode.Beat.
 	InboundEnabled bool `json:"inbound_enabled"`
-	InboundQueued  int  `json:"inbound_queued"`
+	InboundQueued  int  `json:"inbound_queued" validate:"min=0"`
 }
 
 type inboundInput struct {
@@ -98,19 +98,22 @@ type renewInput struct {
 type reportInput struct {
 	NodeID   string          `json:"node_id" validate:"required"`
 	Token    string          `json:"token" validate:"required"`
-	Outcomes []reportOutcome `json:"outcomes"`
+	Outcomes []reportOutcome `json:"outcomes" validate:"max=5000,dive"`
 }
 
 type reportOutcome struct {
 	// EmailID is smtpclient.HeaderEmailID, read by the node out of the
 	// message it was handed. It is what says which send this is about.
-	EmailID   string `json:"email_id"`
-	Recipient string `json:"recipient"`
+	EmailID   string `json:"email_id" validate:"omitempty,max=64"`
+	Recipient string `json:"recipient" validate:"omitempty,max=320"`
 	Delivered bool   `json:"delivered"`
 	// Permanent distinguishes a refusal from having run out of time.
 	// Both are final, only one is the address's fault.
-	Permanent bool   `json:"permanent"`
-	Reason    string `json:"reason"`
+	Permanent bool `json:"permanent"`
+	// Reason is what the destination said, clamped by the handler
+	// rather than refused: refusing the report would leave the node
+	// retrying it forever.
+	Reason string `json:"reason"`
 }
 
 // --- responses ---

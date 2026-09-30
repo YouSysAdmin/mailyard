@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -251,7 +252,7 @@ func (h *Handler) completeAssigned(ctx context.Context, node *nodemodel.Node, ou
 			if o.Delivered {
 				delivered++
 			} else if o.Reason != "" {
-				lastReason = o.Reason
+				lastReason = clampReason(o.Reason)
 			}
 		}
 
@@ -271,10 +272,26 @@ func (h *Handler) completeAssigned(ctx context.Context, node *nodemodel.Node, ou
 			continue
 		}
 
-		// The delete comes FIRST and is what settles ownership: only the
-		// node whose assignment it still is gets to finish the row. A
-		// report that arrives after the sweep moved the message on is
-		// dropped here.
+		// The row is read while the assignment still shields it from
+		// the recovery sweep, so the claimed_at it carries is the claim
+		// the message was handed under. The delete then settles
+		// ownership: only the node whose assignment it still is gets
+		// to finish the row, and a report that arrives after the sweep
+		// moved the message on is dropped here. Read the other way
+		// round, the sweep could requeue the row between the delete
+		// and the read, a peer could claim it, and the outcome below
+		// would be written under the peer's claim while the peer is
+		// mid-delivery. Under the claim read here it is refused
+		// instead, which is what the fence is for.
+		row, err := h.Runtime.Store.Email.GetAny(ctx, emailID)
+		if err != nil || row == nil {
+			if err != nil {
+				h.log().Error("relay node: read assigned email", "email_id", emailID, "err", err)
+			}
+
+			continue
+		}
+
 		gone, err := h.Runtime.Store.RelayNode.DeleteAssignment(ctx, node.ID, emailID)
 		if err != nil {
 			h.log().Error("relay node: delete assignment", "email_id", emailID, "err", err)
@@ -282,15 +299,6 @@ func (h *Handler) completeAssigned(ctx context.Context, node *nodemodel.Node, ou
 		}
 
 		if !gone {
-			continue
-		}
-
-		row, err := h.Runtime.Store.Email.GetAny(ctx, emailID)
-		if err != nil || row == nil {
-			if err != nil {
-				h.log().Error("relay node: read assigned email", "email_id", emailID, "err", err)
-			}
-
 			continue
 		}
 
@@ -359,4 +367,19 @@ func ReleaseExpired(ctx context.Context, rt *env.Runtime) (int, error) {
 	}
 
 	return released, nil
+}
+
+// maxReasonLen bounds what a node's outcome reason may put in
+// emails.error_message. A destination's reply is a few lines at most.
+const maxReasonLen = 1000
+
+// clampReason cuts a reason to maxReasonLen runes.
+func clampReason(reason string) string {
+	if utf8.RuneCountInString(reason) <= maxReasonLen {
+		return reason
+	}
+
+	runes := []rune(reason)
+
+	return string(runes[:maxReasonLen])
 }
