@@ -91,7 +91,7 @@ void load()
         <button class="btn btn-primary" :disabled="!canSendTest" @click="testOpen = true">
           Send a test
         </button>
-        <button class="btn btn-outline-primary" @click="settingsOpen = true">Settings</button>
+        <button class="btn btn-outline-primary" @click="settingsOpen = true">Edit</button>
       </template>
       <button class="btn btn-secondary" @click="router.push({ name: 'templates' })">
         All templates
