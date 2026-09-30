@@ -45,6 +45,15 @@ export interface SendEmailPayload {
   // for testing a specific server rather than for routing.
   smtp_group?: string
   smtp_server_id?: string
+  // The opt-out, one arrangement or the other. unsubscribe_list_id
+  // scopes the send to a Mailyard-managed list: it mints the one-click
+  // link and drops recipients who opted out. The list_unsubscribe_*
+  // fields carry the caller's own header and nothing else. The server
+  // refuses both at once.
+  unsubscribe_list_id?: string
+  list_unsubscribe_url?: string
+  list_unsubscribe_mailto?: string
+  list_unsubscribe_post?: boolean
 }
 
 export interface SendTemplatePayload {
@@ -67,6 +76,11 @@ export interface SendTemplatePayload {
   // for testing a specific server rather than for routing.
   smtp_group?: string
   smtp_server_id?: string
+  // Same opt-out fields as SendEmailPayload.
+  unsubscribe_list_id?: string
+  list_unsubscribe_url?: string
+  list_unsubscribe_mailto?: string
+  list_unsubscribe_post?: boolean
 }
 
 // What a send will accept. Served rather than hardcoded because

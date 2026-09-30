@@ -11,6 +11,7 @@ import { templatesApi } from '../../api/templates'
 import { languagesApi } from '../../api/languages'
 import { sendersApi, type Sender } from '../../api/senders'
 import { smtpGroupApi } from '../../api/smtpGroups'
+import { unsubscribeListsApi, type UnsubscribeList } from '../../api/unsubscribeLists'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
@@ -52,6 +53,15 @@ const sendAt = ref('')
 // integration at it.
 const smtpGroup = ref('')
 const smtpGroups = ref<SMTPServerGroup[]>([])
+
+// A Mailyard-managed unsubscribe list: pick one and the send mints the
+// one-click link, writes the List-Unsubscribe headers and skips whoever
+// opted out of it. The caller's own List-Unsubscribe targets exist on
+// the API and not here - three more fields on this form read as noise,
+// and an application with its own opt-out endpoint is not sending from
+// a browser.
+const unsubscribeLists = ref<UnsubscribeList[]>([])
+const unsubscribeListId = ref('')
 // Custom headers. Always on the page, like the attachment picker: an
 // empty editor is one button, and folded behind a text link in the To
 // hint it was not found. A reply arrives with its two threading headers
@@ -169,6 +179,14 @@ onMounted(async () => {
       // than the server's only costs a rejected file the server
       // would have taken.
     })
+  unsubscribeListsApi
+    .list()
+    .then((res) => {
+      unsubscribeLists.value = (res.data.unsubscribe_lists ?? []).filter((l) => l.active)
+    })
+    .catch(() => {
+      unsubscribeLists.value = []
+    })
   smtpGroupApi
     .list()
     .then((res) => {
@@ -211,6 +229,10 @@ function parseAddresses(text: string): string[] {
     .filter(Boolean)
 }
 
+function unsubscribeFields(payload: SendEmailPayload | SendTemplatePayload) {
+  if (unsubscribeListId.value) payload.unsubscribe_list_id = unsubscribeListId.value
+}
+
 // The Cc and Bcc lists, set on the payload only when filled in, so a
 // send without them is the request it always was.
 function copyRecipients(payload: { cc?: string[]; bcc?: string[] }) {
@@ -228,6 +250,15 @@ function baseValidation(): string[] | null {
   const to = parseAddresses(recipientsText.value)
   if (to.length === 0) {
     notify.error('At least one recipient is required')
+    return null
+  }
+  // The one-click link identifies a person, so the server refuses a
+  // scoped send to several. Said here, before the request.
+  if (
+    unsubscribeListId.value &&
+    to.length + parseAddresses(ccText.value).length + parseAddresses(bccText.value).length > 1
+  ) {
+    notify.error('A send scoped to an unsubscribe list goes to one recipient')
     return null
   }
   // The editor shows the same sentence under itself. Said again as a
@@ -265,6 +296,7 @@ async function sendRaw() {
   if (sendAt.value) payload.send_at = new Date(sendAt.value).toISOString()
   if (smtpGroup.value) payload.smtp_group = smtpGroup.value
   payload.headers = rowsToHeaders(headerRows.value)
+  unsubscribeFields(payload)
   await submit(() => emailsApi.send(payload))
 }
 
@@ -305,6 +337,7 @@ async function sendTemplate() {
   if (sendAt.value) payload.send_at = new Date(sendAt.value).toISOString()
   if (smtpGroup.value) payload.smtp_group = smtpGroup.value
   payload.headers = rowsToHeaders(headerRows.value)
+  unsubscribeFields(payload)
   await submit(() => emailsApi.sendTemplate(payload))
 }
 
@@ -501,6 +534,22 @@ function handleSubmit() {
               <option v-for="g in smtpGroups" :key="g.id" :value="g.slug">
                 {{ g.name }}{{ g.is_default ? ' (default)' : '' }}
               </option>
+            </select>
+          </FormField>
+
+          <FormField
+            label="Unsubscribe list (optional)"
+            for="send-unsub-list"
+            :error="fieldErrors.unsubscribe_list_id"
+            :hint="
+              unsubscribeLists.length > 0
+                ? 'Mailyard mints a one-click opt-out link scoped to this list, adds the List-Unsubscribe headers and skips recipients who opted out of it. One recipient only.'
+                : 'No active unsubscribe lists in this project yet.'
+            "
+          >
+            <select id="send-unsub-list" v-model="unsubscribeListId" class="form-select">
+              <option value="">None</option>
+              <option v-for="l in unsubscribeLists" :key="l.id" :value="l.id">{{ l.name }}</option>
             </select>
           </FormField>
 

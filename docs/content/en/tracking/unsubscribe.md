@@ -189,6 +189,10 @@ DELETE /api/v1/unsubscribe-lists/{id}
 A list has a `name`, an optional `public_name` and `description`, and an `active` flag. Referencing one by
 `unsubscribe_list_id` on a send scopes a one-click opt-out to it.
 
-When a recipient unsubscribes, they land on your **suppression list** so future sends skip them.
-See [Suppression List](/docs/contacts/suppression-list) for managing suppressions
-and [Contact Management](/docs/contacts/contact-management) for how suppression interacts with contacts.
+When a recipient unsubscribes from a send scoped to one of these lists, they land on your **suppression list** so
+future sends under that scope skip them. See [Suppression List](/docs/contacts/suppression-list) for managing
+suppressions and [Contact Management](/docs/contacts/contact-management) for how suppression interacts with contacts.
+A campaign unsubscribe is the other mechanism and never reaches the suppression list - see above.
+
+In the console, the Send email page offers the unsubscribe list as a picker. The caller-managed fields are API
+only: an application with its own opt-out endpoint is not sending from a browser.
