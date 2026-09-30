@@ -33,7 +33,7 @@ that body is not a variable, it is text, and it reaches the recipient as text. U
 A variable that cannot be resolved is **removed**, not left in place. So a message never ships a half-built link — it
 ships without one, and the surrounding markup is what a reader sees.
 
-**`mailyard_web_view_url`** needs `server.public_url` and `auth.jwt_secret`. With those set it resolves on every
+**`mailyard_web_view_url`** needs `server.public_url`. With those set it resolves on every
 templated send. Without them there is no origin to build an absolute signed link from, and it comes out empty.
 
 **`mailyard_unsubscribe_url`** needs something to unsubscribe *from*, and where that comes from depends on the send:

@@ -83,7 +83,7 @@ func (h *Handler) Open(c fiber.Ctx) error {
 	}
 
 	if !h.signer().Enabled() {
-		slog.Warn("tracking: open ignored, tracking is not configured (set server.public_url and auth.jwt_secret)",
+		slog.Warn("tracking: open ignored, tracking is not configured (set server.public_url)",
 			"email_id", emailID)
 
 		return pixel()

@@ -330,9 +330,9 @@ func (h *Handler) Send(c fiber.Ctx) error {
 	// anything is wrong.
 	if h.Runtime.Tracking == nil || !h.Runtime.Tracking.Enabled() {
 		return response.BadRequest(c,
-			"campaigns need a public URL to mint unsubscribe links - set server.public_url "+
-				"(and auth.jwt_secret), otherwise this would send bulk mail with no "+
-				"List-Unsubscribe header and land in spam")
+			"campaigns need a public URL to mint unsubscribe links - set server.public_url, "+
+				"otherwise this would send bulk mail with no List-Unsubscribe header and "+
+				"land in spam")
 	}
 
 	// The same sender check every send makes, asked once here instead

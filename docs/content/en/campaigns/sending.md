@@ -38,7 +38,7 @@ Both are deliberately up front, so a mistake costs you one refused request rathe
 messages.
 
 {{< callout type="warning" title="Campaigns require a public URL" >}}
-A campaign will not start unless `server.public_url` and `auth.jwt_secret` are set. The refusal explains why: the
+A campaign will not start unless `server.public_url` is set. The refusal explains why: the
 one-click unsubscribe link is absolute and signed, and without those it cannot be built.
 
 Sending anyway is not a lesser evil. Gmail and Yahoo have required one-click unsubscribe from bulk senders since

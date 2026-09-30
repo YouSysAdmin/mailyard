@@ -72,7 +72,7 @@ When the recipient clicks it, Mailyard records a **click** and then issues a
 
 ## Enabling and disabling tracking
 
-Tracking needs `server.public_url` and `auth.jwt_secret`: the pixel and redirect URLs are absolute and signed, so
+Tracking needs `server.public_url`: the pixel and redirect URLs are absolute and signed under the encryption key, so
 neither can be built without them. With those missing, nothing is tracked anywhere and the server says so at boot.
 
 Given that, who gets tracked:
