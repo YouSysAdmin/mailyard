@@ -205,9 +205,8 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // it, so the person testing against it is the right person to decide
 // when the noise stops being useful.
 //
-// The body is optional. A bare POST empties everything, which is what
-// every client sent before inboxes existed and still the common case
-// between test runs. With senders the captures removed are the ones
+// The body is optional. A bare POST empties everything, the common
+// case between test runs. With senders the captures removed are the ones
 // whose envelope sender is in the list - addresses rather than inbox
 // ids, because an inbox is only a saved list of addresses and a test
 // run knows what it sent from without looking one up. The console

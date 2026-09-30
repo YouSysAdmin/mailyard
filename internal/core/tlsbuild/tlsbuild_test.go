@@ -631,10 +631,10 @@ func staticACME(a ACME) func() ACME { return func() ACME { return a } }
 
 // autocert offers http-01 only on a manager HTTPHandler was called on,
 // and the manager is rebuilt after a failed order and when the account
-// details change. Calling it once, on the manager that existed at boot,
-// meant that behind a proxy which terminates TLS one failed order left
-// every later one offering tls-alpn-01 alone, against a port the proxy
-// answers, until a restart.
+// details change. So every manager has to be armed, not only the one
+// that existed at boot: behind a proxy which terminates TLS, an unarmed
+// rebuilt manager offers tls-alpn-01 alone, against a port the proxy
+// answers.
 //
 // The flag is autocert's unexported tryHTTP01, read by reflection. The
 // library gives no other way to ask, and ordering from a CA to find out
@@ -685,9 +685,8 @@ func triesHTTP01(t *testing.T, m *autocert.Manager) bool {
 }
 
 // The challenge port is bound whether or not ACME is on, and the
-// request is answered by whatever the settings say at the time. This
-// used to need ACME on BEFORE the restart that bound the port, which
-// put a restart in the middle of a workflow that otherwise has none.
+// request is answered by whatever the settings say at the time, so
+// turning ACME on needs no restart.
 //
 // A token is served out of the shared store, under the key autocert
 // writes it to, so this is also the path a second node answers on when
