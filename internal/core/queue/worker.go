@@ -120,9 +120,16 @@ func (w *Worker) Start(ctx context.Context) {
 	// runs on a context that keeps ctx's values and drops its
 	// cancellation, and the drain is bounded by Stop's timeout instead.
 	flight := context.WithoutCancel(ctx)
+	var ready sync.WaitGroup
 	for range w.cfg.Concurrency {
-		w.wg.Go(func() { w.deliver(flight) })
+		ready.Add(1)
+		w.wg.Go(func() { w.deliver(flight, ready.Done) })
 	}
+
+	// The first poll claims only for goroutines already counted idle,
+	// so it waits for the pool to report in rather than claiming
+	// nothing and leaving the first batch to the next tick.
+	ready.Wait()
 
 	// After the Adds above, so a Stop racing this Start cannot begin
 	// wg.Wait between started turning true and the first Add - that
@@ -229,9 +236,14 @@ func (w *Worker) pollOnce(ctx context.Context) {
 }
 
 // deliver is one pool goroutine: process a job, route the outcome.
-func (w *Worker) deliver(ctx context.Context) {
+func (w *Worker) deliver(ctx context.Context, ready func()) {
 	for {
 		w.idle.Add(1)
+		if ready != nil {
+			ready()
+			ready = nil
+		}
+
 		job, ok := <-w.jobs
 		w.idle.Add(-1)
 		if !ok {
