@@ -95,6 +95,11 @@ type Engagement struct {
 	Opened  int `json:"opened"`
 	Clicked int `json:"clicked"`
 
+	// Unsubscribed counts recipients who unsubscribed through this
+	// campaign's link, whichever scope they chose on the page. Read off
+	// campaign_messages.unsubscribed_at, so it survives the event sweep.
+	Unsubscribed int `json:"unsubscribed"`
+
 	// Sent is the denominator: recipients the campaign actually
 	// delivered to. Not the audience size - a message that failed or
 	// was skipped for a suppression was never in a position to be
@@ -110,16 +115,18 @@ type Engagement struct {
 	// The dashboard reports the same two numbers for the project, and
 	// two places doing the division is two places to round it
 	// differently and to disagree about the denominator.
-	OpenRate  float64 `json:"open_rate"`
-	ClickRate float64 `json:"click_rate"`
+	OpenRate        float64 `json:"open_rate"`
+	ClickRate       float64 `json:"click_rate"`
+	UnsubscribeRate float64 `json:"unsubscribe_rate"`
 }
 
 // engagementOf assembles the counts with their rates.
-func engagementOf(sent, opened, clicked int) Engagement {
-	e := Engagement{Opened: opened, Clicked: clicked, Sent: sent}
+func engagementOf(sent, opened, clicked, unsubscribed int) Engagement {
+	e := Engagement{Opened: opened, Clicked: clicked, Unsubscribed: unsubscribed, Sent: sent}
 	if sent > 0 {
 		e.OpenRate = float64(opened) / float64(sent) * 100
 		e.ClickRate = float64(clicked) / float64(sent) * 100
+		e.UnsubscribeRate = float64(unsubscribed) / float64(sent) * 100
 	}
 
 	return e

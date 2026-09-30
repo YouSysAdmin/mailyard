@@ -148,14 +148,14 @@ func (h *Handler) Get(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	opened, clicked, err := h.Runtime.Store.Campaign.EngagementStats(c.Context(), cam.ID)
+	opened, clicked, unsubscribed, err := h.Runtime.Store.Campaign.EngagementStats(c.Context(), cam.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
 	return response.Success(c, CampaignDetailResponse{
 		Campaign: cam, Stats: totals, StatsByVariant: byVariant,
-		Engagement: engagementOf(totals["sent"], opened, clicked),
+		Engagement: engagementOf(totals["sent"], opened, clicked, unsubscribed),
 	})
 }
 

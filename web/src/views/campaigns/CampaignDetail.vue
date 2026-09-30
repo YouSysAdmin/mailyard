@@ -30,7 +30,15 @@ const campaignId = String(route.params.id)
 const campaign = ref<Campaign | null>(null)
 const stats = ref<Record<string, number>>({})
 const statsByVariant = ref<Record<string, Record<string, number>>>({})
-const engagement = ref({ opened: 0, clicked: 0, sent: 0, open_rate: 0, click_rate: 0 })
+const engagement = ref({
+  opened: 0,
+  clicked: 0,
+  unsubscribed: 0,
+  sent: 0,
+  open_rate: 0,
+  click_rate: 0,
+  unsubscribe_rate: 0,
+})
 
 const { errors: fieldErrors, capture, clear } = useFieldErrors()
 
@@ -75,9 +83,11 @@ async function loadCampaign(quiet = false) {
     engagement.value = res.data.engagement ?? {
       opened: 0,
       clicked: 0,
+      unsubscribed: 0,
       sent: 0,
       open_rate: 0,
       click_rate: 0,
+      unsubscribe_rate: 0,
     }
   } catch (e) {
     if (!quiet) {

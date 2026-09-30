@@ -33,23 +33,45 @@ Both campaign and transactional opt-outs land here. They are **public — no aut
 HMAC-signed token instead of an `Authorization`
 header, because the caller is a recipient or their mailbox provider.
 
-- `GET` renders a small confirmation page showing the address and a confirm button.
+- `GET` renders a small page with a confirm button. It never shows the address: the link is unauthenticated, and a
+  leaked one should not name a mailbox.
 - `POST` performs the opt-out. This is also the RFC 8058 one-click target, so it is idempotent and safe for a mailbox
   provider to call unattended.
 
 The token encodes what is being unsubscribed, and the two kinds cannot be swapped for each other:
 
-| Kind          | Payload                                               | Effect of a confirmed opt-out                                                        |
-|---------------|-------------------------------------------------------|--------------------------------------------------------------------------------------|
-| Campaign      | the campaign message id                               | Suppresses the subscriber on that campaign's list and marks the message unsubscribed |
-| Transactional | the unsubscribe list id **and** the recipient address | Suppresses that one address, scoped to that one list                                 |
+| Kind          | Payload                                               | Effect of a confirmed opt-out                                                                                                |
+|---------------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| Campaign      | the campaign message id                               | Records an opt-out from that campaign's list, stamps the message, and by default sets the subscriber's status to `unsubscribed` |
+| Transactional | the unsubscribe list id **and** the recipient address | Writes a suppression for that one address, scoped to that one list                                                           |
 
 Neither token expires. An unsubscribe link in a message already delivered has to keep working.
 
-An opt-out fires **no webhook**. It writes a suppression, and the way to read opt-outs from outside is
-`GET /api/v1/suppressions` - each row carries its `unsubscribe_list_id`, so a scoped opt-out is distinguishable from
-a global block. There is no `email.unsubscribed` event to subscribe to; see
-[Event Types](/docs/webhooks/event-types) for the seven that do exist.
+### What a campaign unsubscribe does
+
+A person pressing Unsubscribe in their mail client is saying stop, not "stop this one list". So the one-click `POST`
+a mailbox provider sends is **global for campaigns**: the subscriber's status becomes `unsubscribed`, every campaign of
+the project skips them from then on, the list records the opt-out (`opted_out_at` on the member, and on
+`GET /api/v1/subscriber-lists/{id}/opt-outs`), and the campaign message is stamped `unsubscribed_at`, which is what
+`engagement.unsubscribed` on the campaign counts.
+
+The hosted page offers a choice instead. Its first button, **Unsubscribe from <list>**, records the per-list opt-out
+only and leaves the status alone, for somebody who subscribed to several lists on purpose and wants out of one. The
+second, **Unsubscribe from all newsletters**, does what one-click does. Any `POST` that does not carry the page's own
+`scope=list` field is treated as one-click, because a mailbox provider sends `List-Unsubscribe=One-Click` or nothing
+at all.
+
+A campaign unsubscribe writes **no suppression**. Suppressions block transactional mail as well, and a person who left
+a newsletter still expects their receipts and password resets. Their status is lifted where it lives: the status on
+`PATCH /api/v1/subscribers/{id}` (or the console's subscriber page), or `POST /api/v1/subscriber-lists/subscribe`,
+which sets `subscribed` and clears that list's opt-out in one call. `POST /api/v1/subscriber-lists/{id}/resubscribe`
+lifts the list opt-out only.
+
+An opt-out fires **no webhook**. A transactional opt-out is read from `GET /api/v1/suppressions` - each row carries
+its `unsubscribe_list_id`, so a scoped opt-out is distinguishable from a global block. A campaign opt-out is read from
+the subscriber (`status`), the list (`opted_out_count`, `/members`, `/opt-outs`) and the campaign
+(`engagement.unsubscribed`, `unsubscribed_at` on each message). There is no `email.unsubscribed` event to subscribe
+to; see [Event Types](/docs/webhooks/event-types) for the seven that do exist.
 
 ### Scoping a send to a list
 

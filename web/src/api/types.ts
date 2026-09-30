@@ -600,5 +600,6 @@ export interface CampaignMessage {
   sent_at?: string
   opened_at?: string
   clicked_at?: string
+  unsubscribed_at?: string
   created_at: string
 }

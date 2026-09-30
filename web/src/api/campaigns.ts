@@ -34,9 +34,11 @@ export interface CampaignDetail {
   engagement?: {
     opened: number
     clicked: number
+    unsubscribed: number
     sent: number
     open_rate: number
     click_rate: number
+    unsubscribe_rate: number
   }
 }
 

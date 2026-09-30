@@ -7,6 +7,8 @@
 package trackingpage
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -22,6 +24,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/tracking"
 
 	cmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
+	submodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
 	supmodel "github.com/yousysadmin/mailyard/internal/models/suppression"
 )
 
@@ -235,29 +238,67 @@ func (h *Handler) Click(c fiber.Ctx) error {
 	return redirectToTracked(c, link.OriginalURL)
 }
 
-// UnsubscribePage shows the confirmation page (a GET must not mutate:
-// scanners prefetch links).
+// UnsubscribePage renders the hosted page. Two token kinds land here:
+// a campaign message and a transactional opt-out scope.
+//
+// The campaign page offers a CHOICE, this list or every newsletter,
+// because a person reaching it deliberately can say which. The
+// one-click POST a mail client sends never reaches this page and gets
+// the global answer - see UnsubscribeConfirm. No address is shown: the
+// link is unauthenticated, and a leaked one should not name a mailbox.
 func (h *Handler) UnsubscribePage(c fiber.Ctx) error {
 	token := c.Params("token")
+	action := "/tracking/unsubscribe/" + html.EscapeString(token)
 
-	// Two token kinds land here: a campaign message (unsubscribes the
-	// subscriber from that campaign's list) and a transactional
-	// opt-out scope (suppresses the address for that list only).
-	scope := "this list"
 	if listID, _, err := h.signer().VerifyListUnsubscribeToken(token); err == nil {
+		scope := "this list"
 		if l, lerr := h.Runtime.Store.UnsubscribeList.GetAny(c.Context(), listID); lerr == nil && l != nil {
 			scope = l.Display()
 		}
-	} else if _, err := h.signer().VerifyUnsubscribeToken(token); err != nil {
+
+		body := pageBody(fmt.Sprintf(`<p>Click the button below to stop receiving %s emails.</p>
+<form method="post" action="%s"><button type="submit">Unsubscribe</button></form>`,
+			html.EscapeString(scope), action))
+
+		return pageResponse(c, fiber.StatusOK, "Unsubscribe", body)
+	}
+
+	messageID, err := h.signer().VerifyUnsubscribeToken(token)
+	if err != nil {
 		return pageResponse(c, fiber.StatusNotFound, "Link invalid",
 			"This unsubscribe link is invalid or incomplete.")
 	}
 
-	body := pageBody(fmt.Sprintf(`<p>Click the button below to stop receiving %s emails.</p>
-<form method="post" action="/tracking/unsubscribe/%s"><button type="submit">Unsubscribe</button></form>`,
-		html.EscapeString(scope), html.EscapeString(token)))
+	listName := "this list"
+	if cam := h.campaignOf(c, messageID); cam != nil && cam.ListName != "" {
+		listName = cam.ListName
+	}
+
+	body := pageBody(fmt.Sprintf(`<p>Choose what to stop receiving.</p>
+<form method="post" action="%s">
+<button type="submit" name="scope" value="list">Unsubscribe from %s</button>
+<button type="submit" name="scope" value="all">Unsubscribe from all newsletters</button>
+</form>
+<p class="note">Account and service messages are not affected.</p>`,
+		action, html.EscapeString(listName)))
 
 	return pageResponse(c, fiber.StatusOK, "Unsubscribe", body)
+}
+
+// campaignOf resolves a campaign message token to its campaign, nil
+// when either row is gone.
+func (h *Handler) campaignOf(c fiber.Ctx, messageID string) *cmodel.Campaign {
+	m, err := h.Runtime.Store.Campaign.GetMessageAny(c.Context(), messageID)
+	if err != nil || m == nil {
+		return nil
+	}
+
+	cam, err := h.Runtime.Store.Campaign.GetAny(c.Context(), m.CampaignID)
+	if err != nil {
+		return nil
+	}
+
+	return cam
 }
 
 // listUnsubscribe handles the transactional opt-out kind: write a
@@ -294,6 +335,20 @@ func (h *Handler) listUnsubscribe(c fiber.Ctx, listID, email string) error {
 
 // UnsubscribeConfirm performs the opt-out. RFC 8058 one-click POSTs
 // land here directly.
+//
+// For a campaign message the SCOPE decides how far the opt-out reaches,
+// and the default is GLOBAL: a mail client's one-click carries a body
+// of `List-Unsubscribe=One-Click` and nothing else, and somebody who
+// pressed Unsubscribe in their client is saying stop, not "stop this
+// one list". So the subscriber's status becomes unsubscribed and every
+// campaign of the project skips them. Only the hosted page's own form
+// says `scope=list`, which records the per-list opt-out alone. Both
+// record that opt-out and stamp the message, so the campaign counts
+// it either way. Suppressions are never touched: those block
+// transactional mail, which nobody opted out of here.
+//
+// Idempotent throughout - a client may POST twice - and never dependent
+// on the body being present at all.
 func (h *Handler) UnsubscribeConfirm(c fiber.Ctx) error {
 	token := c.Params("token")
 	if listID, email, lerr := h.signer().VerifyListUnsubscribeToken(token); lerr == nil {
@@ -319,31 +374,98 @@ func (h *Handler) UnsubscribeConfirm(c fiber.Ctx) error {
 			"This unsubscribe link no longer resolves.")
 	}
 
-	if err := h.Runtime.Store.SubscriberList.Unsubscribe(ctx,
-		cam.ProjectID, cam.ListID, m.SubscriberID, "unsubscribe link"); err != nil {
+	listOnly := c.FormValue("scope") == "list"
+	reason := "one-click unsubscribe"
+	if listOnly {
+		reason = "unsubscribe page"
+	}
+
+	// The per-list opt-out, for the record and for the list page. A
+	// list that has since been deleted answers ErrNoRows, and that is
+	// not a reason to refuse: the global step below still applies.
+	err = h.Runtime.Store.SubscriberList.Unsubscribe(ctx, cam.ProjectID, cam.ListID, m.SubscriberID, reason)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		slog.Warn("tracking: unsubscribe list is gone", "message_id", messageID, "list_id", cam.ListID)
+	case err != nil:
 		slog.Error("tracking: unsubscribe", "message_id", messageID, "err", err)
 
 		return pageResponse(c, fiber.StatusInternalServerError, "Something went wrong",
 			"The unsubscribe could not be processed. Please try again later.")
 	}
 
+	if !listOnly {
+		if ok, resp := h.unsubscribeEverywhere(c, cam.ProjectID, m.SubscriberID); !ok {
+			return resp
+		}
+	}
+
+	// The stamp is the durable record and the event is written once,
+	// on the first stamp: a mail client may POST the one-click more than
+	// once, and the timeline should not say so.
+	first, err := h.Runtime.Store.Campaign.MarkUnsubscribed(ctx, messageID, time.Now().UTC())
+	if err != nil {
+		slog.Error("tracking: mark unsubscribed", "message_id", messageID, "err", err)
+	}
+
 	// The unsubscribe token names a campaign message - unsubscribing
 	// is from a list, which only campaign mail belongs to - so this
 	// one keeps its campaign identity and carries the email id along
 	// for the timeline.
-	if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
-		EmailID: m.EmailID, CampaignMessageID: messageID,
-		EventType: cmodel.EventUnsubscribe,
-		IP:        clientip.From(c), UserAgent: c.Get("User-Agent"),
-	}); err != nil {
-		slog.Error("tracking: record unsubscribe", "message_id", messageID, "err", err)
+	if first {
+		if err := h.Runtime.Store.Campaign.InsertTrackingEvent(ctx, &cmodel.TrackingEvent{
+			EmailID: m.EmailID, CampaignMessageID: messageID,
+			EventType: cmodel.EventUnsubscribe,
+			IP:        clientip.From(c), UserAgent: c.Get("User-Agent"),
+		}); err != nil {
+			slog.Error("tracking: record unsubscribe", "message_id", messageID, "err", err)
+		}
 	}
 
 	slog.Info("tracking: unsubscribed", "message_id", messageID,
-		"campaign_id", cam.ID, "list_id", cam.ListID)
+		"campaign_id", cam.ID, "list_id", cam.ListID, "list_only", listOnly)
+
+	if listOnly {
+		listName := "this list"
+		if cam.ListName != "" {
+			listName = cam.ListName
+		}
+
+		return pageResponse(c, fiber.StatusOK, "Unsubscribed",
+			pageBody("You will no longer receive emails from "+html.EscapeString(listName)+"."))
+	}
 
 	return pageResponse(c, fiber.StatusOK, "Unsubscribed",
-		"You will no longer receive emails from this list.")
+		"You will no longer receive newsletters from this sender.")
+}
+
+// unsubscribeEverywhere flips the subscriber to unsubscribed, which
+// takes them out of every campaign of the project. A bounced or
+// complained subscriber is left as they are - those are stronger
+// records of the same wish - and a subscriber who has since been
+// deleted is nothing to flip.
+func (h *Handler) unsubscribeEverywhere(c fiber.Ctx, projID, subscriberID string) (bool, error) {
+	ctx := c.Context()
+	sub, err := h.Runtime.Store.Subscriber.Get(ctx, projID, subscriberID)
+	if err != nil {
+		slog.Error("tracking: read subscriber", "subscriber_id", subscriberID, "err", err)
+
+		return false, pageResponse(c, fiber.StatusInternalServerError, "Something went wrong",
+			"The unsubscribe could not be processed. Please try again later.")
+	}
+
+	if sub == nil || sub.Status != submodel.StatusSubscribed {
+		return true, nil
+	}
+
+	if _, err := h.Runtime.Store.Subscriber.SetStatusByEmail(ctx, projID, sub.Email, submodel.StatusUnsubscribed); err != nil {
+		slog.Error("tracking: set unsubscribed", "subscriber_id", subscriberID, "err", err)
+
+		return false, pageResponse(c, fiber.StatusInternalServerError, "Something went wrong",
+			"The unsubscribe could not be processed. Please try again later.")
+	}
+
+	return true, nil
 }
 
 // webViewCSP replaces the site policy on the one response that returns
@@ -430,6 +552,8 @@ func pageResponse(c fiber.Ctx, status int, title string, body pageBody) error {
 <style>
 body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; color: #222; }
 button { font-size: 1rem; padding: 0.6rem 1.4rem; cursor: pointer; }
+form { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.note { color: #666; font-size: 0.9rem; }
 </style></head>
 <body><h1>%s</h1>%s</body></html>`,
 		html.EscapeString(title), html.EscapeString(title), body))

@@ -20,7 +20,7 @@ Every route here is project-scoped and needs a `subscribers` permission.
 | Status | Meaning | Set by |
 |---|---|---|
 | `subscribed` | Receives campaigns | The default on create |
-| `unsubscribed` | Opted out | The subscriber, or you |
+| `unsubscribed` | Opted out of every campaign | A one-click from a campaign message, the hosted page's all-newsletters button, or you |
 | `bounced` | The address failed | Delivery feedback |
 | `complained` | Reported as spam | Delivery feedback |
 

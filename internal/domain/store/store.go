@@ -866,6 +866,11 @@ type CampaignStore interface {
 	// tell an already-open message from an id that names nothing.
 	MarkOpened(ctx context.Context, messageID string, t time.Time) (bool, error)
 	MarkClicked(ctx context.Context, messageID string, t time.Time) error
+
+	// MarkUnsubscribed stamps the first unsubscribe through the
+	// message's link and reports whether this was it, so the timeline
+	// event is written once however often a client repeats the POST.
+	MarkUnsubscribed(ctx context.Context, messageID string, t time.Time) (bool, error)
 	UpsertTrackedLink(ctx context.Context, l *campaign.TrackedLink) error
 	GetTrackedLink(ctx context.Context, projID, campaignID, hash string) (*campaign.TrackedLink, error)
 	ListTrackedLinks(ctx context.Context, campaignID string) ([]*campaign.TrackedLink, error)
@@ -876,7 +881,7 @@ type CampaignStore interface {
 	TrackedLinkURLs(ctx context.Context, projID string, hashes []string) (map[string]string, error)
 	IncrementLinkClicks(ctx context.Context, id string) error
 	InsertTrackingEvent(ctx context.Context, ev *campaign.TrackingEvent) error
-	EngagementStats(ctx context.Context, campaignID string) (opened, clicked int, err error)
+	EngagementStats(ctx context.Context, campaignID string) (opened, clicked, unsubscribed int, err error)
 	EventSeries(ctx context.Context, campaignID, eventType string) ([]campaign.DayCount, error)
 
 	// Retention sweep, unscoped by project.

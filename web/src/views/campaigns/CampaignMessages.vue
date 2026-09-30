@@ -161,6 +161,7 @@ async function open(msg: CampaignMessage) {
               <th>Sent</th>
               <th>Opened</th>
               <th>Clicked</th>
+              <th>Unsubscribed</th>
             </tr>
           </thead>
           <tbody>
@@ -191,6 +192,7 @@ async function open(msg: CampaignMessage) {
               <td>{{ formatDate(m.sent_at) }}</td>
               <td>{{ formatDate(m.opened_at) }}</td>
               <td>{{ formatDate(m.clicked_at) }}</td>
+              <td>{{ formatDate(m.unsubscribed_at) }}</td>
             </tr>
           </tbody>
         </table>

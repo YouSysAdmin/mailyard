@@ -106,11 +106,24 @@ func TestTrackingReadsRunAgainstTheRealSchema(t *testing.T) {
 		}
 	}
 
-	opened, clicked, err := s.EngagementStats(ctx, camp.ID)
+	opened, clicked, unsubscribed, err := s.EngagementStats(ctx, camp.ID)
 	if err != nil {
 		t.Errorf("EngagementStats: %v", err)
-	} else if opened != 1 || clicked != 1 {
-		t.Errorf("EngagementStats = opened %d, clicked %d, want 1 and 1", opened, clicked)
+	} else if opened != 1 || clicked != 1 || unsubscribed != 0 {
+		t.Errorf("EngagementStats = opened %d, clicked %d, unsubscribed %d, want 1, 1 and 0", opened, clicked, unsubscribed)
+	}
+
+	// The unsubscribe stamp is first-write only, and says so.
+	if first, err := s.MarkUnsubscribed(ctx, msg.ID, time.Now().UTC()); err != nil || !first {
+		t.Errorf("MarkUnsubscribed = first %v, err %v, want the first stamp", first, err)
+	}
+
+	if first, err := s.MarkUnsubscribed(ctx, msg.ID, time.Now().UTC()); err != nil || first {
+		t.Errorf("second MarkUnsubscribed = first %v, err %v, want not first", first, err)
+	}
+
+	if _, _, unsubscribed, err := s.EngagementStats(ctx, camp.ID); err != nil || unsubscribed != 1 {
+		t.Errorf("EngagementStats after unsubscribe = %d, err %v, want 1", unsubscribed, err)
 	}
 
 	if _, err := s.GetMessageByEmail(ctx, ids.New()); err != nil {

@@ -652,11 +652,13 @@ type EnableResponse struct {
 
 // Engagement is the wire body.
 type Engagement struct {
-	Opened    int64   `json:"opened"`
-	Clicked   int64   `json:"clicked"`
-	Sent      int64   `json:"sent"`
-	OpenRate  float64 `json:"open_rate"`
-	ClickRate float64 `json:"click_rate"`
+	Opened          int64   `json:"opened"`
+	Clicked         int64   `json:"clicked"`
+	Unsubscribed    int64   `json:"unsubscribed"`
+	Sent            int64   `json:"sent"`
+	OpenRate        float64 `json:"open_rate"`
+	ClickRate       float64 `json:"click_rate"`
+	UnsubscribeRate float64 `json:"unsubscribe_rate"`
 }
 
 // ErasureResponse is the response body.
@@ -1144,19 +1146,20 @@ type MembershipResponse struct {
 
 // Message is the wire body.
 type Message struct {
-	ID           string     `json:"id"`
-	CampaignID   string     `json:"campaign_id"`
-	SubscriberID string     `json:"subscriber_id"`
-	Email        string     `json:"email,omitempty"`
-	EmailID      string     `json:"email_id,omitempty"`
-	Status       string     `json:"status"`
-	ErrorMessage string     `json:"error_message,omitempty"`
-	Variant      string     `json:"variant,omitempty"`
-	DeliverAt    *time.Time `json:"deliver_at,omitempty"`
-	SentAt       *time.Time `json:"sent_at,omitempty"`
-	OpenedAt     *time.Time `json:"opened_at,omitempty"`
-	ClickedAt    *time.Time `json:"clicked_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID             string     `json:"id"`
+	CampaignID     string     `json:"campaign_id"`
+	SubscriberID   string     `json:"subscriber_id"`
+	Email          string     `json:"email,omitempty"`
+	EmailID        string     `json:"email_id,omitempty"`
+	Status         string     `json:"status"`
+	ErrorMessage   string     `json:"error_message,omitempty"`
+	Variant        string     `json:"variant,omitempty"`
+	DeliverAt      *time.Time `json:"deliver_at,omitempty"`
+	SentAt         *time.Time `json:"sent_at,omitempty"`
+	OpenedAt       *time.Time `json:"opened_at,omitempty"`
+	ClickedAt      *time.Time `json:"clicked_at,omitempty"`
+	UnsubscribedAt *time.Time `json:"unsubscribed_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // MessageListResponse is the response body.

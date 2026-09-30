@@ -388,7 +388,7 @@ func (s *Store) HasMessages(ctx context.Context, campaignID string) (bool, error
 
 const messageSelect = `
 SELECT id, campaign_id, subscriber_id, email_id, status, error_message, variant,
-       deliver_at, sent_at, opened_at, clicked_at, created_at
+       deliver_at, sent_at, opened_at, clicked_at, unsubscribed_at, created_at
 FROM campaign_messages`
 
 // PendingDue returns pending messages whose deliver_at (when set) has
@@ -512,7 +512,7 @@ func (s *Store) ListMessages(ctx context.Context, projID, campaignID string, f s
 	var q strings.Builder
 	q.WriteString(`
         SELECT m.id, m.campaign_id, m.subscriber_id, m.email_id, m.status, m.error_message,
-               m.variant, m.deliver_at, m.sent_at, m.opened_at, m.clicked_at, m.created_at,
+               m.variant, m.deliver_at, m.sent_at, m.opened_at, m.clicked_at, m.unsubscribed_at, m.created_at,
                COALESCE(s.email, '')
         FROM campaign_messages m
         JOIN campaigns c ON c.id = m.campaign_id
@@ -628,9 +628,9 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 
 func scanMessage(r interface{ Scan(...any) error }) (*cmodel.Message, error) {
 	var m cmodel.Message
-	var deliverAt, sentAt, openedAt, clickedAt sql.NullTime
+	var deliverAt, sentAt, openedAt, clickedAt, unsubscribedAt sql.NullTime
 	if err := r.Scan(&m.ID, &m.CampaignID, &m.SubscriberID, database.Str(&m.EmailID), &m.Status,
-		&m.ErrorMessage, &m.Variant, &deliverAt, &sentAt, &openedAt, &clickedAt, &m.CreatedAt); err != nil {
+		&m.ErrorMessage, &m.Variant, &deliverAt, &sentAt, &openedAt, &clickedAt, &unsubscribedAt, &m.CreatedAt); err != nil {
 		return nil, err
 	}
 
@@ -650,6 +650,10 @@ func scanMessage(r interface{ Scan(...any) error }) (*cmodel.Message, error) {
 		m.ClickedAt = new(clickedAt.Time)
 	}
 
+	if unsubscribedAt.Valid {
+		m.UnsubscribedAt = new(unsubscribedAt.Time)
+	}
+
 	return &m, nil
 }
 
@@ -661,9 +665,9 @@ func collectMessagesWithEmail(rows *sql.Rows) ([]*cmodel.Message, error) {
 	var out []*cmodel.Message
 	for rows.Next() {
 		var m cmodel.Message
-		var deliverAt, sentAt, openedAt, clickedAt sql.NullTime
+		var deliverAt, sentAt, openedAt, clickedAt, unsubscribedAt sql.NullTime
 		if err := rows.Scan(&m.ID, &m.CampaignID, &m.SubscriberID, database.Str(&m.EmailID), &m.Status,
-			&m.ErrorMessage, &m.Variant, &deliverAt, &sentAt, &openedAt, &clickedAt,
+			&m.ErrorMessage, &m.Variant, &deliverAt, &sentAt, &openedAt, &clickedAt, &unsubscribedAt,
 			&m.CreatedAt, &m.Email); err != nil {
 			return nil, err
 		}
@@ -682,6 +686,10 @@ func collectMessagesWithEmail(rows *sql.Rows) ([]*cmodel.Message, error) {
 
 		if clickedAt.Valid {
 			m.ClickedAt = new(clickedAt.Time)
+		}
+
+		if unsubscribedAt.Valid {
+			m.UnsubscribedAt = new(unsubscribedAt.Time)
 		}
 
 		out = append(out, &m)
@@ -759,6 +767,26 @@ func (s *Store) MarkClicked(ctx context.Context, messageID string, t time.Time) 
 	_, err := s.MarkOpened(ctx, messageID, t)
 
 	return err
+}
+
+// MarkUnsubscribed stamps the first unsubscribe through the message's
+// link and reports whether this call was that first one. A mail client
+// may POST the one-click more than once, and the caller writes the
+// timeline event only for the first.
+func (s *Store) MarkUnsubscribed(ctx context.Context, messageID string, t time.Time) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE campaign_messages SET unsubscribed_at = ? WHERE id = ? AND unsubscribed_at IS NULL
+    `, t, messageID)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return n > 0, nil
 }
 
 // UpsertTrackedLink registers a rewritten link once per grouping.
@@ -947,19 +975,19 @@ func (s *Store) InsertTrackingEvent(ctx context.Context, ev *cmodel.TrackingEven
 }
 
 // EngagementStats returns unique opened and clicked message counts.
-func (s *Store) EngagementStats(ctx context.Context, campaignID string) (opened, clicked int, err error) {
+func (s *Store) EngagementStats(ctx context.Context, campaignID string) (opened, clicked, unsubscribed int, err error) {
 	err = s.QueryRow(ctx, `
-        SELECT COUNT(opened_at), COUNT(clicked_at)
+        SELECT COUNT(opened_at), COUNT(clicked_at), COUNT(unsubscribed_at)
         FROM campaign_messages WHERE campaign_id = ?
-    `, campaignID).Scan(&opened, &clicked)
+    `, campaignID).Scan(&opened, &clicked, &unsubscribed)
 
-	return opened, clicked, err
+	return opened, clicked, unsubscribed, err
 }
 
-// PurgeTrackingEventsOlderThan trims open and click events. The
-// per-message and per-link counters they rolled up into are kept --
-// those are the numbers the campaign reports, and they are already
-// aggregated.
+// PurgeTrackingEventsOlderThan trims every tracking event, opens,
+// clicks and unsubscribes alike. The per-message stamps and per-link
+// counters they rolled up into are kept -- those are the numbers the
+// campaign reports, and they are already aggregated.
 func (s *Store) PurgeTrackingEventsOlderThan(ctx context.Context, before time.Time) (int64, error) {
 	res, err := s.Exec(ctx, `DELETE FROM tracking_events WHERE created_at < ?`, before)
 	if err != nil {

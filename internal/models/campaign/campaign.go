@@ -137,7 +137,12 @@ type Message struct {
 	SentAt       *time.Time `json:"sent_at,omitempty"`
 	OpenedAt     *time.Time `json:"opened_at,omitempty"`
 	ClickedAt    *time.Time `json:"clicked_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
+
+	// UnsubscribedAt is when the recipient unsubscribed through this
+	// message's link, whichever scope they chose. The durable record:
+	// the tracking event behind it is swept by retention.
+	UnsubscribedAt *time.Time `json:"unsubscribed_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // TrackedLink is one rewritten URL of a campaign: the /tracking/click/ redirect

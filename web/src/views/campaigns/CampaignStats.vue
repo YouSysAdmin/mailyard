@@ -22,9 +22,11 @@ const props = defineProps<{
   engagement: {
     opened: number
     clicked: number
+    unsubscribed: number
     sent: number
     open_rate: number
     click_rate: number
+    unsubscribe_rate: number
   }
   links: TrackedLink[]
 }>()
@@ -103,6 +105,15 @@ const VARIANT_COLUMNS = ['pending', 'queued', 'sent', 'failed', 'skipped']
             <span v-if="engagement.sent" class="stat-rate">{{ pct(engagement.click_rate) }}</span>
           </div>
           <div class="summary-label">Clicked</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value">
+            {{ engagement.unsubscribed }}
+            <span v-if="engagement.sent" class="stat-rate">
+              {{ pct(engagement.unsubscribe_rate) }}
+            </span>
+          </div>
+          <div class="summary-label">Unsubscribed</div>
         </div>
       </div>
 

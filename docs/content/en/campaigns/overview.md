@@ -117,7 +117,7 @@ This is the route with the numbers on it:
   "campaign": { "id": "...", "name": "April dispatch", "status": "sending" },
   "stats": { "pending": 2100, "queued": 500, "sent": 2300, "failed": 50, "skipped": 50 },
   "stats_by_variant": { "A": { "sent": 1150 }, "B": { "sent": 1150 } },
-  "engagement": { "opened": 890, "clicked": 214 }
+  "engagement": { "opened": 890, "clicked": 214, "unsubscribed": 12, "sent": 2300 }
 }
 ```
 
@@ -128,8 +128,10 @@ This is the route with the numbers on it:
 - `sent`, `failed` — mirroring that email's fate
 - `skipped` — the recipient was suppressed, or the campaign was cancelled before their turn
 
-`engagement` is the **unique recipient** view — how many people opened, not how many opens there were. Those counters
-are aggregated as the send runs, so they survive the tracking-event retention sweep. The per-day series on
+`engagement` is the **unique recipient** view — how many people opened, not how many opens there were. `unsubscribed`
+counts recipients who unsubscribed through this campaign's link, whichever scope they chose on the page, and each
+message carries its `unsubscribed_at` — see [Unsubscribe & One-Click](/docs/tracking/unsubscribe). Those counters are
+aggregated as the send runs, so they survive the tracking-event retention sweep. The per-day series on
 `GET /api/v1/campaigns/{id}/analytics` come from the raw event log and only reach back as far as retention keeps it.
 
 ## Manage
