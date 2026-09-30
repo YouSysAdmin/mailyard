@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"log/slog"
+	"maps"
 	"net"
 	"net/smtp"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/email"
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
+	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
 	scmodel "github.com/yousysadmin/mailyard/internal/models/smtpcredential"
 
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
@@ -83,6 +85,16 @@ func (f *fakeSender) Send(_ context.Context, projID, _, apiKeyID string, req *em
 	return &emailmodel.Email{ID: "em-1", ProjectID: projID, Recipients: req.To}, nil, nil
 }
 
+// fakeProjects answers one project, whose drop list is what the
+// forwarding tests vary.
+type fakeProjects struct {
+	drop []string
+}
+
+func (f *fakeProjects) Get(context.Context, string) (*projmodel.Project, error) {
+	return &projmodel.Project{ID: "proj-1", SubmissionDropHeaders: f.drop}, nil
+}
+
 // canSend is the permission list a submission credential needs.
 //
 // Spelled out in every test that expects a successful AUTH, because
@@ -93,6 +105,11 @@ var canSend = []string{"emails:write"}
 // startServer boots the listener on a random loopback port and returns
 // its address plus the fakes for assertions.
 func startServer(t *testing.T, sender *fakeSender, perms []string, revoked bool) (string, string) {
+	return startServerDropping(t, sender, perms, revoked, nil)
+}
+
+// startServerDropping is startServer with a project drop list.
+func startServerDropping(t *testing.T, sender *fakeSender, perms []string, revoked bool, drop []string) (string, string) {
 	t.Helper()
 	token, prefix, hash, err := akmodel.Generate()
 	if err != nil {
@@ -106,6 +123,7 @@ func startServer(t *testing.T, sender *fakeSender, perms []string, revoked bool)
 	b := &Backend{
 		Keys:           keys,
 		Sender:         sender,
+		Projects:       &fakeProjects{drop: drop},
 		Log:            slog.New(slog.DiscardHandler),
 		MaxMessageSize: 1 << 20,
 	}
@@ -204,6 +222,69 @@ func TestRelayAcceptsValidKey(t *testing.T) {
 	}
 }
 
+// headerMsg carries the kinds of header a real client writes: its own
+// structural ones, a Mailyard control header, and two of its own.
+const headerMsg = "From: Ann <ann@example.com>\r\n" +
+	"To: bob@example.com\r\n" +
+	"Date: Tue, 30 Sep 2026 10:00:00 +0000\r\n" +
+	"Message-ID: <client-1@example.com>\r\n" +
+	"X-Mailyard-Sandbox-Retention: 1\r\n" +
+	"X-Mailer: swaks\r\n" +
+	"X-Ticket: 4182\r\n" +
+	"Subject: headers\r\n" +
+	"Content-Type: text/plain; charset=UTF-8\r\n" +
+	"\r\n" +
+	"body\r\n"
+
+// A client's own headers reach the send request. The structural ones
+// the builder writes itself do not, and neither does anything in the
+// X-Mailyard- namespace, which is an instruction rather than content.
+func TestRelayForwardsCustomHeadersOnly(t *testing.T) {
+	sender := &fakeSender{}
+	addr, token := startServer(t, sender, canSend, false)
+
+	if err := submit(addr, token, "ann@example.com", []string{"bob@example.com"}, headerMsg); err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	got := sender.lastReq.Headers
+	want := map[string]string{"X-Mailer": "swaks", "X-Ticket": "4182"}
+	if !maps.Equal(got, want) {
+		t.Errorf("forwarded headers = %v, want %v", got, want)
+	}
+}
+
+// A name on the project's drop list stays home, whatever its case.
+func TestRelayHonoursTheProjectDropList(t *testing.T) {
+	sender := &fakeSender{}
+	addr, token := startServerDropping(t, sender, canSend, false, []string{"x-mailer"})
+
+	if err := submit(addr, token, "ann@example.com", []string{"bob@example.com"}, headerMsg); err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	got := sender.lastReq.Headers
+	want := map[string]string{"X-Ticket": "4182"}
+	if !maps.Equal(got, want) {
+		t.Errorf("forwarded headers = %v, want %v", got, want)
+	}
+}
+
+// A message with nothing custom keeps a nil map, so the row stores
+// what it stored before headers were forwarded.
+func TestRelayForwardsNothingWhenThereIsNothing(t *testing.T) {
+	sender := &fakeSender{}
+	addr, token := startServer(t, sender, canSend, false)
+
+	if err := submit(addr, token, "ann@example.com", []string{"bob@example.com"}, testMsg); err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	if sender.lastReq.Headers != nil {
+		t.Errorf("headers = %v, want nil", sender.lastReq.Headers)
+	}
+}
+
 func TestRelayRejectsBadCredentials(t *testing.T) {
 	sender := &fakeSender{}
 	addr, token := startServer(t, sender, canSend, false)
@@ -284,6 +365,7 @@ func startCredServer(t *testing.T, sender *fakeSender, revoked bool, allowedIPs 
 		}},
 		Keys:           &fakeKeys{},
 		Sender:         sender,
+		Projects:       &fakeProjects{},
 		Log:            slog.New(slog.DiscardHandler),
 		MaxMessageSize: 1 << 20,
 	}

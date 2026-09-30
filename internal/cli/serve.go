@@ -811,6 +811,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		backend := &submission.Backend{
 			Credentials:    st.SMTPCredential,
 			Keys:           st.APIKey,
+			Projects:       st.Project,
 			Sender:         email.NewService(rt),
 			Sandbox:        &sandbox.Service{Store: st.Sandbox, Settings: rt.Settings, Log: log, All: st},
 			Log:            log,

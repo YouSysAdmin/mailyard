@@ -17,6 +17,7 @@ import (
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 
+	"github.com/yousysadmin/mailyard/internal/core/mailheader"
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
@@ -26,6 +27,7 @@ import (
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
+	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
 	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
 	scmodel "github.com/yousysadmin/mailyard/internal/models/smtpcredential"
 
@@ -56,6 +58,17 @@ type Backend struct {
 	Log            *slog.Logger
 	MaxMessageSize int64
 	Limiter        *iplimit.Limiter
+
+	// Projects answers which of a client's headers the project does
+	// not want forwarded. Narrower than store.ProjectStore so a test
+	// can stand in one method.
+	Projects ProjectReader
+}
+
+// ProjectReader is the one project read the listener makes, per
+// accepted message.
+type ProjectReader interface {
+	Get(ctx context.Context, id string) (*projmodel.Project, error)
 }
 
 // touchInterval throttles last_used_at writes, mirroring the HTTP
@@ -114,11 +127,10 @@ const headerSandboxRetention = "X-Mailyard-Sandbox-Retention"
 // truthy, and REMOVES it either way.
 //
 // Removing matters: these headers are instructions to Mailyard, not
-// part of the message. The submission listener does not currently forward custom
-// headers at all, so nothing leaks today - but that is a property of
-// the code five hundred lines away, not a decision anybody made here,
-// and the day headers start being forwarded this control must not go
-// out to the recipient's server with them.
+// part of the message, and the rest of the client's headers ARE
+// forwarded. mailheader reserves the whole X-Mailyard- prefix as a
+// second fence, so a control header this code forgot to take still
+// never goes out to the recipient's server.
 func takeControlHeader(headers map[string]string, name string) bool {
 	if headers == nil {
 		return false
@@ -500,13 +512,31 @@ func (s *session) Data(r io.Reader) (err error) {
 	// the header, so the value travels as a field and is written once.
 	req.ReplyTo = strings.TrimSpace(parsed.Headers[email.HeaderReplyTo])
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Everything else the client wrote travels as a custom header,
+	// less the structural ones the builder writes itself and the names
+	// the project asked to have dropped. What survives is judged by
+	// the send service exactly as an API caller's headers are, so
+	// twenty-one X- headers or a value carrying a bare CR is refused
+	// rather than trimmed.
+	proj, perr := s.backend.Projects.Get(ctx, s.auth.projectID)
+	if perr != nil {
+		return s.mapSendError(perr)
+	}
+
+	var drop []string
+	if proj != nil {
+		drop = proj.SubmissionDropHeaders
+	}
+
+	req.Headers = mailheader.Forwardable(parsed.Headers, drop)
+
 	// Which credential carried it, so the log can name what the
 	// message was sent WITH. The person it also records is whoever
 	// minted that credential, which is a different question.
 	req.CredentialID = s.auth.credentialID
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	e, blocked, serr := s.backend.Sender.Send(ctx, s.auth.projectID, s.auth.createdBy, s.auth.apiKeyID, req)
 	if serr != nil {
