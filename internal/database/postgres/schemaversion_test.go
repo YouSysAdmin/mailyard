@@ -102,15 +102,28 @@ func TestASchemaBehindTheBinaryRefusesToServe(t *testing.T) {
 		}
 	}
 
+	if err := RequireExactSchema(db); err == nil {
+		t.Error("rekey against a schema behind the binary was allowed")
+	}
+
 	record(newest)
 	if err := RequireCurrentSchema(db); err != nil {
 		t.Errorf("a current schema was refused: %v", err)
 	}
 
+	if err := RequireExactSchema(db); err != nil {
+		t.Errorf("rekey against the matching schema was refused: %v", err)
+	}
+
 	// A rollback. The operator did this deliberately, and columns this
-	// binary does not name cost it nothing.
+	// binary does not name cost it nothing - except to rekey, which
+	// would leave the columns it cannot see under the old key.
 	record(newest + 10)
 	if err := RequireCurrentSchema(db); err != nil {
 		t.Errorf("a schema newer than the binary was refused, which blocks a rollback: %v", err)
+	}
+
+	if err := RequireExactSchema(db); err == nil {
+		t.Error("rekey by a binary older than the schema was allowed")
 	}
 }

@@ -126,7 +126,7 @@ func TestRekeyKeepsTheRetiredTrackingKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, err := trackingkey.NewStore(db, first).Retired(t.Context()); err != nil || len(got) != 2 {
-		t.Errorf("a rekey that forgets keeps nothing new and still reseals the rest: %q, %v", got, err)
+	if got, err := trackingkey.NewStore(db, first).Retired(t.Context()); err != nil || len(got) != 0 {
+		t.Errorf("a rekey that forgets keeps nothing, the keys retired earlier included: %q, %v", got, err)
 	}
 }

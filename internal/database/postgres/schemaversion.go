@@ -73,18 +73,9 @@ func BinarySchemaVersion() (int64, error) {
 // A database AHEAD only warns. That is a rollback, and a column this
 // binary never names costs it nothing.
 func RequireCurrentSchema(db *sql.DB) error {
-	want, err := BinarySchemaVersion()
+	have, want, err := schemaVersions(db)
 	if err != nil {
 		return err
-	}
-
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("goose set dialect: %w", err)
-	}
-
-	have, err := goose.GetDBVersion(db)
-	if err != nil {
-		return fmt.Errorf("reading the applied schema version: %w", err)
 	}
 
 	switch {
@@ -100,4 +91,43 @@ func RequireCurrentSchema(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// RequireExactSchema refuses a database whose schema is older OR newer
+// than this binary. For the one command where a rollback is the
+// dangerous direction: rekey rewrites the sealed columns it knows, so
+// an older binary on a newer schema leaves any column added since
+// under the old key, commits, and reports success.
+func RequireExactSchema(db *sql.DB) error {
+	have, want, err := schemaVersions(db)
+	if err != nil {
+		return err
+	}
+
+	if have != want {
+		return fmt.Errorf(
+			"the database is at schema version %d and this binary carries %d - "+
+				"run the binary that matches the installation", have, want)
+	}
+
+	return nil
+}
+
+// schemaVersions reads the applied version beside the embedded one.
+func schemaVersions(db *sql.DB) (have, want int64, err error) {
+	want, err = BinarySchemaVersion()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		return 0, 0, fmt.Errorf("goose set dialect: %w", err)
+	}
+
+	have, err = goose.GetDBVersion(db)
+	if err != nil {
+		return 0, 0, fmt.Errorf("reading the applied schema version: %w", err)
+	}
+
+	return have, want, nil
 }

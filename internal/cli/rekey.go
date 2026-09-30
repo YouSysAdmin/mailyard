@@ -14,6 +14,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/database"
+	"github.com/yousysadmin/mailyard/internal/database/postgres"
 )
 
 // newRekeyCmd re-encrypts every sealed column under a new encryption
@@ -52,6 +53,23 @@ func newRekeyCmd() *cobra.Command {
 				return fmt.Errorf("config invalid: %w", err)
 			}
 
+			current := crypto.New(cfg.Database.Crypto.EncryptionKey)
+			db, _, err := openDatabase(&cfg.Database, current, false)
+			if err != nil {
+				return fmt.Errorf("open database: %w", err)
+			}
+
+			defer func() { _ = db.Close() }()
+
+			// Exact, not "at least": a binary older than the schema
+			// does not know every sealed column and would leave the
+			// rest under the old key while reporting success. Before
+			// the prompt, so the wrong binary is refused before a
+			// secret is typed into it.
+			if err := postgres.RequireExactSchema(db.DB()); err != nil {
+				return err
+			}
+
 			newKey, err = resolveSecret(cmd.ErrOrStderr(), "New encryption key", newKey, stdin)
 			if err != nil {
 				return err
@@ -65,14 +83,6 @@ func newRekeyCmd() *cobra.Command {
 			if newKey == cfg.Database.Crypto.EncryptionKey {
 				return usage("the new key is the current one")
 			}
-
-			current := crypto.New(cfg.Database.Crypto.EncryptionKey)
-			db, _, err := openDatabase(&cfg.Database, current, false)
-			if err != nil {
-				return fmt.Errorf("open database: %w", err)
-			}
-
-			defer func() { _ = db.Close() }()
 
 			retire := crypto.DeriveKey(cfg.Database.Crypto.EncryptionKey, crypto.KeyTracking)
 			if forgetTracking {
@@ -89,7 +99,7 @@ func newRekeyCmd() *cobra.Command {
 			}
 
 			if forgetTracking {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "\nthe old tracking key was not kept: every unsubscribe link delivered so far is refused")
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "\nno retired tracking key was kept: unsubscribe links signed under a retired encryption key are refused")
 			}
 
 			_, _ = fmt.Fprintln(cmd.ErrOrStderr(),
@@ -169,6 +179,16 @@ func rekeyAll(ctx context.Context, db *sql.DB, current, fresh *crypto.Service, r
 		}
 
 		counts[col.table+"."+col.column] = n
+	}
+
+	// Forgetting forgets every retired key, not only the one retiring
+	// now: after a leak the rows sealed under the leaked key are as
+	// exposed as the key itself.
+	if retire == "" {
+		//sqlconst:allow a literal with no placeholders
+		if _, err := tx.ExecContext(ctx, `DELETE FROM tracking_keys`); err != nil {
+			return nil, fmt.Errorf("tracking_keys: %w", err)
+		}
 	}
 
 	// After the loop, so the row is sealed once, under fresh.
