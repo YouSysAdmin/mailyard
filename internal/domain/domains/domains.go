@@ -468,7 +468,7 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 		return response.NotFound(c, "domain not found")
 	}
 
-	// Four lookups, so a longer budget than a single-record check.
+	// Several lookups, so a longer budget than a single-record check.
 	// Still bounded: an unreachable resolver must fail the request,
 	// not hold a console connection open.
 	ctx, cancel := context.WithTimeout(c.Context(), 20*time.Second)
@@ -591,7 +591,7 @@ func (h *Handler) CancelDKIMRotation(c fiber.Ctx) error {
 	}
 
 	if !d.Rotating() {
-		return response.NotFound(c, "no rotation is pending")
+		return response.Conflict(c, "no rotation is pending")
 	}
 
 	d.DKIMNextSelector, d.DKIMNextPrivateKey, d.DKIMNextPublicKey = "", "", ""

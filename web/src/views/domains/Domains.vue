@@ -366,7 +366,13 @@ async function deleteDomain(d: InboundDomain) {
       </template>
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="closeDnsModal">Close</button>
-        <template v-if="projStore.can('domains:write') && dnsModalDomain.dkim_public_key">
+        <template
+          v-if="
+            projStore.can('domains:write') &&
+            dnsModalDomain.verified &&
+            dnsModalDomain.dkim_public_key
+          "
+        >
           <button
             v-if="dnsModalDomain.dkim_next_public_key"
             type="button"
