@@ -1,19 +1,19 @@
 <script setup lang="ts">
 // Everyone this project can send a campaign to.
 //
-// The whole list is fetched and filtered in the browser. That is a
-// deliberate limit rather than an oversight: search here matches an
-// address or a name against what is already on screen, which is instant
-// and needs no endpoint. A project large enough for it to hurt wants a
-// server-side search, and that is a change to the API before it is a
-// change to this page.
+// Searched and paged on the SERVER. It used to fetch one request's worth
+// and filter that in the browser, which read as the whole audience: the
+// list endpoint answers fifty rows by default, so a project past fifty
+// subscribers showed the newest fifty and searched only those, with
+// nothing on the page saying so. The endpoint matches the address and
+// reports the total of what matched, and this page asks it.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscribersApi } from '../../api/subscribers'
 import { apiErrorMessage } from '../../api/client'
 import type { Subscriber, SubscriberStatus } from '../../api/types'
 import { SUBSCRIBER_STATUSES } from './statuses'
-import { useClientPager } from '../../composables/usePagination'
+import type { Pageable } from '../../composables/usePagination'
 import { useConfirm } from '../../composables/useConfirm'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import { useNotificationStore } from '../../stores/notification'
@@ -35,28 +35,38 @@ const projects = useProjectStore()
 const { confirm } = useConfirm()
 const { errors, capture, clear } = useFieldErrors()
 
-const all = ref<Subscriber[]>([])
+const rows = ref<Subscriber[]>([])
+const total = ref(0)
 const loading = ref(true)
 
 const term = ref('')
 const status = ref<SubscriberStatus | ''>('')
 
-const matching = computed(() => {
-  const q = term.value.trim().toLowerCase()
+const PAGE = 20
+const page = ref(0)
 
-  return all.value.filter((s) => {
-    if (status.value && s.status !== status.value) return false
-    if (!q) return true
+const pageable = computed<Pageable>(() => ({
+  current_page: page.value,
+  size: PAGE,
+  total_pages: Math.max(1, Math.ceil(total.value / PAGE)),
+  total_elements: total.value,
+  empty: total.value === 0,
+}))
 
-    return s.email.toLowerCase().includes(q) || (s.name ?? '').toLowerCase().includes(q)
-  })
+function goToPage(p: number) {
+  page.value = Math.max(0, p)
+  void load()
+}
+
+// Debounced, so typing is not a request per keystroke. Back to the
+// first page when the set under the pager changes, or a filter that
+// leaves three rows shows page four of nothing.
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(term, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => goToPage(0), 300)
 })
-
-const { pageable, pageItems, goToPage } = useClientPager(matching, 20)
-
-// Back to the first page when the set under the pager changes, or a
-// filter that leaves three rows shows page four of nothing.
-watch([term, status], () => goToPage(0))
+watch(status, () => goToPage(0))
 
 const importing = ref(false)
 
@@ -72,7 +82,14 @@ const saving = ref(false)
 async function load() {
   loading.value = true
   try {
-    all.value = (await subscribersApi.list()).data.subscribers ?? []
+    const res = await subscribersApi.list({
+      q: term.value.trim() || undefined,
+      status: status.value || undefined,
+      limit: PAGE,
+      offset: page.value * PAGE,
+    })
+    rows.value = res.data.subscribers ?? []
+    total.value = res.data.total ?? 0
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load the subscribers'))
   } finally {
@@ -178,7 +195,7 @@ void load().then(openFromQuery)
 
     <div class="card">
       <div class="card-header filters">
-        <input v-model="term" class="form-input w-search" placeholder="Email or name" />
+        <input v-model="term" class="form-input w-search" placeholder="Part of an address" />
 
         <select v-model="status" class="form-select w-filter">
           <option value="">All statuses</option>
@@ -195,7 +212,7 @@ void load().then(openFromQuery)
 
       <LoadingBlock v-if="loading" />
 
-      <EmptyState v-else-if="matching.length === 0" title="No subscribers">
+      <EmptyState v-else-if="rows.length === 0" title="No subscribers">
         <p v-if="term || status">Nothing matches those filters.</p>
         <p v-else>Add them one at a time, or import a file.</p>
       </EmptyState>
@@ -215,7 +232,7 @@ void load().then(openFromQuery)
             </thead>
             <tbody>
               <tr
-                v-for="s in pageItems"
+                v-for="s in rows"
                 :key="s.id"
                 class="row-clickable"
                 @click="router.push(`/subscribers/${s.id}`)"
