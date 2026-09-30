@@ -1,5 +1,5 @@
 import api from './client'
-import type { Subscriber } from './types'
+import type { Subscriber, SubscriberList } from './types'
 
 export interface SubscriberPayload {
   email?: string
@@ -26,6 +26,10 @@ export const subscribersApi = {
   update: (id: string, payload: SubscriberPayload) =>
     api.patch<{ subscriber: Subscriber }>(`/subscribers/${id}`, payload),
   remove: (id: string) => api.delete(`/subscribers/${id}`),
+  // The static lists the subscriber is on. Membership is written from
+  // the list side (subscriberListsApi.addMember), this is the read back.
+  lists: (id: string) =>
+    api.get<{ subscriber_lists: SubscriberList[] }>(`/subscribers/${id}/lists`),
   importJSON: (payload: { subscribers: SubscriberPayload[] }) =>
     api.post<ImportResult>('/subscribers/import', payload),
   importCSV: (csv: string) =>

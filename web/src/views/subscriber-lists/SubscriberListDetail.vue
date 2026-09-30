@@ -8,7 +8,6 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscriberListsApi } from '../../api/subscriberLists'
-import { subscribersApi } from '../../api/subscribers'
 import { apiErrorMessage } from '../../api/client'
 import type { FilterRule, Subscriber, SubscriberList } from '../../api/types'
 import { useClientPager } from '../../composables/usePagination'
@@ -25,7 +24,7 @@ import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
 import SegmentRules from './SegmentRules.vue'
-import { formatMailbox } from '../../composables/mailbox'
+import SubscriberPicker from '../../components/SubscriberPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,9 +49,10 @@ const form = ref({ name: '', description: '', rules: [] as FilterRule[] })
 
 const { pageable, pageItems, goToPage } = useClientPager(members, 20)
 
-// Adding a member, by picking one or by naming an address.
+// Adding a member. The box searches the audience as you type, and a
+// row picked from it carries the id. An address typed in full works
+// too, so a pasted one needs no menu.
 const adding = ref<{ id: string; email: string } | null>(null)
-const candidates = ref<Subscriber[]>([])
 const addBusy = ref(false)
 
 const optOut = ref('')
@@ -112,17 +112,13 @@ async function save() {
   }
 }
 
-async function openAdd() {
+function openAdd() {
   clear()
   adding.value = { id: '', email: '' }
-  try {
-    candidates.value = (await subscribersApi.list()).data.subscribers ?? []
-  } catch (e) {
-    // The picker is empty and the email field still works, which is
-    // the whole of what this dialog needs.
-    candidates.value = []
-    notify.error(apiErrorMessage(e, 'Failed to load the subscribers'))
-  }
+}
+
+function onPick(s: Subscriber | null) {
+  if (adding.value) adding.value.id = s?.id ?? ''
 }
 
 async function addMember() {
@@ -327,27 +323,17 @@ void start()
     </template>
 
     <BaseModal v-if="adding" title="Add member" @close="adding = null">
-      <FormField label="Subscriber">
-        <select v-model="adding.id" class="form-select">
-          <option value="">Pick one...</option>
-          <option v-for="s in candidates" :key="s.id" :value="s.id">
-            {{ formatMailbox(s.email, s.name) }}
-          </option>
-        </select>
-      </FormField>
-
+      <!-- Room under the box for the picker's menu: it is absolute, and
+           the dialog scrolls its own box, so without this the menu opens
+           into a scrollbar. -->
       <FormField
-        label="Or by email"
+        label="Subscriber"
+        for="add-member-email"
+        class="member-field"
         :error="errors.email"
-        hint="The address has to belong to a subscriber already."
+        hint="Type part of an address to search. The address has to belong to a subscriber already."
       >
-        <input
-          v-model="adding.email"
-          type="email"
-          class="form-input"
-          placeholder="user@example.com"
-          :disabled="adding.id !== ''"
-        />
+        <SubscriberPicker id="add-member-email" v-model="adding.email" @pick="onPick" />
       </FormField>
 
       <template #footer>
@@ -391,6 +377,10 @@ void start()
 
 .actions {
   margin-top: 16px;
+}
+
+.member-field {
+  min-height: 300px;
 }
 
 /* Wraps, because an address field and two buttons do not fit a phone. */

@@ -27,6 +27,7 @@ import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
 import SubscriberImport from './SubscriberImport.vue'
+import AddToListsModal from './AddToListsModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,6 +70,9 @@ watch(term, () => {
 watch(status, () => goToPage(0))
 
 const importing = ref(false)
+
+// The subscriber whose lists are being picked, while the dialog is up.
+const listing = ref<Subscriber | null>(null)
 
 const draft = ref<{
   email: string
@@ -254,6 +258,13 @@ void load().then(openFromQuery)
                     >
                       Send email
                     </button>
+                    <button
+                      v-if="projects.can('subscribers:write')"
+                      class="btn btn-secondary btn-sm"
+                      @click="listing = s"
+                    >
+                      Add to list
+                    </button>
                     <!-- delete, not write - DELETE /subscribers/:id is
                          permDelete on the server, so a member holding
                          write without delete must not see a button that
@@ -320,6 +331,8 @@ void load().then(openFromQuery)
     </BaseModal>
 
     <SubscriberImport v-if="importing" @imported="load" @close="importing = false" />
+
+    <AddToListsModal v-if="listing" :subscriber="listing" @close="listing = null" />
   </div>
 </template>
 

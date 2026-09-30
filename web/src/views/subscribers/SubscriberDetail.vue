@@ -9,7 +9,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscribersApi } from '../../api/subscribers'
 import { apiErrorMessage } from '../../api/client'
-import type { Subscriber, SubscriberStatus } from '../../api/types'
+import type { Subscriber, SubscriberList, SubscriberStatus } from '../../api/types'
 import { SUBSCRIBER_STATUSES } from './statuses'
 import { useConfirm } from '../../composables/useConfirm'
 import { useFieldErrors } from '../../composables/fieldErrors'
@@ -21,6 +21,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import FormField from '../../components/FormField.vue'
+import AddToListsModal from './AddToListsModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,6 +35,11 @@ const id = String(route.params.id)
 const subscriber = ref<Subscriber | null>(null)
 const loading = ref(true)
 const saving = ref(false)
+
+// The static lists they are on. Loaded beside the subscriber and again
+// after the dialog adds some.
+const lists = ref<SubscriberList[]>([])
+const addingToLists = ref(false)
 
 const form = ref({
   email: '',
@@ -79,6 +85,18 @@ async function load() {
     notify.error(apiErrorMessage(e, 'Failed to load the subscriber'))
   } finally {
     loading.value = false
+  }
+
+  await loadLists()
+}
+
+async function loadLists() {
+  if (!subscriber.value) return
+
+  try {
+    lists.value = (await subscribersApi.lists(id)).data.subscriber_lists ?? []
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to load the lists'))
   }
 }
 
@@ -204,6 +222,32 @@ void load()
 
       <div class="card">
         <div class="card-header">
+          <h2>Lists</h2>
+          <button
+            v-if="projects.can('subscribers:write')"
+            class="btn btn-secondary btn-sm"
+            @click="addingToLists = true"
+          >
+            Add to list
+          </button>
+        </div>
+
+        <EmptyState
+          v-if="lists.length === 0"
+          text="Not on any static list. A dynamic list picks them up by its rules."
+        />
+
+        <!-- Plain links into each list, where membership is managed. -->
+        <ul v-else class="list-links">
+          <li v-for="l in lists" :key="l.id">
+            <router-link :to="`/subscriber-lists/${l.id}`">{{ l.name }}</router-link>
+            <span v-if="l.description" class="text-muted">{{ l.description }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
           <h2>History</h2>
         </div>
 
@@ -219,6 +263,13 @@ void load()
     </template>
 
     <EmptyState v-else title="No such subscriber" />
+
+    <AddToListsModal
+      v-if="addingToLists && subscriber"
+      :subscriber="subscriber"
+      @added="loadLists"
+      @close="addingToLists = false"
+    />
   </div>
 </template>
 
@@ -227,6 +278,22 @@ void load()
   display: flex;
   gap: 8px;
   margin-top: 16px;
+}
+
+.list-links {
+  list-style: none;
+  margin: 0;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.list-links li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
 }
 
 .history {
