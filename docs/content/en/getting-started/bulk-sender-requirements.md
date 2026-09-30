@@ -60,6 +60,56 @@ threshold and their own tooling:
 Registering the sending IP with Microsoft's SNDS and JMRP is worth doing on day one: without JMRP a complaint from an
 Outlook.com recipient reaches nobody, and the address keeps being mailed.
 
+## What it adds up to
+
+Every provider above, and the regional ones below, score the same handful of things. A domain that has all of them
+is in good standing everywhere and the rest is reputation, which only volume and time build:
+
+1. **SPF, DKIM and DMARC on the From domain**, DMARC at `p=none` or stricter and aligned with one of the other two.
+   In Mailyard that is the four records on [Domain Verification](/docs/smtp-domains/domain-verification).
+2. **Reverse DNS on the sending IP** that resolves back to the sending host, and **TLS** on the connection. Both
+   belong to the [SMTP server](/docs/smtp-domains/smtp-servers) or relay node, not to Mailyard.
+3. **A working opt-out**: `List-Unsubscribe` with a one-click target for anything a person subscribed to, honoured at
+   once, and a link in the body. Campaigns do this by themselves, a transactional send does it through an
+   [unsubscribe list](/docs/contacts/unsubscribe-lists).
+4. **Complaints handled**: bounces and complaints turned into [suppressions](/docs/contacts/suppression-list) so the
+   same address is never mailed twice, and the provider's feedback loop registered where one exists.
+5. **A steady, honest sending pattern**: a consistent From on a verified domain, no sudden volume spikes from a fresh
+   IP, and mail people asked for.
+
+The difference between providers is how they punish a miss. Google and Yahoo filter quietly. Microsoft moves mail to
+Junk and later refuses it. T-Online, GMX and the Chinese providers act at the IP level and refuse the connection.
+
+## Regional providers
+
+The same five points, with these particulars:
+
+| Provider                                                         | Particulars                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ukr.net** (Ukraine)                                            | Publishes rules for bulk mail: SPF, DKIM, DMARC, reverse DNS, an unsubscribe link and `List-Unsubscribe`, connection limits per IP. Complaints go through its own form rather than a feedback loop. Most Ukrainian mailboxes are Gmail, so the list above covers the rest |
+| **GMX, web.de** (Germany)                                        | Strict on the three records and reverse DNS. Whitelisting through the Certified Senders Alliance (CSA) for high volume                                                                                                                                                    |
+| **T-Online** (Germany)                                           | Refuses connections from an IP with no reverse DNS or no reachable postmaster contact, and unblocks by application                                                                                                                                                        |
+| **Seznam** (Czechia), **WP, Onet** (Poland), **Orange** (France) | The standard set. Seznam publishes its own postmaster rules                                                                                                                                                                                                               |
+| **Mail.ru, Yandex**                                              | SPF and DKIM required, DMARC recommended, `List-Unsubscribe` required for bulk mail, per-domain statistics and a complaint feedback loop on their postmaster sites, tight limits on an IP with no history                                                                 |
+
+## China
+
+Delivery into China is a different problem and deserves its own paragraph. **NetEase** (163.com, 126.com), **QQ Mail**
+(Tencent), **Sina**, **Sohu** and **Aliyun** judge by the **sending IP** far more than by the domain:
+
+- An IP with no history is **greylisted or refused at connection**, whatever the domain's records say. The three
+  records and reverse DNS are still required, they are just not sufficient.
+- **Rate limits are per IP and per connection**: messages per connection, connections per hour, recipients per
+  message. NetEase publishes the figures in its anti-spam rules and blocks an IP that exceeds them.
+- **Unblocking is by application** to the provider's postmaster, in Chinese, with the IP and the sending domain.
+- **Content and links** are weighed harder: a body full of tracked links to foreign hosts scores worse than the same
+  mail elsewhere.
+
+What works in practice, in order of effort: a dedicated IP warmed up slowly with genuine mail, a
+[server group](/docs/smtp-domains/server-groups) for Chinese recipients so their limits do not throttle everything
+else, and for real volume a local relay such as Alibaba Cloud DirectMail or Tencent Cloud SES as the SMTP server of
+that group, since their IPs already carry the reputation.
+
 ## What this means for a multi-tenant install
 
 Projects are separate domains, so a shared IP does not merge their counts, and one project's complaints do not push
