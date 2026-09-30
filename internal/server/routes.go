@@ -888,6 +888,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	camps.Post("/:id/duplicate", permWrite, ch.Duplicate)
 	camps.Get("/:id/messages", permRead, ch.Messages)
 	camps.Get("/:id/analytics", permRead, ch.Analytics)
+	// Renders what one subscriber would receive and stores nothing.
+	// Declared read for the same reason the template preview is.
+	camps.Post("/:id/preview", permRead, ch.Preview)
 
 	// The embedded Hugo build, registered only when a site was actually
 	// built into the binary - a plain `go build` without `task docs`

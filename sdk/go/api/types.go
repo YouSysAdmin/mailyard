@@ -588,6 +588,12 @@ type EmailListResponse struct {
 	Emails []*Email `json:"emails"`
 }
 
+// EmailPreviewResponse is the response body.
+type EmailPreviewResponse struct {
+	Template string  `json:"template"`
+	Preview  *Output `json:"preview"`
+}
+
 // EmailResponse is the response body.
 type EmailResponse struct {
 	Email      *Email      `json:"email"`
@@ -1282,13 +1288,13 @@ type PlanUpsertInput struct {
 
 // PreviewInput is the request body.
 type PreviewInput struct {
-	FilterRules []FilterRule `json:"filter_rules"`
+	SubscriberID string `json:"subscriber_id"`
+	Variant      string `json:"variant"`
 }
 
 // PreviewResponse is the response body.
 type PreviewResponse struct {
-	Template string  `json:"template"`
-	Preview  *Output `json:"preview"`
+	Preview *Output `json:"preview"`
 }
 
 // Project is the wire body.
@@ -1972,6 +1978,11 @@ type SubscriberlistMemberInput struct {
 // SubscriberlistMemberListResponse is the response body.
 type SubscriberlistMemberListResponse struct {
 	Members []*Subscriber `json:"members"`
+}
+
+// SubscriberlistPreviewInput is the request body.
+type SubscriberlistPreviewInput struct {
+	FilterRules []FilterRule `json:"filter_rules"`
 }
 
 // SubscriberlistUpsertInput is the request body.

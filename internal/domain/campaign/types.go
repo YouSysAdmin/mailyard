@@ -3,6 +3,7 @@
 package campaign
 
 import (
+	"github.com/yousysadmin/mailyard/internal/core/render"
 	cmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 )
 
@@ -52,6 +53,14 @@ type upsertInput struct {
 
 type sendInput struct {
 	ScheduledAt string `json:"scheduled_at" validate:"omitempty"`
+}
+
+// previewInput picks whose message to render. With no subscriber the
+// template's sample data stands in. variant names an A/B variant and
+// defaults to the first one.
+type previewInput struct {
+	SubscriberID string `json:"subscriber_id" validate:"omitempty,uuid"`
+	Variant      string `json:"variant"       validate:"omitempty,max=50" normalize:"trim"`
 }
 
 // ----------------------------------------------------------------------------
@@ -124,6 +133,13 @@ type AnalyticsResponse struct {
 	Links       any `json:"links"`
 	OpenSeries  any `json:"open_series"`
 	ClickSeries any `json:"click_series"`
+}
+
+// PreviewResponse is the campaign rendered for one subscriber, exactly
+// as the runner would render it, with the system links stripped since
+// no message exists for them to point at.
+type PreviewResponse struct {
+	Preview *render.Output `json:"preview"`
 }
 
 // MessageListResponse is the per-recipient rows of one campaign.

@@ -386,6 +386,11 @@ module Mailyard
       @t.request("POST", "/campaigns/#{esc(id)}/pause", body: nil, query: query)
     end
 
+    # Preview
+    def preview_campaign(id, body: nil, **query)
+      @t.request("POST", "/campaigns/#{esc(id)}/preview", body: body, query: query)
+    end
+
     # Resume
     def resume_campaign(id, **query)
       @t.request("POST", "/campaigns/#{esc(id)}/resume", body: nil, query: query)

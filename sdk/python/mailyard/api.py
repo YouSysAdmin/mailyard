@@ -315,6 +315,10 @@ class API:
         "Pause"
         return self._t.request("POST", f"/campaigns/{_esc(id)}/pause", body=None, query=query)
 
+    def preview_campaign(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Preview"
+        return self._t.request("POST", f"/campaigns/{_esc(id)}/preview", body=body, query=query)
+
     def resume_campaign(self, id, **query: Any) -> Any:
         "Resume"
         return self._t.request("POST", f"/campaigns/{_esc(id)}/resume", body=None, query=query)

@@ -144,7 +144,24 @@ are aggregated as the send runs, so they survive the tracking-event retention sw
 | `POST /api/v1/campaigns/{id}/cancel` | Stop for good |
 | `GET /api/v1/campaigns/{id}/messages` | The per-recipient rows, with addresses |
 | `GET /api/v1/campaigns/{id}/analytics` | Per-link click tallies and daily series |
+| `POST /api/v1/campaigns/{id}/preview` | Render the message one subscriber would get |
 | `DELETE /api/v1/campaigns/{id}` | Remove the campaign and its messages |
+
+### Preview
+
+```json
+POST /api/v1/campaigns/{id}/preview
+{ "subscriber_id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33", "variant": "B" }
+```
+
+Renders the campaign the way the runner will: the variant's template and subject if one is named (the first variant
+when none is), the subscriber's language, and data merged as campaign `template_data` under their custom fields
+under their `email` and `name`. Both fields are optional. Without `subscriber_id` the template's sample data stands
+in, so the page has something to show before anyone is picked. The answer is `preview` with `subject`, `html` and
+`text`. The web view and unsubscribe links are left out, since no message exists for them to open. Nothing is
+stored, and it needs `campaigns:read` only.
+
+The console has this as **Preview** on the campaign page, with a subscriber picker that searches the audience.
 
 Duplicate is the way to iterate: a `sent` campaign cannot be edited or re-run, so the second attempt is a copy with the
 audience or the wording changed.

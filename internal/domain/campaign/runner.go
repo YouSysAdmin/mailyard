@@ -405,7 +405,7 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		return r.Store.Campaign.UpdateMessage(ctx, m.ID, cmodel.MsgSkipped, "subscriber missing or no longer subscribed", "")
 	}
 
-	out, templateID, err := r.renderFor(ctx, c, m, sub)
+	out, templateID, err := renderForSubscriber(ctx, r.EmailService, c, m.Variant, sub, nil)
 	if err != nil {
 		return err
 	}
@@ -454,30 +454,51 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 	return r.Store.Campaign.UpdateMessage(fctx, m.ID, cmodel.MsgQueued, "", e.ID)
 }
 
-// renderFor renders the campaign content for one subscriber: variant
-// template and subject overrides, subscriber language fallback, and
-// data merged as campaign data < custom fields < email + name.
-func (r *Runner) renderFor(ctx context.Context, c *cmodel.Campaign, m *cmodel.Message, sub *submodel.Subscriber) (*render.Output, string, error) {
-	templateID := c.TemplateID
-	variantSubject := ""
-	if c.ABTestEnabled && m.Variant != "" {
-		for _, v := range c.ABVariants {
-			if v.Name == m.Variant {
-				if v.TemplateID != "" {
-					templateID = v.TemplateID
-				}
+// resolveVariant answers which template and subject override a
+// variant carries. An empty or unknown name is the campaign's own
+// template with no override.
+func resolveVariant(c *cmodel.Campaign, variant string) (templateID, subject string) {
+	templateID = c.TemplateID
+	if !c.ABTestEnabled || variant == "" {
+		return templateID, ""
+	}
 
-				variantSubject = v.Subject
-				break
+	for _, v := range c.ABVariants {
+		if v.Name == variant {
+			if v.TemplateID != "" {
+				templateID = v.TemplateID
 			}
+
+			return templateID, v.Subject
 		}
 	}
 
+	return templateID, ""
+}
+
+// renderForSubscriber renders the campaign content for one subscriber:
+// variant template and subject overrides, subscriber language
+// fallback, and data merged as base < campaign data < custom fields <
+// email + name.
+//
+// ONE function for the runner and the preview endpoint, so what the
+// console shows is what the runner sends. base is what sits under the
+// campaign's own data - nil for a send, the template's sample for a
+// preview with nobody picked, which also leaves sub nil.
+func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Campaign,
+	variant string, sub *submodel.Subscriber, base map[string]any) (*render.Output, string, error) {
+	templateID, variantSubject := resolveVariant(c, variant)
+
 	data := map[string]any{}
+	maps.Copy(data, base)
 	maps.Copy(data, c.TemplateData)
-	maps.Copy(data, sub.CustomFields)
-	data["email"] = sub.Email
-	data["name"] = sub.Name
+	language := c.Language
+	if sub != nil {
+		maps.Copy(data, sub.CustomFields)
+		data["email"] = sub.Email
+		data["name"] = sub.Name
+		language = cmp.Or(sub.Language, c.Language)
+	}
 
 	// RenderTemplate injects these for the body. It is applied to the
 	// local map as well because the A/B variant subject below is
@@ -485,9 +506,7 @@ func (r *Runner) renderFor(ctx context.Context, c *cmodel.Campaign, m *cmodel.Me
 	// reserved name the body accepts.
 	data = tracking.WithSystemVars(data)
 
-	language := cmp.Or(sub.Language, c.Language)
-
-	out, _, err := r.EmailService.RenderTemplate(ctx, c.ProjectID, &email.TemplateRef{
+	out, _, err := svc.RenderTemplate(ctx, c.ProjectID, &email.TemplateRef{
 		ID:       templateID,
 		Language: language,
 		Data:     data,

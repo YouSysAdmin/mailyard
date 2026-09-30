@@ -514,6 +514,13 @@ func (c *Client) PauseCampaign(ctx context.Context, id string, opts ...RequestOp
 	return do[CampaignResponse](ctx, c, "POST", fmt.Sprintf("/campaigns/%s/pause", escape(id)), nil, opts)
 }
 
+// PreviewCampaign Preview.
+//
+// POST /campaigns/:id/preview
+func (c *Client) PreviewCampaign(ctx context.Context, id string, body PreviewInput, opts ...RequestOption) (PreviewResponse, error) {
+	return do[PreviewResponse](ctx, c, "POST", fmt.Sprintf("/campaigns/%s/preview", escape(id)), body, opts)
+}
+
 // ResumeCampaign Resume.
 //
 // POST /campaigns/:id/resume
@@ -701,8 +708,8 @@ func (c *Client) ListEmailsLimits(ctx context.Context, opts ...RequestOption) (L
 // PreviewEmail Render a template without sending.
 //
 // POST /emails/preview
-func (c *Client) PreviewEmail(ctx context.Context, body RenderPreviewInput, opts ...RequestOption) (PreviewResponse, error) {
-	return do[PreviewResponse](ctx, c, "POST", "/emails/preview", body, opts)
+func (c *Client) PreviewEmail(ctx context.Context, body RenderPreviewInput, opts ...RequestOption) (EmailPreviewResponse, error) {
+	return do[EmailPreviewResponse](ctx, c, "POST", "/emails/preview", body, opts)
 }
 
 // SendEmail Queue one email.
@@ -1390,7 +1397,7 @@ func (c *Client) UnsubscribeSubscriberList(ctx context.Context, id string, body 
 // PreviewSegmentSubscriberList Preview segment.
 //
 // POST /subscriber-lists/preview-segment
-func (c *Client) PreviewSegmentSubscriberList(ctx context.Context, body PreviewInput, opts ...RequestOption) (SegmentPreviewResponse, error) {
+func (c *Client) PreviewSegmentSubscriberList(ctx context.Context, body SubscriberlistPreviewInput, opts ...RequestOption) (SegmentPreviewResponse, error) {
 	return do[SegmentPreviewResponse](ctx, c, "POST", "/subscriber-lists/preview-segment", body, opts)
 }
 

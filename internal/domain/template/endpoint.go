@@ -509,7 +509,7 @@ func (h *Handler) PreviewVersion(c fiber.Ctx) error {
 
 	data := in.Data
 	if data == nil {
-		data = sampleData(v.SampleData, t.SampleData)
+		data = SampleData(v.SampleData, t.SampleData)
 	}
 
 	css, err := h.versionCSS(c, rc.Project.ID, v)
@@ -619,9 +619,10 @@ func (h *Handler) checkStylesheet(c fiber.Ctx, projID, id string) (bool, error) 
 	return true, nil
 }
 
-// sampleData parses the first non-empty JSON sample (version first,
-// template fallback) into a data map for previews.
-func sampleData(candidates ...string) map[string]any {
+// SampleData parses the first non-empty JSON sample (version first,
+// template fallback) into a data map for previews. Exported for the
+// campaign preview, which stands the sample in for a subscriber.
+func SampleData(candidates ...string) map[string]any {
 	for _, raw := range candidates {
 		if raw == "" {
 			continue
