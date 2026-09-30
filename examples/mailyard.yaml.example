@@ -255,7 +255,12 @@ worker:
   max_attempts: 5
   retry_base_delay: 30s
   retry_max_delay: 1h
-  claim_timeout: 5m
+  # One delivery attempt, connect to QUIT. Two minutes of silence on
+  # the connection also ends it.
+  attempt_timeout: 10m
+  # Must be longer than attempt_timeout, or a running attempt is
+  # requeued and sent twice.
+  claim_timeout: 15m
 
 sending:
   max_recipients: 50

@@ -179,7 +179,8 @@ These settings are **per node**. Three nodes at concurrency 4 give you twelve pa
 | `MAILYARD_WORKER_MAX_ATTEMPTS`     | `5`     | Delivery attempts before an email is marked failed                                                                                                                                                                  |
 | `MAILYARD_WORKER_RETRY_BASE_DELAY` | `30s`   | Seeds the exponential backoff: base × 2^(attempt−1)                                                                                                                                                                 |
 | `MAILYARD_WORKER_RETRY_MAX_DELAY`  | `1h`    | Ceiling for that backoff                                                                                                                                                                                            |
-| `MAILYARD_WORKER_CLAIM_TIMEOUT`    | `5m`    | Re-queues `processing` rows older than this, which is how a crashed node's in-flight mail is recovered. Keep it comfortably above your slowest SMTP delivery, or a slow send is re-queued while it is still running |
+| `MAILYARD_WORKER_CLAIM_TIMEOUT`    | `15m`   | Re-queues `processing` rows older than this, which is how a crashed node's in-flight mail is recovered. Must be longer than `MAILYARD_WORKER_ATTEMPT_TIMEOUT`, or a running attempt is requeued and sent twice - the server refuses to start otherwise |
+| `MAILYARD_WORKER_ATTEMPT_TIMEOUT`  | `10m`   | Ceiling on one delivery attempt, connect to QUIT. Two minutes of silence on the connection also ends it. An attempt that runs out is scored as a transient failure and retried |
 
 ## Campaigns
 
