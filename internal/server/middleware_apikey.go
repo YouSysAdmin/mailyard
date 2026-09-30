@@ -105,6 +105,13 @@ func stampAPIKey(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	return true, nil
 }
 
+// AuthHeader names, on every /api/v1 answer, which credential
+// authenticated it: `api-key`, `admin-key` or `session`. Two
+// credentials reach one surface and a same-origin caller can hold
+// both, so a reader looking at a response could not tell whether a
+// bearer or the ambient cookie earned it.
+const AuthHeader = "X-Mailyard-Auth"
+
 // machineAuth is the /api/v1 gate: an API key, or the session the
 // browser already holds.
 //
@@ -163,6 +170,8 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 				return resp
 			}
 
+			c.Set(AuthHeader, "admin-key")
+
 			// A platform credential names no project. It may still
 			// address one by header, and stampProject grants it
 			// owner-equivalent access there exactly as a platform-admin
@@ -182,6 +191,8 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 				return resp
 			}
 
+			c.Set(AuthHeader, "api-key")
+
 			return c.Next()
 		}
 
@@ -190,6 +201,8 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 
 			return resp
 		}
+
+		c.Set(AuthHeader, "session")
 
 		if ok, resp := stampProject(c, rt); !ok {
 			return resp

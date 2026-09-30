@@ -47,7 +47,9 @@ Two credentials reach it. An API key (` + "`Authorization: Bearer myk_...`" + `)
 is bound to one project and names it implicitly. A browser SESSION
 reaches the same routes and names its project with the
 ` + "`X-Mailyard-Project-Id`" + ` header - the operator console is built on this
-surface, which is why there is no second copy of it.
+surface, which is why there is no second copy of it. Every answer carries
+` + "`X-Mailyard-Auth: api-key|admin-key|session`" + ` naming which of the two
+authenticated it, since a browser on the console's origin holds both.
 
 Authorization is per resource: every operation below names the
 ` + "`resource:action`" + ` permission it needs, from the same catalogue that
