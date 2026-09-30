@@ -115,7 +115,7 @@ func (s *Store) PutKeepingAnAdmin(ctx context.Context, u *usermodel.User) error 
 
 	defer func() { _ = tx.Rollback() }()
 
-	others, err := s.otherActiveAdmins(ctx, tx, u.ID)
+	others, _, err := s.lockActiveAdmins(ctx, tx, u.ID)
 	if err != nil {
 		return err
 	}
@@ -131,31 +131,59 @@ func (s *Store) PutKeepingAnAdmin(ctx context.Context, u *usermodel.User) error 
 	return tx.Commit()
 }
 
-// otherActiveAdmins locks the enabled administrators and counts the
-// ones that are not exceptID.
-func (s *Store) otherActiveAdmins(ctx context.Context, tx *sql.Tx, exceptID string) (int, error) {
+// DeleteKeepingAnAdmin removes the row like Delete, unless it is the
+// last enabled administrator. Same lock as PutKeepingAnAdmin, so a
+// demotion and a deletion racing each other cannot both succeed.
+func (s *Store) DeleteKeepingAnAdmin(ctx context.Context, id string) error {
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	others, target, err := s.lockActiveAdmins(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+
+	if target && others == 0 {
+		return ErrLastAdmin
+	}
+
+	if _, err := tx.ExecContext(ctx, s.Q(`DELETE FROM users WHERE id = ?`), id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// lockActiveAdmins locks the enabled administrators, counts the ones
+// that are not exceptID, and reports whether exceptID is one of them.
+func (s *Store) lockActiveAdmins(ctx context.Context, tx *sql.Tx, exceptID string) (others int, target bool, err error) {
 	rows, err := tx.QueryContext(ctx, s.Q(`
         SELECT id FROM users WHERE admin AND NOT disabled FOR UPDATE
     `))
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	defer func() { _ = rows.Close() }()
 
-	others := 0
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			return 0, err
+			return 0, false, err
 		}
 
-		if id != exceptID {
+		if id == exceptID {
+			target = true
+		} else {
 			others++
 		}
 	}
 
-	return others, rows.Err()
+	return others, target, rows.Err()
 }
 
 // PutFirst inserts u under a lock that makes "first" mean exactly

@@ -150,11 +150,13 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		u.PasswordHash = hash
 	}
 
+	// Read before the flags move: this is the fact the guarded write
+	// below is chosen on.
+	wasAdmin := u.Admin && !u.Disabled
 	if in.Admin != nil {
 		u.Admin = *in.Admin
 	}
 
-	wasAdmin := u.Admin && !u.Disabled
 	if in.Disabled != nil {
 		u.Disabled = *in.Disabled
 	}
@@ -166,13 +168,13 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	// Put, deliberately: this is the administrator's editor for the whole
 	// row, every column it writes is a field on that form, and
 	// last-writer-wins between two administrators editing one account is
-	// what an editor means. The paths that changed to targeted UPDATEs
-	// are the ones that touch one fact as a side effect of doing
-	// something else - a password reset, a second-factor enrolment -
-	// where rewriting `disabled` was never anybody's intention. The
-	// remaining exposure here is narrow and known: an admin saving this
-	// form at the instant the account owner enrols a second factor writes
-	// the pre-enrolment totp columns back.
+	// what an editor means. The targeted UPDATEs are for the paths that
+	// touch one fact as a side effect of doing something else - a
+	// password reset, a second-factor enrolment - where rewriting
+	// `disabled` is nobody's intention. The remaining exposure here is
+	// narrow and known: an admin saving this form at the instant the
+	// account owner enrols a second factor writes the pre-enrolment totp
+	// columns back.
 	//
 	// A change that demotes or disables an administrator goes through
 	// the guarded write, which locks the administrators and refuses to
@@ -188,15 +190,12 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	}
 
 	// An administrator setting a password evicts whoever was using the
-	// old one, exactly as the two self-service paths do.
-	//
-	// It did not, and this is the path an admin reaches for when an
-	// account is compromised: the new password was written and the
-	// intruder's cookie stayed live for the rest of the session TTL,
-	// along with any reset link they had already been mailed. Disabling
-	// the account WAS immediate (stampSession re-reads the row per
-	// request) so the two controls behaved differently in the one
-	// situation where they are used together.
+	// old one, exactly as the two self-service paths do. This is the
+	// path an admin reaches for when an account is compromised, and
+	// disabling the account is immediate (stampSession re-reads the row
+	// per request), so the two controls used together must both take
+	// effect at once: the intruder's cookie and any reset link already
+	// mailed go with the old password.
 	if in.Password != "" {
 		if _, err := h.Runtime.Store.Session.RevokeAllForUser(c.Context(), u.ID); err != nil {
 			slog.Warn("users: revoking sessions after an admin password set failed",
@@ -215,7 +214,9 @@ func (h *Handler) Update(c fiber.Ctx) error {
 
 // Delete removes a user by id. Deleting yourself is refused (lockout
 // guard) - deleting a missing id is a 404 so a double-click in the UI
-// surfaces as "already gone" rather than silent success.
+// surfaces as "already gone" rather than silent success. Deleting the
+// last enabled administrator is refused the way demoting one is: the
+// outcome is the same installation nobody can administer.
 func (h *Handler) Delete(c fiber.Ctx) error {
 	id := c.Params("id")
 	if isSelf(c, id) {
@@ -231,7 +232,9 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 		return response.NotFound(c, "user not found")
 	}
 
-	if err := h.Runtime.Store.User.Delete(c.Context(), id); err != nil {
+	if err := h.Runtime.Store.User.DeleteKeepingAnAdmin(c.Context(), id); errors.Is(err, ErrLastAdmin) {
+		return response.Conflict(c, "this is the last enabled administrator - promote somebody else first")
+	} else if err != nil {
 		return response.Internal(c, err)
 	}
 

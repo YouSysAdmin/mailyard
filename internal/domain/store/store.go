@@ -319,6 +319,10 @@ type UserStore interface {
 	// reporting whether it was first - see the store method.
 	PutFirst(ctx context.Context, u *user.User, onlyIfFirst bool) (bool, error)
 	Delete(ctx context.Context, id string) error
+
+	// DeleteKeepingAnAdmin is Delete refusing to remove the last enabled
+	// administrator - see the store method.
+	DeleteKeepingAnAdmin(ctx context.Context, id string) error
 	List(ctx context.Context) ([]*user.User, error)
 	Count(ctx context.Context) (int, error)
 	TouchLastLogin(ctx context.Context, email string) error
