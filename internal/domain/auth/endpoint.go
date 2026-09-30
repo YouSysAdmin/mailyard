@@ -285,13 +285,17 @@ func (h *Handler) Logout(c fiber.Ctx) error {
 }
 
 // currentSession resolves the session behind the request's own
-// cookie or bearer token. Returns nil for anything unusable - a
+// bearer token or cookie, the bearer first: a request naming one is
+// judged on it and never on the ambient cookie, the same order the
+// gates use, since the cross-site check exempts a request on the
+// strength of its bearer. Returns nil for anything unusable - a
 // logout with no valid token still clears the cookie and succeeds.
 func (h *Handler) currentSession(c fiber.Ctx) (*sessmodel.Session, string) {
-	raw := SessionCookieValue(c, h.Runtime)
-	if raw == "" {
-		raw, _ = strings.CutPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")
+	raw, ok := strings.CutPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")
+	if !ok {
+		raw = SessionCookieValue(c, h.Runtime)
 	}
+
 	if raw == "" {
 		return nil, ""
 	}

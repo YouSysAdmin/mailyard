@@ -45,6 +45,7 @@ func TestTheSessionCookieNameFollowsTheConnection(t *testing.T) {
 
 		var got [64]byte
 		n, _ := resp.Body.Read(got[:])
+		_ = resp.Body.Close()
 		if string(got[:n]) != tc.want {
 			t.Errorf("%s: read %q, want %q", name, got[:n], tc.want)
 		}

@@ -43,10 +43,11 @@ import (
 //
 // Scoped to the COOKIE: a request carrying a bearer is let through,
 // since extractToken then judges it on the bearer. Any other
-// Authorization scheme is not read, so it does not exempt the cookie. A bearer is not ambient, so there is nothing for a
-// third-party page to ride on, and a browser app holding a key on
-// another origin is exactly the client cors exists for. Reads are let
-// through too - a cross-site GET cannot read the answer without CORS.
+// Authorization scheme is not read, so it does not exempt the cookie.
+// A bearer is not ambient, so there is nothing for a third-party page
+// to ride on, and a browser app holding a key on another origin is
+// exactly the client cors exists for. Reads are let through too - a
+// cross-site GET cannot read the answer without CORS.
 func refuseCrossSite(rt *env.Runtime) fiber.Handler {
 	allowed := map[string]bool{}
 	if o := originOf(rt.Config.Server.PublicURL); o != "" {
