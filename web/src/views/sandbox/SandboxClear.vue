@@ -30,17 +30,21 @@ const everything = ref(!props.current)
 const chosen = ref<string[]>(props.current ? [props.current] : [])
 const clearing = ref(false)
 
-const canDelete = computed(() => everything.value || chosen.value.length > 0)
+// The addresses behind the ticked inboxes. An inbox saved through the
+// API may hold none, and the server reads an empty list as everything,
+// so a selection that names no address is not a selection.
+const senders = computed(() =>
+  props.inboxes.filter((box) => chosen.value.includes(box.id)).flatMap((box) => box.addresses),
+)
+
+const canDelete = computed(() => everything.value || senders.value.length > 0)
 
 async function submit() {
   if (!canDelete.value || clearing.value) return
   clearing.value = true
   try {
     const ids = everything.value ? [] : chosen.value
-    const senders = props.inboxes
-      .filter((box) => ids.includes(box.id))
-      .flatMap((box) => box.addresses)
-    const res = await sandboxApi.clear(senders)
+    const res = await sandboxApi.clear(everything.value ? [] : senders.value)
     notify.success(`Deleted ${res.data.deleted} messages`)
     emit('cleared', ids)
   } catch (e) {
