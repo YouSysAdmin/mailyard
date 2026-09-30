@@ -66,20 +66,34 @@ are served at `/docs` on the same instance.
 ## Architecture
 
 One process is the whole system. The API, the console, the SMTP listeners and the delivery worker all run inside it, and
-PostgreSQL is the only thing it talks to.
+PostgreSQL is the only thing it depends on.
 
-```
-┌─────────────┐     ┌──────────────────────────────┐     ┌──────────────┐
-│  Your App   │────▶│  mailyard serve              │────▶│  PostgreSQL  │
-│  HTTP / SMTP│     │  api + console + smtp in     │◀────│  data +      │
-└─────────────┘     │  delivery worker         out │     │  queue       │
-                    └───────────────┬──────────────┘     └──────────────┘
+```ascii
+┌──────────────┐     ┌──────────────────────────────┐     ┌──────────────┐
+│  Your App    │────▶│  mailyard serve              │────▶│  PostgreSQL  │
+│  HTTP / SMTP │     │  api + console + smtp in     │◀────│  data +      │
+└──────────────┘     │  delivery worker         out │     │  queue       │
+                     └──────────────┬───────────────┘     └──────────────┘
                                     │
-                                    ▼
-                            ┌──────────────┐
-                            │  SMTP Server │
-                            └──────────────┘
+               ┌────────────────────┼────────────────────┐
+               │ SMTP               │ HTTPS              │ mutual TLS
+               ▼                    ▼                    ▼
+        ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+        │ SMTP server  │     │  Amazon SES  │     │  Relay node  │
+        │ own / shared │     │  API         │     │  mailyard    │
+        └──────────────┘     └──────────────┘     │  relay       │
+                                                  └──────┬───────┘
+                                                         │ SMTP :25
+                                                         ▼
+                                                   recipient MX
 ```
+
+A message leaves by one of three doors, and which one is decided per message by the server it resolves to. An
+[SMTP server](/docs/smtp-domains/server-groups) is any host you have credentials for, the project's own or one from
+the [shared pool](/docs/admin/shared-servers). [Amazon SES](/docs/smtp-domains/aws-ses) as a provider is reached over
+its API rather than dialled, so a machine running on AWS needs no stored secret. A
+[relay node](/docs/smtp-domains/relay-nodes) is a second Mailyard process on a machine of yours, holding no database
+credentials, that delivers straight to the recipient's mail exchangers from its own address.
 
 The queue lives in the `emails` table. When one process is no longer enough, run several against the same database:
 every node claims from that one queue, and each claim takes a disjoint batch. See
