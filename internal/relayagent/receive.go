@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/mail"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -359,7 +360,7 @@ func (s *receiveSession) Data(r io.Reader) (err error) {
 	m := &Received{
 		ID:           ids.New(),
 		EnvelopeFrom: s.from,
-		Recipients:   append([]string(nil), s.to...),
+		Recipients:   slices.Clone(s.to),
 		ClientIP:     s.ip,
 		HELO:         s.helo,
 		ReceivedAt:   time.Now().UTC(),

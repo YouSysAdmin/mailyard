@@ -3,7 +3,6 @@
 package inbound
 
 import (
-	"context"
 	"encoding/base64"
 	"strings"
 	"testing"
@@ -52,7 +51,7 @@ func TestARebuiltMessageParsesBackToWhatWasStored(t *testing.T) {
 		ReceivedAt: received,
 	}
 
-	raw, err := rebuild(context.Background(), nil, e)
+	raw, err := rebuild(t.Context(), nil, e)
 	if err != nil {
 		t.Fatalf("rebuild: %v", err)
 	}
@@ -147,7 +146,7 @@ func TestARebuiltMessageFallsBackToTheEnvelope(t *testing.T) {
 		ReceivedAt:    time.Now(),
 	}
 
-	raw, err := rebuild(context.Background(), nil, e)
+	raw, err := rebuild(t.Context(), nil, e)
 	if err != nil {
 		t.Fatalf("rebuild: %v", err)
 	}

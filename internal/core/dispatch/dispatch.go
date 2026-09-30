@@ -376,14 +376,14 @@ func matchesFilters(filters []string, sender string) bool {
 	}
 
 	bare := strings.ToLower(smtpclient.EnvelopeAddress(sender))
-	at := strings.LastIndex(bare, "@")
+	_, domain, hasAt := strings.CutLast(bare, "@")
 	for _, f := range filters {
 		f = strings.ToLower(f)
 		if f == bare {
 			return true
 		}
 
-		if strings.HasPrefix(f, "*") && at >= 0 && f[1:] == bare[at:] {
+		if wild, ok := strings.CutPrefix(f, "*@"); ok && hasAt && wild == domain {
 			return true
 		}
 	}

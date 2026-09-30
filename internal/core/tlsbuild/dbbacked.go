@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -202,7 +203,7 @@ func (b *Builder) ACMEHosts() []string {
 		return nil
 	}
 
-	return append([]string(nil), a.Hosts...)
+	return slices.Clone(a.Hosts)
 }
 
 // Order obtains a certificate for one host, now.

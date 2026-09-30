@@ -29,7 +29,7 @@ func TestASilentPeerIsCutByTheContext(t *testing.T) {
 		_ = conn.Close()
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 
 	cfg := ServerConfig{Host: "127.0.0.1", Port: ln.Addr().(*net.TCPAddr).Port, Encryption: EncryptionNone}

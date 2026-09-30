@@ -77,9 +77,7 @@ func FromWith(c fiber.Ctx, def, ceiling int) Page {
 		}
 	}
 
-	if offset < 0 {
-		offset = 0
-	}
+	offset = max(offset, 0)
 
 	return Page{Limit: limit, Offset: offset}
 }

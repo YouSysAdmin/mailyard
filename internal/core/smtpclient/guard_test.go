@@ -3,7 +3,6 @@
 package smtpclient
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -17,7 +16,7 @@ import (
 func TestAGuardedServerRefusesAPrivateHost(t *testing.T) {
 	for _, enc := range []string{EncryptionNone, EncryptionSTARTTLS, EncryptionSSL} {
 		cfg := ServerConfig{Host: "127.0.0.1", Port: 25, Encryption: enc, GuardPrivate: true}
-		err := TestConnection(context.Background(), cfg)
+		err := TestConnection(t.Context(), cfg)
 		if _, ok := errors.AsType[*safedial.ErrBlocked](err); !ok {
 			t.Errorf("%s: got %v, want ErrBlocked", enc, err)
 		}

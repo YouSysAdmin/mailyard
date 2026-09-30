@@ -404,10 +404,7 @@ func (w *Worker) notify(job *emailmodel.Email, status, errMsg string) {
 // base * 2^(attempts-1), capped, with up to 20 percent jitter so a
 // burst of failures does not re-arrive as a thundering herd.
 func (w *Worker) backoff(attempts int) time.Duration {
-	if attempts < 1 {
-		attempts = 1
-	}
-
+	attempts = max(attempts, 1)
 	d := w.cfg.RetryBaseDelay << (attempts - 1)
 	if d > w.cfg.RetryMaxDelay || d <= 0 {
 		d = w.cfg.RetryMaxDelay

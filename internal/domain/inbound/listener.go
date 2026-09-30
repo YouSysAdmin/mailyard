@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/mail"
+	"slices"
 	"strings"
 	"time"
 
@@ -186,7 +187,7 @@ func (s *session) Data(r io.Reader) (err error) {
 	defer cancel()
 
 	_, ierr := s.backend.Service.Ingest(ctx, s.domain, s.from,
-		append([]string(nil), s.to...), raw, Conn{IP: s.ip, HELO: s.helo})
+		slices.Clone(s.to), raw, Conn{IP: s.ip, HELO: s.helo})
 	switch {
 	case ierr == nil:
 		return nil

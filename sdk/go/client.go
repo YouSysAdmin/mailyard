@@ -28,7 +28,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/yousysadmin/mailyard/sdk/go/api"
 )
 
 // DefaultTimeout bounds a single request. Sending is asynchronous on
@@ -49,7 +52,7 @@ type Client struct {
 	agent   string
 
 	// The generated client, built on first use - see API().
-	apiHolder
+	api func() *api.Client
 }
 
 // Option customizes a Client.
@@ -87,6 +90,8 @@ func New(baseURL, apiKey string, opts ...Option) *Client {
 	for _, o := range opts {
 		o(c)
 	}
+
+	c.api = sync.OnceValue(c.buildAPI)
 
 	return c
 }

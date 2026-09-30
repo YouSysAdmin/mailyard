@@ -340,9 +340,7 @@ func (d *Deliverer) report(ctx context.Context, o Outcome) {
 // backoff grows the gap between attempts: about a minute, then five,
 // fifteen, an hour, capped at four.
 func backoff(attempt int) time.Duration {
-	if attempt < 1 {
-		attempt = 1
-	}
+	attempt = max(attempt, 1)
 	const base = time.Minute
 	const ceiling = 4 * time.Hour
 	d := time.Duration(math.Pow(3, float64(attempt-1))) * base

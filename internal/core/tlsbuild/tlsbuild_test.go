@@ -263,7 +263,7 @@ func (r *recordingStore) asked() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	return append([]string(nil), r.gets...)
+	return slices.Clone(r.gets)
 }
 
 // The load-bearing claim of putting certificates in the database: a

@@ -276,8 +276,8 @@ func param(p Param, in string, required bool) map[string]any {
 // emits calls a URL that only works because of a redirect. The
 // documented form is the one without it.
 func NormalizePath(p string) string {
-	if len(p) > 1 && strings.HasSuffix(p, "/") {
-		return strings.TrimSuffix(p, "/")
+	if trimmed, ok := strings.CutSuffix(p, "/"); ok && len(p) > 1 {
+		return trimmed
 	}
 
 	return p

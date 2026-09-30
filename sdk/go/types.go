@@ -325,12 +325,12 @@ const (
 // Suppression is one blocked address. UnsubscribeListID empty means a
 // global block covering every send from the project.
 type Suppression struct {
-	ID                string    `json:"id"`
-	ProjectID         string    `json:"project_id"`
-	Email             string    `json:"email"`
-	Kind              string    `json:"kind"`
-	Reason            string    `json:"reason,omitempty"`
-	UnsubscribeListID string    `json:"unsubscribe_list_id,omitempty"`
+	ID                string `json:"id"`
+	ProjectID         string `json:"project_id"`
+	Email             string `json:"email"`
+	Kind              string `json:"kind"`
+	Reason            string `json:"reason,omitempty"`
+	UnsubscribeListID string `json:"unsubscribe_list_id,omitempty"`
 
 	// UnsubscribeListName is the readable name beside the id.
 	UnsubscribeListName string    `json:"unsubscribe_list_name,omitempty"`
@@ -464,11 +464,11 @@ type InboundEmail struct {
 	Sender        string            `json:"sender"`
 	BounceAddress string            `json:"bounce_address"`
 	Recipients    []string          `json:"recipients"`
-	Subject     string            `json:"subject,omitempty"`
-	TextBody    string            `json:"text_body,omitempty"`
-	HTMLBody    string            `json:"html_body,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Attachments []Attachment      `json:"attachments,omitempty"`
+	Subject       string            `json:"subject,omitempty"`
+	TextBody      string            `json:"text_body,omitempty"`
+	HTMLBody      string            `json:"html_body,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	Attachments   []Attachment      `json:"attachments,omitempty"`
 
 	// Auth is the SPF, DKIM and DMARC verdict stamped at ingest.
 	Auth   *InboundAuth `json:"auth,omitempty"`

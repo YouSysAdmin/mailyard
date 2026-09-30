@@ -215,13 +215,13 @@ func (s *Server) AllowsSender(sender string) bool {
 		return true
 	}
 
-	at := strings.LastIndex(sender, "@")
+	_, domain, hasAt := strings.CutLast(sender, "@")
 	for _, allowed := range s.AllowedEmails {
 		if strings.EqualFold(allowed, sender) {
 			return true
 		}
 
-		if strings.HasPrefix(allowed, "*") && at >= 0 && strings.EqualFold(allowed[1:], sender[at:]) {
+		if wild, ok := strings.CutPrefix(allowed, "*@"); ok && hasAt && strings.EqualFold(wild, domain) {
 			return true
 		}
 	}

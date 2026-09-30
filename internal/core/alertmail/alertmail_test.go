@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -38,7 +39,7 @@ func (f *fakeMail) all() []sentMail {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	return append([]sentMail(nil), f.sent...)
+	return slices.Clone(f.sent)
 }
 
 type fakeRecipients struct {

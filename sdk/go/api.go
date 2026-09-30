@@ -2,11 +2,7 @@
 
 package mailyard
 
-import (
-	"sync"
-
-	"github.com/yousysadmin/mailyard/sdk/go/api"
-)
+import "github.com/yousysadmin/mailyard/sdk/go/api"
 
 // API returns the generated client: one method per /api/v1 route.
 //
@@ -23,22 +19,16 @@ import (
 // It shares this client's base URL, credential and http.Client, so
 // timeouts and proxies configured here apply there.
 func (c *Client) API() *api.Client {
-	c.apiOnce.Do(func() {
-		opts := []api.ClientOption{api.WithHTTPClient(c.http)}
-		if c.agent != "" {
-			opts = append(opts, api.WithUserAgent(c.agent))
-		}
-
-		c.api = api.New(c.baseURL, c.apiKey, opts...)
-	})
-
-	return c.api
+	return c.api()
 }
 
-// apiHolder is embedded into Client. A separate type only so the
-// once-and-pointer pair can be added without disturbing the struct
-// literal in New.
-type apiHolder struct {
-	apiOnce sync.Once
-	api     *api.Client
+// buildAPI is what API memoizes: the generated client over this
+// client's settings, read once so a later option cannot split the two.
+func (c *Client) buildAPI() *api.Client {
+	opts := []api.ClientOption{api.WithHTTPClient(c.http)}
+	if c.agent != "" {
+		opts = append(opts, api.WithUserAgent(c.agent))
+	}
+
+	return api.New(c.baseURL, c.apiKey, opts...)
 }
