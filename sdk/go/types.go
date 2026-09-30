@@ -316,10 +316,10 @@ type TemplateVersion struct {
 
 // Suppression kinds.
 const (
-	SuppressionHard      = "hard"
-	SuppressionBounce    = "bounce"
-	SuppressionComplaint = "complaint"
-	SuppressionManual    = "manual"
+	SuppressionBounce          = "bounce"
+	SuppressionComplaint       = "complaint"
+	SuppressionManual          = "manual"
+	SuppressionListUnsubscribe = "list_unsubscribe"
 )
 
 // Suppression is one blocked address. UnsubscribeListID empty means a
@@ -331,7 +331,10 @@ type Suppression struct {
 	Kind              string    `json:"kind"`
 	Reason            string    `json:"reason,omitempty"`
 	UnsubscribeListID string    `json:"unsubscribe_list_id,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
+
+	// UnsubscribeListName is the readable name beside the id.
+	UnsubscribeListName string    `json:"unsubscribe_list_name,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // Bounce is one delivery failure report.
@@ -453,8 +456,14 @@ type InboundEmail struct {
 	DomainID  string `json:"domain_id"`
 	MessageID string `json:"message_id,omitempty"`
 
-	Sender      string            `json:"sender"`
-	Recipients  []string          `json:"recipients"`
+	// Domain is the verified domain the message was accepted for.
+	Domain string `json:"domain,omitempty"`
+
+	// Sender is the From header, display name included. BounceAddress
+	// is the envelope sender, where a bounce would go.
+	Sender        string            `json:"sender"`
+	BounceAddress string            `json:"bounce_address"`
+	Recipients    []string          `json:"recipients"`
 	Subject     string            `json:"subject,omitempty"`
 	TextBody    string            `json:"text_body,omitempty"`
 	HTMLBody    string            `json:"html_body,omitempty"`
