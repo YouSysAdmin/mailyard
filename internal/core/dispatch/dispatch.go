@@ -266,8 +266,14 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 			return
 		}
 
-		status, err := d.post(ctx, h, event, body)
-		release()
+		// Deferred inside the attempt, so a panic in the post returns
+		// the slots on its way to the recover above rather than
+		// leaking one of the eight for good.
+		status, err := func() (int, error) {
+			defer release()
+
+			return d.post(ctx, h, event, body)
+		}()
 		del := &whmodel.Delivery{
 			WebhookID:  h.ID,
 			ProjectID:  h.ProjectID,

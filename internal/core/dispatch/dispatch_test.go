@@ -222,3 +222,33 @@ type projectSink struct {
 func (s *projectSink) List(_ context.Context, projID string) ([]*whmodel.Webhook, error) {
 	return s.hooks[projID], nil
 }
+
+// panicTransport stands in for a network stack that panics mid-post.
+type panicTransport struct{}
+
+func (panicTransport) RoundTrip(*http.Request) (*http.Response, error) { panic("boom") }
+
+// A delivery that panics inside the post returns its slots. Held
+// inline rather than deferred, two such panics left a project's two
+// slots taken for good and its webhooks never delivered again.
+func TestAPanickingPostReturnsItsSlots(t *testing.T) {
+	sink := &memSink{hooks: []*whmodel.Webhook{{
+		ID: "6ce38800-147c-4a17-8ecb-7cdaf5557273", ProjectID: "proj", URL: "http://127.0.0.1:9/x", Secret: "s",
+		Events: []string{whmodel.EventEmailSent},
+	}}}
+	d := testDispatcher(sink)
+	d.client.Transport = panicTransport{}
+	for range 3 {
+		d.Emit(t.Context(), "proj", whmodel.EventEmailSent, "a@b.co", map[string]any{"id": "x"})
+	}
+
+	d.Close(2 * time.Second)
+
+	if got := len(d.sem); got != 0 {
+		t.Errorf("%d global slots still held after the panics", got)
+	}
+
+	if got := len(d.slot("proj")); got != 0 {
+		t.Errorf("%d project slots still held after the panics", got)
+	}
+}
