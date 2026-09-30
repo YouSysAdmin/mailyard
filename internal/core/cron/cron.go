@@ -123,6 +123,13 @@ type Manager struct {
 
 	// running counts jobs in flight, so shutdown can wait for them.
 	running sync.WaitGroup
+
+	// cut ends the jobs in flight once Wait has run out of patience.
+	cut context.CancelFunc
+
+	// tick is the scheduler's resolution, coarse because nothing here is
+	// finer than hourly. Tests shorten it.
+	tick time.Duration
 }
 
 // New builds an empty manager.
@@ -131,6 +138,7 @@ func New(log *slog.Logger) *Manager {
 		log:     log,
 		jobs:    map[string]*jobState{},
 		stopped: make(chan struct{}),
+		tick:    30 * time.Second,
 	}
 }
 
@@ -150,10 +158,22 @@ func (m *Manager) Register(j Job) {
 // (30s) because nothing registered here is finer than hourly - firing a
 // few seconds late is irrelevant, and a slow tick keeps an idle process
 // genuinely idle.
+//
+// A job runs on a context that keeps ctx's values and drops its
+// cancellation: cancelling ctx stops the SCHEDULING, and the job in
+// flight finishes under Wait's timeout, which is what cuts it. Cut at
+// the same instant as the loop, a retention sweep that had deleted a
+// blob failed on the row DELETE naming it - the exact state Wait exists
+// to prevent.
 func (m *Manager) Start(ctx context.Context) {
 	defer m.once.Do(func() { close(m.stopped) })
 
-	t := time.Tick(30 * time.Second)
+	flight, cut := context.WithCancel(context.WithoutCancel(ctx))
+	m.mu.Lock()
+	m.cut = cut
+	m.mu.Unlock()
+
+	t := time.Tick(m.tick)
 	m.log.Info("cron: started", "jobs", len(m.jobs))
 
 	for {
@@ -163,7 +183,7 @@ func (m *Manager) Start(ctx context.Context) {
 
 			return
 		case <-t:
-			m.runDue(ctx)
+			m.runDue(flight)
 		}
 	}
 }
@@ -307,6 +327,13 @@ func (m *Manager) Wait(timeout time.Duration) {
 	select {
 	case <-done:
 	case <-deadline:
-		m.log.Warn("cron: jobs still running at shutdown, not waiting any longer")
+		m.log.Warn("cron: jobs still running at shutdown, cutting them")
+	}
+
+	m.mu.Lock()
+	cut := m.cut
+	m.mu.Unlock()
+	if cut != nil {
+		cut()
 	}
 }

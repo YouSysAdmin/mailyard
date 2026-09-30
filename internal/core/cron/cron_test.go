@@ -159,3 +159,59 @@ func TestRegisterIgnoresDuplicates(t *testing.T) {
 		t.Errorf("statuses = %d, want 1", got)
 	}
 }
+
+// Cancelling the scheduler's context stops the scheduling and nothing
+// else: a job in flight keeps its context until Wait runs out of
+// patience and cuts it. Cut together with the loop, a sweep that had
+// deleted a blob failed on the row naming it.
+func TestAJobInFlightOutlivesTheSchedulerUntilWaitCutsIt(t *testing.T) {
+	m := New(discard())
+	m.tick = 5 * time.Millisecond
+	started := make(chan struct{})
+	ended := make(chan error, 1)
+	m.Register(Job{
+		Name:     "slow",
+		Schedule: EveryInterval(time.Hour),
+		Run: func(ctx context.Context) error {
+			close(started)
+			<-ctx.Done()
+			ended <- ctx.Err()
+
+			return nil
+		},
+	})
+	m.mu.Lock()
+	m.jobs["slow"].nextRun = time.Time{}
+	m.mu.Unlock()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	go m.Start(ctx)
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the job never started")
+	}
+
+	cancel()
+	select {
+	case <-m.stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the scheduler loop did not stop")
+	}
+
+	select {
+	case err := <-ended:
+		t.Fatalf("the job was cut with the scheduler: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	m.Wait(50 * time.Millisecond)
+	select {
+	case err := <-ended:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("job context ended with %v, want Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait timed out and the job was not cut")
+	}
+}
