@@ -1031,6 +1031,11 @@ module Mailyard
       @t.request("PATCH", "/subscribers/#{esc(id)}", body: body, query: query)
     end
 
+    # Lists
+    def get_subscribers_lists(id, **query)
+      @t.request("GET", "/subscribers/#{esc(id)}/lists", body: nil, query: query)
+    end
+
     # Import
     def import_subscriber(body: nil, **query)
       @t.request("POST", "/subscribers/import", body: body, query: query)

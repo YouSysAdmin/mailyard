@@ -831,6 +831,10 @@ class API:
         "Update"
         return self._t.request("PATCH", f"/subscribers/{_esc(id)}", body=body, query=query)
 
+    def get_subscribers_lists(self, id, **query: Any) -> Any:
+        "Lists"
+        return self._t.request("GET", f"/subscribers/{_esc(id)}/lists", body=None, query=query)
+
     def import_subscriber(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
         "Import"
         return self._t.request("POST", "/subscribers/import", body=body, query=query)

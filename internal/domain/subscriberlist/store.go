@@ -198,6 +198,34 @@ func (s *Store) CountMembers(ctx context.Context, projID, listID string) (int, e
 	return n, err
 }
 
+// ListsOf returns the static lists within projID that hold the
+// subscriber, by name.
+func (s *Store) ListsOf(ctx context.Context, projID, subscriberID string) ([]*slmodel.List, error) {
+	rows, err := s.Query(ctx, `
+        SELECT l.id, l.project_id, l.name, l.description, l.type, l.filter_rules, l.created_at, l.updated_at
+        FROM subscriber_lists l
+        JOIN subscriber_list_members m ON m.list_id = l.id
+        WHERE l.project_id = ? AND m.subscriber_id = ?
+        ORDER BY l.name ASC
+    `, projID, subscriberID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	var out []*slmodel.List
+	for rows.Next() {
+		l, err := scanList(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, l)
+	}
+
+	return out, rows.Err()
+}
+
 // Unsubscribe records a per-list opt-out (the subscriber's global
 // status is untouched).
 func (s *Store) Unsubscribe(ctx context.Context, projID, listID, subscriberID, reason string) error {

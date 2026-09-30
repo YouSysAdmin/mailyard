@@ -153,6 +153,10 @@ The add call takes either identifier — whichever your caller has to hand:
 Adding somebody twice is not an error. A dynamic list refuses membership calls: its members are a query result, and
 there is nothing to insert into.
 
+In the console, **Add member** on a list searches the audience as you type rather than offering the whole of it,
+and a subscriber's own page lists what they are on with an **Add to list** button for the other direction. Which
+lists somebody is on is `GET /api/v1/subscribers/{id}/lists`.
+
 ## Sign-up flows
 
 These three take an address rather than a subscriber id, which is what a sign-up form or an automation tool actually

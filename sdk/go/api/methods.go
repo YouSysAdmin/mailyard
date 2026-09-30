@@ -1437,6 +1437,13 @@ func (c *Client) UpdateSubscriber(ctx context.Context, id string, body Subscribe
 	return do[SubscriberSubscriberResponse](ctx, c, "PATCH", fmt.Sprintf("/subscribers/%s", escape(id)), body, opts)
 }
 
+// GetSubscribersLists Lists.
+//
+// GET /subscribers/:id/lists
+func (c *Client) GetSubscribersLists(ctx context.Context, id string, opts ...RequestOption) (MembershipResponse, error) {
+	return do[MembershipResponse](ctx, c, "GET", fmt.Sprintf("/subscribers/%s/lists", escape(id)), nil, opts)
+}
+
 // ImportSubscriber Import.
 //
 // POST /subscribers/import

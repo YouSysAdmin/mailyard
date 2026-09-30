@@ -20,6 +20,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	submodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
+	slmodel "github.com/yousysadmin/mailyard/internal/models/subscriberlist"
 )
 
 // Handler owns the /api/subscribers surface.
@@ -73,6 +74,31 @@ func (h *Handler) Get(c fiber.Ctx) error {
 	}
 
 	return response.Success(c, SubscriberResponse{Subscriber: sub})
+}
+
+// Lists serves GET /api/v1/subscribers/:id/lists: the static lists the
+// subscriber is on.
+func (h *Handler) Lists(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	sub, err := h.Runtime.Store.Subscriber.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if sub == nil {
+		return response.NotFound(c, "subscriber not found")
+	}
+
+	lists, err := h.Runtime.Store.SubscriberList.ListsOf(c.Context(), rc.Project.ID, sub.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if lists == nil {
+		lists = []*slmodel.List{}
+	}
+
+	return response.Success(c, MembershipResponse{SubscriberLists: lists})
 }
 
 // Create serves POST /api/v1/subscribers.

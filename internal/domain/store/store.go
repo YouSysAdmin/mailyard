@@ -809,6 +809,11 @@ type SubscriberListStore interface {
 	ListMembers(ctx context.Context, projID, listID string, limit, offset int) ([]*subscriber.Subscriber, error)
 	CountMembers(ctx context.Context, projID, listID string) (int, error)
 
+	// ListsOf is the static lists a subscriber has been put on. A
+	// dynamic list is never answered: its membership is computed when
+	// a campaign sends, not stored.
+	ListsOf(ctx context.Context, projID, subscriberID string) ([]*subscriberlist.List, error)
+
 	Unsubscribe(ctx context.Context, projID, listID, subscriberID, reason string) error
 	Resubscribe(ctx context.Context, projID, listID, subscriberID string) error
 	UnsubscribedIDs(ctx context.Context, projID, listID string) (map[string]struct{}, error)

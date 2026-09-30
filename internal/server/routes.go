@@ -775,6 +775,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	subs.Get("/:id", permRead, subh.Get)
 	subs.Patch("/:id", permWrite, subh.Update)
 	subs.Delete("/:id", permDelete, subh.Delete)
+	// Which static lists hold the subscriber. Membership is written
+	// from the list side, so this is the one read from the other.
+	subs.Get("/:id/lists", permRead, subh.Lists)
 
 	// Subscriber lists - static membership and dynamic segments.
 	lists := v1.Group("/subscriber-lists", permOn(perm.ResourceSubscribers))

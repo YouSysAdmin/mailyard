@@ -60,6 +60,15 @@ func ConsoleDocs() []apidoc.Route {
 			Responses:   []apidoc.Response{apidoc.OK("The result.", SubscriberResponse{})},
 		},
 		{
+			Method:      "GET",
+			Path:        "/subscribers/:id/lists",
+			Tag:         "subscriber",
+			Summary:     "Lists",
+			Description: "The static lists the subscriber is on. Needs the `subscribers:read` permission.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", MembershipResponse{})},
+		},
+		{
 			Method:      "POST",
 			Path:        "/subscribers/import",
 			Tag:         "subscriber",

@@ -73,7 +73,12 @@ one, and the pager offers one page rather than fifty mostly empty ones.
 
 ```
 GET /api/v1/subscribers/{id}
+GET /api/v1/subscribers/{id}/lists
 ```
+
+The second answers which **static** lists hold the subscriber, as `subscriber_lists`. A dynamic list is never in
+it: a segment has no membership to read back, it has rules. The console shows the same on the subscriber's page,
+where **Add to list** puts them on several lists at once.
 
 ## Update
 

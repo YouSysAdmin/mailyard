@@ -5,6 +5,7 @@ package subscriber
 import (
 	"github.com/gofiber/fiber/v3"
 	smodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
+	slmodel "github.com/yousysadmin/mailyard/internal/models/subscriberlist"
 )
 
 // The wire types of this domain: what requests carry in and what
@@ -48,6 +49,13 @@ type ListResponse struct {
 // SubscriberResponse is one subscriber.
 type SubscriberResponse struct {
 	Subscriber *smodel.Subscriber `json:"subscriber"`
+}
+
+// MembershipResponse is the static lists one subscriber is on. Dynamic
+// lists are absent by construction - a segment has no membership to
+// list.
+type MembershipResponse struct {
+	SubscriberLists []*slmodel.List `json:"subscriber_lists"`
 }
 
 // ImportResponse reports what a bulk import did, per row.

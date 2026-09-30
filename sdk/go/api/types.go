@@ -1131,6 +1131,11 @@ type MembershipChange struct {
 	Email        string `json:"email"`
 }
 
+// MembershipResponse is the response body.
+type MembershipResponse struct {
+	SubscriberLists []*List `json:"subscriber_lists"`
+}
+
 // Message is the wire body.
 type Message struct {
 	ID           string     `json:"id"`
