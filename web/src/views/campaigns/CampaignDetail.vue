@@ -17,6 +17,7 @@ import CampaignEdit from './CampaignEdit.vue'
 import CampaignMessages from './CampaignMessages.vue'
 import CampaignStats from './CampaignStats.vue'
 import CampaignSchedule from './CampaignSchedule.vue'
+import CampaignPreview from './CampaignPreview.vue'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import { formatMailbox } from '../../composables/mailbox'
 
@@ -53,6 +54,9 @@ const isDraft = computed(() => campaign.value?.status === 'draft')
 
 // Schedule modal
 const showScheduleModal = ref(false)
+
+// The rendered message, for anyone who can read the campaign.
+const showPreview = ref(false)
 
 // Only a draft is editable, so the form is a card the page reveals.
 const showEdit = ref(false)
@@ -204,6 +208,7 @@ void start()
         @refresh="refresh"
         @update:auto="auto = $event"
       />
+      <button v-if="campaign" class="btn btn-secondary" @click="showPreview = true">Preview</button>
       <template v-if="campaign && projStore.can('campaigns:write')">
         <button v-if="isDraft && !showEdit" class="btn btn-secondary" @click="showEdit = true">
           Edit
@@ -368,6 +373,12 @@ void start()
       v-if="showScheduleModal"
       @schedule="scheduleCampaign"
       @close="showScheduleModal = false"
+    />
+
+    <CampaignPreview
+      v-if="showPreview && campaign"
+      :campaign="campaign"
+      @close="showPreview = false"
     />
   </div>
 </template>

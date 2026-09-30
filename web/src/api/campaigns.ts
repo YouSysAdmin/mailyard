@@ -1,5 +1,6 @@
 import api from './client'
 import type { Campaign, CampaignMessage, CampaignVariant } from './types'
+import type { RenderedPreview } from './templates'
 
 export interface CampaignPayload {
   name?: string
@@ -58,6 +59,10 @@ export const campaignsApi = {
       params,
     }),
   analytics: (id: string) => api.get<CampaignAnalytics>(`/campaigns/${id}/analytics`),
+  // The message one subscriber would get, rendered the way the runner
+  // renders it. No subscriber means the template's sample data.
+  preview: (id: string, payload: { subscriber_id?: string; variant?: string } = {}) =>
+    api.post<{ preview: RenderedPreview }>(`/campaigns/${id}/preview`, payload),
 }
 
 // TrackedLink mirrors internal/models/campaign.TrackedLink.
