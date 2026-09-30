@@ -10,6 +10,7 @@ export interface CampaignPayload {
   template_id?: string
   language?: string
   template_data?: Record<string, unknown>
+  headers?: Record<string, string>
   list_id?: string
   send_rate?: number
   // smtp_group routes the whole campaign to a named pool, by slug.

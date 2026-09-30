@@ -17,6 +17,9 @@ export interface ProjectPayload {
   bounce_address?: string
   alert_email?: string
   sandbox_retention_days?: number
+  // Both REPLACE the stored set. An empty object or list clears it.
+  default_headers?: Record<string, string>
+  submission_drop_headers?: string[]
 }
 
 // What the caller may do in one project. The list carries it per row,

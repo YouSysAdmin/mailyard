@@ -19,6 +19,8 @@ import type { Template, Language, EmailAttachment, SMTPServerGroup } from '../..
 import PageHeader from '../../components/PageHeader.vue'
 import FormField from '../../components/FormField.vue'
 import AttachmentPicker, { type PendingAttachment } from './AttachmentPicker.vue'
+import HeaderEditor from '../../components/HeaderEditor.vue'
+import { headerRowsProblem, rowsToHeaders, type HeaderRow } from '../../composables/headerRows'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import Notice from '../../components/Notice.vue'
 
@@ -50,11 +52,12 @@ const sendAt = ref('')
 // integration at it.
 const smtpGroup = ref('')
 const smtpGroups = ref<SMTPServerGroup[]>([])
-// Threading headers for a reply, set from the query and attached to
-// whatever is sent. Not an editable field: there is no custom-header
-// UI here, and inventing one to carry two values nobody types by hand
-// would be the wrong shape.
-const replyHeaders = ref<Record<string, string> | null>(null)
+// Custom headers, folded away like Cc and Bcc until asked for. A reply
+// arrives with its two threading headers already in the rows, so they
+// are visible and can be dropped rather than riding along unseen.
+const headerRows = ref<HeaderRow[]>([])
+const showHeaders = ref(false)
+const headersOpen = computed(() => showHeaders.value || headerRows.value.length > 0)
 
 // Raw mode
 const subject = ref('')
@@ -147,7 +150,10 @@ function prefillFromQuery() {
     // References is what most clients actually thread on, and a
     // single-message thread makes it identical to In-Reply-To.
     const id = replyTo.startsWith('<') ? replyTo : `<${replyTo}>`
-    replyHeaders.value = { 'In-Reply-To': id, References: id }
+    headerRows.value = [
+      { name: 'In-Reply-To', value: id },
+      { name: 'References', value: id },
+    ]
   }
 }
 
@@ -224,6 +230,13 @@ function baseValidation(): string[] | null {
     notify.error('At least one recipient is required')
     return null
   }
+  // The editor shows the same sentence under itself. Said again as a
+  // toast because the editor may be scrolled off the screen by now.
+  const problem = headerRowsProblem(headerRows.value)
+  if (problem) {
+    notify.error(`Custom headers: ${problem}`)
+    return null
+  }
   return to
 }
 
@@ -251,7 +264,7 @@ async function sendRaw() {
   if (files) payload.attachments = files
   if (sendAt.value) payload.send_at = new Date(sendAt.value).toISOString()
   if (smtpGroup.value) payload.smtp_group = smtpGroup.value
-  if (replyHeaders.value) payload.headers = replyHeaders.value
+  payload.headers = rowsToHeaders(headerRows.value)
   await submit(() => emailsApi.send(payload))
 }
 
@@ -291,7 +304,7 @@ async function sendTemplate() {
   if (files) payload.attachments = files
   if (sendAt.value) payload.send_at = new Date(sendAt.value).toISOString()
   if (smtpGroup.value) payload.smtp_group = smtpGroup.value
-  if (replyHeaders.value) payload.headers = replyHeaders.value
+  payload.headers = rowsToHeaders(headerRows.value)
   await submit(() => emailsApi.sendTemplate(payload))
 }
 
@@ -379,6 +392,14 @@ function handleSubmit() {
               >
                 Add Cc / Bcc
               </button>
+              <button
+                v-if="!headersOpen"
+                type="button"
+                class="form-reveal"
+                @click="showHeaders = true"
+              >
+                Add custom headers
+              </button>
             </template>
           </FormField>
 
@@ -405,6 +426,15 @@ function handleSubmit() {
               rows="2"
               placeholder="one address per line or comma separated"
             ></textarea>
+          </FormField>
+
+          <FormField
+            v-if="headersOpen"
+            label="Custom headers"
+            :error="fieldErrors.headers"
+            hint="Written into the message as given. Up to 20. From, To, Subject, Date, Message-ID and the other headers Mailyard writes itself cannot be set here, and the project's default headers are added underneath - a header named here wins."
+          >
+            <HeaderEditor v-model="headerRows" :disabled="!projStore.can('emails:write')" />
           </FormField>
 
           <template v-if="mode === 'raw'">

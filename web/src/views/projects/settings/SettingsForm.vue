@@ -13,6 +13,13 @@ import { useNotificationStore } from '../../../stores/notification'
 import { useProjectStore } from '../../../stores/project'
 import { useFieldErrors } from '../../../composables/fieldErrors'
 import FormField from '../../../components/FormField.vue'
+import HeaderEditor from '../../../components/HeaderEditor.vue'
+import {
+  headerRowsProblem,
+  headersToRows,
+  rowsToHeaders,
+  type HeaderRow,
+} from '../../../composables/headerRows'
 
 const props = defineProps<{
   project: Project
@@ -47,6 +54,9 @@ function blank() {
     bounce_address: '',
     alert_email: '',
     sandbox_retention_days: 0,
+    default_headers: [] as HeaderRow[],
+    // One name per line, split on save.
+    submission_drop_headers: '',
   }
 }
 
@@ -61,7 +71,18 @@ function fill(p: Project) {
     bounce_address: p.bounce_address ?? '',
     alert_email: p.alert_email ?? '',
     sandbox_retention_days: p.sandbox_retention_days ?? 0,
+    default_headers: headersToRows(p.default_headers),
+    submission_drop_headers: (p.submission_drop_headers ?? []).join('\n'),
   }
+}
+
+// One name per line or comma separated, the way the send form reads
+// addresses.
+function dropList(): string[] {
+  return form.value.submission_drop_headers
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 watch(() => props.project, fill, { immediate: true })
@@ -113,6 +134,13 @@ async function save() {
     return
   }
 
+  const headerProblem = headerRowsProblem(form.value.default_headers)
+  if (headerProblem) {
+    notify.error(`Default headers: ${headerProblem}`)
+
+    return
+  }
+
   clear()
   saving.value = true
   try {
@@ -123,6 +151,9 @@ async function save() {
       default_language: form.value.default_language.trim(),
       bounce_address: form.value.bounce_address.trim(),
       alert_email: form.value.alert_email.trim(),
+      // Both replace the stored set, so an emptied editor clears it.
+      default_headers: rowsToHeaders(form.value.default_headers) ?? {},
+      submission_drop_headers: dropList(),
     })
     notify.success('Project updated')
     emit('saved', res.data.project)
@@ -244,6 +275,28 @@ async function save() {
           warning. They need platform mail configured, and an administrator can turn the whole
           channel off with <code>security_alerts_enabled</code>.</template
         >
+      </FormField>
+
+      <FormField
+        label="Default headers"
+        :error="errors.default_headers"
+        hint="Custom headers added to every message this project sends, from the API, the console, SMTP submission and campaigns alike. A message or campaign that names the same header wins. Up to 20, and the headers Mailyard writes itself cannot be set."
+      >
+        <HeaderEditor v-model="form.default_headers" />
+      </FormField>
+
+      <FormField
+        label="Headers dropped on SMTP submission"
+        :error="errors.submission_drop_headers"
+        hint="Header names the SMTP submission listener removes from a client's message before forwarding the rest, one per line. Mail clients and libraries add X-Mailer and X-Priority on their own, and this is where a project says it does not want them delivered. Applies to submission only: an API caller who named a header meant it."
+      >
+        <textarea
+          v-model="form.submission_drop_headers"
+          class="form-textarea code-font"
+          rows="3"
+          placeholder="X-Mailer"
+          spellcheck="false"
+        ></textarea>
       </FormField>
 
       <FormField

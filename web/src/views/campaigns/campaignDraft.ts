@@ -6,6 +6,12 @@
 // only place a draft becomes a request.
 import type { CampaignPayload } from '../../api/campaigns'
 import type { Campaign, CampaignVariant } from '../../api/types'
+import {
+  headerRowsProblem,
+  headersToRows,
+  rowsToHeaders,
+  type HeaderRow,
+} from '../../composables/headerRows'
 
 /** What the form holds. Strings throughout - it is bound to inputs. */
 export interface CampaignDraft {
@@ -23,6 +29,8 @@ export interface CampaignDraft {
   send_at_local_time: boolean
   /** Raw JSON, parsed at submit so a half-typed object is not an error. */
   template_data: string
+  /** Custom headers as rows, the editor's shape. */
+  headers: HeaderRow[]
   ab_test_enabled: boolean
 }
 
@@ -41,6 +49,7 @@ export function blankDraft(): CampaignDraft {
     smtp_group: '',
     send_at_local_time: false,
     template_data: '',
+    headers: [],
     ab_test_enabled: false,
   }
 }
@@ -60,6 +69,7 @@ export function fromCampaign(c: Campaign): CampaignDraft {
     smtp_group: c.smtp_group ?? '',
     send_at_local_time: c.send_at_local_time,
     template_data: c.template_data ? JSON.stringify(c.template_data, null, 2) : '',
+    headers: headersToRows(c.headers),
     ab_test_enabled: c.ab_test_enabled,
   }
 }
@@ -80,6 +90,9 @@ export function toPayload(d: CampaignDraft, variants: CampaignVariant[]): Campai
     template_id: d.template_id,
     language: d.language.trim() || undefined,
     template_data: d.template_data.trim() ? JSON.parse(d.template_data) : undefined,
+    // The endpoint rebuilds the record, so an empty object here CLEARS
+    // headers the campaign had - which is what removing every row means.
+    headers: rowsToHeaders(d.headers) ?? {},
     list_id: d.list_id,
     send_rate: d.send_rate,
     smtp_group: d.smtp_group,
@@ -107,6 +120,8 @@ export function toPayload(d: CampaignDraft, variants: CampaignVariant[]): Campai
  */
 export function draftIsReady(d: CampaignDraft, variants: CampaignVariant[]): boolean {
   if (!d.name.trim() || !d.from_email.trim() || !d.template_id || !d.list_id) return false
+  // The editor says what is wrong under itself.
+  if (headerRowsProblem(d.headers)) return false
   if (!d.ab_test_enabled) return true
 
   const total = variants.reduce((sum, v) => sum + (Number(v.split_percentage) || 0), 0)

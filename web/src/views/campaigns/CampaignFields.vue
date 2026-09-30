@@ -19,6 +19,7 @@ import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
 import { draftIsReady, type CampaignDraft } from './campaignDraft'
 import FormField from '../../components/FormField.vue'
+import HeaderEditor from '../../components/HeaderEditor.vue'
 import SenderSelect from '../../components/SenderSelect.vue'
 
 defineProps<{
@@ -246,6 +247,14 @@ void loadSenders()
       hint="Merged under each subscriber's own fields."
     >
       <textarea v-model="draft.template_data" class="form-textarea code-font" rows="4"></textarea>
+    </FormField>
+
+    <FormField
+      label="Custom headers"
+      :error="errors.headers"
+      hint="On every message of the campaign, over the project's default headers. Up to 20. The headers Mailyard writes itself cannot be set here."
+    >
+      <HeaderEditor v-model="draft.headers" />
     </FormField>
 
     <FormField>

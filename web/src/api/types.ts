@@ -43,6 +43,11 @@ export interface Project {
   // see the server field.
   alert_email?: string
   sandbox_retention_days?: number
+  // Custom headers under every message the project sends. A message or
+  // campaign naming the same header wins.
+  default_headers?: Record<string, string>
+  // Header names the SMTP submission listener drops before forwarding.
+  submission_drop_headers?: string[]
   // The role members carry when their own membership names none.
   // Empty means they reach nothing at all.
   default_role_id?: string
@@ -554,6 +559,9 @@ export interface Campaign {
   template_name?: string
   language?: string
   template_data?: Record<string, unknown>
+  // Custom headers on every message of the campaign, over the project's
+  // defaults.
+  headers?: Record<string, string>
   status: CampaignStatus
   list_id: string
   list_name?: string
