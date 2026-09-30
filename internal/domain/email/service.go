@@ -17,6 +17,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/mailheader"
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
 	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
@@ -43,23 +44,10 @@ func reqErrf(format string, args ...any) error {
 	return &RequestError{msg: fmt.Sprintf(format, args...)}
 }
 
-// protectedHeaders are message headers the builder owns. Custom
-// headers colliding with them are rejected so a caller cannot spoof
-// the envelope or break the MIME structure.
-var protectedHeaders = map[string]struct{}{
-	"from": {}, "to": {}, "cc": {}, "bcc": {}, "subject": {}, "date": {},
-	"mime-version": {}, "content-type": {}, "content-transfer-encoding": {},
-	"list-unsubscribe": {}, "list-unsubscribe-post": {}, "return-path": {},
-	"message-id": {}, "received": {}, "dkim-signature": {}, "reply-to": {},
-	// The bounce trail attributes a report by this one, so a second copy
-	// from the caller would leave a parser to pick which message it names.
-	strings.ToLower(smtpclient.HeaderEmailID): {},
-}
-
 // HeaderDisplayTo, HeaderDisplayCc and HeaderReplyTo are the keys
 // under which the client's own To and Cc headers and the reply address
 // ride in Email.Headers from the request to the processor, which lifts
-// them out before building. They are in protectedHeaders, so a caller
+// them out before building. mailheader reserves all three, so a caller
 // cannot smuggle any of them in through the header map.
 const (
 	HeaderDisplayTo = "To"
@@ -91,26 +79,6 @@ func withDisplayRecipients(req *SendRequest) map[string]string {
 	}
 
 	return out
-}
-
-// validHeaderName reports whether name is an RFC 5322 field name: one
-// or more printable US-ASCII characters other than the colon. Leading
-// or trailing whitespace fails - it is not part of any name, and a
-// receiver that trims it would match a reserved header this check
-// would otherwise have missed.
-func validHeaderName(name string) bool {
-	if name == "" {
-		return false
-	}
-
-	for i := range len(name) {
-		ch := name[i]
-		if ch < 33 || ch > 126 || ch == ':' {
-			return false
-		}
-	}
-
-	return true
 }
 
 // Service is the send pipeline entry: validate, persist as queued or
@@ -459,27 +427,14 @@ func (s *Service) ValidateShape(req *SendRequest) error {
 		return reqErrf("either html or text body is required")
 	}
 
-	for key := range req.Headers {
-		// The name is checked BEFORE the reserved-name lookup, and
-		// against RFC 5322 ftext (printable ASCII, no colon) rather
-		// than a character blocklist: "Bcc " with a trailing space is
-		// not in protectedHeaders, and a lenient receiver folds the
-		// space away and honours it as Bcc.
-		if !validHeaderName(key) {
-			return reqErrf("header %q is not a valid header name", key)
+	// The caller's OWN headers only. The project's defaults were
+	// checked when they were saved and are merged in after this.
+	if herr := mailheader.Validate(req.Headers); herr != nil {
+		if hint := reservedHeaderHint[strings.ToLower(herr.Name)]; herr.Kind == mailheader.KindReserved && hint != "" {
+			return reqErrf("%s - %s", herr.Error(), hint)
 		}
 
-		if _, protected := protectedHeaders[strings.ToLower(key)]; protected {
-			if hint := reservedHeaderHint[strings.ToLower(key)]; hint != "" {
-				return reqErrf("header %q is reserved and cannot be overridden - %s", key, hint)
-			}
-
-			return reqErrf("header %q is reserved and cannot be overridden", key)
-		}
-
-		if strings.ContainsAny(req.Headers[key], "\r\n") {
-			return reqErrf("header %q contains invalid characters", key)
-		}
+		return &RequestError{msg: herr.Error()}
 	}
 
 	if len(req.Attachments) > 0 {
