@@ -77,9 +77,20 @@ func TestRenderMissingKey(t *testing.T) {
 	}
 
 	// text/template renders a missing map key as "<no value>" even
-	// under missingkey=zero (zero value of any is nil).
-	if out.Subject != "x<no value>y" && out.Subject != "xy" {
-		t.Errorf("subject = %q", out.Subject)
+	// under missingkey=zero (zero value of any is nil), and the
+	// renderer takes that marker out: lenient means blank, in the
+	// subject and text part as it already is in the html.
+	if out.Subject != "xy" {
+		t.Errorf("subject = %q, want %q", out.Subject, "xy")
+	}
+
+	out, err = lax.Render(&Input{Subject: "s", HTML: "<p>[{{ missing }}]</p>", Text: "[{{ missing }}]"}, map[string]any{})
+	if err != nil {
+		t.Fatalf("missingkey=zero must not fail: %v", err)
+	}
+
+	if !strings.Contains(out.HTML, "[]") || out.Text != "[]" {
+		t.Errorf("html = %q, text = %q, want a blank in both", out.HTML, out.Text)
 	}
 }
 

@@ -137,7 +137,22 @@ func plainTemplate(src string, data map[string]any, onMissing string) (string, e
 		return "", fmt.Errorf("template parse error: %w", err)
 	}
 
-	return execute(t.Funcs(funcs), data)
+	out, err := execute(t.Funcs(funcs), data)
+	if err != nil {
+		return "", err
+	}
+
+	// text/template prints a missing key of a map[string]any as
+	// "<no value>" even under missingkey=zero: the zero value of any is
+	// nil, and nil prints as that marker. html/template's escapers
+	// print the same nil as an empty string, so a lenient render put a
+	// blank in the body and this literal in the subject and text part
+	// of the same message. Lenient means blank, in every part.
+	if onMissing == MissingKeyZero {
+		out = strings.ReplaceAll(out, "<no value>", "")
+	}
+
+	return out, nil
 }
 
 // escapingTemplate renders markup, with html/template's contextual
