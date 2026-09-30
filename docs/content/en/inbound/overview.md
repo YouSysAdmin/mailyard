@@ -40,7 +40,7 @@ authentication — the verified-domain gate is what stops it being an open relay
 
 ## How It Works
 
-```
+```ascii
 sending MTA  ──►  SMTP on :25  ──►  RCPT TO checked against verified domains
                                           │
                                           ▼

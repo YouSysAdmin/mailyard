@@ -87,7 +87,3 @@ healthcheck:
     retries: 3
 ```
 
-## Application info
-
-There is no `/api/v1/info` endpoint. The running version is shown in the console footer and, when metrics are enabled,
-on the [Prometheus endpoint](/docs/admin/platform-metrics).
