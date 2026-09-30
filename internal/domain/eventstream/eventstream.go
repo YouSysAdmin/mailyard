@@ -11,7 +11,6 @@ package eventstream
 import (
 	"bufio"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -88,7 +87,7 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 	return c.SendStreamWriter(func(w *bufio.Writer) {
 		// The closure runs after the handler returns, outside the
 		// server's recover middleware.
-		defer safego.Recover(slog.Default(), "eventstream: stream", "project_id", projectID)
+		defer safego.Recover(h.Runtime.Log, "eventstream: stream", "project_id", projectID)
 		defer sub.Close()
 
 		deadline := time.NewTimer(MaxStreamLife)
