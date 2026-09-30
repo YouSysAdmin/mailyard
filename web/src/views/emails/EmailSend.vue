@@ -52,12 +52,12 @@ const sendAt = ref('')
 // integration at it.
 const smtpGroup = ref('')
 const smtpGroups = ref<SMTPServerGroup[]>([])
-// Custom headers, folded away like Cc and Bcc until asked for. A reply
-// arrives with its two threading headers already in the rows, so they
-// are visible and can be dropped rather than riding along unseen.
+// Custom headers. Always on the page, like the attachment picker: an
+// empty editor is one button, and folded behind a text link in the To
+// hint it was not found. A reply arrives with its two threading headers
+// already in the rows, so they are visible and can be dropped rather
+// than riding along unseen.
 const headerRows = ref<HeaderRow[]>([])
-const showHeaders = ref(false)
-const headersOpen = computed(() => showHeaders.value || headerRows.value.length > 0)
 
 // Raw mode
 const subject = ref('')
@@ -392,14 +392,6 @@ function handleSubmit() {
               >
                 Add Cc / Bcc
               </button>
-              <button
-                v-if="!headersOpen"
-                type="button"
-                class="form-reveal"
-                @click="showHeaders = true"
-              >
-                Add custom headers
-              </button>
             </template>
           </FormField>
 
@@ -429,7 +421,6 @@ function handleSubmit() {
           </FormField>
 
           <FormField
-            v-if="headersOpen"
             label="Custom headers"
             :error="fieldErrors.headers"
             hint="Written into the message as given. Up to 20. From, To, Subject, Date, Message-ID and the other headers Mailyard writes itself cannot be set here, and the project's default headers are added underneath - a header named here wins."
