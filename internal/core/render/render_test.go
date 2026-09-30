@@ -188,7 +188,9 @@ func TestRenderRefusesUnboundedIteration(t *testing.T) {
 			t.Errorf("%s: err = %v, want ErrTooManyIterations", name, err)
 		}
 
-		if took := time.Since(start); took > 5*time.Second {
+		// Generous because the race detector slows a million counted
+		// iterations several times over.
+		if took := time.Since(start); took > 60*time.Second {
 			t.Errorf("%s: refused only after %s", name, took)
 		}
 	}
@@ -226,6 +228,12 @@ func TestRenderRefusesWideFormats(t *testing.T) {
 		`{{printf "%999999999d" 1}}`,
 		`{{printf "%.999999999f" 1.0}}`,
 		`{{printf "%*d" 5 1}}`,
+		`{{printf "%[1]*d" 5 1}}`,
+		`{{printf "%[2]*[1]d" 1 5}}`,
+		`{{printf "%.[1]*f" 5 1.0}}`,
+		`{{$f := "%99999d"}}{{printf $f 1}}`,
+		`{{printf (print "%9999" "9d") 1}}`,
+		`{{"%99999d" | printf}}`,
 		`{{if true}}{{printf "%-99999s" "x"}}{{end}}`,
 	} {
 		if _, err := r.Render(&Input{Subject: src}, nil); !errors.Is(err, ErrFormatWidth) {
@@ -236,5 +244,23 @@ func TestRenderRefusesWideFormats(t *testing.T) {
 	out, err := r.Render(&Input{Subject: `{{printf "%05d|%8.2f" 42 3.14159}}`}, nil)
 	if err != nil || out.Subject != "00042|    3.14" {
 		t.Errorf("ordinary printf: %q, %v", out.Subject, err)
+	}
+}
+
+// The planted iteration count writes nothing in any context. As an
+// action it wrote an empty string, which html/template renders as `""`
+// inside a script, so a template call in a JSON-LD block produced
+// `var a=""1`.
+func TestTheIterationCountWritesNothingInAScript(t *testing.T) {
+	r := &Renderer{}
+	out, err := r.Render(&Input{
+		HTML: `{{define "x"}}1{{end}}<script>var a={{template "x" .}};var b=[{{range .N}}{{.}},{{end}}];</script>`,
+	}, map[string]any{"N": []int{1, 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `<script>var a=1;var b=[ 1 , 2 ,];</script>`; out.HTML != want {
+		t.Errorf("html = %q, want %q", out.HTML, want)
 	}
 }

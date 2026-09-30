@@ -29,12 +29,16 @@ var ErrFormatWidth = errors.New("template printf width or precision is too large
 // collide with a data key an author references through Normalize.
 const budgetFunc = "_iteration"
 
-// tickTree is parsed once to borrow a well-formed action node from.
-// Every range gets a copy: html/template edits the action nodes it
-// escapes and refuses one it meets twice, and Copy needs the node's
-// tree pointer set, which a hand-built node lacks.
+// tickTree is parsed once to borrow a well-formed node from. The call
+// sits in the CONDITION of an empty if, never in an action: an action
+// is output, and html/template writes an empty string as `""` inside
+// a script, so a planted action turned `var a={{template "x"}}` into
+// `var a=""1`. A condition renders nothing in any context. Every
+// site gets a copy: html/template edits the nodes it escapes and
+// refuses one it meets twice, and Copy needs the node's tree pointer
+// set, which a hand-built node lacks.
 var tickTree = func() *parse.Tree {
-	trees, err := parse.Parse("tick", "{{"+budgetFunc+"}}", "", "",
+	trees, err := parse.Parse("tick", "{{if "+budgetFunc+"}}{{end}}", "", "",
 		map[string]any{budgetFunc: func() (string, error) { return "", nil }})
 	if err != nil {
 		panic(err)
@@ -78,7 +82,19 @@ func plant(trees map[string]*parse.Tree) (map[string]any, error) {
 		t.Root.Nodes = append([]parse.Node{tickTree.Root.Nodes[0].Copy()}, t.Root.Nodes...)
 	}
 
-	return map[string]any{budgetFunc: b.tick}, nil
+	return map[string]any{budgetFunc: b.tick, "printf": printfFunc}, nil
+}
+
+// printfFunc stands in for the builtin at execution, so a format
+// assembled at run time - a variable, a print concatenation, a
+// pipeline - meets the same width check as a literal one. The parse
+// check stays for the error to name the template line.
+func printfFunc(format string, a ...any) (string, error) {
+	if wideVerb.MatchString(format) {
+		return "", fmt.Errorf("%w: %s", ErrFormatWidth, format)
+	}
+
+	return fmt.Sprintf(format, a...), nil
 }
 
 func plantList(l *parse.ListNode) error {
@@ -145,12 +161,14 @@ func plantNode(n parse.Node) error {
 }
 
 // wideVerb matches a printf verb whose width or precision runs to
-// five digits or is taken from an argument. fmt allocates the padding
+// five digits or is taken from an argument, the argument named by an
+// explicit index (`%[1]*d`) included. fmt allocates the padding
 // before writing, so the output cap does not bound it.
-var wideVerb = regexp.MustCompile(`%[-+# 0]*(\d{5,}|\*)|%[-+# 0]*\d*\.(\d{5,}|\*)`)
+var wideVerb = regexp.MustCompile(
+	`%[-+# 0]*(\[\d+\])?(\d{5,}|\*)|%[-+# 0]*(\[\d+\])?\d*\.(\[\d+\])?(\d{5,}|\*)`)
 
 // checkPipe refuses a printf whose format asks for absurd padding.
-// Only a literal format is checked.
+// Only a literal format is checked here, printfFunc covers the rest.
 func checkPipe(p *parse.PipeNode) error {
 	if p == nil {
 		return nil
