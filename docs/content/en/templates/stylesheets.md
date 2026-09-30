@@ -46,7 +46,7 @@ curl -X POST http://localhost:3000/api/v1/stylesheets \
 ## List
 
 ```
-GET /api/v1/stylesheets?limit=20
+GET /api/v1/stylesheets
 ```
 
 ## Read one

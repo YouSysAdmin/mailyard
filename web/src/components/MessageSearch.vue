@@ -3,8 +3,10 @@
 // part of any recipient, both at once when both are given.
 //
 // Labelled From and To because those are the words the list, the reader
-// and every form use. What is matched is the envelope, which is what the
-// list rows show too - To therefore also finds a Bcc recipient.
+// and every form use. To matches the envelope recipients, which is what
+// the list rows show, so it also finds a Bcc recipient. From matches
+// what the list shows as the sender: the envelope in the sandbox, the
+// From header for inbound mail.
 //
 // Collapsed behind a toggle, because it is reached for now and then
 // and two inputs cost the list two rows. Collapsing keeps the terms,

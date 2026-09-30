@@ -238,7 +238,7 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "Verify email confirm",
 			Description: "Any signed-in member.",
 			Request:     verifyConfirmInput{},
-			Responses:   []apidoc.Response{apidoc.OK("The result.", UserResponse{})},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", MessageResponse{})},
 		},
 		{
 			Method:      "POST",

@@ -22,7 +22,7 @@ func ConsoleDocs() []apidoc.Route {
 			Description: "Needs the `inbound:read` permission.",
 			Query: []apidoc.Param{
 				{Name: "status"},
-				{Name: "sender", Description: "Part of the envelope sender, case-insensitive."},
+				{Name: "sender", Description: "Part of the sender (the From header), case-insensitive."},
 				{Name: "recipient", Description: "Part of any envelope recipient, Bcc included, case-insensitive."},
 			},
 			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},

@@ -61,7 +61,7 @@ export interface InboundAuth {
 
 export interface InboundListParams {
   status?: string
-  // Part of the envelope sender, or of any envelope recipient.
+  // Part of the sender (the From header), or of any envelope recipient.
   sender?: string
   recipient?: string
   limit?: number

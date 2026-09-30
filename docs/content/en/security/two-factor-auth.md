@@ -11,8 +11,8 @@ Local accounts only. An account an identity provider owns manages its second fac
 
 ## Turning it on
 
-**Profile - Two-Factor Authentication - Set up 2FA.** Scan the QR code with an authenticator app, then enter a code to
-confirm. From then on sign-in asks for a code after the password.
+**Profile - Two-Factor Authentication - Set up 2FA.** Enter your password, scan the QR code with an authenticator app,
+then enter a code to confirm. From then on sign-in asks for a code after the password.
 
 A code is single use: presenting the same one twice is refused, even inside the 90-second skew window.
 

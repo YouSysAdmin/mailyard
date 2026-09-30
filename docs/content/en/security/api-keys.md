@@ -297,11 +297,11 @@ is the intent.
 GET /api/v1/api-keys
 ```
 
-Any project member can list. Only the prefix is returned - see the warning above.
+Needs `apikeys:read`. Only the prefix is returned - see the warning above.
 
 ## Revoking a Key
 
-Instantly disable a key without deleting it. Project admin role required.
+Instantly disable a key without deleting it. Needs `apikeys:write`.
 
 ```
 POST /api/v1/api-keys/{id}/revoke
@@ -316,8 +316,8 @@ preserved.
 DELETE /api/v1/api-keys/{id}
 ```
 
-Project admin role required. Deleting removes the record entirely - prefer revoking if you may later need to explain
-what a key was.
+Needs `apikeys:delete`. Deleting removes the record entirely - prefer revoking if you may later need to explain what
+a key was.
 
 ## Security Features
 

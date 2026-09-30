@@ -77,7 +77,7 @@ Response:
 | `list_unsubscribe` | A recipient clicking a one-click link scoped to an [unsubscribe list](/docs/contacts/unsubscribe-lists) |
 
 Only the first three can be **created** by a caller. `list_unsubscribe` is written by the hosted unsubscribe page and
-carries an `unsubscribe_list_id`, so it blocks that one scope rather than everything. All five are accepted as a
+carries an `unsubscribe_list_id`, so it blocks that one scope rather than everything. All four are accepted as a
 `kind` filter on this list.
 
 ### Paging

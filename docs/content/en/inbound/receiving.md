@@ -34,7 +34,8 @@ The listener does not authenticate its clients — that is what an MX is. What p
 - **`RCPT TO` is checked against verified domains.** A recipient on a domain no project has claimed is refused with a
   `550`, during the conversation, before the message body is transferred. This is what stops the listener being an open
   relay.
-- **The sender is checked against the project suppression list.** A suppressed sender is refused.
+- **The envelope sender is checked against the project suppression list.** A suppressed `MAIL FROM` address (the
+  `bounce_address` on the stored message) is refused.
 - **`MAILYARD_INBOUND_MAX_MESSAGE_SIZE`** is advertised in the `SIZE` extension and enforced, so an oversized message is
   rejected rather than buffered.
 - **`MAILYARD_INBOUND_RATE_PER_MINUTE`** caps sessions per client IP.

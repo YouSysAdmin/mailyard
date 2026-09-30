@@ -28,7 +28,7 @@ GET   /api/v1/projects/{id}
 PATCH /api/v1/projects/{id}
 ```
 
-Reading needs membership. Writing needs `settings:write`, which the owner and admin role presets carry.
+Reading needs membership. Writing needs `settings:write`.
 
 The settings that shape behaviour:
 

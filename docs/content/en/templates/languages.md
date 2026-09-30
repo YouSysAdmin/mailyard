@@ -60,7 +60,7 @@ A code already present in the project is refused with `409`.
 ## List
 
 ```
-GET /api/v1/languages?limit=20
+GET /api/v1/languages
 ```
 
 ## Replace

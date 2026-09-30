@@ -47,7 +47,8 @@ export const authApi = {
       '/auth/register',
       { email, password },
     ),
-  // Redeeming the emailed link also signs the account in.
+  // Redeeming the emailed link confirms the address and nothing more:
+  // the reader still signs in with the password.
   verifyEmail: (token: string) => appApi.post<{ message: string }>('/auth/verify-email', { token }),
   verifyEmailResend: (email: string) =>
     appApi.post<{ message: string }>('/auth/verify-email/resend', { email }),
