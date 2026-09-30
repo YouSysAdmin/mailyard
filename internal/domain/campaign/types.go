@@ -56,8 +56,9 @@ type sendInput struct {
 }
 
 // previewInput picks whose message to render. With no subscriber the
-// template's sample data stands in. variant names an A/B variant and
-// defaults to the first one.
+// campaign's own template_data renders alone, exactly as a send
+// would treat a subscriber carrying no custom fields. variant names an
+// A/B variant and defaults to the first one.
 type previewInput struct {
 	SubscriberID string `json:"subscriber_id" validate:"omitempty,uuid"`
 	Variant      string `json:"variant"       validate:"omitempty,max=50" normalize:"trim"`

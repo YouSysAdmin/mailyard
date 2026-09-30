@@ -116,9 +116,10 @@ func ConsoleDocs() []apidoc.Route {
 			Summary: "Preview",
 			Description: "Renders the campaign for one subscriber, exactly as a send would - " +
 				"variant overrides, the subscriber's language and custom fields included - " +
-				"and stores nothing. Without `subscriber_id` the template's sample data " +
-				"stands in. System links are left out, since no message exists for them " +
-				"to point at. Needs the `campaigns:read` permission.",
+				"and stores nothing. Without `subscriber_id` the campaign's own template_data " +
+				"renders alone - the template's sample data is never used, since a send never " +
+				"reads it. System links are left out, since no message exists for them to " +
+				"point at. Needs the `campaigns:read` permission.",
 			PathParams: []apidoc.Param{{Name: "id"}},
 			Request:    previewInput{},
 			Responses:  []apidoc.Response{apidoc.OK("The rendered message.", PreviewResponse{})},

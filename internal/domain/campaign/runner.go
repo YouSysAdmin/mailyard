@@ -405,7 +405,7 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		return r.Store.Campaign.UpdateMessage(ctx, m.ID, cmodel.MsgSkipped, "subscriber missing or no longer subscribed", "")
 	}
 
-	out, templateID, err := renderForSubscriber(ctx, r.EmailService, c, m.Variant, sub, nil)
+	out, templateID, err := renderForSubscriber(ctx, r.EmailService, c, m.Variant, sub)
 	if err != nil {
 		return err
 	}
@@ -478,19 +478,20 @@ func resolveVariant(c *cmodel.Campaign, variant string) (templateID, subject str
 
 // renderForSubscriber renders the campaign content for one subscriber:
 // variant template and subject overrides, subscriber language
-// fallback, and data merged as base < campaign data < custom fields <
+// fallback, and data merged as campaign data < custom fields <
 // email + name.
 //
 // ONE function for the runner and the preview endpoint, so what the
-// console shows is what the runner sends. base is what sits under the
-// campaign's own data - nil for a send, the template's sample for a
-// preview with nobody picked, which also leaves sub nil.
+// console shows is what the runner sends. sub is nil for a preview
+// with nobody picked, which renders the campaign's own data and
+// nothing else - the template's sample data is deliberately not
+// consulted, because a send never reads it and a preview that filled
+// the blanks from it looked right until the mail went out.
 func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Campaign,
-	variant string, sub *submodel.Subscriber, base map[string]any) (*render.Output, string, error) {
+	variant string, sub *submodel.Subscriber) (*render.Output, string, error) {
 	templateID, variantSubject := resolveVariant(c, variant)
 
 	data := map[string]any{}
-	maps.Copy(data, base)
 	maps.Copy(data, c.TemplateData)
 	language := c.Language
 	if sub != nil {

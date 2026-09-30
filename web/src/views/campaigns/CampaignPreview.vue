@@ -4,10 +4,10 @@
 // Rendered by the SERVER, through the same function the runner sends
 // with, so the variant overrides, the subscriber's language and their
 // custom fields all land the way they will on the day. Opening with
-// nobody picked shows the template's sample data, and picking a
-// subscriber re-renders for them - which is the whole reason for the
-// picker: a campaign template reads {{.name}} and custom fields, and a
-// sample answers those for one made-up person only.
+// nobody picked renders the campaign's own template data and nothing
+// else. NOT the template's sample data: a send never reads it, and a
+// preview that filled the blanks from it looked fine until the mail
+// went out empty. Picking a subscriber re-renders for them.
 import { computed, ref, watch } from 'vue'
 import { campaignsApi } from '../../api/campaigns'
 import type { RenderedPreview } from '../../api/templates'
@@ -99,7 +99,8 @@ void render()
         custom fields.
       </template>
       <template v-else>
-        Rendered with the template's sample data. Pick a subscriber to see their message.
+        Rendered with the campaign's template data only, as a subscriber with no custom fields would
+        get it. Pick a subscriber to see their message.
       </template>
       Web view and unsubscribe links are left out here, since no message exists for them to open.
     </p>

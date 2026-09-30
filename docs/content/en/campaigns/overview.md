@@ -156,10 +156,12 @@ POST /api/v1/campaigns/{id}/preview
 
 Renders the campaign the way the runner will: the variant's template and subject if one is named (the first variant
 when none is), the subscriber's language, and data merged as campaign `template_data` under their custom fields
-under their `email` and `name`. Both fields are optional. Without `subscriber_id` the template's sample data stands
-in, so the page has something to show before anyone is picked. The answer is `preview` with `subject`, `html` and
-`text`. The web view and unsubscribe links are left out, since no message exists for them to open. Nothing is
-stored, and it needs `campaigns:read` only.
+under their `email` and `name`. Both fields are optional. Without `subscriber_id` the campaign's `template_data`
+renders alone, which is what a subscriber with no custom fields receives. The template's **sample data is never
+used** here: a send never reads it, so a preview filled from it would look right until the mail went out. A value
+a campaign needs has to be in its own `template_data`. The answer is `preview` with `subject`, `html` and `text`.
+The web view and unsubscribe links are left out, since no message exists for them to open. Nothing is stored, and
+it needs `campaigns:read` only.
 
 The console has this as **Preview** on the campaign page, with a subscriber picker that searches the audience.
 

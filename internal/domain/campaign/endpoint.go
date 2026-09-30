@@ -18,7 +18,6 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
-	"github.com/yousysadmin/mailyard/internal/domain/template"
 	cmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 	submodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
 )
@@ -522,7 +521,6 @@ func (h *Handler) Preview(c fiber.Ctx) error {
 	}
 
 	var sub *submodel.Subscriber
-	var base map[string]any
 	if in.SubscriberID != "" {
 		sub, err = h.Runtime.Store.Subscriber.Get(c.Context(), rc.Project.ID, in.SubscriberID)
 		if err != nil {
@@ -532,15 +530,9 @@ func (h *Handler) Preview(c fiber.Ctx) error {
 		if sub == nil {
 			return response.NotFound(c, "subscriber not found")
 		}
-	} else {
-		templateID, _ := resolveVariant(cam, variant)
-		base, err = h.sampleDataFor(c, rc.Project.ID, templateID)
-		if err != nil {
-			return response.Internal(c, err)
-		}
 	}
 
-	out, _, err := renderForSubscriber(c.Context(), email.NewService(h.Runtime), cam, variant, sub, base)
+	out, _, err := renderForSubscriber(c.Context(), email.NewService(h.Runtime), cam, variant, sub)
 	if err != nil {
 		if _, ok := errors.AsType[*email.RequestError](err); ok {
 			return response.BadRequest(c, err.Error())
@@ -552,23 +544,6 @@ func (h *Handler) Preview(c fiber.Ctx) error {
 	email.StripSystemLinks(out)
 
 	return response.Success(c, PreviewResponse{Preview: out})
-}
-
-// sampleDataFor is the template's sample, version first. Empty when
-// the template or its active version is gone - the render reports
-// that itself.
-func (h *Handler) sampleDataFor(c fiber.Ctx, projID, templateID string) (map[string]any, error) {
-	t, err := h.Runtime.Store.Template.Get(c.Context(), projID, templateID)
-	if err != nil || t == nil || t.ActiveVersionID == nil {
-		return nil, err
-	}
-
-	v, err := h.Runtime.Store.Template.GetVersion(c.Context(), projID, t.ID, *t.ActiveVersionID)
-	if err != nil || v == nil {
-		return nil, err
-	}
-
-	return template.SampleData(v.SampleData, t.SampleData), nil
 }
 
 func hasVariant(c *cmodel.Campaign, name string) bool {
