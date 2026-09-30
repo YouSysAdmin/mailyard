@@ -32,6 +32,7 @@ export interface CampaignDraft {
   /** Custom headers as rows, the editor's shape. */
   headers: HeaderRow[]
   ab_test_enabled: boolean
+  unsubscribe_disabled: boolean
 }
 
 /** An empty draft, for the create dialog. */
@@ -51,6 +52,7 @@ export function blankDraft(): CampaignDraft {
     template_data: '',
     headers: [],
     ab_test_enabled: false,
+    unsubscribe_disabled: false,
   }
 }
 
@@ -71,6 +73,7 @@ export function fromCampaign(c: Campaign): CampaignDraft {
     template_data: c.template_data ? JSON.stringify(c.template_data, null, 2) : '',
     headers: headersToRows(c.headers),
     ab_test_enabled: c.ab_test_enabled,
+    unsubscribe_disabled: c.unsubscribe_disabled,
   }
 }
 
@@ -98,6 +101,7 @@ export function toPayload(d: CampaignDraft, variants: CampaignVariant[]): Campai
     smtp_group: d.smtp_group,
     send_at_local_time: d.send_at_local_time,
     ab_test_enabled: d.ab_test_enabled,
+    unsubscribe_disabled: d.unsubscribe_disabled,
     // Sent only when the split is on. Sending an empty list with it off
     // would ask the server to store variants nothing will ever read.
     ab_variants: d.ab_test_enabled

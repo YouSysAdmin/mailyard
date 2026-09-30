@@ -20,6 +20,7 @@ import { useProjectStore } from '../../stores/project'
 import { draftIsReady, type CampaignDraft } from './campaignDraft'
 import FormField from '../../components/FormField.vue'
 import HeaderEditor from '../../components/HeaderEditor.vue'
+import Notice from '../../components/Notice.vue'
 import SenderSelect from '../../components/SenderSelect.vue'
 
 defineProps<{
@@ -239,6 +240,22 @@ void loadSenders()
         <input v-model="draft.send_at_local_time" type="checkbox" />
         Send at each subscriber's local time
       </label>
+    </FormField>
+
+    <FormField>
+      <label class="checkbox-label">
+        <input v-model="draft.unsubscribe_disabled" type="checkbox" />
+        Do not add unsubscribe links or headers
+      </label>
+      <!-- Said right here rather than in a hint: it is the one option
+           on this form that makes the mail worse, and a reader ticking
+           it should see why before they save. -->
+      <Notice v-if="draft.unsubscribe_disabled" kind="warning" class="mt-4">
+        <p>
+          Bulk mail without List-Unsubscribe is filtered by Gmail and Yahoo rather than bounced, so
+          the failure is invisible from here. The template's unsubscribe link renders empty.
+        </p>
+      </Notice>
     </FormField>
 
     <FormField

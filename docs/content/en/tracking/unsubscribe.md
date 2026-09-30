@@ -12,7 +12,8 @@ want depends on who owns the opt-out:
 - **Caller-managed** — your application supplies its own URL, Mailyard carries the header and nothing else. Suitable
   when the application already runs its own preference centre and knows who its recipients are.
 
-Campaigns are always Mailyard-managed.
+Campaigns are Mailyard-managed, unless the campaign turns its unsubscribe off (`unsubscribe_disabled`), in which
+case its mail carries neither header and no link.
 
 ## Why it matters even for a non-marketing send
 

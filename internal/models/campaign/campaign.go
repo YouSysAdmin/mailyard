@@ -86,6 +86,12 @@ type Campaign struct {
 	ABTestEnabled   bool      `json:"ab_test_enabled"`
 	ABVariants      []Variant `json:"ab_variants,omitempty"`
 
+	// UnsubscribeDisabled leaves the List-Unsubscribe headers and the
+	// unsubscribe link out of every message of the campaign. An option
+	// and not a default: bulk mail without them is filtered by Gmail
+	// and Yahoo rather than bounced.
+	UnsubscribeDisabled bool `json:"unsubscribe_disabled"`
+
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`

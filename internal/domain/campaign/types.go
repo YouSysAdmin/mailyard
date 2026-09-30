@@ -44,6 +44,11 @@ type upsertInput struct {
 	ABTestEnabled   bool             `json:"ab_test_enabled"`
 	ABVariants      []cmodel.Variant `json:"ab_variants"        validate:"omitempty,max=5,dive"`
 
+	// UnsubscribeDisabled sends the campaign with no List-Unsubscribe
+	// headers and no unsubscribe link. Against the bulk-sender rules
+	// of Gmail and Yahoo, and offered anyway as a deliberate choice.
+	UnsubscribeDisabled bool `json:"unsubscribe_disabled"`
+
 	// smtpGroupID is the resolved form of SMTPGroup, filled by
 	// validateCampaignRefs. Unexported so it cannot arrive from the
 	// request body - a caller naming a group id directly would skip

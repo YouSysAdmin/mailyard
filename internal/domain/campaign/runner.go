@@ -548,10 +548,14 @@ func (r *Runner) applyTracking(ctx context.Context, c *cmodel.Campaign, m *cmode
 
 	// The email id is minted here so the web view token can embed it
 	// before the row exists. The service honors the pinned id.
+	//
+	// A campaign that turned its unsubscribe off gets an empty link, so
+	// the sentinel is stripped rather than left as a dead href, and
+	// neither List-Unsubscribe header is written below.
 	req.ID = ids.New()
-	system := tracking.Links{
-		WebView:     r.Tracking.WebViewURL(req.ID),
-		Unsubscribe: r.Tracking.UnsubscribeURL(m.ID),
+	system := tracking.Links{WebView: r.Tracking.WebViewURL(req.ID)}
+	if !c.UnsubscribeDisabled {
+		system.Unsubscribe = r.Tracking.UnsubscribeURL(m.ID)
 	}
 	req.Subject = tracking.SubstituteSystemLinks(req.Subject, system)
 	req.HTML = tracking.SubstituteSystemLinks(req.HTML, system)
@@ -571,6 +575,10 @@ func (r *Runner) applyTracking(ctx context.Context, c *cmodel.Campaign, m *cmode
 		}); err != nil {
 			r.Log.Error("campaign: upsert tracked link", "campaign_id", c.ID, "err", err)
 		}
+	}
+
+	if c.UnsubscribeDisabled {
+		return
 	}
 
 	req.ListUnsubscribeURL = system.Unsubscribe

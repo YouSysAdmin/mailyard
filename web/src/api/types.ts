@@ -593,6 +593,9 @@ export interface Campaign {
   send_at_local_time: boolean
   ab_test_enabled: boolean
   ab_variants?: CampaignVariant[]
+  // No List-Unsubscribe headers and no unsubscribe link on this
+  // campaign's mail. An option, never a default.
+  unsubscribe_disabled: boolean
   scheduled_at?: string
   started_at?: string
   completed_at?: string

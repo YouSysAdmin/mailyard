@@ -338,6 +338,10 @@ void start()
                 }}
               </div>
             </div>
+            <div>
+              <div class="summary-label">Unsubscribe Links</div>
+              <div>{{ campaign.unsubscribe_disabled ? 'Off' : 'On' }}</div>
+            </div>
           </div>
         </div>
       </div>

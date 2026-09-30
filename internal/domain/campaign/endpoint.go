@@ -330,16 +330,16 @@ func (h *Handler) Send(c fiber.Ctx) error {
 	// February 2024, and mail without it is filtered rather than
 	// bounced - so the failure is invisible from here.
 	//
-	// The hosted unsubscribe link is absolute and signed, so it cannot
-	// be built without server.public_url. Refusing to start is the
-	// only honest option: the alternative is sending the whole
-	// audience with no List-Unsubscribe header and no indication
-	// anything is wrong.
+	// The hosted links are absolute and signed, so none of them can be
+	// built without server.public_url: the unsubscribe, the open pixel,
+	// the click redirects and the web view. Refusing to start is the
+	// only honest option, and a campaign that turned its unsubscribe
+	// off still needs the rest.
 	if h.Runtime.Tracking == nil || !h.Runtime.Tracking.Enabled() {
 		return response.BadRequest(c,
-			"campaigns need a public URL to mint unsubscribe links - set server.public_url, "+
-				"otherwise this would send bulk mail with no List-Unsubscribe header and "+
-				"land in spam")
+			"campaigns need a public URL to mint tracking and unsubscribe links - "+
+				"set server.public_url, otherwise this would send bulk mail with no "+
+				"List-Unsubscribe header and land in spam")
 	}
 
 	// The same sender check every send makes, asked once here instead
@@ -652,6 +652,8 @@ func (in *upsertInput) toModel(projID string) *cmodel.Campaign {
 		SendAtLocalTime: in.SendAtLocalTime,
 		ABTestEnabled:   in.ABTestEnabled,
 		ABVariants:      in.ABVariants,
+
+		UnsubscribeDisabled: in.UnsubscribeDisabled,
 	}
 	if cam.ABVariants == nil {
 		cam.ABVariants = []cmodel.Variant{}

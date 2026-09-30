@@ -63,6 +63,13 @@ copy where the copy lives.
 | `send_at_local_time` | `false` | Deliver at the scheduled wall-clock time in each subscriber's own timezone |
 | `ab_test_enabled` | `false` | Turn on [A/B testing](/docs/campaigns/ab-testing) |
 | `ab_variants` | — | Up to 5 variants |
+| `unsubscribe_disabled` | `false` | Send with no `List-Unsubscribe` headers and no unsubscribe link |
+
+{{< callout type="warning" title="`unsubscribe_disabled` makes the mail worse" >}}
+Gmail and Yahoo filter bulk mail that lacks `List-Unsubscribe` rather than bouncing it, so the failure is invisible
+from here, and `{{ mailyard_unsubscribe_url }}` in the template renders empty. It exists for the case where the
+opt-out is handled entirely elsewhere. Opens, clicks and the web view keep working.
+{{< /callout >}}
 
 `smtp_group` is worth setting. Bulk mail on its own pool is the usual arrangement, so a campaign that burns an IP's
 reputation does not take your transactional mail down with it.

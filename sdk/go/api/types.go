@@ -225,35 +225,36 @@ type BounceListResponse struct {
 
 // Campaign is the wire body.
 type Campaign struct {
-	ID              string            `json:"id"`
-	ProjectID       string            `json:"project_id"`
-	CreatedBy       string            `json:"created_by,omitempty"`
-	CreatedByEmail  string            `json:"created_by_email,omitempty"`
-	Name            string            `json:"name"`
-	Subject         string            `json:"subject,omitempty"`
-	FromEmail       string            `json:"from_email"`
-	FromName        string            `json:"from_name,omitempty"`
-	ReplyTo         string            `json:"reply_to,omitempty"`
-	TemplateID      string            `json:"template_id"`
-	TemplateName    string            `json:"template_name,omitempty"`
-	Language        string            `json:"language,omitempty"`
-	TemplateData    map[string]any    `json:"template_data,omitempty"`
-	Headers         map[string]string `json:"headers"`
-	Status          string            `json:"status"`
-	ListID          string            `json:"list_id"`
-	ListName        string            `json:"list_name,omitempty"`
-	SMTPGroupID     string            `json:"smtp_group_id,omitempty"`
-	SMTPGroup       string            `json:"smtp_group,omitempty"`
-	SMTPGroupName   string            `json:"smtp_group_name,omitempty"`
-	SendRate        int64             `json:"send_rate"`
-	SendAtLocalTime bool              `json:"send_at_local_time"`
-	ABTestEnabled   bool              `json:"ab_test_enabled"`
-	ABVariants      []Variant         `json:"ab_variants,omitempty"`
-	ScheduledAt     *time.Time        `json:"scheduled_at,omitempty"`
-	StartedAt       *time.Time        `json:"started_at,omitempty"`
-	CompletedAt     *time.Time        `json:"completed_at,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       *time.Time        `json:"updated_at,omitempty"`
+	ID                  string            `json:"id"`
+	ProjectID           string            `json:"project_id"`
+	CreatedBy           string            `json:"created_by,omitempty"`
+	CreatedByEmail      string            `json:"created_by_email,omitempty"`
+	Name                string            `json:"name"`
+	Subject             string            `json:"subject,omitempty"`
+	FromEmail           string            `json:"from_email"`
+	FromName            string            `json:"from_name,omitempty"`
+	ReplyTo             string            `json:"reply_to,omitempty"`
+	TemplateID          string            `json:"template_id"`
+	TemplateName        string            `json:"template_name,omitempty"`
+	Language            string            `json:"language,omitempty"`
+	TemplateData        map[string]any    `json:"template_data,omitempty"`
+	Headers             map[string]string `json:"headers"`
+	Status              string            `json:"status"`
+	ListID              string            `json:"list_id"`
+	ListName            string            `json:"list_name,omitempty"`
+	SMTPGroupID         string            `json:"smtp_group_id,omitempty"`
+	SMTPGroup           string            `json:"smtp_group,omitempty"`
+	SMTPGroupName       string            `json:"smtp_group_name,omitempty"`
+	SendRate            int64             `json:"send_rate"`
+	SendAtLocalTime     bool              `json:"send_at_local_time"`
+	ABTestEnabled       bool              `json:"ab_test_enabled"`
+	ABVariants          []Variant         `json:"ab_variants,omitempty"`
+	UnsubscribeDisabled bool              `json:"unsubscribe_disabled"`
+	ScheduledAt         *time.Time        `json:"scheduled_at,omitempty"`
+	StartedAt           *time.Time        `json:"started_at,omitempty"`
+	CompletedAt         *time.Time        `json:"completed_at,omitempty"`
+	CreatedAt           time.Time         `json:"created_at"`
+	UpdatedAt           *time.Time        `json:"updated_at,omitempty"`
 }
 
 // CampaignDetailResponse is the response body.
@@ -276,21 +277,22 @@ type CampaignResponse struct {
 
 // CampaignUpsertInput is the request body.
 type CampaignUpsertInput struct {
-	Name            string            `json:"name"`
-	Subject         string            `json:"subject"`
-	FromEmail       string            `json:"from_email"`
-	FromName        string            `json:"from_name"`
-	ReplyTo         string            `json:"reply_to"`
-	TemplateID      string            `json:"template_id"`
-	Language        string            `json:"language"`
-	TemplateData    map[string]any    `json:"template_data"`
-	ListID          string            `json:"list_id"`
-	Headers         map[string]string `json:"headers"`
-	SMTPGroup       string            `json:"smtp_group"`
-	SendRate        int64             `json:"send_rate"`
-	SendAtLocalTime bool              `json:"send_at_local_time"`
-	ABTestEnabled   bool              `json:"ab_test_enabled"`
-	ABVariants      []Variant         `json:"ab_variants"`
+	Name                string            `json:"name"`
+	Subject             string            `json:"subject"`
+	FromEmail           string            `json:"from_email"`
+	FromName            string            `json:"from_name"`
+	ReplyTo             string            `json:"reply_to"`
+	TemplateID          string            `json:"template_id"`
+	Language            string            `json:"language"`
+	TemplateData        map[string]any    `json:"template_data"`
+	ListID              string            `json:"list_id"`
+	Headers             map[string]string `json:"headers"`
+	SMTPGroup           string            `json:"smtp_group"`
+	SendRate            int64             `json:"send_rate"`
+	SendAtLocalTime     bool              `json:"send_at_local_time"`
+	ABTestEnabled       bool              `json:"ab_test_enabled"`
+	ABVariants          []Variant         `json:"ab_variants"`
+	UnsubscribeDisabled bool              `json:"unsubscribe_disabled"`
 }
 
 // CatalogResponse is the response body.

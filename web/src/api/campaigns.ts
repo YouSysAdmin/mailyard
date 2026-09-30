@@ -20,6 +20,7 @@ export interface CampaignPayload {
   send_at_local_time?: boolean
   ab_test_enabled?: boolean
   ab_variants?: CampaignVariant[]
+  unsubscribe_disabled?: boolean
 }
 
 export interface CampaignDetail {
