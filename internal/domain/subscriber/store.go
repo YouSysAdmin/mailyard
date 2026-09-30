@@ -60,7 +60,7 @@ func (s *Store) GetByEmail(ctx context.Context, projID, email string) (*submodel
 }
 
 // List returns subscribers newest first, optionally narrowed by
-// status and an email substring.
+// status and part of the address or name.
 func (s *Store) List(ctx context.Context, projID, status, query string, limit, offset int) ([]*submodel.Subscriber, error) {
 	sqlQuery := subSelect + subscriberScope
 	if status != "" {
@@ -68,7 +68,7 @@ func (s *Store) List(ctx context.Context, projID, status, query string, limit, o
 	}
 
 	if query != "" {
-		sqlQuery += subscriberByEmail
+		sqlQuery += subscriberBySearch
 	}
 
 	args := subscriberFilterArgs(projID, status, query)
@@ -111,7 +111,7 @@ func (s *Store) CountMatching(ctx context.Context, projID, status, query string)
 	}
 
 	if query != "" {
-		sqlQuery += subscriberByEmail
+		sqlQuery += subscriberBySearch
 	}
 
 	var n int
@@ -134,8 +134,10 @@ const (
 
 	// Same rule as every other search here - see contact.List. LOWER
 	// on the column, since the term is lowercased: without it a
-	// subscriber stored as Ann@Example.com never matches "ann".
-	subscriberByEmail = ` AND LOWER(email) LIKE ? ESCAPE '\'`
+	// subscriber stored as Ann@Example.com never matches "ann". Both
+	// expressions carry a trigram index (00096), so the shape here is
+	// what the index serves.
+	subscriberBySearch = ` AND (LOWER(email) LIKE ? ESCAPE '\' OR LOWER(name) LIKE ? ESCAPE '\')`
 )
 
 func subscriberFilterArgs(projID, status, query string) []any {
@@ -145,7 +147,8 @@ func subscriberFilterArgs(projID, status, query string) []any {
 	}
 
 	if query != "" {
-		args = append(args, "%"+database.EscapeLike(strings.ToLower(query))+"%")
+		pattern := "%" + database.EscapeLike(strings.ToLower(query)) + "%"
+		args = append(args, pattern, pattern)
 	}
 
 	return args

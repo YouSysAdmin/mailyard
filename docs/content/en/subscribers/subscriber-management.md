@@ -56,15 +56,15 @@ The project's subscriber cap is checked first, so a create over the plan limit a
 ## List
 
 ```
-GET /api/v1/subscribers?limit=20&offset=0&status=subscribed&search=acme
+GET /api/v1/subscribers?limit=20&offset=0&status=subscribed&q=acme
 ```
 
 | Parameter | Notes |
 |---|---|
-| `limit` | Default 20, clamped to the API ceiling |
+| `limit` | Default 50, clamped to the API ceiling |
 | `offset` | Rows to skip. `page` is honoured as a zero-based alias when `offset` is absent |
 | `status` | One of the four statuses |
-| `search` | Matches email or name |
+| `q` | Part of the address, matched without regard to case |
 
 `total` counts what the **filters** match, not the project — so a search hitting one row out of five thousand reports
 one, and the pager offers one page rather than fifty mostly empty ones.
