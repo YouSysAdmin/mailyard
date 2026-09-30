@@ -424,6 +424,9 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		Subject: out.Subject,
 		HTML:    out.HTML,
 		Text:    out.Text,
+		// The campaign's own headers. The project's defaults are laid
+		// under them by the send service, like every other path.
+		Headers: c.Headers,
 		// The campaign's pool, already resolved to an id when the
 		// campaign was created. Empty means the project's default.
 		Route: email.Route{GroupID: c.SMTPGroupID},

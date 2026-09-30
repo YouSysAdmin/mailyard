@@ -57,6 +57,7 @@ copy where the copy lives.
 | `subject` | — | Fallback subject, as above |
 | `language` | — | Localization to render. Falls through the [usual four steps](/docs/templates/localization#choosing-one-at-send-time) per subscriber |
 | `template_data` | — | Campaign-wide render values, up to 100 keys |
+| `headers` | — | Custom headers on every message of the campaign, up to 20. Over the project's defaults, under nothing - see [the three layers](/docs/email-sending/single-email#three-layers-of-headers) |
 | `smtp_group` | project default | Slug of the [server pool](/docs/smtp-domains/server-groups) to send through |
 | `send_rate` | `0` | Emails per minute. `0` is unthrottled |
 | `send_at_local_time` | `false` | Deliver at the scheduled wall-clock time in each subscriber's own timezone |

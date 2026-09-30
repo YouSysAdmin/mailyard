@@ -36,7 +36,7 @@ func NewStore(db *sql.DB) *Store {
 
 const campaignSelect = `
 SELECT id, project_id, created_by, name, subject, from_email, from_name, reply_to,
-       template_id, language, template_data, status, list_id, smtp_group_id, send_rate,
+       template_id, language, template_data, headers_json, status, list_id, smtp_group_id, send_rate,
        send_at_local_time, ab_test_enabled, ab_variants,
        scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at,
        COALESCE((SELECT u.email FROM users u WHERE u.id = NULLIF(campaigns.created_by, '')::uuid), ''),
@@ -108,10 +108,10 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
 	_, err := s.Exec(ctx, `
         INSERT INTO campaigns (
             id, project_id, created_by, name, subject, from_email, from_name, reply_to,
-            template_id, language, template_data, status, list_id, smtp_group_id, send_rate,
+            template_id, language, template_data, headers_json, status, list_id, smtp_group_id, send_rate,
             send_at_local_time, ab_test_enabled, ab_variants,
             scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name               = excluded.name,
             subject            = excluded.subject,
@@ -121,6 +121,7 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
             template_id        = excluded.template_id,
             language           = excluded.language,
             template_data      = excluded.template_data,
+            headers_json       = excluded.headers_json,
             smtp_group_id      = excluded.smtp_group_id,
             list_id            = excluded.list_id,
             send_rate          = excluded.send_rate,
@@ -130,7 +131,8 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
             updated_at         = excluded.updated_at
     `,
 		c.ID, c.ProjectID, c.CreatedBy, c.Name, c.Subject, c.FromEmail, c.FromName, c.ReplyTo,
-		c.TemplateID, c.Language, database.MustJSON(c.TemplateData), c.Status, c.ListID, database.NullStr(c.SMTPGroupID),
+		c.TemplateID, c.Language, database.MustJSON(c.TemplateData), database.MustJSON(orEmptyHeaders(c.Headers)),
+		c.Status, c.ListID, database.NullStr(c.SMTPGroupID),
 		c.SendRate, c.SendAtLocalTime, c.ABTestEnabled, database.MustJSON(c.ABVariants),
 		database.NullTime(c.ScheduledAt), database.NullTime(c.StartedAt),
 		database.NullTime(c.CompletedAt), database.NullTime(c.NextBatchAt),
@@ -576,12 +578,21 @@ func (s *Store) MessageStats(ctx context.Context, campaignID string) (map[string
 	return totals, byVariant, rows.Err()
 }
 
+// orEmptyHeaders keeps the wire and the column at {} rather than null.
+func orEmptyHeaders(h map[string]string) map[string]string {
+	if h == nil {
+		return map[string]string{}
+	}
+
+	return h
+}
+
 func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	var c cmodel.Campaign
-	var data, variants string
+	var data, headers, variants string
 	var scheduledAt, startedAt, completedAt, nextBatchAt, updatedAt sql.NullTime
 	if err := r.Scan(&c.ID, &c.ProjectID, &c.CreatedBy, &c.Name, &c.Subject,
-		&c.FromEmail, &c.FromName, &c.ReplyTo, &c.TemplateID, &c.Language, &data, &c.Status,
+		&c.FromEmail, &c.FromName, &c.ReplyTo, &c.TemplateID, &c.Language, &data, &headers, &c.Status,
 		&c.ListID, database.Str(&c.SMTPGroupID), &c.SendRate, &c.SendAtLocalTime, &c.ABTestEnabled, &variants,
 		&scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt,
 		&c.CreatedByEmail, &c.TemplateName, &c.ListName, &c.SMTPGroup, &c.SMTPGroupName); err != nil {
@@ -589,6 +600,8 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	}
 
 	database.MustUnmarshalJSON(data, &c.TemplateData)
+	database.MustUnmarshalJSON(headers, &c.Headers)
+	c.Headers = orEmptyHeaders(c.Headers)
 	database.MustUnmarshalJSON(variants, &c.ABVariants)
 	if scheduledAt.Valid {
 		c.ScheduledAt = new(scheduledAt.Time)

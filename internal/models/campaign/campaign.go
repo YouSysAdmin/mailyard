@@ -57,9 +57,13 @@ type Campaign struct {
 	// it is merged with the subscriber's custom fields plus the
 	// reserved keys email and name.
 	TemplateData map[string]any `json:"template_data,omitempty"`
-	Status       string         `json:"status"`
-	ListID       string         `json:"list_id"`
-	ListName     string         `json:"list_name,omitempty"`
+
+	// Headers are custom headers on every message of the campaign,
+	// laid over the project's defaults. Never nil on the wire.
+	Headers  map[string]string `json:"headers"`
+	Status   string            `json:"status"`
+	ListID   string            `json:"list_id"`
+	ListName string            `json:"list_name,omitempty"`
 
 	// SMTPGroupID routes the whole campaign to a named server pool.
 	// Empty uses the project's default group. Separating pools is the

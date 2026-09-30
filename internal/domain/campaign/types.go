@@ -29,6 +29,10 @@ type upsertInput struct {
 	TemplateData map[string]any `json:"template_data"      validate:"omitempty,max=100"`
 	ListID       string         `json:"list_id"            validate:"required,uuid"`
 
+	// Headers go on every message of the campaign, over the project's
+	// defaults. Same rules as a message's own headers.
+	Headers map[string]string `json:"headers" validate:"omitempty,max=20"`
+
 	// SMTPGroup names the server pool the campaign sends through, by
 	// slug. Empty uses the project's default group. Bulk on its own
 	// pool is the usual arrangement, so a campaign cannot take

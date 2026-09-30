@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/keyset"
+	"github.com/yousysadmin/mailyard/internal/core/mailheader"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -39,6 +40,10 @@ type Handler struct {
 // Same trap as verifySession, passkeySelf, enrolmentScope and
 // refuseCAOverAnAssignedName.
 func (h *Handler) validateCampaignRefs(c fiber.Ctx, projID string, in *upsertInput) (bool, error) {
+	if herr := mailheader.Validate(in.Headers); herr != nil {
+		return false, response.BadRequest(c, herr.Error())
+	}
+
 	t, err := h.Runtime.Store.Template.Get(c.Context(), projID, in.TemplateID)
 	if err != nil {
 		return false, response.Internal(c, err)
@@ -574,6 +579,7 @@ func (in *upsertInput) toModel(projID string) *cmodel.Campaign {
 		TemplateID:      in.TemplateID,
 		Language:        in.Language,
 		TemplateData:    in.TemplateData,
+		Headers:         in.Headers,
 		ListID:          in.ListID,
 		SMTPGroupID:     in.smtpGroupID,
 		SendRate:        in.SendRate,
@@ -583,6 +589,10 @@ func (in *upsertInput) toModel(projID string) *cmodel.Campaign {
 	}
 	if cam.ABVariants == nil {
 		cam.ABVariants = []cmodel.Variant{}
+	}
+
+	if cam.Headers == nil {
+		cam.Headers = map[string]string{}
 	}
 
 	return cam
