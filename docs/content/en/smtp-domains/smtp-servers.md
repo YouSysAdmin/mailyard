@@ -6,6 +6,8 @@ weight: 10
 
 An SMTP server is a route out. A project can hold several, arranged into
 [groups](/docs/smtp-domains/server-groups) that decide which one a given message tries and what it falls back to.
+The server's IP is what receivers see, so its reverse DNS and TLS are two of the
+[bulk sender requirements](/docs/getting-started/bulk-sender-requirements) that are met here rather than in Mailyard.
 
 ## Adding one
 

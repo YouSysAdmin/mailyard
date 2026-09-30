@@ -1,0 +1,69 @@
+---
+title: "Bulk Sender Requirements"
+description: "What Gmail, Yahoo, Microsoft and Apple demand of a domain that sends at volume, and which Mailyard feature answers each demand"
+weight: 45
+---
+
+Since February 2024 Gmail and Yahoo hold a **bulk sender** to a fixed list of requirements, and a message that misses
+one is **filtered rather than bounced**: the delivery report is clean, the recipient never sees it, and nothing in
+your logs says so. This page is what the two ask for and where in Mailyard each demand is met. The originals are
+Google's [Email sender guidelines](https://support.google.com/mail/answer/81126) and Yahoo's
+[Sender Hub](https://senders.yahooinc.com/best-practices/), and those are the authority when this page and they
+disagree.
+
+## Who counts as a bulk sender
+
+A domain sending about **5,000 messages a day** to Gmail addresses. Yahoo draws its line in the same place. Two things
+about how that is counted decide how it applies to you:
+
+- **It is counted per domain, not per address and not per IP.** Every From address on `example.com` and on its
+  subdomains rolls into one figure, Google calls it the _primary sending domain_. Sending from several addresses
+  does not split the count, and a dedicated IP does not lift the requirement.
+- **It is the domain's whole traffic.** Receipts and password resets count toward the threshold beside the newsletter.
+  A domain that crosses it is judged as a whole, so the rules below are worth meeting on transactional mail too.
+
+Below the threshold nothing is enforced, but filtering is reputation driven either way, and a message without an
+unsubscribe header goes to spam faster once complaints start.
+
+## The requirements and where Mailyard meets them
+
+| Requirement                                   | What it means                                                                                                   | In Mailyard                                                                                                                                                                                                                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SPF and DKIM**                              | Both must pass for the domain                                                                                   | [Domain Verification](/docs/smtp-domains/domain-verification) publishes the SPF record and signs outbound mail with DKIM once the domain is claimed                                                                                                                                 |
+| **DMARC**                                     | A policy on the From domain, `p=none` is enough, and the From domain must **align** with the SPF or DKIM domain | The DMARC record is on the same page. Alignment is automatic: Mailyard signs with the From domain's own key                                                                                                                                                                         |
+| **One-click unsubscribe**                     | `List-Unsubscribe` with an `https` target plus `List-Unsubscribe-Post`, honoured within two days                | Campaigns carry both headers unconditionally, a transactional send carries them when scoped to an [unsubscribe list](/docs/contacts/unsubscribe-lists) or given [your own targets](/docs/tracking/unsubscribe#caller-managed-opt-out). The hosted endpoint answers the POST at once |
+| **A visible unsubscribe link**                | In the body, for marketing and subscribed mail                                                                  | `{{ mailyard_unsubscribe_url }}` in the [template](/docs/templates/system-variables)                                                                                                                                                                                                |
+| **Spam rate under 0.3%**                      | Measured in Google Postmaster Tools, aim for 0.1%                                                               | [Bounce handling](/docs/smtp-domains/bounce-handling) turns complaints into suppressions so the same address is not mailed again                                                                                                                                                    |
+| **Forward and reverse DNS on the sending IP** | A PTR record that resolves back to the sending host                                                             | A property of the [SMTP server](/docs/smtp-domains/smtp-servers) or relay node you send through, not of Mailyard itself. Check it when adding a server                                                                                                                              |
+| **TLS on the connection**                     | The SMTP session to their servers                                                                               | Configure the server with STARTTLS or SSL                                                                                                                                                                                                                                           |
+| **No impersonation**                          | The From header must not imitate Gmail or another provider                                                      | [Sender addresses](/docs/smtp-domains/sender-addresses) and strict sender mode keep the From on verified domains                                                                                                                                                                    |
+
+{{< callout type="warning" title="Turning the unsubscribe off" >}}
+A campaign can be sent with `unsubscribe_disabled`, which drops both headers and the link. On a domain past the
+threshold that is a decision to be filtered. It exists for the case where the opt-out is handled entirely elsewhere -
+see [Campaigns](/docs/campaigns/overview).
+{{< /callout >}}
+
+## The other providers
+
+Gmail and Yahoo published the list first and in the most detail. The others ask for the same things, with less of a
+threshold and their own tooling:
+
+| Provider                                   | Threshold                                                        | What they require                                                                                                                                                                                                                                    | Where complaints are read                                                                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Yahoo, AOL**                             | About 5,000 a day                                                | The list above. AOL mailboxes are Yahoo's infrastructure and follow the same rules                                                                                                                                                                   | Yahoo's Complaint Feedback Loop, per verified domain                                                                                           |
+| **Microsoft** (Outlook.com, Hotmail, Live) | About 5,000 a day to consumer addresses, enforced since May 2025 | SPF **and** DKIM **and** DMARC, `p=none` at least, aligned with SPF or DKIM. A miss lands in Junk first and is rejected with `550 5.7.515` later. Also asked for: a valid From and Reply-To, a working unsubscribe, bounce handling and list hygiene | SNDS (Smart Network Data Services) for IP reputation and JMRP (Junk Mail Reporting) for per-message complaints, both registered per sending IP |
+| **Microsoft 365** (business tenants)       | Reputation based, no published figure                            | The same authentication trio. Tenant filtering is stricter than the consumer side and an unauthenticated domain is quarantined outright                                                                                                              | The same SNDS and JMRP                                                                                                                         |
+| **Apple** (iCloud Mail)                    | None published                                                   | SPF and DKIM that pass, DMARC on the domain, reverse DNS on the IP, TLS, RFC 5321/5322 compliant messages, unsubscribes honoured, low complaint rates                                                                                                | No feedback loop. Apple's postmaster guidelines are the reference                                                                              |
+| **Everyone else**                          | Varies                                                           | The same three records plus reverse DNS carry most of the weight. A provider that publishes no rules still scores on them                                                                                                                            | Their postmaster page, where one exists                                                                                                        |
+
+Registering the sending IP with Microsoft's SNDS and JMRP is worth doing on day one: without JMRP a complaint from an
+Outlook.com recipient reaches nobody, and the address keeps being mailed.
+
+## What this means for a multi-tenant install
+
+Projects are separate domains, so a shared IP does not merge their counts, and one project's complaints do not push
+another over the line. Inside one project every From address on one domain shares a single count and a single
+reputation: a marketing list and a transactional service on the same domain rise and fall together. Where that is a
+concern, send them from different subdomains verified in different projects, and give bulk mail its own
+[server group](/docs/smtp-domains/server-groups) so a campaign burning an IP does not take receipts down with it.

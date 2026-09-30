@@ -19,7 +19,9 @@ case its mail carries neither header and no link.
 
 Gmail and Yahoo require a working `List-Unsubscribe` on bulk mail. Neither bounces a message that lacks one, they
 **filter** it, so the sender sees a clean delivery report and the recipient sees nothing. An application relaying a
-hundred thousand notifications is bulk mail by their definition regardless of what it is about.
+hundred thousand notifications is bulk mail by their definition regardless of what it is about, because the count is
+per domain and not per kind of mail - see [Bulk Sender Requirements](/docs/getting-started/bulk-sender-requirements)
+for the rest of what they ask.
 
 ## Mailyard-managed opt-out
 

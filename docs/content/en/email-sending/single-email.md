@@ -93,7 +93,7 @@ with no text alternative scores worse with spam filters than one that has it.
 | `dry_run` | Run every validation and persist nothing |
 | `disable_tracking` | Opt this message out of open and click tracking |
 | `unsubscribe_list_id` | Send under a transactional [opt-out scope](/docs/contacts/unsubscribe-lists) |
-| `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Carry your own opt-out targets |
+| `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Carry your own opt-out targets. One of the two arrangements is part of what [Gmail and Yahoo require](/docs/getting-started/bulk-sender-requirements) of a domain sending at volume |
 | `smtp_group`, `smtp_server_id` | Pin the [route out](/docs/smtp-domains/server-groups) |
 | `sandbox`, `sandbox_retention_days` | Capture instead of delivering — see [Sandbox](/docs/email-sending/sandbox) |
 

@@ -6,7 +6,8 @@ weight: 30
 
 A domain has to be claimed before the platform will **send** mail as it, route inbound mail for it, or sign it with
 DKIM. Claiming proves ownership with one TXT record. Three further records are optional and govern how receivers treat
-your mail.
+your mail - and for a domain sending at volume they stop being optional, see
+[Bulk Sender Requirements](/docs/getting-started/bulk-sender-requirements).
 
 {{< callout type="info" title="Verification gates sending" >}}
 Every outbound surface refuses a `From` on a domain this project has not verified — the API, templates, batches,

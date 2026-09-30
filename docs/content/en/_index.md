@@ -33,6 +33,12 @@ weight: 0
 | [Analytics and Monitoring](/docs/analytics/dashboard) | Dashboard figures, delivery trends, Prometheus metrics, health probes                                                 |
 | [Data](/docs/data/data-export-import)                 | Project export and per-address or bulk erasure                                                                        |
 
+## Before sending at volume
+
+Gmail, Yahoo and Microsoft hold a domain that sends around five thousand messages a day to a fixed list of
+requirements, and filter rather than bounce what misses one. [Bulk Sender Requirements](/docs/getting-started/bulk-sender-requirements)
+is that list, with the Mailyard feature that answers each item.
+
 ## Every endpoint
 
 These pages cover the routes a feature is used through. For the complete list, with request and response schemas, export

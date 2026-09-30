@@ -43,7 +43,8 @@ one-click unsubscribe link is absolute and signed, and without those it cannot b
 
 Sending anyway is not a lesser evil. Gmail and Yahoo have required one-click unsubscribe from bulk senders since
 February 2024, and mail without it is **filtered rather than bounced** — so the whole audience would go to spam and
-nothing in your logs would say so.
+nothing in your logs would say so. The full list of what they require is on
+[Bulk Sender Requirements](/docs/getting-started/bulk-sender-requirements).
 {{< /callout >}}
 
 The `from_email` domain is also checked for
