@@ -76,9 +76,10 @@ GET /api/v1/subscribers/{id}
 GET /api/v1/subscribers/{id}/lists
 ```
 
-The second answers which **static** lists hold the subscriber, as `subscriber_lists`. A dynamic list is never in
-it: a segment has no membership to read back, it has rules. The console shows the same on the subscriber's page,
-where **Add to list** puts them on several lists at once.
+The second answers every list the subscriber is on **or opted out of**, as `subscriber_lists`. Each row carries
+`member` and, when set, `opted_out_at`. A dynamic list appears only through an opt-out, with `member: false`: a
+segment has no membership to read back, it has rules. The console shows the same on the subscriber's page, where
+**Add to list** puts them on several lists at once.
 
 ## Update
 

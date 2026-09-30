@@ -120,7 +120,8 @@ GET /api/v1/subscriber-lists/{id}
 
 `member_count` comes back on the **single-list** route, and only for a static list. A dynamic list has no membership to
 count without resolving the segment, and reporting `0` there would be a wrong answer rather than an empty one — so the
-field is absent instead.
+field is absent instead. `opted_out_count` comes back for both types: an opt-out is a stored row whichever way the
+list is defined.
 
 ## Update and delete
 
@@ -138,7 +139,12 @@ opt-outs, so recreating a list under the same name does not restore who had left
 GET    /api/v1/subscriber-lists/{id}/members?limit=20
 POST   /api/v1/subscriber-lists/{id}/members
 DELETE /api/v1/subscriber-lists/{id}/members/{subscriberId}
+GET    /api/v1/subscriber-lists/{id}/opt-outs?limit=20
 ```
+
+A member row carries `opted_out_at` and `opt_out_reason` when the subscriber opted out of this list, beside their
+global `status`. The opt-outs route lists everyone who opted out, newest first, member or not — it is the only way to
+see the opt-outs of a **dynamic** list, which has no members to carry them.
 
 The add call takes either identifier — whichever your caller has to hand:
 
@@ -213,6 +219,10 @@ POST /api/v1/subscriber-lists/{id}/unsubscribe
 
 Records an opt-out **scoped to this list**. The subscriber's global status is untouched, so they keep receiving your
 other campaigns. `reason` is optional and stored as written.
+
+This is what the hosted unsubscribe page's list-only button does. The one-click a mailbox provider sends on a campaign
+message goes further and sets the status to `unsubscribed` as well — see
+[Unsubscribe & One-Click](/docs/tracking/unsubscribe).
 
 ### Resubscribe
 

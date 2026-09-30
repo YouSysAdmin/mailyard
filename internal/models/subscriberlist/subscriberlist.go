@@ -48,6 +48,27 @@ type FilterRule struct {
 	Value    any    `json:"value"`
 }
 
+// Member is a subscriber as one list sees them: the row, plus the
+// per-list opt-out when they have one. Named opted_out rather than
+// unsubscribed because the subscriber already carries a global
+// unsubscribed_at, and the two answer different questions.
+type Member struct {
+	subscriber.Subscriber
+
+	OptedOutAt   *time.Time `json:"opted_out_at,omitempty"`
+	OptOutReason string     `json:"opt_out_reason,omitempty"`
+}
+
+// Membership is one list as a subscriber sees it: whether they are a
+// member, and whether they opted out of it. Both can be true, and on a
+// dynamic list only the second ever is - a segment has no member rows.
+type Membership struct {
+	List
+
+	Member     bool       `json:"member"`
+	OptedOutAt *time.Time `json:"opted_out_at,omitempty"`
+}
+
 // List is one audience. FilterRules apply to dynamic lists only and
 // are evaluated at send / preview time.
 type List struct {

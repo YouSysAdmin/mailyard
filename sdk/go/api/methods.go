@@ -1380,6 +1380,13 @@ func (c *Client) DeleteSubscriberListMember(ctx context.Context, id string, subs
 	return err
 }
 
+// ListSubscriberListOptOuts Opt-outs.
+//
+// GET /subscriber-lists/:id/opt-outs
+func (c *Client) ListSubscriberListOptOuts(ctx context.Context, id string, opts ...RequestOption) (OptOutListResponse, error) {
+	return do[OptOutListResponse](ctx, c, "GET", fmt.Sprintf("/subscriber-lists/%s/opt-outs", escape(id)), nil, opts)
+}
+
 // ResubscribeSubscriberList Re-add an address that had opted out.
 //
 // POST /subscriber-lists/:id/resubscribe

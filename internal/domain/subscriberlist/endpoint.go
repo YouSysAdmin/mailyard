@@ -76,6 +76,13 @@ func (h *Handler) Get(c fiber.Ctx) error {
 		out.MemberCount = &n
 	}
 
+	optedOut, err := h.Runtime.Store.SubscriberList.CountOptedOut(c.Context(), rc.Project.ID, l.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	out.OptedOutCount = optedOut
+
 	return response.Success(c, out)
 }
 
@@ -198,10 +205,37 @@ func (h *Handler) ListMembers(c fiber.Ctx) error {
 	}
 
 	if members == nil {
-		members = []*submodel.Subscriber{}
+		members = []*slmodel.Member{}
 	}
 
 	return response.Success(c, MemberListResponse{Members: members})
+}
+
+// ListOptOuts serves GET /api/v1/subscriber-lists/:id/opt-outs: who
+// opted out of the list, whichever type it is.
+func (h *Handler) ListOptOuts(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if l == nil {
+		return response.NotFound(c, "subscriber list not found")
+	}
+
+	pg := paging.From(c)
+	out, err := h.Runtime.Store.SubscriberList.ListOptedOut(c.Context(),
+		rc.Project.ID, l.ID, pg.Limit, pg.Offset)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if out == nil {
+		out = []*slmodel.Member{}
+	}
+
+	return response.Success(c, OptOutListResponse{OptOuts: out})
 }
 
 // AddMember attaches a subscriber (by id or email) to a static list.

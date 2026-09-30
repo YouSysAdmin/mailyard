@@ -991,6 +991,11 @@ module Mailyard
       @t.request("DELETE", "/subscriber-lists/#{esc(id)}/members/#{esc(subscriber_id)}", body: nil, query: query)
     end
 
+    # Opt-outs
+    def list_subscriber_list_opt_outs(id, **query)
+      @t.request("GET", "/subscriber-lists/#{esc(id)}/opt-outs", body: nil, query: query)
+    end
+
     # Re-add an address that had opted out Needs subscribers:write.
     def resubscribe_subscriber_list(id, body: nil, **query)
       @t.request("POST", "/subscriber-lists/#{esc(id)}/resubscribe", body: body, query: query)

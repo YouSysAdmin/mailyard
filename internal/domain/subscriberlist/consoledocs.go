@@ -88,6 +88,16 @@ func ConsoleDocs() []apidoc.Route {
 			Responses:   []apidoc.Response{apidoc.NoContent},
 		},
 		{
+			Method:      "GET",
+			Path:        "/subscriber-lists/:id/opt-outs",
+			Tag:         "subscriberlist",
+			Summary:     "Opt-outs",
+			Description: "Everyone who opted out of the list, newest first, member or not - a dynamic list has opt-outs and no members. Needs the `subscribers:read` permission.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Query:       []apidoc.Param{{Name: "limit", Type: "integer"}, {Name: "offset", Type: "integer"}},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", OptOutListResponse{})},
+		},
+		{
 			Method:      "POST",
 			Path:        "/subscriber-lists/:id/resubscribe",
 			Tag:         "subscriberlist",

@@ -51,11 +51,11 @@ type SubscriberResponse struct {
 	Subscriber *smodel.Subscriber `json:"subscriber"`
 }
 
-// MembershipResponse is the static lists one subscriber is on. Dynamic
-// lists are absent by construction - a segment has no membership to
-// list.
+// MembershipResponse is every list one subscriber is a member of or
+// has opted out of. A dynamic list appears only through an opt-out: a
+// segment has no membership to list.
 type MembershipResponse struct {
-	SubscriberLists []*slmodel.List `json:"subscriber_lists"`
+	SubscriberLists []*slmodel.Membership `json:"subscriber_lists"`
 }
 
 // ImportResponse reports what a bulk import did, per row.

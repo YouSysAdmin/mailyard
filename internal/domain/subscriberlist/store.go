@@ -152,18 +152,16 @@ func (s *Store) RemoveMember(ctx context.Context, projID, listID, subscriberID s
 }
 
 // ListMembers pages the static membership with subscriber rows.
-func (s *Store) ListMembers(ctx context.Context, projID, listID string, limit, offset int) ([]*submodel.Subscriber, error) {
+func (s *Store) ListMembers(ctx context.Context, projID, listID string, limit, offset int) ([]*slmodel.Member, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 
-	rows, err := s.Query(ctx, `
-        SELECT sub.id, sub.project_id, sub.email, sub.name, sub.status, sub.custom_fields,
-               sub.timezone, sub.language, sub.subscribed_at, sub.unsubscribed_at,
-               sub.created_at, sub.updated_at
+	rows, err := s.Query(ctx, memberSelect+`
         FROM subscriber_list_members m
         JOIN subscribers sub ON sub.id = m.subscriber_id
         JOIN subscriber_lists l ON l.id = m.list_id
+        LEFT JOIN subscriber_list_unsubscribes u ON u.list_id = m.list_id AND u.subscriber_id = sub.id
         WHERE l.project_id = ? AND m.list_id = ?
         ORDER BY m.created_at ASC
         LIMIT ? OFFSET ?
@@ -173,17 +171,53 @@ func (s *Store) ListMembers(ctx context.Context, projID, listID string, limit, o
 	}
 
 	defer func() { _ = rows.Close() }()
-	var out []*submodel.Subscriber
-	for rows.Next() {
-		sub, err := scanMemberSubscriber(rows)
-		if err != nil {
-			return nil, err
-		}
 
-		out = append(out, sub)
+	return collectMembers(rows)
+}
+
+// memberSelect is the subscriber's columns plus the per-list opt-out,
+// which every member-shaped query reads through the same LEFT JOIN
+// alias u. The FROM clause is the caller's.
+const memberSelect = `
+        SELECT sub.id, sub.project_id, sub.email, sub.name, sub.status, sub.custom_fields,
+               sub.timezone, sub.language, sub.subscribed_at, sub.unsubscribed_at,
+               sub.created_at, sub.updated_at, u.unsubscribed_at, u.reason`
+
+// ListOptedOut returns everyone who opted out of the list, newest
+// opt-out first. Member or not: a dynamic list has opt-outs and no
+// member rows, and this is the only way to see them.
+func (s *Store) ListOptedOut(ctx context.Context, projID, listID string, limit, offset int) ([]*slmodel.Member, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
 	}
 
-	return out, rows.Err()
+	rows, err := s.Query(ctx, memberSelect+`
+        FROM subscriber_list_unsubscribes u
+        JOIN subscribers sub ON sub.id = u.subscriber_id
+        JOIN subscriber_lists l ON l.id = u.list_id
+        WHERE l.project_id = ? AND u.list_id = ?
+        ORDER BY u.unsubscribed_at DESC, sub.id DESC
+        LIMIT ? OFFSET ?
+    `, projID, listID, limit, max(offset, 0))
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	return collectMembers(rows)
+}
+
+// CountOptedOut returns how many subscribers opted out of the list.
+func (s *Store) CountOptedOut(ctx context.Context, projID, listID string) (int, error) {
+	var n int
+	err := s.QueryRow(ctx, `
+        SELECT COUNT(*) FROM subscriber_list_unsubscribes u
+        JOIN subscriber_lists l ON l.id = u.list_id
+        WHERE l.project_id = ? AND u.list_id = ?
+    `, projID, listID).Scan(&n)
+
+	return n, err
 }
 
 // CountMembers returns how many members there are.
@@ -198,29 +232,51 @@ func (s *Store) CountMembers(ctx context.Context, projID, listID string) (int, e
 	return n, err
 }
 
-// ListsOf returns the static lists within projID that hold the
-// subscriber, by name.
-func (s *Store) ListsOf(ctx context.Context, projID, subscriberID string) ([]*slmodel.List, error) {
+// ListsOf returns every list within projID the subscriber is a member
+// of or has opted out of, by name. The opt-out side is what makes a
+// dynamic list appear: a segment has no member rows, so without it an
+// opt-out from a segment campaign was recorded and reachable nowhere.
+func (s *Store) ListsOf(ctx context.Context, projID, subscriberID string) ([]*slmodel.Membership, error) {
 	rows, err := s.Query(ctx, `
-        SELECT l.id, l.project_id, l.name, l.description, l.type, l.filter_rules, l.created_at, l.updated_at
+        SELECT l.id, l.project_id, l.name, l.description, l.type, l.filter_rules, l.created_at, l.updated_at,
+               m.subscriber_id IS NOT NULL, u.unsubscribed_at
         FROM subscriber_lists l
-        JOIN subscriber_list_members m ON m.list_id = l.id
-        WHERE l.project_id = ? AND m.subscriber_id = ?
+        LEFT JOIN subscriber_list_members m ON m.list_id = l.id AND m.subscriber_id = ?
+        LEFT JOIN subscriber_list_unsubscribes u ON u.list_id = l.id AND u.subscriber_id = ?
+        WHERE l.project_id = ? AND (m.subscriber_id IS NOT NULL OR u.subscriber_id IS NOT NULL)
         ORDER BY l.name ASC
-    `, projID, subscriberID)
+    `, subscriberID, subscriberID, projID)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() { _ = rows.Close() }()
-	var out []*slmodel.List
+	var out []*slmodel.Membership
 	for rows.Next() {
-		l, err := scanList(rows)
-		if err != nil {
+		var l slmodel.List
+		var rules string
+		var updated, optedOut sql.NullTime
+		var member bool
+		if err := rows.Scan(&l.ID, &l.ProjectID, &l.Name, &l.Description, &l.Type,
+			&rules, &l.CreatedAt, &updated, &member, &optedOut); err != nil {
 			return nil, err
 		}
 
-		out = append(out, l)
+		database.MustUnmarshalJSON(rules, &l.FilterRules)
+		if l.FilterRules == nil {
+			l.FilterRules = []slmodel.FilterRule{}
+		}
+
+		if updated.Valid {
+			l.UpdatedAt = new(updated.Time)
+		}
+
+		ms := &slmodel.Membership{List: l, Member: member}
+		if optedOut.Valid {
+			ms.OptedOutAt = new(optedOut.Time)
+		}
+
+		out = append(out, ms)
 	}
 
 	return out, rows.Err()
@@ -338,8 +394,8 @@ func (s *Store) ResolveRecipients(ctx context.Context, subs store.SubscriberStor
 			return nil, err
 		}
 
-		for _, sub := range page {
-			keep(sub)
+		for _, m := range page {
+			keep(&m.Subscriber)
 		}
 
 		if len(page) < resolvePageSize {
@@ -371,13 +427,14 @@ func scanList(r interface{ Scan(...any) error }) (*slmodel.List, error) {
 	return &l, nil
 }
 
-func scanMemberSubscriber(r interface{ Scan(...any) error }) (*submodel.Subscriber, error) {
+func scanMember(r interface{ Scan(...any) error }) (*slmodel.Member, error) {
 	var sub submodel.Subscriber
 	var fields string
-	var subscribedAt, unsubscribedAt, updatedAt sql.NullTime
+	var subscribedAt, unsubscribedAt, updatedAt, optedOutAt sql.NullTime
+	var reason sql.NullString
 	if err := r.Scan(&sub.ID, &sub.ProjectID, &sub.Email, &sub.Name, &sub.Status,
 		&fields, &sub.Timezone, &sub.Language,
-		&subscribedAt, &unsubscribedAt, &sub.CreatedAt, &updatedAt); err != nil {
+		&subscribedAt, &unsubscribedAt, &sub.CreatedAt, &updatedAt, &optedOutAt, &reason); err != nil {
 		return nil, err
 	}
 
@@ -394,5 +451,24 @@ func scanMemberSubscriber(r interface{ Scan(...any) error }) (*submodel.Subscrib
 		sub.UpdatedAt = new(updatedAt.Time)
 	}
 
-	return &sub, nil
+	m := &slmodel.Member{Subscriber: sub, OptOutReason: reason.String}
+	if optedOutAt.Valid {
+		m.OptedOutAt = new(optedOutAt.Time)
+	}
+
+	return m, nil
+}
+
+func collectMembers(rows *sql.Rows) ([]*slmodel.Member, error) {
+	var out []*slmodel.Member
+	for rows.Next() {
+		m, err := scanMember(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, m)
+	}
+
+	return out, rows.Err()
 }

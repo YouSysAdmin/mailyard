@@ -95,7 +95,7 @@ func (h *Handler) Lists(c fiber.Ctx) error {
 	}
 
 	if lists == nil {
-		lists = []*slmodel.List{}
+		lists = []*slmodel.Membership{}
 	}
 
 	return response.Success(c, MembershipResponse{SubscriberLists: lists})

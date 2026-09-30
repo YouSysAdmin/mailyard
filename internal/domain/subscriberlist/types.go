@@ -92,11 +92,22 @@ type ListResponse struct {
 type ListDetailResponse struct {
 	SubscriberList *slmodel.List `json:"subscriber_list"`
 	MemberCount    *int          `json:"member_count,omitempty"`
+
+	// OptedOutCount is how many subscribers opted out of the list,
+	// present for both types: a dynamic list has opt-outs too, and
+	// they are the only membership fact it stores.
+	OptedOutCount int `json:"opted_out_count"`
 }
 
-// MemberListResponse is a static list's membership.
+// MemberListResponse is a static list's membership, each member
+// carrying their per-list opt-out when they have one.
 type MemberListResponse struct {
-	Members []*smodel.Subscriber `json:"members"`
+	Members []*slmodel.Member `json:"members"`
+}
+
+// OptOutListResponse is everyone who opted out of a list, newest first.
+type OptOutListResponse struct {
+	OptOuts []*slmodel.Member `json:"opt_outs"`
 }
 
 // SubscriberResponse is one subscriber.

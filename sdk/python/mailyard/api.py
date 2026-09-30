@@ -799,6 +799,10 @@ class API:
         "Remove member"
         return self._t.request("DELETE", f"/subscriber-lists/{_esc(id)}/members/{_esc(subscriber_id)}", body=None, query=query)
 
+    def list_subscriber_list_opt_outs(self, id, **query: Any) -> Any:
+        "Opt-outs"
+        return self._t.request("GET", f"/subscriber-lists/{_esc(id)}/opt-outs", body=None, query=query)
+
     def resubscribe_subscriber_list(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
         "Re-add an address that had opted out Needs subscribers:write."
         return self._t.request("POST", f"/subscriber-lists/{_esc(id)}/resubscribe", body=body, query=query)

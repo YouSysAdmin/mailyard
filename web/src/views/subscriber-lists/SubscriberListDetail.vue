@@ -9,7 +9,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscriberListsApi } from '../../api/subscriberLists'
 import { apiErrorMessage } from '../../api/client'
-import type { FilterRule, Subscriber, SubscriberList } from '../../api/types'
+import type { FilterRule, Subscriber, SubscriberList, SubscriberListMember } from '../../api/types'
 import { useClientPager } from '../../composables/usePagination'
 import { useConfirm } from '../../composables/useConfirm'
 import { useFieldErrors } from '../../composables/fieldErrors'
@@ -37,10 +37,16 @@ const id = String(route.params.id)
 
 const list = ref<SubscriberList | null>(null)
 const memberCount = ref<number | null>(null)
-const members = ref<Subscriber[]>([])
+const optedOutCount = ref(0)
+const members = ref<SubscriberListMember[]>([])
 const loading = ref(true)
 const membersLoading = ref(false)
 const saving = ref(false)
+
+// Who opted out of this list, for both types. A dynamic list has no
+// member table, so this card is the only place its opt-outs show.
+const optOuts = ref<SubscriberListMember[]>([])
+const optOutsLoading = ref(false)
 
 const dynamic = computed(() => list.value?.type === 'dynamic')
 const mayWrite = computed(() => projects.can('subscribers:write'))
@@ -63,6 +69,7 @@ async function loadList() {
     const res = await subscriberListsApi.get(id)
     list.value = res.data.subscriber_list
     memberCount.value = res.data.member_count ?? null
+    optedOutCount.value = res.data.opted_out_count ?? 0
     form.value = {
       name: res.data.subscriber_list.name,
       description: res.data.subscriber_list.description ?? '',
@@ -85,6 +92,22 @@ async function loadMembers() {
   } finally {
     membersLoading.value = false
   }
+}
+
+async function loadOptOuts() {
+  optOutsLoading.value = true
+  try {
+    optOuts.value = (await subscriberListsApi.listOptOuts(id, { limit: 200 })).data.opt_outs ?? []
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to load the opt-outs'))
+  } finally {
+    optOutsLoading.value = false
+  }
+}
+
+/** Everything an opt-out changes: the count, the marker and the card. */
+async function reloadOptOuts() {
+  await Promise.all([loadList(), loadMembers(), loadOptOuts()])
 }
 
 async function save() {
@@ -172,6 +195,7 @@ async function setOptOut(out: boolean) {
       : subscriberListsApi.resubscribe(id, email))
     optOut.value = ''
     notify.success(out ? 'Unsubscribed from this list' : 'Resubscribed to this list')
+    await reloadOptOuts()
   } catch (e) {
     notify.error(apiErrorMessage(e, out ? 'Failed to unsubscribe' : 'Failed to resubscribe'))
   } finally {
@@ -179,9 +203,20 @@ async function setOptOut(out: boolean) {
   }
 }
 
+/** Lift one opt-out from the card. Not a membership change. */
+async function resubscribe(m: SubscriberListMember) {
+  try {
+    await subscriberListsApi.resubscribe(id, m.email)
+    notify.success(`${m.email} resubscribed to this list`)
+    await reloadOptOuts()
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to resubscribe'))
+  }
+}
+
 async function start() {
   await loadList()
-  await loadMembers()
+  await Promise.all([loadMembers(), loadOptOuts()])
   loading.value = false
 }
 
@@ -240,7 +275,9 @@ void start()
       <div v-if="!dynamic" class="card">
         <div class="card-header">
           <h2>Members</h2>
-          <span v-if="memberCount !== null" class="text-muted">{{ memberCount }} total</span>
+          <span v-if="memberCount !== null" class="text-muted">
+            {{ memberCount }} total{{ optedOutCount ? `, ${optedOutCount} opted out` : '' }}
+          </span>
         </div>
 
         <LoadingBlock v-if="membersLoading" />
@@ -259,6 +296,7 @@ void start()
                   <th>Email</th>
                   <th>Name</th>
                   <th>Status</th>
+                  <th>Opted out</th>
                   <th>Added</th>
                   <!-- delete, matching the cell below it. Gated on write,
                        a member holding write without delete got a header
@@ -272,6 +310,18 @@ void start()
                   <td>{{ m.email }}</td>
                   <td>{{ m.name || '-' }}</td>
                   <td><StatusBadge :status="m.status" scope="subscriber" /></td>
+                  <!-- The list's own opt-out, beside the global status:
+                       a subscribed person who asked this list to stop. -->
+                  <td>
+                    <span
+                      v-if="m.opted_out_at"
+                      class="badge badge-warning"
+                      :title="m.opt_out_reason"
+                    >
+                      {{ formatDate(m.opted_out_at) }}
+                    </span>
+                    <span v-else>-</span>
+                  </td>
                   <td>{{ formatDate(m.created_at) }}</td>
                   <td v-if="projects.can('subscribers:delete')" class="text-right">
                     <button class="btn btn-danger btn-sm" @click="removeMember(m)">Remove</button>
@@ -283,6 +333,50 @@ void start()
 
           <Pagination :pageable="pageable" @page="goToPage" />
         </template>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Opted out</h2>
+          <span v-if="optedOutCount" class="text-muted">{{ optedOutCount }} total</span>
+        </div>
+
+        <LoadingBlock v-if="optOutsLoading" />
+
+        <EmptyState
+          v-else-if="optOuts.length === 0"
+          title="Nobody has opted out"
+          text="A recipient who unsubscribes from a campaign sent to this list lands here, whether they are a member or matched by rules."
+        />
+
+        <div v-else class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Reason</th>
+                <th>Opted out</th>
+                <th v-if="mayWrite" class="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in optOuts" :key="m.id">
+                <td>
+                  <router-link :to="`/subscribers/${m.id}`">{{ m.email }}</router-link>
+                </td>
+                <td>{{ m.name || '-' }}</td>
+                <td>{{ m.opt_out_reason || '-' }}</td>
+                <td>{{ formatDate(m.opted_out_at) }}</td>
+                <td v-if="mayWrite" class="text-right">
+                  <button class="btn btn-secondary btn-sm" @click="resubscribe(m)">
+                    Resubscribe
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div v-if="mayWrite" class="card">

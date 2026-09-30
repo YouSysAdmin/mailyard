@@ -1004,6 +1004,7 @@ type List struct {
 type ListDetailResponse struct {
 	SubscriberList *List  `json:"subscriber_list"`
 	MemberCount    *int64 `json:"member_count,omitempty"`
+	OptedOutCount  int64  `json:"opted_out_count"`
 }
 
 // ListEmailInput is the request body.
@@ -1131,6 +1132,20 @@ type MemberRoleInput struct {
 	Owner  *bool   `json:"owner"`
 }
 
+// Membership is the wire body.
+type Membership struct {
+	ID          string       `json:"id"`
+	ProjectID   string       `json:"project_id"`
+	Name        string       `json:"name"`
+	Description string       `json:"description,omitempty"`
+	Type        string       `json:"type"`
+	FilterRules []FilterRule `json:"filter_rules"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   *time.Time   `json:"updated_at,omitempty"`
+	Member      bool         `json:"member"`
+	OptedOutAt  *time.Time   `json:"opted_out_at,omitempty"`
+}
+
 // MembershipChange is the wire body.
 type MembershipChange struct {
 	Unsubscribed bool   `json:"unsubscribed,omitzero"`
@@ -1141,7 +1156,7 @@ type MembershipChange struct {
 
 // MembershipResponse is the response body.
 type MembershipResponse struct {
-	SubscriberLists []*List `json:"subscriber_lists"`
+	SubscriberLists []*Membership `json:"subscriber_lists"`
 }
 
 // Message is the wire body.
@@ -1218,6 +1233,11 @@ type NotificationListResponse struct {
 // OauthproviderListResponse is the response body.
 type OauthproviderListResponse struct {
 	Providers []ProviderView `json:"providers"`
+}
+
+// OptOutListResponse is the response body.
+type OptOutListResponse struct {
+	OptOuts []*SubscriberlistMember `json:"opt_outs"`
 }
 
 // OptionField is the wire body.
@@ -1972,6 +1992,24 @@ type SubscriberlistListResponse struct {
 	SubscriberLists []*List `json:"subscriber_lists"`
 }
 
+// SubscriberlistMember is the wire body.
+type SubscriberlistMember struct {
+	ID             string         `json:"id"`
+	ProjectID      string         `json:"project_id"`
+	Email          string         `json:"email"`
+	Name           string         `json:"name,omitempty"`
+	Status         string         `json:"status"`
+	CustomFields   map[string]any `json:"custom_fields,omitempty"`
+	Timezone       string         `json:"timezone,omitempty"`
+	Language       string         `json:"language,omitempty"`
+	SubscribedAt   *time.Time     `json:"subscribed_at,omitempty"`
+	UnsubscribedAt *time.Time     `json:"unsubscribed_at,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      *time.Time     `json:"updated_at,omitempty"`
+	OptedOutAt     *time.Time     `json:"opted_out_at,omitempty"`
+	OptOutReason   string         `json:"opt_out_reason,omitempty"`
+}
+
 // SubscriberlistMemberInput is the request body.
 type SubscriberlistMemberInput struct {
 	SubscriberID string `json:"subscriber_id"`
@@ -1980,7 +2018,7 @@ type SubscriberlistMemberInput struct {
 
 // SubscriberlistMemberListResponse is the response body.
 type SubscriberlistMemberListResponse struct {
-	Members []*Subscriber `json:"members"`
+	Members []*SubscriberlistMember `json:"members"`
 }
 
 // SubscriberlistPreviewInput is the request body.

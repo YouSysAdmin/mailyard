@@ -536,6 +536,23 @@ export interface SubscriberList {
   updated_at?: string
 }
 
+// SubscriberListMember mirrors internal/models/subscriberlist.Member:
+// the subscriber, plus the list's own opt-out when they have one. Named
+// opted_out because unsubscribed_at above is the subscriber's global
+// status, and the two answer different questions.
+export interface SubscriberListMember extends Subscriber {
+  opted_out_at?: string
+  opt_out_reason?: string
+}
+
+// SubscriberMembership mirrors internal/models/subscriberlist.Membership:
+// a list as one subscriber stands to it. member is false only for a
+// list they opted out of without being on it, which is a dynamic one.
+export interface SubscriberMembership extends SubscriberList {
+  member: boolean
+  opted_out_at?: string
+}
+
 export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'paused' | 'sent' | 'cancelled'
 
 export interface CampaignVariant {

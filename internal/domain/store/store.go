@@ -806,13 +806,20 @@ type SubscriberListStore interface {
 
 	// RemoveMember reports whether the subscriber was on the list.
 	RemoveMember(ctx context.Context, projID, listID, subscriberID string) (bool, error)
-	ListMembers(ctx context.Context, projID, listID string, limit, offset int) ([]*subscriber.Subscriber, error)
+	// ListMembers carries each member's per-list opt-out, when there
+	// is one, so a list page can show who asked to be left alone.
+	ListMembers(ctx context.Context, projID, listID string, limit, offset int) ([]*subscriberlist.Member, error)
 	CountMembers(ctx context.Context, projID, listID string) (int, error)
 
-	// ListsOf is the static lists a subscriber has been put on. A
-	// dynamic list is never answered: its membership is computed when
-	// a campaign sends, not stored.
-	ListsOf(ctx context.Context, projID, subscriberID string) ([]*subscriberlist.List, error)
+	// ListOptedOut is everyone who opted out of the list, newest first,
+	// member or not - a dynamic list has opt-outs and no members.
+	ListOptedOut(ctx context.Context, projID, listID string, limit, offset int) ([]*subscriberlist.Member, error)
+	CountOptedOut(ctx context.Context, projID, listID string) (int, error)
+
+	// ListsOf is every list a subscriber is a member of OR has opted
+	// out of, which is how an opt-out from a dynamic list is reachable
+	// at all: a segment has no member rows.
+	ListsOf(ctx context.Context, projID, subscriberID string) ([]*subscriberlist.Membership, error)
 
 	Unsubscribe(ctx context.Context, projID, listID, subscriberID, reason string) error
 	Resubscribe(ctx context.Context, projID, listID, subscriberID string) error

@@ -1,5 +1,5 @@
 import api from './client'
-import type { FilterRule, Subscriber, SubscriberList } from './types'
+import type { FilterRule, Subscriber, SubscriberList, SubscriberListMember } from './types'
 
 export interface SubscriberListPayload {
   name?: string
@@ -11,7 +11,9 @@ export interface SubscriberListPayload {
 export const subscriberListsApi = {
   list: () => api.get<{ subscriber_lists: SubscriberList[] }>('/subscriber-lists/'),
   get: (id: string) =>
-    api.get<{ subscriber_list: SubscriberList; member_count?: number }>(`/subscriber-lists/${id}`),
+    api.get<{ subscriber_list: SubscriberList; member_count?: number; opted_out_count: number }>(
+      `/subscriber-lists/${id}`,
+    ),
   create: (payload: SubscriberListPayload) =>
     api.post<{ subscriber_list: SubscriberList }>('/subscriber-lists/', payload),
   update: (id: string, payload: SubscriberListPayload) =>
@@ -19,7 +21,11 @@ export const subscriberListsApi = {
   remove: (id: string) => api.delete(`/subscriber-lists/${id}`),
 
   listMembers: (id: string) =>
-    api.get<{ members: Subscriber[] }>(`/subscriber-lists/${id}/members`),
+    api.get<{ members: SubscriberListMember[] }>(`/subscriber-lists/${id}/members`),
+  // Who opted out, member or not - a dynamic list has opt-outs and no
+  // members, and this is the only way to see them.
+  listOptOuts: (id: string, params: { limit?: number; offset?: number } = {}) =>
+    api.get<{ opt_outs: SubscriberListMember[] }>(`/subscriber-lists/${id}/opt-outs`, { params }),
   addMember: (id: string, payload: { subscriber_id?: string; email?: string }) =>
     api.post(`/subscriber-lists/${id}/members`, payload),
   removeMember: (id: string, subscriberId: string) =>

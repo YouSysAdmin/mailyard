@@ -794,6 +794,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	lists.Delete("/:id", permDelete, slh.Delete)
 	lists.Get("/:id/members", permRead, slh.ListMembers)
 	lists.Post("/:id/members", permWrite, slh.AddMember)
+	// Who opted out, for either list type. The members table cannot
+	// show a dynamic list's opt-outs: a segment has no members.
+	lists.Get("/:id/opt-outs", permRead, slh.ListOptOuts)
 	lists.Delete("/:id/members/:subscriberId", permDelete, slh.RemoveMember)
 	lists.Post("/:id/unsubscribe", permWrite, slh.UnsubscribeByEmail)
 	lists.Post("/:id/resubscribe", permWrite, slh.ResubscribeByEmail)

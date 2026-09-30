@@ -9,7 +9,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscribersApi } from '../../api/subscribers'
 import { apiErrorMessage } from '../../api/client'
-import type { Subscriber, SubscriberList, SubscriberStatus } from '../../api/types'
+import type { Subscriber, SubscriberMembership, SubscriberStatus } from '../../api/types'
 import { SUBSCRIBER_STATUSES } from './statuses'
 import { useConfirm } from '../../composables/useConfirm'
 import { useFieldErrors } from '../../composables/fieldErrors'
@@ -36,9 +36,9 @@ const subscriber = ref<Subscriber | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 
-// The static lists they are on. Loaded beside the subscriber and again
-// after the dialog adds some.
-const lists = ref<SubscriberList[]>([])
+// Every list they are on or opted out of. Loaded beside the subscriber
+// and again after the dialog adds some.
+const lists = ref<SubscriberMembership[]>([])
 const addingToLists = ref(false)
 
 const form = ref({
@@ -234,14 +234,20 @@ void load()
 
         <EmptyState
           v-if="lists.length === 0"
-          text="Not on any static list. A dynamic list picks them up by its rules."
+          text="Not on any list and no opt-outs. A dynamic list picks them up by its rules."
         />
 
-        <!-- Plain links into each list, where membership is managed. -->
+        <!-- Plain links into each list, where membership is managed. A
+             dynamic list appears here only through an opt-out, which is
+             why a row can say opted out and not a member at once. -->
         <ul v-else class="list-links">
           <li v-for="l in lists" :key="l.id">
             <router-link :to="`/subscriber-lists/${l.id}`">{{ l.name }}</router-link>
-            <span v-if="l.description" class="text-muted">{{ l.description }}</span>
+            <span v-if="l.opted_out_at" class="badge badge-warning">
+              opted out {{ formatDate(l.opted_out_at) }}
+            </span>
+            <span v-if="!l.member" class="text-muted">not a member, matched by rules</span>
+            <span v-else-if="l.description" class="text-muted">{{ l.description }}</span>
           </li>
         </ul>
       </div>
