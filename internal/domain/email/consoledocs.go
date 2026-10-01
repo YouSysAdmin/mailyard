@@ -59,6 +59,15 @@ func ConsoleDocs() []apidoc.Route {
 			Responses:   []apidoc.Response{apidoc.OK("The result.", EmailResponse{})},
 		},
 		{
+			Method:      "POST",
+			Path:        "/emails/:id/cancel",
+			Tag:         "email",
+			Summary:     "Cancel",
+			Description: "Needs the `emails:write` permission.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", EmailResponse{})},
+		},
+		{
 			Method:      "GET",
 			Path:        "/emails/:id/status",
 			Tag:         "email",

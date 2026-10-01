@@ -14,6 +14,7 @@ const (
 	EventEmailSent         = "email.sent"
 	EventEmailFailed       = "email.failed"
 	EventEmailSuppressed   = "email.suppressed"
+	EventEmailCancelled    = "email.cancelled"
 	EventCampaignStarted   = "campaign.started"
 	EventCampaignCompleted = "campaign.completed"
 	EventInboundReceived   = "inbound.received"
@@ -22,6 +23,7 @@ const (
 // ValidEvents enumerates subscribable events for input validation.
 var ValidEvents = map[string]struct{}{
 	EventEmailQueued: {}, EventEmailSent: {}, EventEmailFailed: {}, EventEmailSuppressed: {},
+	EventEmailCancelled:  {},
 	EventCampaignStarted: {}, EventCampaignCompleted: {}, EventInboundReceived: {},
 }
 

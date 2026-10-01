@@ -491,6 +491,11 @@ module Mailyard
       @t.request("GET", "/emails/#{esc(id)}/attachments/#{esc(idx)}", body: nil, query: query, raw: true)
     end
 
+    # Cancel a message that has not gone out Needs emails:write.
+    def cancel_email(id, **query)
+      @t.request("POST", "/emails/#{esc(id)}/cancel", body: nil, query: query)
+    end
+
     # EML
     def get_email_eml(id, **query)
       @t.request("GET", "/emails/#{esc(id)}/eml", body: nil, query: query, raw: true)

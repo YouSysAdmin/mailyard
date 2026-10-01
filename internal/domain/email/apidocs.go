@@ -126,7 +126,7 @@ func APIDocs() []apidoc.Route {
 			Permission: "emails:read",
 			Summary:    "List sent and queued emails",
 			Query: []apidoc.Param{
-				{Name: "status", Enum: []string{"pending", "queued", "scheduled", "processing", "sent", "failed", "suppressed"}},
+				{Name: "status", Enum: []string{"pending", "queued", "scheduled", "processing", "sent", "failed", "suppressed", "cancelled"}},
 				{Name: "before", Format: "date-time", Description: "Only rows created before this RFC 3339 instant."},
 				{Name: "before_id", Description: "The id of the last row on the previous page. " +
 					"Pass it with `before` - two messages can share a created_at, and without the id " +
@@ -204,6 +204,20 @@ func APIDocs() []apidoc.Route {
 			PathParams:  []apidoc.Param{{Name: "id", Format: "uuid"}},
 			Responses: []apidoc.Response{
 				apidoc.OK("The requeued email.", EmailResponse{}),
+				apidoc.BadRequest,
+				apidoc.NotFound,
+			},
+		},
+		{
+			Method:      "POST",
+			Path:        "/emails/:id/cancel",
+			Tag:         "emails",
+			Permission:  "emails:write",
+			Summary:     "Cancel a message that has not gone out",
+			Description: "A scheduled message, or a queued one no worker has claimed yet, becomes `cancelled` and is never sent. Anything a worker holds or has finished is refused, naming its state.",
+			PathParams:  []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Responses: []apidoc.Response{
+				apidoc.OK("The cancelled email.", EmailResponse{}),
 				apidoc.BadRequest,
 				apidoc.NotFound,
 			},

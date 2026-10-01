@@ -369,6 +369,26 @@ func (h *Handler) Retry(c fiber.Ctx) error {
 	})
 }
 
+// Cancel serves POST /api/v1/emails/:id/cancel.
+func (h *Handler) Cancel(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	svc := NewService(h.Runtime)
+	e, err := svc.Cancel(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return sendFailure(c, err)
+	}
+
+	if e == nil {
+		return response.NotFound(c, "email not found")
+	}
+
+	return response.Success(c, EmailResponse{
+		Email:      e,
+		SentVia:    resolveSentVia(c.Context(), h.Runtime, e),
+		Addressing: splitRecipients(e),
+	})
+}
+
 // toRequest converts the bound input into the service request, parsing send_at.
 func (in *sendInput) toRequest() (*SendRequest, error) {
 	req := &SendRequest{

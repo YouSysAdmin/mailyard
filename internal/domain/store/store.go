@@ -649,6 +649,11 @@ type EmailStore interface {
 	Put(ctx context.Context, e *email.Email) error
 	Reset(ctx context.Context, projID, id string) (bool, error)
 
+	// Cancel takes a message out of the queue before a worker claims
+	// it, reporting whether it was still there to take. createdAt
+	// prunes the partition walk, off the row the caller just read.
+	Cancel(ctx context.Context, projID, id string, createdAt time.Time) (bool, error)
+
 	// Open and click tallies. Not project scoped: the tracking endpoints
 	// are authorized by the signature in the URL, which names the email
 	// and nothing else. MarkOpened reports whether this was the first

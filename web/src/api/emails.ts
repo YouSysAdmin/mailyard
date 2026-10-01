@@ -141,4 +141,6 @@ export const emailsApi = {
   preview: (payload: Record<string, unknown>) => api.post('/emails/preview', payload),
   retry: (id: string) =>
     api.post<{ email: Email; sent_via?: SentVia; addressing?: Addressing }>(`/emails/${id}/retry`),
+  cancel: (id: string) =>
+    api.post<{ email: Email; sent_via?: SentVia; addressing?: Addressing }>(`/emails/${id}/cancel`),
 }

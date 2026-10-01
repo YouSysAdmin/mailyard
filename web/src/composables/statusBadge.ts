@@ -19,6 +19,7 @@ const scopes: Record<StatusScope, Record<string, string>> = {
     processing: 'badge-warning',
     suppressed: 'badge-secondary',
     scheduled: 'badge-info',
+    cancelled: 'badge-neutral',
   },
   campaign: {
     draft: 'badge-neutral',

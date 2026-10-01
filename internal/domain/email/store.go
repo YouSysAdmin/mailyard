@@ -367,6 +367,27 @@ func (s *Store) Reset(ctx context.Context, projID, id string) (bool, error) {
 	return n > 0, err
 }
 
+// Cancel moves a row that no worker has claimed to cancelled. The
+// status list is the complement of what the claim takes, written as
+// the same literals, so a row is either claimed or cancelled and
+// never both: the claim re-checks its qualifier after locking, and so
+// does this UPDATE.
+func (s *Store) Cancel(ctx context.Context, projID, id string, createdAt time.Time) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE emails
+        SET status = ?, next_attempt_at = NULL, claimed_at = NULL
+        WHERE project_id = ? AND id = ? AND created_at = ?
+          AND status IN ('pending', 'queued', 'scheduled')
+    `, emailmodel.StatusCancelled, projID, id, createdAt)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
 // CountByStatus powers the dashboard-style summary.
 func (s *Store) CountByStatus(ctx context.Context, projID string) (map[string]int, error) {
 	rows, err := s.ReadQuery(ctx, `SELECT status, COUNT(*) FROM emails WHERE project_id = ? GROUP BY status`, projID)

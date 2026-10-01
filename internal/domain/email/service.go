@@ -736,6 +736,45 @@ func (s *Service) Retry(ctx context.Context, projID, id string) (*emailmodel.Ema
 	return s.Store.Email.Get(ctx, projID, id)
 }
 
+// Cancel withdraws a message that has not been handed to a worker:
+// scheduled, or queued and not yet claimed. Anything a worker holds or
+// has finished is refused with the state it is in, the same way Retry
+// refuses.
+func (s *Service) Cancel(ctx context.Context, projID, id string) (*emailmodel.Email, error) {
+	e, err := s.Store.Email.Get(ctx, projID, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if e == nil {
+		return nil, nil
+	}
+
+	switch e.Status {
+	case emailmodel.StatusPending, emailmodel.StatusQueued, emailmodel.StatusScheduled:
+	default:
+		return nil, reqErrf("only a scheduled or queued email can be cancelled (status is %q)", e.Status)
+	}
+
+	ok, err := s.Store.Email.Cancel(ctx, projID, id, e.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		return nil, reqErrf("email was claimed for delivery before it could be cancelled")
+	}
+
+	e, err = s.Store.Email.Get(ctx, projID, id)
+	if err != nil || e == nil {
+		return e, err
+	}
+
+	s.Emit(ctx, whmodel.EventEmailCancelled, e)
+
+	return e, nil
+}
+
 // offloadAttachments moves inline base64 content into the blob store,
 // keyed under the email id. No-op without a store.
 func (s *Service) offloadAttachments(ctx context.Context, e *emailmodel.Email) error {

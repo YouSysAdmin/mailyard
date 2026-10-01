@@ -663,6 +663,13 @@ func (c *Client) GetEmailAttachment(ctx context.Context, id string, idx string, 
 	return doRaw(ctx, c, "GET", fmt.Sprintf("/emails/%s/attachments/%s", escape(id), escape(idx)), opts)
 }
 
+// CancelEmail Cancel a message that has not gone out.
+//
+// POST /emails/:id/cancel
+func (c *Client) CancelEmail(ctx context.Context, id string, opts ...RequestOption) (EmailResponse, error) {
+	return do[EmailResponse](ctx, c, "POST", fmt.Sprintf("/emails/%s/cancel", escape(id)), nil, opts)
+}
+
 // GetEmailEml EML.
 //
 // GET /emails/:id/eml

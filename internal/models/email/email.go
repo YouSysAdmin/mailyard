@@ -21,6 +21,7 @@ const (
 	StatusFailed     = "failed"
 	StatusSuppressed = "suppressed"
 	StatusScheduled  = "scheduled"
+	StatusCancelled  = "cancelled"
 )
 
 // validStatuses is the set the API will accept as a filter.

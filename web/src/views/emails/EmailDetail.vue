@@ -22,6 +22,7 @@ const projStore = useProjectStore()
 
 const loading = ref(true)
 const retrying = ref(false)
+const cancelling = ref(false)
 const email = ref<Email | null>(null)
 const sentVia = ref<SentVia | null>(null)
 
@@ -145,6 +146,28 @@ const { refreshing, refresh, everySeconds } = useAutoRefresh(
 
 onMounted(() => load())
 
+// Withdraws a message that has not gone out. The server refuses once a
+// worker holds it, so the button is offered only while it is waiting.
+const cancellable = computed(
+  () => !!email.value && ['pending', 'queued', 'scheduled'].includes(email.value.status),
+)
+
+async function cancelEmail() {
+  if (!email.value || cancelling.value) return
+  cancelling.value = true
+  try {
+    const res = await emailsApi.cancel(email.value.id)
+    email.value = res.data.email
+    sentVia.value = res.data.sent_via ?? null
+    addressing.value = res.data.addressing ?? null
+    notify.success('Email cancelled')
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to cancel email'))
+  } finally {
+    cancelling.value = false
+  }
+}
+
 async function retryEmail() {
   if (!email.value || retrying.value) return
   retrying.value = true
@@ -177,6 +200,14 @@ async function retryEmail() {
           @click="retryEmail"
         >
           {{ retrying ? 'Retrying...' : 'Retry' }}
+        </button>
+        <button
+          v-if="cancellable && projStore.can('emails:write')"
+          class="btn btn-danger"
+          :disabled="cancelling"
+          @click="cancelEmail"
+        >
+          {{ cancelling ? 'Cancelling...' : 'Cancel' }}
         </button>
         <a v-if="email" class="btn btn-secondary" :href="browserURL(`/emails/${email.id}/eml`)">
           Download .eml

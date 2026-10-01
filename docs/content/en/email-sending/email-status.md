@@ -44,6 +44,7 @@ or a client generator.
 | `sent`       | An SMTP server accepted it                 | Terminal                 |
 | `failed`     | Every attempt was spent                    | Terminal, unless retried |
 | `suppressed` | Every recipient was blocked before sending | Terminal                 |
+| `cancelled`  | Withdrawn by the caller before a worker took it | Terminal            |
 
 A seventh value, `pending`, is accepted as a filter on the [email log](/docs/email-sending/email-log) for historical
 reasons and is never written. Filtering on it always returns nothing.
@@ -79,6 +80,17 @@ message that failed for a permanent reason, which will simply spend the whole bu
 
 The response is the full email record, not the status summary. The worker is woken immediately, so a healthy queue
 picks the message up in the same second rather than at the next poll.
+
+## Cancel
+
+```
+POST /api/v1/emails/{id}/cancel
+```
+
+A `scheduled` message, or a `queued` one no worker has claimed yet, becomes `cancelled` and is never sent. Anything
+a worker already holds, or has finished with, is refused naming the state it is in. The decision is made in one
+statement against the same row the worker would claim, so a message is either claimed or cancelled and never both.
+A webhook subscribed to `email.cancelled` is told.
 
 ## Polling
 

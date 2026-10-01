@@ -14,6 +14,7 @@ Seven events exist, and a subscription to anything else is refused with `400` wh
 | `email.sent`       | It was handed to an SMTP server successfully                        |
 | `email.failed`     | Delivery failed and no attempt remains                              |
 | `email.suppressed` | Every recipient was on a suppression list, so nothing was attempted |
+| `email.cancelled`  | The caller withdrew it before a worker claimed it                   |
 
 ## Campaign Events
 
@@ -46,7 +47,7 @@ see [Signature Verification](/docs/webhooks/overview#signature-verification).
 
 ## Email Payloads
 
-`email.queued`, `email.sent`, `email.failed` and `email.suppressed` all carry the **same** `data` shape, so one handler
+`email.queued`, `email.sent`, `email.failed`, `email.suppressed` and `email.cancelled` all carry the **same** `data` shape, so one handler
 can serve all four and switch on `event` or on `data.status`:
 
 ```json

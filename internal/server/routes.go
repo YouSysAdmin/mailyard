@@ -639,6 +639,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	emails.Get("/:id/eml", permRead, eh.EML)
 	emails.Get("/:id/status", permRead, eh.Status)
 	emails.Post("/:id/retry", permWrite, eh.Retry)
+	emails.Post("/:id/cancel", permWrite, eh.Cancel)
 
 	// Send-test lives on the templates surface but is a send, so the
 	// email handler owns it. refuseSandboxCredential is on the ROUTE

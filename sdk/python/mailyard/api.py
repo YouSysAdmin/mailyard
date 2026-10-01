@@ -399,6 +399,10 @@ class API:
         "Attachment"
         return self._t.request("GET", f"/emails/{_esc(id)}/attachments/{_esc(idx)}", body=None, query=query, raw=True)
 
+    def cancel_email(self, id, **query: Any) -> Any:
+        "Cancel a message that has not gone out Needs emails:write."
+        return self._t.request("POST", f"/emails/{_esc(id)}/cancel", body=None, query=query)
+
     def get_email_eml(self, id, **query: Any) -> bytes:
         "EML"
         return self._t.request("GET", f"/emails/{_esc(id)}/eml", body=None, query=query, raw=True)

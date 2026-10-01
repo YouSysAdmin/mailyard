@@ -47,6 +47,7 @@ const STATUS_OPTIONS = [
   { value: 'failed', label: 'Failed' },
   { value: 'suppressed', label: 'Suppressed' },
   { value: 'scheduled', label: 'Scheduled' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 async function load(quiet = false) {

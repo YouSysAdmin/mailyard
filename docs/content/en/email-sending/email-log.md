@@ -110,6 +110,7 @@ Related routes on the same message:
 | `GET /api/v1/emails/{id}/eml`               | The message as an `.eml` file, built the way delivery builds it |
 | `GET /api/v1/emails/{id}/tracked-links`     | The links rewritten for click tracking, with their tallies |
 | `POST /api/v1/emails/{id}/retry`            | Requeue a failed message                                   |
+| `POST /api/v1/emails/{id}/cancel`           | Withdraw a scheduled or still queued message               |
 
 ## Counts
 

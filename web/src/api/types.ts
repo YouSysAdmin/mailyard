@@ -471,6 +471,7 @@ export const WEBHOOK_EVENTS = [
   'email.sent',
   'email.failed',
   'email.suppressed',
+  'email.cancelled',
   'campaign.started',
   'campaign.completed',
   'inbound.received',
