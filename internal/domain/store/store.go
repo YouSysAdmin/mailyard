@@ -220,14 +220,29 @@ type PasskeyStore interface {
 // by actor.
 type AuditStore interface {
 	Put(ctx context.Context, e *audit.Event) error
-	ListProject(ctx context.Context, projID string, limit, offset int) ([]*audit.Event, error)
+	ListProject(ctx context.Context, projID string, f AuditFilter) ([]*audit.Event, error)
 	GetProject(ctx context.Context, projID, id string) (*audit.Event, error)
-	ListForActor(ctx context.Context, actorID string, limit, offset int) ([]*audit.Event, error)
-	ListSecurity(ctx context.Context, limit, offset int) ([]*audit.Event, error)
+
+	// ListForActor is one account's own security trail, so Actor on
+	// the filter is ignored there.
+	ListForActor(ctx context.Context, actorID string, f AuditFilter) ([]*audit.Event, error)
+	ListSecurity(ctx context.Context, f AuditFilter) ([]*audit.Event, error)
 	ExportProject(ctx context.Context, projID string, from, to time.Time, limit int) ([]*audit.Event, error)
 	ExportForActor(ctx context.Context, actorID string, from, to time.Time, limit int) ([]*audit.Event, error)
 	ExportSecurity(ctx context.Context, from, to time.Time, limit int) ([]*audit.Event, error)
 	PurgeOlderThan(ctx context.Context, before time.Time) (int64, error)
+}
+
+// AuditFilter narrows a paged trail. Type is one event type exactly,
+// Actor an account id or its address, From and To a half-open window
+// over created_at. Zero values mean no constraint.
+type AuditFilter struct {
+	Type   string
+	Actor  string
+	From   *time.Time
+	To     *time.Time
+	Limit  int
+	Offset int
 }
 
 // SettingStore persists platform-wide setting overrides. Not
@@ -679,7 +694,9 @@ type EmailStore interface {
 	// partition. The tracking handler has already read the row.
 	MarkOpened(ctx context.Context, id string, createdAt, at time.Time) (first bool, opens int64, err error)
 	MarkClicked(ctx context.Context, id string, createdAt, at time.Time) (clicks int64, err error)
-	CountByStatus(ctx context.Context, projID string) (map[string]int, error)
+	// CountByStatus tallies the log, over a created_at window when
+	// either bound is given.
+	CountByStatus(ctx context.Context, projID string, from, to *time.Time) (map[string]int, error)
 	CountCreatedSince(ctx context.Context, projID string, since time.Time) (int, error)
 
 	// AcceptedSince reads the per-minute volume counter, which is what
@@ -933,7 +950,9 @@ type CampaignStore interface {
 	IncrementLinkClicks(ctx context.Context, id string) error
 	InsertTrackingEvent(ctx context.Context, ev *campaign.TrackingEvent) error
 	EngagementStats(ctx context.Context, campaignID string) (opened, clicked, unsubscribed int, err error)
-	EventSeries(ctx context.Context, campaignID, eventType string) ([]campaign.DayCount, error)
+	// EventSeries counts one kind of tracking event per day, over a
+	// window when either bound is given.
+	EventSeries(ctx context.Context, campaignID, eventType string, from, to *time.Time) ([]campaign.DayCount, error)
 
 	// Retention sweep, unscoped by project.
 	PurgeTrackingEventsOlderThan(ctx context.Context, before time.Time) (int64, error)
@@ -1025,7 +1044,7 @@ type InboundStore interface {
 	Put(ctx context.Context, e *inbound.Email) error
 	Delete(ctx context.Context, projID, id string) error
 	FindByDedupHash(ctx context.Context, projID, hash string) (*inbound.Email, error)
-	CountByStatus(ctx context.Context, projID string) (map[string]int, error)
+	CountByStatus(ctx context.Context, projID string, from, to *time.Time) (map[string]int, error)
 
 	// Retention sweep, unscoped by project.
 	StorageKeysOlderThan(ctx context.Context, before time.Time) ([]string, error)

@@ -64,8 +64,9 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/campaigns/:id/analytics",
 			Tag:         "campaign",
 			Summary:     "Analytics",
-			Description: "Needs the `campaigns:read` permission.",
+			Description: "Needs the `campaigns:read` permission. `from` and `to` bound the daily series, the link tallies are over the campaign's life.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
+			Query:       []apidoc.Param{{Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", AnalyticsResponse{})},
 		},
 		{

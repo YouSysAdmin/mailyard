@@ -12,6 +12,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 )
 
@@ -30,14 +31,38 @@ const (
 // names who changed what, which is not something every viewer should read.
 func (h *Handler) ProjectLog(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
-	limit, offset := pg.Limit, pg.Offset
-	events, err := h.Runtime.Store.Audit.ListProject(c.Context(), rc.Project.ID, limit, offset)
+	f, resp, ok := listFilter(c)
+	if !ok {
+		return resp
+	}
+
+	events, err := h.Runtime.Store.Audit.ListProject(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	return response.Success(c, ListResponse{Events: orEmpty(events), Limit: limit, Offset: offset})
+	return response.Success(c, ListResponse{Events: orEmpty(events), Limit: f.Limit, Offset: f.Offset})
+}
+
+// listFilter reads the page and the filters a paged trail takes:
+// one event type, one actor, and a window with the same date-or-instant
+// bounds as the exports. Returns (filter, resp, ok) for the reason
+// exportWindow does.
+func listFilter(c fiber.Ctx) (store.AuditFilter, error, bool) {
+	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
+	f := store.AuditFilter{
+		Type:   paging.Search(c, "type"),
+		Actor:  paging.Search(c, "actor"),
+		Limit:  pg.Limit,
+		Offset: pg.Offset,
+	}
+
+	var err error
+	if f.From, f.To, err = paging.TimeWindow(c); err != nil {
+		return f, response.BadRequest(c, "from and to "+err.Error()), false
+	}
+
+	return f, nil, true
 }
 
 // ProjectEvent returns one project event by id, same gate as the
@@ -61,29 +86,28 @@ func (h *Handler) ProjectEvent(c fiber.Ctx) error {
 // other people's sign-in times and IPs would be a new disclosure.
 func (h *Handler) SecurityLog(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
-	limit, offset := pg.Limit, pg.Offset
+	f, resp, ok := listFilter(c)
+	if !ok {
+		return resp
+	}
 
-	var (
-		events []*amodel.Event
-		err    error
-	)
+	var events []*amodel.Event
 	if rc != nil && rc.User != nil && rc.User.IsAdmin() && c.Query("all") == "true" {
-		events, err = h.Runtime.Store.Audit.ListSecurity(c.Context(), limit, offset)
+		events, resp = h.Runtime.Store.Audit.ListSecurity(c.Context(), f)
 	} else {
 		actorID := ""
 		if rc != nil && rc.User != nil {
 			actorID = rc.User.ID
 		}
 
-		events, err = h.Runtime.Store.Audit.ListForActor(c.Context(), actorID, limit, offset)
+		events, resp = h.Runtime.Store.Audit.ListForActor(c.Context(), actorID, f)
 	}
 
-	if err != nil {
-		return response.Internal(c, err)
+	if resp != nil {
+		return response.Internal(c, resp)
 	}
 
-	return response.Success(c, ListResponse{Events: orEmpty(events), Limit: limit, Offset: offset})
+	return response.Success(c, ListResponse{Events: orEmpty(events), Limit: f.Limit, Offset: f.Offset})
 }
 
 // exportCap bounds one export.

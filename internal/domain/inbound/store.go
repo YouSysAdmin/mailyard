@@ -184,8 +184,21 @@ func (s *Store) FindByDedupHash(ctx context.Context, projID, hash string) (*imod
 
 // CountByStatus returns how many received messages projID has in each
 // status.
-func (s *Store) CountByStatus(ctx context.Context, projID string) (map[string]int, error) {
-	rows, err := s.ReadQuery(ctx, `SELECT status, COUNT(*) FROM inbound_emails WHERE project_id = ? GROUP BY status`, projID)
+func (s *Store) CountByStatus(ctx context.Context, projID string, from, to *time.Time) (map[string]int, error) {
+	query := `SELECT status, COUNT(*) FROM inbound_emails WHERE project_id = ?`
+	args := []any{projID}
+	if from != nil {
+		query += ` AND received_at >= ?`
+		args = append(args, from.UTC())
+	}
+
+	if to != nil {
+		query += ` AND received_at < ?`
+		args = append(args, to.UTC())
+	}
+
+	query += ` GROUP BY status`
+	rows, err := s.ReadQuery(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

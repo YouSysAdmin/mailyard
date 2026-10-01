@@ -184,12 +184,17 @@ func (h *Handler) Analytics(c fiber.Ctx) error {
 		links = []*cmodel.TrackedLink{}
 	}
 
-	openSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventOpen)
+	from, to, err := paging.TimeWindow(c)
+	if err != nil {
+		return response.BadRequest(c, "from and to "+err.Error())
+	}
+
+	openSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventOpen, from, to)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	clickSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventClick)
+	clickSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventClick, from, to)
 	if err != nil {
 		return response.Internal(c, err)
 	}

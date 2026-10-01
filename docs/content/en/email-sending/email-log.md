@@ -117,10 +117,11 @@ Related routes on the same message:
 ## Counts
 
 ```
-GET /api/v1/emails/stats
+GET /api/v1/emails/stats?from=2026-08-01&to=2026-08-31
 ```
 
-Per-status totals for the project, which is what the dashboard tiles read:
+Per-status totals for the project, which is what the dashboard tiles read. `from` and `to` are optional and take the
+same date-or-instant bounds as the list, so one month's counts are one request:
 
 ```json
 {

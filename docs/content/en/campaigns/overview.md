@@ -153,7 +153,7 @@ aggregated as the send runs, so they survive the tracking-event retention sweep.
 | `POST /api/v1/campaigns/{id}/resume` | Carry on |
 | `POST /api/v1/campaigns/{id}/cancel` | Stop for good |
 | `GET /api/v1/campaigns/{id}/messages` | The per-recipient rows, with addresses |
-| `GET /api/v1/campaigns/{id}/analytics` | Per-link click tallies and daily series |
+| `GET /api/v1/campaigns/{id}/analytics` | Per-link click tallies and daily series. `from` and `to` bound the series |
 | `POST /api/v1/campaigns/{id}/preview` | Render the message one subscriber would get |
 | `DELETE /api/v1/campaigns/{id}` | Remove the campaign and its messages |
 

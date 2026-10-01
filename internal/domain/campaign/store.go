@@ -924,14 +924,25 @@ func (s *Store) ListTrackedLinks(ctx context.Context, campaignID string) ([]*cmo
 // Series length is bounded by the retention sweep on tracking_events,
 // not by this query - a purged event leaves the per-message and
 // per-link counters intact but drops out of the series.
-func (s *Store) EventSeries(ctx context.Context, campaignID, eventType string) ([]cmodel.DayCount, error) {
-	rows, err := s.Query(ctx, `
+func (s *Store) EventSeries(ctx context.Context, campaignID, eventType string, from, to *time.Time) ([]cmodel.DayCount, error) {
+	query := `
         SELECT to_char(e.created_at, 'YYYY-MM-DD') AS day, COUNT(*)
         FROM tracking_events e
         JOIN campaign_messages m ON m.id = e.campaign_message_id
-        WHERE m.campaign_id = ? AND e.event_type = ?
-        GROUP BY day ORDER BY day ASC
-    `, campaignID, eventType)
+        WHERE m.campaign_id = ? AND e.event_type = ?`
+	args := []any{campaignID, eventType}
+	if from != nil {
+		query += ` AND e.created_at >= ?`
+		args = append(args, from.UTC())
+	}
+
+	if to != nil {
+		query += ` AND e.created_at < ?`
+		args = append(args, to.UTC())
+	}
+
+	query += ` GROUP BY day ORDER BY day ASC`
+	rows, err := s.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

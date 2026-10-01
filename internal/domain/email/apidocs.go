@@ -159,6 +159,7 @@ func APIDocs() []apidoc.Route {
 			Tag:        "emails",
 			Permission: "emails:read",
 			Summary:    "Count emails by delivery status",
+			Query:      []apidoc.Param{{Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
 			Responses:  []apidoc.Response{apidoc.OK("Counts keyed by status.", StatsResponse{})},
 		},
 		{

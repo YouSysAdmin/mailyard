@@ -6,9 +6,12 @@ package audit
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/database"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 )
 
@@ -55,16 +58,54 @@ func (s *Store) Put(ctx context.Context, e *amodel.Event) error {
 
 // ListProject returns operational events for one project, newest
 // first. Scoped by projID like every other tenant read.
-func (s *Store) ListProject(ctx context.Context, projID string, limit, offset int) ([]*amodel.Event, error) {
-	rows, err := s.ReadQuery(ctx, eventSelect+`
-        WHERE category = ? AND project_id = ?
-        ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-		amodel.CategoryProject, projID, limit, offset)
+func (s *Store) ListProject(ctx context.Context, projID string, f store.AuditFilter) ([]*amodel.Event, error) {
+	var sb strings.Builder
+	sb.WriteString(eventSelect)
+	sb.WriteString(` WHERE category = ? AND project_id = ?`)
+	args := narrow(&sb, []any{amodel.CategoryProject, projID}, f, true)
+	rows, err := s.ReadQuery(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}
 
 	return scanEvents(rows)
+}
+
+// narrow appends f's conditions and the page to sb and their values
+// to args. withActor is false on one account's own trail, where
+// naming an actor would either repeat the scope or escape it.
+func narrow(sb *strings.Builder, args []any, f store.AuditFilter, withActor bool) []any {
+	if f.Type != "" {
+		sb.WriteString(` AND type = ?`)
+		args = append(args, f.Type)
+	}
+
+	// An actor is named by id or by address. The id column is a uuid,
+	// which an address would fail against rather than miss, so the
+	// shape of the value picks the column.
+	if withActor && f.Actor != "" {
+		if ids.Valid(f.Actor) {
+			sb.WriteString(` AND actor_id = ?`)
+			args = append(args, f.Actor)
+		} else {
+			sb.WriteString(` AND LOWER(actor_email) = ?`)
+			args = append(args, strings.ToLower(f.Actor))
+		}
+	}
+
+	if f.From != nil {
+		sb.WriteString(` AND created_at >= ?`)
+		args = append(args, f.From.UTC())
+	}
+
+	if f.To != nil {
+		sb.WriteString(` AND created_at < ?`)
+		args = append(args, f.To.UTC())
+	}
+
+	sb.WriteString(` ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+
+	return append(args, f.Limit, f.Offset)
 }
 
 // GetProject returns one project event by id. Scoped on the
@@ -136,11 +177,12 @@ func (s *Store) ExportSecurity(ctx context.Context, from, to time.Time, limit in
 }
 
 // ListForActor returns security events for one user, newest first.
-func (s *Store) ListForActor(ctx context.Context, actorID string, limit, offset int) ([]*amodel.Event, error) {
-	rows, err := s.ReadQuery(ctx, eventSelect+`
-        WHERE category = ? AND actor_id = ?
-        ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-		amodel.CategorySecurity, actorID, limit, offset)
+func (s *Store) ListForActor(ctx context.Context, actorID string, f store.AuditFilter) ([]*amodel.Event, error) {
+	var sb strings.Builder
+	sb.WriteString(eventSelect)
+	sb.WriteString(` WHERE category = ? AND actor_id = ?`)
+	args := narrow(&sb, []any{amodel.CategorySecurity, actorID}, f, false)
+	rows, err := s.ReadQuery(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -150,11 +192,12 @@ func (s *Store) ListForActor(ctx context.Context, actorID string, limit, offset 
 
 // ListSecurity returns every security event, for platform admins
 // investigating sign-in activity across accounts.
-func (s *Store) ListSecurity(ctx context.Context, limit, offset int) ([]*amodel.Event, error) {
-	rows, err := s.ReadQuery(ctx, eventSelect+`
-        WHERE category = ?
-        ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-		amodel.CategorySecurity, limit, offset)
+func (s *Store) ListSecurity(ctx context.Context, f store.AuditFilter) ([]*amodel.Event, error) {
+	var sb strings.Builder
+	sb.WriteString(eventSelect)
+	sb.WriteString(` WHERE category = ?`)
+	args := narrow(&sb, []any{amodel.CategorySecurity}, f, true)
+	rows, err := s.ReadQuery(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}

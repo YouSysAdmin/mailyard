@@ -88,7 +88,7 @@ func (f *fakeInbound) FindByDedupHash(_ context.Context, _, h string) (*imodel.E
 
 	return nil, nil
 }
-func (f *fakeInbound) CountByStatus(context.Context, string) (map[string]int, error) {
+func (f *fakeInbound) CountByStatus(context.Context, string, *time.Time, *time.Time) (map[string]int, error) {
 	return nil, nil
 }
 func (f *fakeInbound) StorageKeysOlderThan(context.Context, time.Time) ([]string, error) {

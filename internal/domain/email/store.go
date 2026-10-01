@@ -469,8 +469,21 @@ func (s *Store) Cancel(ctx context.Context, projID, id string, createdAt time.Ti
 }
 
 // CountByStatus powers the dashboard-style summary.
-func (s *Store) CountByStatus(ctx context.Context, projID string) (map[string]int, error) {
-	rows, err := s.ReadQuery(ctx, `SELECT status, COUNT(*) FROM emails WHERE project_id = ? GROUP BY status`, projID)
+func (s *Store) CountByStatus(ctx context.Context, projID string, from, to *time.Time) (map[string]int, error) {
+	query := `SELECT status, COUNT(*) FROM emails WHERE project_id = ?`
+	args := []any{projID}
+	if from != nil {
+		query += ` AND created_at >= ?`
+		args = append(args, from.UTC())
+	}
+
+	if to != nil {
+		query += ` AND created_at < ?`
+		args = append(args, to.UTC())
+	}
+
+	query += ` GROUP BY status`
+	rows, err := s.ReadQuery(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -45,8 +45,10 @@ curl -G http://localhost:3000/api/v1/inbound-emails \
 ## Counts
 
 ```
-GET /api/v1/inbound-emails/stats
+GET /api/v1/inbound-emails/stats?from=2026-08-01&to=2026-08-31
 ```
+
+`from` and `to` are optional and bound `received_at` the way the list's cursor does.
 
 ```json
 { "counts": { "received": 812, "rejected": 40, "failed": 3 } }

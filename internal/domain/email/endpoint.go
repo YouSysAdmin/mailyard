@@ -277,7 +277,12 @@ func (h *Handler) List(c fiber.Ctx) error {
 // Stats returns per-status counts for the project.
 func (h *Handler) Stats(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	counts, err := h.Runtime.Store.Email.CountByStatus(c.Context(), rc.Project.ID)
+	from, to, err := paging.TimeWindow(c)
+	if err != nil {
+		return response.BadRequest(c, "from and to "+err.Error())
+	}
+
+	counts, err := h.Runtime.Store.Email.CountByStatus(c.Context(), rc.Project.ID, from, to)
 	if err != nil {
 		return response.Internal(c, err)
 	}

@@ -95,7 +95,7 @@ func TestTrackingReadsRunAgainstTheRealSchema(t *testing.T) {
 	}
 
 	for _, kind := range []string{"open", "click"} {
-		series, err := s.EventSeries(ctx, camp.ID, kind)
+		series, err := s.EventSeries(ctx, camp.ID, kind, nil, nil)
 		if err != nil {
 			t.Errorf("EventSeries(%s): %v", kind, err)
 			continue
