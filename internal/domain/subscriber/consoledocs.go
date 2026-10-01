@@ -20,7 +20,17 @@ func ConsoleDocs() []apidoc.Route {
 			Tag:         "subscriber",
 			Summary:     "List",
 			Description: "Needs the `subscribers:read` permission.",
-			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
+			Query: []apidoc.Param{
+				{
+					Name:        "status",
+					Description: "Only subscribers in this status.",
+					Enum:        []string{"subscribed", "unsubscribed", "bounced", "complained"},
+				},
+				{Name: "q", Description: "Part of the address or the name, case-insensitive."},
+				{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
 			Method:      "POST",

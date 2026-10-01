@@ -20,7 +20,12 @@ func ConsoleDocs() []apidoc.Route {
 			Tag:         "notification",
 			Summary:     "List",
 			Description: "Needs the `notifications:read` permission.",
-			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
+			Query: []apidoc.Param{
+				{Name: "unread", Type: "boolean", Description: "Only notifications not yet marked read."},
+				{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
 			Method:      "DELETE",

@@ -96,18 +96,27 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/auth/oauth/:slug/callback",
 			Tag:         "auth",
 			Summary:     "O auth callback",
-			Description: "Any signed-in member.",
+			Description: "The provider's redirect back, carrying either a code or an error.",
 			PathParams:  []apidoc.Param{{Name: "slug"}},
-			Responses:   []apidoc.Response{apidoc.Redirect(302, "The console, signed in.")},
+			Query: []apidoc.Param{
+				{Name: "code", Description: "The authorization code to exchange."},
+				{Name: "state", Description: "The state issued by the start step."},
+				{Name: "error", Description: "The provider's error code when it refused."},
+				{Name: "error_description", Description: "The provider's explanation of the error."},
+			},
+			Responses: []apidoc.Response{apidoc.Redirect(302, "The console, signed in.")},
 		},
 		{
 			Method:      "GET",
 			Path:        "/auth/oauth/:slug/start",
 			Tag:         "auth",
 			Summary:     "O auth start",
-			Description: "Any signed-in member.",
+			Description: "Begins the sign-in with this provider.",
 			PathParams:  []apidoc.Param{{Name: "slug"}},
-			Responses:   []apidoc.Response{apidoc.Redirect(302, "The provider's authorization endpoint.")},
+			Query: []apidoc.Param{
+				{Name: "invite", Description: "An invitation token to accept once signed in."},
+			},
+			Responses: []apidoc.Response{apidoc.Redirect(302, "The provider's authorization endpoint.")},
 		},
 		{
 			Method:      "POST",
@@ -168,7 +177,10 @@ func ConsoleDocs() []apidoc.Route {
 			Tag:         "auth",
 			Summary:     "Passkey register finish",
 			Description: "Any signed-in member.",
-			Responses:   []apidoc.Response{apidoc.Created("The result.", PasskeyResponse{})},
+			Query: []apidoc.Param{
+				{Name: "name", Description: "A label for the new passkey, truncated to 60 characters."},
+			},
+			Responses: []apidoc.Response{apidoc.Created("The result.", PasskeyResponse{})},
 		},
 		{
 			Method:      "POST",

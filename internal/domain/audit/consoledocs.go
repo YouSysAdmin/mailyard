@@ -20,6 +20,7 @@ func ConsoleDocs() []apidoc.Route {
 			Tag:         "audit",
 			Summary:     "Project log",
 			Description: "Needs the `audit:read` permission.",
+			Query:       []apidoc.Param{{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."}, {Name: "offset", Type: "integer", Description: "Rows to skip."}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
@@ -32,6 +33,7 @@ func ConsoleDocs() []apidoc.Route {
 				"RFC 3339 timestamp - a bare date for `to` includes that whole day, " +
 				"an explicit timestamp is an exclusive bound. Newest first, capped, " +
 				"and `truncated` says whether the cap was reached.",
+			Query:     []apidoc.Param{{Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
 			Responses: []apidoc.Response{apidoc.OK("The result.", ExportResponse{})},
 		},
 		{
@@ -48,7 +50,8 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/security-log",
 			Tag:         "audit",
 			Summary:     "Security log",
-			Description: "Any signed-in member.",
+			Description: "Any signed-in member, for their own account.",
+			Query:       []apidoc.Param{{Name: "all", Type: "boolean", Description: "Every account's events rather than the caller's own. Honored only for a platform admin."}, {Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."}, {Name: "offset", Type: "integer", Description: "Rows to skip."}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
@@ -59,6 +62,7 @@ func ConsoleDocs() []apidoc.Route {
 			Description: "Any signed-in member, for their own account - `all=true` is " +
 				"honored only for a platform admin. Same optional `from` and `to` as " +
 				"the project export.",
+			Query:     []apidoc.Param{{Name: "all", Type: "boolean", Description: "Every account's events rather than the caller's own. Honored only for a platform admin."}, {Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
 			Responses: []apidoc.Response{apidoc.OK("The result.", ExportResponse{})},
 		},
 	}

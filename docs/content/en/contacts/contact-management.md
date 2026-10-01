@@ -30,7 +30,6 @@ GET /api/v1/contacts?search=alice&limit=25&offset=0
 | `search`  | -       | Matches the address or the display name, case-insensitively |
 | `limit`   | `20`    | Page size, capped at `200`                                  |
 | `offset`  | `0`     | Rows to skip                                                |
-| `page`    | -       | Zero-based page number, honored when `offset` is absent     |
 
 ```bash
 curl "http://localhost:3000/api/v1/contacts?search=alice" \

@@ -67,17 +67,7 @@ func FromWith(c fiber.Ctx, def, ceiling int) Page {
 
 	limit = min(limit, ceiling)
 
-	offset := fiber.Query[int](c, "offset", 0)
-	// The original API paged by zero-based page number. Honor it when
-	// offset was not given, so a client written against those docs
-	// keeps working.
-	if offset == 0 {
-		if p := fiber.Query[int](c, "page", 0); p > 0 {
-			offset = p * limit
-		}
-	}
-
-	offset = max(offset, 0)
+	offset := max(fiber.Query[int](c, "offset", 0), 0)
 
 	return Page{Limit: limit, Offset: offset}
 }

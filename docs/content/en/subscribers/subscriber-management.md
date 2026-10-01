@@ -62,7 +62,7 @@ GET /api/v1/subscribers?limit=20&offset=0&status=subscribed&q=acme
 | Parameter | Notes |
 |---|---|
 | `limit` | Default 50, clamped to the API ceiling |
-| `offset` | Rows to skip. `page` is honoured as a zero-based alias when `offset` is absent |
+| `offset` | Rows to skip |
 | `status` | One of the four statuses |
 | `q` | Part of the address or the name, matched without regard to case |
 

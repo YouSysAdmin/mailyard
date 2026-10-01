@@ -66,6 +66,7 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "List members",
 			Description: "Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
+			Query:       []apidoc.Param{{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."}, {Name: "offset", Type: "integer", Description: "Rows to skip."}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", MemberListResponse{})},
 		},
 		{

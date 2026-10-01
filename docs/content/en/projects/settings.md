@@ -103,7 +103,7 @@ middleware, so new routes are covered automatically.
 | Parameter | Type | Default | Description                                                                           |
 |-----------|------|---------|---------------------------------------------------------------------------------------|
 | `limit`   | int  | `20`    | Page size. Over-asking is clamped to the ceiling, never refused.                      |
-| `offset`  | int  | `0`     | Rows to skip. `page` is still honoured as a zero-based alias when `offset` is absent. |
+| `offset`  | int  | `0`     | Rows to skip. |
 
 ```bash
 curl "http://localhost:3000/api/v1/audit-log?limit=20" \
