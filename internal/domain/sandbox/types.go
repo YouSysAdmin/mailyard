@@ -33,11 +33,14 @@ type inboxCreateInput struct {
 	Addresses   []string `json:"addresses"   validate:"required,min=1,max=50,dive,email"    normalize:"normalize"`
 }
 
-// clearInput narrows Clear to captures from these envelope senders,
-// lowercased the way an inbox's list is. An empty list, or no body at
-// all, empties the whole sandbox.
+// clearInput narrows Clear. Senders and recipients are envelope
+// addresses, lowercased the way an inbox's list is, and older_than is
+// an RFC 3339 instant. Nothing set, or no body at all, empties the
+// whole sandbox.
 type clearInput struct {
-	Senders []string `json:"senders" validate:"omitempty,max=500,dive,email" normalize:"normalize"`
+	Senders    []string `json:"senders"    validate:"omitempty,max=500,dive,email" normalize:"normalize"`
+	Recipients []string `json:"recipients" validate:"omitempty,max=500,dive,email" normalize:"normalize"`
+	OlderThan  string   `json:"older_than" validate:"omitempty,max=40"             normalize:"trim"`
 }
 
 type inboxUpdateInput struct {

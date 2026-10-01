@@ -1026,10 +1026,10 @@ type SandboxStore interface {
 	// is a 404 rather than a deletion the audit trail records.
 	Delete(ctx context.Context, projID, id string) (bool, error)
 
-	// Clear removes every capture whose envelope sender is in addresses,
-	// or every capture in the project when the list is empty - the same
-	// reading of an empty list as SandboxFilter.
-	Clear(ctx context.Context, projID string, addresses []string) (int64, error)
+	// Clear removes every capture sel selects, or every capture in the
+	// project when sel is empty - the same reading of an empty list as
+	// SandboxFilter.
+	Clear(ctx context.Context, projID string, sel SandboxClear) (int64, error)
 
 	// Trim keeps at most keep messages, dropping the oldest. Called on
 	// every capture, so it must stay one statement.
@@ -1046,15 +1046,29 @@ type SandboxStore interface {
 // capture - an inbox with NO addresses is the handler's business, since
 // the store cannot tell "no filter" from "a filter nothing satisfies".
 //
-// Sender and Recipient are search terms over the envelope, matched as a
+// Sender, Recipient and Subject are search terms, matched as a
 // case-insensitive substring and ANDed with each other and with the
-// inbox. Empty means no condition.
+// inbox. Since keeps only captures received after that instant, which
+// is how a test run asks for its own mail. Empty means no condition.
 type SandboxFilter struct {
 	Addresses []string
 	Sender    string
 	Recipient string
+	Subject   string
+	Since     *time.Time
 	Limit     int
 	Offset    int
+}
+
+// SandboxClear selects what Clear removes. Senders and Recipients are
+// lowercased addresses, a capture going when its envelope sender is
+// among Senders or any envelope recipient is among Recipients.
+// OlderThan keeps what was received at or after that instant. The
+// conditions are ANDed, and all empty means everything.
+type SandboxClear struct {
+	Senders    []string
+	Recipients []string
+	OlderThan  *time.Time
 }
 
 // SandboxInboxStore persists sandbox inboxes, the saved sender filters

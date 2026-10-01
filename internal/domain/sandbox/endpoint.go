@@ -3,8 +3,10 @@
 package sandbox
 
 import (
-	"github.com/gofiber/fiber/v3"
 	"strconv"
+	"time"
+
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
@@ -50,9 +52,19 @@ func (h *Handler) List(c fiber.Ctx) error {
 	f := store.SandboxFilter{
 		Sender:    paging.Search(c, "sender"),
 		Recipient: paging.Search(c, "recipient"),
+		Subject:   paging.Search(c, "subject"),
 		Limit:     p.Limit,
 		Offset:    p.Offset,
 	}
+	if raw := c.Query("since"); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return response.BadRequest(c, "since must be an RFC 3339 timestamp")
+		}
+
+		f.Since = &t
+	}
+
 	if id := c.Query("inbox"); id != "" {
 		in, err := h.Runtime.Store.SandboxInbox.Get(c.Context(), rc.Project.ID, id)
 		if err != nil {
@@ -210,21 +222,31 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // whose envelope sender is in the list - addresses rather than inbox
 // ids, because an inbox is only a saved list of addresses and a test
 // run knows what it sent from without looking one up. The console
-// hands over the addresses of the inboxes ticked.
+// hands over the addresses of the inboxes ticked. Recipients narrows
+// the same way on the other side of the envelope, and older_than
+// keeps what a run still in progress has just received.
 func (h *Handler) Clear(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 
-	var senders []string
+	var sel store.SandboxClear
 	if len(c.Body()) > 0 {
 		in, resp, ok := validation.Bind[clearInput](c)
 		if !ok {
 			return resp
 		}
 
-		senders = in.Senders
+		sel.Senders, sel.Recipients = in.Senders, in.Recipients
+		if in.OlderThan != "" {
+			t, err := time.Parse(time.RFC3339, in.OlderThan)
+			if err != nil {
+				return response.BadRequest(c, "older_than must be an RFC 3339 timestamp")
+			}
+
+			sel.OlderThan = &t
+		}
 	}
 
-	n, err := h.Runtime.Store.Sandbox.Clear(c.Context(), rc.Project.ID, senders)
+	n, err := h.Runtime.Store.Sandbox.Clear(c.Context(), rc.Project.ID, sel)
 	if err != nil {
 		return response.Internal(c, err)
 	}

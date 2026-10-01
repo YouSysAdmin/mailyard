@@ -314,7 +314,9 @@ type Checks struct {
 
 // ClearInput is the request body.
 type ClearInput struct {
-	Senders []string `json:"senders"`
+	Senders    []string `json:"senders"`
+	Recipients []string `json:"recipients"`
+	OlderThan  string   `json:"older_than"`
 }
 
 // Contact is the wire body.

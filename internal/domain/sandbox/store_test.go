@@ -335,7 +335,7 @@ func TestClearEmptiesOneProject(t *testing.T) {
 	put(t, s, mine, time.Now().UTC(), "b", nil)
 	kept := put(t, s, theirs, time.Now().UTC(), "c", nil)
 
-	n, err := s.Clear(t.Context(), mine, nil)
+	n, err := s.Clear(t.Context(), mine, store.SandboxClear{})
 	if err != nil {
 		t.Fatalf("clear: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestClearRemovesOnlyTheChosenSenders(t *testing.T) {
 	kept := putFrom(t, s, mine, "b@example.test")
 	other := putFrom(t, s, theirs, "a@example.test")
 
-	n, err := s.Clear(t.Context(), mine, []string{"a@example.test"})
+	n, err := s.Clear(t.Context(), mine, store.SandboxClear{Senders: []string{"a@example.test"}})
 	if err != nil {
 		t.Fatalf("clear: %v", err)
 	}
@@ -388,8 +388,9 @@ func TestTheSandboxSearchesTheEnvelope(t *testing.T) {
 	app := putFrom(t, s, mine, "App@Example.test")
 	putFrom(t, s, mine, "cron@other.test")
 	putFrom(t, s, theirs, "app@example.test")
-	if _, err := s.Exec(t.Context(), `UPDATE sandbox_emails SET recipients = ? WHERE id = ?`,
-		`["qa@team.test","ops@team.test"]`, app.ID); err != nil {
+	now := time.Now().UTC()
+	if _, err := s.Exec(t.Context(), `UPDATE sandbox_emails SET recipients = ?, subject = ?, received_at = ? WHERE id = ?`,
+		`["qa@team.test","ops@team.test"]`, "Your receipt", now.Add(-time.Hour), app.ID); err != nil {
 		t.Fatalf("set recipients: %v", err)
 	}
 
@@ -405,6 +406,12 @@ func TestTheSandboxSearchesTheEnvelope(t *testing.T) {
 		{"both, one misses", store.SandboxFilter{Sender: "cron", Recipient: "qa@"}, 0},
 		{"with inbox", store.SandboxFilter{Addresses: []string{"cron@other.test"}, Sender: "app"}, 0},
 		{"wildcard is literal", store.SandboxFilter{Sender: "%"}, 0},
+		{"subject substring", store.SandboxFilter{Subject: "RECEIPT"}, 1},
+		{"subject misses", store.SandboxFilter{Subject: "invoice"}, 0},
+		{"since before both", store.SandboxFilter{Since: ptr(now.Add(-2 * time.Hour))}, 2},
+		{"since between, with the sender", store.SandboxFilter{Since: ptr(now.Add(-90 * time.Minute)), Sender: "app"}, 1},
+		{"since excludes the older one", store.SandboxFilter{Since: ptr(now.Add(-30 * time.Minute)), Sender: "app"}, 0},
+		{"since after both", store.SandboxFilter{Since: ptr(now.Add(time.Hour))}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -426,5 +433,58 @@ func TestTheSandboxSearchesTheEnvelope(t *testing.T) {
 				t.Errorf("listed %s, want %s", got[0].Sender, app.Sender)
 			}
 		})
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// Clearing by recipient unpacks the JSON array rather than searching
+// its text, so an address is matched whole and without regard to
+// case. older_than is a strict bound, and the conditions narrow each
+// other.
+func TestClearSelectsByRecipientAndAge(t *testing.T) {
+	s := testStore(t)
+	mine := newProject(t, s)
+	now := time.Now().UTC()
+	old := put(t, s, mine, now.Add(-2*time.Hour), "old", nil)
+	fresh := put(t, s, mine, now, "fresh", nil)
+	other := put(t, s, mine, now.Add(-2*time.Hour), "other recipient", nil)
+	for id, rcpts := range map[string]string{
+		old.ID:   `["QA@Team.test","ops@team.test"]`,
+		fresh.ID: `["qa@team.test"]`,
+		other.ID: `["someone@else.test"]`,
+	} {
+		if _, err := s.Exec(t.Context(), `UPDATE sandbox_emails SET recipients = ? WHERE id = ?`, rcpts, id); err != nil {
+			t.Fatalf("set recipients: %v", err)
+		}
+	}
+
+	n, err := s.Clear(t.Context(), mine, store.SandboxClear{
+		Recipients: []string{"qa@team.test"},
+		OlderThan:  ptr(now.Add(-time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+
+	if n != 1 {
+		t.Errorf("cleared %d, want 1", n)
+	}
+
+	if got, _ := s.Get(t.Context(), mine, fresh.ID); got == nil {
+		t.Error("a capture newer than older_than was removed")
+	}
+
+	if got, _ := s.Get(t.Context(), mine, other.ID); got == nil {
+		t.Error("a capture to another recipient was removed")
+	}
+
+	n, err = s.Clear(t.Context(), mine, store.SandboxClear{Recipients: []string{"qa@team.test"}})
+	if err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+
+	if n != 1 {
+		t.Errorf("cleared %d by recipient alone, want 1", n)
 	}
 }

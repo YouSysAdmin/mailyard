@@ -39,10 +39,10 @@ func (f *fakeStore) Raw(context.Context, string, string) ([]byte, error)        
 func (f *fakeStore) List(context.Context, string, store.SandboxFilter) ([]*sbmodel.Email, error) {
 	return nil, nil
 }
-func (f *fakeStore) Count(context.Context, string, store.SandboxFilter) (int, error) { return 0, nil }
-func (f *fakeStore) Delete(context.Context, string, string) (bool, error)            { return false, nil }
-func (f *fakeStore) Clear(context.Context, string, []string) (int64, error)          { return 0, nil }
-func (f *fakeStore) PurgeExpired(context.Context, time.Time) (int64, error)          { return 0, nil }
+func (f *fakeStore) Count(context.Context, string, store.SandboxFilter) (int, error)  { return 0, nil }
+func (f *fakeStore) Delete(context.Context, string, string) (bool, error)             { return false, nil }
+func (f *fakeStore) Clear(context.Context, string, store.SandboxClear) (int64, error) { return 0, nil }
+func (f *fakeStore) PurgeExpired(context.Context, time.Time) (int64, error)           { return 0, nil }
 
 // fakeLoader feeds the settings cache without a database.
 type fakeLoader struct{ rows []*smodel.Setting }

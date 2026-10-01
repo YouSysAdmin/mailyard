@@ -95,7 +95,22 @@ const senderIn = ` AND lower(e.sender) = ANY(?::text[])`
 const (
 	senderLike    = ` AND e.sender ILIKE ? ESCAPE '\'`
 	recipientLike = ` AND e.recipients ILIKE ? ESCAPE '\'`
+	subjectLike   = ` AND e.subject ILIKE ? ESCAPE '\'`
 )
+
+// receivedAfter is the since filter, and receivedBefore the clear
+// window. Strict on both sides so a capture is never both kept by the
+// one and removed by the other at the same instant.
+const (
+	receivedAfter  = ` AND e.received_at > ?`
+	receivedBefore = ` AND e.received_at < ?`
+)
+
+// recipientIn matches a capture whose envelope has any recipient in the
+// list. recipients is a JSON array in a TEXT column, so it is unpacked
+// rather than searched as text, and lowered on the element the same
+// way senderIn lowers the sender.
+const recipientIn = ` AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(e.recipients::jsonb) r WHERE lower(r) = ANY(?::text[]))`
 
 // narrow appends f's conditions to sb and their values to args, for
 // List and Count alike.
@@ -113,6 +128,16 @@ func narrow(sb *strings.Builder, args []any, f store.SandboxFilter) []any {
 	if f.Recipient != "" {
 		sb.WriteString(recipientLike)
 		args = append(args, "%"+database.EscapeLike(f.Recipient)+"%")
+	}
+
+	if f.Subject != "" {
+		sb.WriteString(subjectLike)
+		args = append(args, "%"+database.EscapeLike(f.Subject)+"%")
+	}
+
+	if f.Since != nil {
+		sb.WriteString(receivedAfter)
+		args = append(args, *f.Since)
 	}
 
 	return args
@@ -211,13 +236,23 @@ func (s *Store) Delete(ctx context.Context, projID, id string) (bool, error) {
 // Clear empties one project's sandbox. The button a developer reaches
 // for after a confusing test run, and the reason nothing here is worth
 // a confirmation beyond the one in the console.
-func (s *Store) Clear(ctx context.Context, projID string, addresses []string) (int64, error) {
+func (s *Store) Clear(ctx context.Context, projID string, sel store.SandboxClear) (int64, error) {
 	var sb strings.Builder
 	sb.WriteString(`DELETE FROM sandbox_emails e WHERE e.project_id = ?`)
 	args := []any{projID}
-	if len(addresses) > 0 {
+	if len(sel.Senders) > 0 {
 		sb.WriteString(senderIn)
-		args = append(args, addresses)
+		args = append(args, sel.Senders)
+	}
+
+	if len(sel.Recipients) > 0 {
+		sb.WriteString(recipientIn)
+		args = append(args, sel.Recipients)
+	}
+
+	if sel.OlderThan != nil {
+		sb.WriteString(receivedBefore)
+		args = append(args, *sel.OlderThan)
 	}
 
 	res, err := s.Exec(ctx, sb.String(), args...)

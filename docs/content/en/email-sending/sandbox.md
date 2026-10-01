@@ -247,14 +247,14 @@ The sandbox has a console API under `/api/v1/sandbox`, session-authenticated lik
 
 | Route                                      | Purpose                                       |
 |--------------------------------------------|-----------------------------------------------|
-| `GET /api/v1/sandbox`                      | Page of captured messages, newest first. `?inbox=<id>` narrows it to one inbox's senders, `?sender=` and `?recipient=` match an address or part of one |
+| `GET /api/v1/sandbox`                      | Page of captured messages, newest first, `?limit=` (50, at most 200) and `?offset=`. `?inbox=<id>` narrows it to one inbox's senders, `?sender=`, `?recipient=` and `?subject=` match a value or part of one, `?since=` keeps what was received after an RFC 3339 instant |
 | `GET /api/v1/sandbox/info`                 | Connection details and the retention settings |
 | `GET /api/v1/sandbox/:id`                  | One message, parsed                           |
 | `GET /api/v1/sandbox/:id/raw`              | The wire bytes as `text/plain`                |
 | `GET /api/v1/sandbox/:id/eml`              | The same bytes as an `.eml` download          |
 | `GET /api/v1/sandbox/:id/attachments/:idx` | One attachment                                |
 | `DELETE /api/v1/sandbox/:id`               | Delete one message                            |
-| `POST /api/v1/sandbox/clear`               | Empty the project's sandbox. With a body of `senders`, only captures from those addresses |
+| `POST /api/v1/sandbox/clear`               | Empty the project's sandbox. A body of `senders` or `recipients` keeps it to captures from or to those addresses, `older_than` to what was received before that instant |
 | `GET /api/v1/sandbox/inboxes`              | Every inbox in the project                    |
 | `POST /api/v1/sandbox/inboxes`             | Create an inbox: `name`, `description`, `addresses` |
 | `GET /api/v1/sandbox/inboxes/:id`          | One inbox                                     |
