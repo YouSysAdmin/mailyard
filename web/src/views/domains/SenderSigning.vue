@@ -7,7 +7,7 @@
 // they read in - which is why both kinds are offered and the operator
 // picks by where their recipients read.
 import { computed, ref } from 'vue'
-import { sendersApi, type Sender, type SigningPayload } from '../../api/senders'
+import { type Sender, sendersApi, type SigningPayload } from '../../api/senders'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'

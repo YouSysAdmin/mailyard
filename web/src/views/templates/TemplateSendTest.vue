@@ -7,7 +7,7 @@
 // the markup, and this can.
 import { computed, ref } from 'vue'
 import { templatesApi } from '../../api/templates'
-import { sendersApi, type Sender } from '../../api/senders'
+import { type Sender, sendersApi } from '../../api/senders'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'

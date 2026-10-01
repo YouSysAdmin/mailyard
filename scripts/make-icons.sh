@@ -11,7 +11,7 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-SMALL=web/public/favicon.svg              # solid letter, heavier stroke, for <= 20px
+SMALL=web/public/favicon.svg # solid letter, heavier stroke, for <= 20px
 # The stroked envelope, for larger use.
 FULL=docs/themes/mailyard/static/assets/logo/logo.svg
 
@@ -32,11 +32,11 @@ trap 'rm -rf "$tmp"' EXIT
 
 flatten() {
   sed -e "s/stroke: #[0-9a-fA-F]\{6\}/stroke: $FLAT/g" \
-      -e "s/fill: #[0-9a-fA-F]\{6\}/fill: $FLAT/g" "$1" > "$2"
+    -e "s/fill: #[0-9a-fA-F]\{6\}/fill: $FLAT/g" "$1" >"$2"
 }
 
 flatten "$SMALL" "$tmp/small.svg"
-flatten "$FULL"  "$tmp/full.svg"
+flatten "$FULL" "$tmp/full.svg"
 
 # Console. index.html links the SVG first and the PNG as the fallback.
 # The ICO is not linked at all and is kept because a browser asks for
@@ -57,7 +57,7 @@ rsvg-convert -w 180 -h 180 "$tmp/full.svg" -o docs/themes/mailyard/static/assets
 
 echo "regenerated:"
 ls -l web/public/favicon.png web/public/favicon.ico \
-      docs/themes/mailyard/static/assets/logo/favicon-16.png \
-      docs/themes/mailyard/static/assets/logo/favicon-32.png \
-      docs/themes/mailyard/static/assets/logo/apple-touch-icon.png |
+  docs/themes/mailyard/static/assets/logo/favicon-16.png \
+  docs/themes/mailyard/static/assets/logo/favicon-32.png \
+  docs/themes/mailyard/static/assets/logo/apple-touch-icon.png |
   awk '{printf "  %-48s %7s bytes\n", $NF, $5}'

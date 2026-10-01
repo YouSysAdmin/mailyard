@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { PROJECT_KEY } from '../api/client'
 import { projectApi } from '../api/projects'
 import { useAuthStore } from './auth'

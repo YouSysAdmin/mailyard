@@ -50,21 +50,21 @@ copy where the copy lives.
 
 ### The rest
 
-| Field | Default | Does |
-|---|---|---|
-| `from_name` | — | Display name on the From header |
-| `reply_to` | — | Reply-To address, for a campaign sent from a no-reply mailbox. Not required to be verified |
-| `subject` | — | Fallback subject, as above |
-| `language` | — | Localization to render. Falls through the [usual four steps](/docs/templates/localization#choosing-one-at-send-time) per subscriber |
-| `template_data` | — | Campaign-wide render values, up to 100 keys |
-| `headers` | — | Custom headers on every message of the campaign, up to 20. Over the project's defaults, under nothing - see [the three layers](/docs/email-sending/single-email#three-layers-of-headers) |
-| `smtp_group` | project default | Slug of the [server pool](/docs/smtp-domains/server-groups) to send through |
-| `send_rate` | `0` | Emails per minute. `0` is unthrottled |
-| `send_at_local_time` | `false` | Deliver at the scheduled wall-clock time in each subscriber's own timezone |
-| `ab_test_enabled` | `false` | Turn on [A/B testing](/docs/campaigns/ab-testing) |
-| `ab_variants` | — | Up to 5 variants |
-| `unsubscribe_disabled` | `false` | Send with no `List-Unsubscribe` headers and no unsubscribe link |
-| `disable_signing` | `false` | Send without the From address's S/MIME or PGP signature, when the address holds one - see [Signed Mail](/docs/email-sending/signing) |
+| Field                  | Default         | Does                                                                                                                                                                                     |
+|------------------------|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `from_name`            | —               | Display name on the From header                                                                                                                                                          |
+| `reply_to`             | —               | Reply-To address, for a campaign sent from a no-reply mailbox. Not required to be verified                                                                                               |
+| `subject`              | —               | Fallback subject, as above                                                                                                                                                               |
+| `language`             | —               | Localization to render. Falls through the [usual four steps](/docs/templates/localization#choosing-one-at-send-time) per subscriber                                                      |
+| `template_data`        | —               | Campaign-wide render values, up to 100 keys                                                                                                                                              |
+| `headers`              | —               | Custom headers on every message of the campaign, up to 20. Over the project's defaults, under nothing - see [the three layers](/docs/email-sending/single-email#three-layers-of-headers) |
+| `smtp_group`           | project default | Slug of the [server pool](/docs/smtp-domains/server-groups) to send through                                                                                                              |
+| `send_rate`            | `0`             | Emails per minute. `0` is unthrottled                                                                                                                                                    |
+| `send_at_local_time`   | `false`         | Deliver at the scheduled wall-clock time in each subscriber's own timezone                                                                                                               |
+| `ab_test_enabled`      | `false`         | Turn on [A/B testing](/docs/campaigns/ab-testing)                                                                                                                                        |
+| `ab_variants`          | —               | Up to 5 variants                                                                                                                                                                         |
+| `unsubscribe_disabled` | `false`         | Send with no `List-Unsubscribe` headers and no unsubscribe link                                                                                                                          |
+| `disable_signing`      | `false`         | Send without the From address's S/MIME or PGP signature, when the address holds one - see [Signed Mail](/docs/email-sending/signing)                                                     |
 
 {{< callout type="warning" title="`unsubscribe_disabled` makes the mail worse" >}}
 Gmail and Yahoo filter bulk mail that lacks `List-Unsubscribe` rather than bouncing it, so the failure is invisible
@@ -85,14 +85,14 @@ pin an older one.
 
 ## Statuses
 
-| Status | Means | Editable |
-|---|---|---|
-| `draft` | Created, never started | Yes |
-| `scheduled` | A send was requested for a future time | No |
-| `sending` | The runner is working through the audience | No |
-| `paused` | Stopped part-way, resumable | No |
-| `sent` | Every message reached a terminal state | No |
-| `cancelled` | Stopped permanently | No |
+| Status      | Means                                      | Editable |
+|-------------|--------------------------------------------|----------|
+| `draft`     | Created, never started                     | Yes      |
+| `scheduled` | A send was requested for a future time     | No       |
+| `sending`   | The runner is working through the audience | No       |
+| `paused`    | Stopped part-way, resumable                | No       |
+| `sent`      | Every message reached a terminal state     | No       |
+| `cancelled` | Stopped permanently                        | No       |
 
 Only `draft` can be edited, and only `draft` or `scheduled` can be sent. Anything else answers `409` with "campaign is
 already running or finished".
@@ -105,11 +105,11 @@ GET /api/v1/campaigns
 
 Every campaign in the project, newest first, with `total`.
 
-| Param | Notes |
-|---|---|
-| `status` | One status or several separated by commas: `draft`, `scheduled`, `sending`, `paused`, `sent`, `cancelled` |
-| `q` | Part of the name, without regard to case |
-| `limit`, `offset` | A page, at most 200 rows. Without `limit` the whole list comes back, which is what the console wants |
+| Param             | Notes                                                                                                     |
+|-------------------|-----------------------------------------------------------------------------------------------------------|
+| `status`          | One status or several separated by commas: `draft`, `scheduled`, `sending`, `paused`, `sent`, `cancelled` |
+| `q`               | Part of the name, without regard to case                                                                  |
+| `limit`, `offset` | A page, at most 200 rows. Without `limit` the whole list comes back, which is what the console wants      |
 
 Each entry is the campaign record alone. **Per-campaign statistics are not included**: those come from the
 single-campaign route below.
@@ -124,10 +124,32 @@ This is the route with the numbers on it:
 
 ```json
 {
-  "campaign": { "id": "...", "name": "April dispatch", "status": "sending" },
-  "stats": { "pending": 2100, "queued": 500, "sent": 2300, "failed": 50, "skipped": 50 },
-  "stats_by_variant": { "A": { "sent": 1150 }, "B": { "sent": 1150 } },
-  "engagement": { "opened": 890, "clicked": 214, "unsubscribed": 12, "sent": 2300 }
+    "campaign": {
+        "id": "...",
+        "name": "April dispatch",
+        "status": "sending"
+    },
+    "stats": {
+        "pending": 2100,
+        "queued": 500,
+        "sent": 2300,
+        "failed": 50,
+        "skipped": 50
+    },
+    "stats_by_variant": {
+        "A": {
+            "sent": 1150
+        },
+        "B": {
+            "sent": 1150
+        }
+    },
+    "engagement": {
+        "opened": 890,
+        "clicked": 214,
+        "unsubscribed": 12,
+        "sent": 2300
+    }
 }
 ```
 
@@ -146,24 +168,29 @@ aggregated as the send runs, so they survive the tracking-event retention sweep.
 
 ## Manage
 
-| Route | Does |
-|---|---|
-| `PATCH /api/v1/campaigns/{id}` | Edit — `draft` only |
-| `POST /api/v1/campaigns/{id}/duplicate` | Copy the definition as a fresh `draft` |
-| `POST /api/v1/campaigns/{id}/send` | Start, or schedule — see [Sending](/docs/campaigns/sending) |
-| `POST /api/v1/campaigns/{id}/pause` | Stop between batches |
-| `POST /api/v1/campaigns/{id}/resume` | Carry on |
-| `POST /api/v1/campaigns/{id}/cancel` | Stop for good |
-| `GET /api/v1/campaigns/{id}/messages` | The per-recipient rows, with addresses |
-| `GET /api/v1/campaigns/{id}/analytics` | Per-link click tallies and daily series. `from` and `to` bound the series |
-| `POST /api/v1/campaigns/{id}/preview` | Render the message one subscriber would get |
-| `DELETE /api/v1/campaigns/{id}` | Remove the campaign and its messages |
+| Route                                   | Does                                                                      |
+|-----------------------------------------|---------------------------------------------------------------------------|
+| `PATCH /api/v1/campaigns/{id}`          | Edit — `draft` only                                                       |
+| `POST /api/v1/campaigns/{id}/duplicate` | Copy the definition as a fresh `draft`                                    |
+| `POST /api/v1/campaigns/{id}/send`      | Start, or schedule — see [Sending](/docs/campaigns/sending)               |
+| `POST /api/v1/campaigns/{id}/pause`     | Stop between batches                                                      |
+| `POST /api/v1/campaigns/{id}/resume`    | Carry on                                                                  |
+| `POST /api/v1/campaigns/{id}/cancel`    | Stop for good                                                             |
+| `GET /api/v1/campaigns/{id}/messages`   | The per-recipient rows, with addresses                                    |
+| `GET /api/v1/campaigns/{id}/analytics`  | Per-link click tallies and daily series. `from` and `to` bound the series |
+| `POST /api/v1/campaigns/{id}/preview`   | Render the message one subscriber would get                               |
+| `DELETE /api/v1/campaigns/{id}`         | Remove the campaign and its messages                                      |
 
 ### Preview
 
 ```json
-POST /api/v1/campaigns/{id}/preview
-{ "subscriber_id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33", "variant": "B" }
+POST /api/v1/campaigns/{
+    id
+}/preview
+{
+    "subscriber_id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+    "variant": "B"
+}
 ```
 
 Renders the campaign the way the runner will: the variant's template and subject if one is named (the first variant

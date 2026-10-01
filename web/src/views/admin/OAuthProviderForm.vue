@@ -10,9 +10,9 @@
 // provider because somebody renamed it.
 import { ref, watch } from 'vue'
 import {
-  oauthProvidersApi,
   type OAuthProvider,
   type OAuthProviderInput,
+  oauthProvidersApi,
 } from '../../api/oauthProviders'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'

@@ -74,8 +74,8 @@ if [ -z "$PW" ]; then
 fi
 
 AUDIT_URL="http://localhost:$APP_PORT" \
-AUDIT_ADMIN_PW="$PW" \
-AUDIT_SPEC="$WORK/openapi.yaml" \
-AUDIT_APP_SPEC="$WORK/app.yaml" \
-AUDIT_PG_CONTAINER="$CONTAINER" \
+  AUDIT_ADMIN_PW="$PW" \
+  AUDIT_SPEC="$WORK/openapi.yaml" \
+  AUDIT_APP_SPEC="$WORK/app.yaml" \
+  AUDIT_PG_CONTAINER="$CONTAINER" \
   python3 scripts/audit-permissions.py

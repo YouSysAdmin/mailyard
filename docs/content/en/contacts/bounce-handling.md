@@ -10,11 +10,11 @@ reason an address stays blocked after somebody thought they had unblocked it.
 
 ## Types
 
-| Type | Means | Suppresses |
-|---|---|---|
-| `hard` | A permanent failure — the mailbox does not exist | Yes |
-| `soft` | A temporary failure — mailbox full, server busy | No |
-| `complaint` | The recipient marked it as spam | Yes |
+| Type        | Means                                            | Suppresses |
+|-------------|--------------------------------------------------|------------|
+| `hard`      | A permanent failure — the mailbox does not exist | Yes        |
+| `soft`      | A temporary failure — mailbox full, server busy  | No         |
+| `complaint` | The recipient marked it as spam                  | Yes        |
 
 A soft bounce is recorded and nothing more. It may resolve on its own, and suppressing an address because a mailbox was
 briefly full would lose you a real customer.
@@ -38,12 +38,12 @@ POST /api/v1/webhooks/bounce
 
 Needs an API key with `bounces:write`. The key decides the project, so there is no header to set.
 
-| Field | Required | Notes |
-|---|---|---|
-| `recipient` | **Yes** | The bounced address. Trimmed and lowercased |
-| `email_id` | No | The message this relates to, if you know it |
-| `type` | No | `hard`, `soft` or `complaint`. **Defaults to `hard`** |
-| `reason` | No | Free text, up to 1000 characters — usually the SMTP diagnostic |
+| Field       | Required | Notes                                                          |
+|-------------|----------|----------------------------------------------------------------|
+| `recipient` | **Yes**  | The bounced address. Trimmed and lowercased                    |
+| `email_id`  | No       | The message this relates to, if you know it                    |
+| `type`      | No       | `hard`, `soft` or `complaint`. **Defaults to `hard`**          |
+| `reason`    | No       | Free text, up to 1000 characters — usually the SMTP diagnostic |
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/webhooks/bounce \
@@ -61,8 +61,12 @@ Answers `201` with the record and whether it caused a block:
 
 ```json
 {
-  "bounce": { "id": "...", "recipient": "j.okafor@acme-industrial.example", "type": "hard" },
-  "suppressed": true
+    "bounce": {
+        "id": "...",
+        "recipient": "j.okafor@acme-industrial.example",
+        "type": "hard"
+    },
+    "suppressed": true
 }
 ```
 

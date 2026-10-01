@@ -47,7 +47,8 @@ see [Signature Verification](/docs/webhooks/overview#signature-verification).
 
 ## Email Payloads
 
-`email.queued`, `email.sent`, `email.failed`, `email.suppressed` and `email.cancelled` all carry the **same** `data` shape, so one handler
+`email.queued`, `email.sent`, `email.failed`, `email.suppressed` and `email.cancelled` all carry the **same** `data`
+shape, so one handler
 can serve all four and switch on `event` or on `data.status`:
 
 ```json

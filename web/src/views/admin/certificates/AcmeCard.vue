@@ -5,7 +5,7 @@
 // Always on screen, whether or not ACME is on: this is the one place
 // you would look to turn it on.
 import { computed, ref } from 'vue'
-import { certificatesApi, type ACMEStatus } from '../../../api/certificates'
+import { type ACMEStatus, certificatesApi } from '../../../api/certificates'
 import { settingsApi } from '../../../api/settings'
 import { apiErrorMessage } from '../../../api/client'
 import { useNotificationStore } from '../../../stores/notification'

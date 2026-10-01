@@ -11,7 +11,7 @@
 // store's current one - so the store's can() would answer for the wrong
 // project. GET /projects/:id returns the set that applies here, and it
 // covers platform admins too, since the server hands them the wildcard.
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { projectApi } from '../../api/projects'
 import { apiErrorMessage } from '../../api/client'

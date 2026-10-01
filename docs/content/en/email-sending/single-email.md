@@ -68,9 +68,15 @@ ceiling, and the same mailbox named twice is delivered once.
 
 ```json
 {
-  "to":  ["jane@customer.example"],
-  "cc":  ["account-manager@yourapp.example"],
-  "bcc": ["archive@yourapp.example"]
+    "to": [
+        "jane@customer.example"
+    ],
+    "cc": [
+        "account-manager@yourapp.example"
+    ],
+    "bcc": [
+        "archive@yourapp.example"
+    ]
 }
 ```
 
@@ -83,21 +89,21 @@ with no text alternative scores worse with spam filters than one that has it.
 
 ## Optional fields
 
-| Field | Does |
-|---|---|
-| `cc`, `bcc` | The other two recipient lists - see [Who sees whom](#who-sees-whom) |
-| `reply_to` | Where a reply lands when it should not go back to `from`. Any parseable address, verified or not |
-| `headers` | Up to 20 custom headers, written over the [project's defaults](/docs/projects/settings) - see below |
-| `tags` | Up to 10 labels of 64 characters. The [log](/docs/email-sending/email-log) filters by `?tag=` |
-| `metadata` | Up to 20 string pairs - your order id, your tenant - read back on the record and never interpreted |
-| `attachments` | Base64 files — see [Attachments](/docs/email-sending/attachments) |
-| `send_at` | Hold until an RFC 3339 time — see [Scheduled Email](/docs/email-sending/scheduled-email) |
-| `dry_run` | Run every validation and persist nothing |
-| `disable_tracking` | Opt this message out of open and click tracking |
-| `unsubscribe_list_id` | Send under a transactional [opt-out scope](/docs/contacts/unsubscribe-lists) |
+| Field                                                                      | Does                                                                                                                                                                                |
+|----------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `cc`, `bcc`                                                                | The other two recipient lists - see [Who sees whom](#who-sees-whom)                                                                                                                 |
+| `reply_to`                                                                 | Where a reply lands when it should not go back to `from`. Any parseable address, verified or not                                                                                    |
+| `headers`                                                                  | Up to 20 custom headers, written over the [project's defaults](/docs/projects/settings) - see below                                                                                 |
+| `tags`                                                                     | Up to 10 labels of 64 characters. The [log](/docs/email-sending/email-log) filters by `?tag=`                                                                                       |
+| `metadata`                                                                 | Up to 20 string pairs - your order id, your tenant - read back on the record and never interpreted                                                                                  |
+| `attachments`                                                              | Base64 files — see [Attachments](/docs/email-sending/attachments)                                                                                                                   |
+| `send_at`                                                                  | Hold until an RFC 3339 time — see [Scheduled Email](/docs/email-sending/scheduled-email)                                                                                            |
+| `dry_run`                                                                  | Run every validation and persist nothing                                                                                                                                            |
+| `disable_tracking`                                                         | Opt this message out of open and click tracking                                                                                                                                     |
+| `unsubscribe_list_id`                                                      | Send under a transactional [opt-out scope](/docs/contacts/unsubscribe-lists)                                                                                                        |
 | `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Carry your own opt-out targets. One of the two arrangements is part of what [Gmail and Yahoo require](/docs/getting-started/bulk-sender-requirements) of a domain sending at volume |
-| `smtp_group`, `smtp_server_id` | Pin the [route out](/docs/smtp-domains/server-groups) |
-| `sandbox`, `sandbox_retention_days` | Capture instead of delivering — see [Sandbox](/docs/email-sending/sandbox) |
+| `smtp_group`, `smtp_server_id`                                             | Pin the [route out](/docs/smtp-domains/server-groups)                                                                                                                               |
+| `sandbox`, `sandbox_retention_days`                                        | Capture instead of delivering — see [Sandbox](/docs/email-sending/sandbox)                                                                                                          |
 
 `dry_run` is the cheapest way to check an integration: it validates the sender, the recipients, the headers, the
 attachment sizes and the routing, then returns without writing a row or spending quota.
@@ -144,12 +150,12 @@ curl -X POST https://mail.example.com/api/v1/emails/send \
   -d '{ ... }'
 ```
 
-| Outcome | Status | Body |
-|---|---|---|
-| First request | `201` | The queued message |
-| A retry after the first completed | `200` | The same message, with `replayed: true` and an empty `suppressed_recipients` |
-| A duplicate while the first is still running | `409` | An error naming the key |
-| A retry after the first was refused | Whatever the corrected request earns | The key is released by a failure |
+| Outcome                                      | Status                               | Body                                                                         |
+|----------------------------------------------|--------------------------------------|------------------------------------------------------------------------------|
+| First request                                | `201`                                | The queued message                                                           |
+| A retry after the first completed            | `200`                                | The same message, with `replayed: true` and an empty `suppressed_recipients` |
+| A duplicate while the first is still running | `409`                                | An error naming the key                                                      |
+| A retry after the first was refused          | Whatever the corrected request earns | The key is released by a failure                                             |
 
 The key is scoped to the project and forgotten after a day. It applies to `/emails/send` and `/emails/send-template`.
 A batch is its own unit and does not take one.
@@ -160,13 +166,15 @@ A batch is its own unit and does not take one.
 
 ```json
 {
-  "email": {
-    "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
-    "status": "queued",
-    "recipients": ["jane@customer.example"],
-    "subject": "Receipt for order 4471"
-  },
-  "suppressed_recipients": []
+    "email": {
+        "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+        "status": "queued",
+        "recipients": [
+            "jane@customer.example"
+        ],
+        "subject": "Receipt for order 4471"
+    },
+    "suppressed_recipients": []
 }
 ```
 

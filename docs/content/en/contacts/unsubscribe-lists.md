@@ -71,18 +71,18 @@ GET /api/v1/unsubscribe-lists?limit=20
 
 ```json
 {
-  "unsubscribe_lists": [
-    {
-      "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
-      "project_id": "0198f6a0-9d12-7f33-a1b8-6c4e2f8a0d57",
-      "name": "shipping-notices",
-      "public_name": "Shipping and delivery updates",
-      "description": "Dispatch and tracking mail. Not receipts.",
-      "active": true,
-      "suppressed_count": 142,
-      "created_at": "2026-01-01T00:00:00Z"
-    }
-  ]
+    "unsubscribe_lists": [
+        {
+            "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+            "project_id": "0198f6a0-9d12-7f33-a1b8-6c4e2f8a0d57",
+            "name": "shipping-notices",
+            "public_name": "Shipping and delivery updates",
+            "description": "Dispatch and tracking mail. Not receipts.",
+            "active": true,
+            "suppressed_count": 142,
+            "created_at": "2026-01-01T00:00:00Z"
+        }
+    ]
 }
 ```
 

@@ -6,7 +6,7 @@
 // here depends on which of those is selected, and the detail page was
 // carrying six unrelated concerns in one file.
 import { ref } from 'vue'
-import { templatesApi, type TemplateAttachment } from '../../api/templates'
+import { type TemplateAttachment, templatesApi } from '../../api/templates'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'

@@ -74,13 +74,13 @@ bob@example.com,Bob,fr,Globex,free
 
 Five header names are recognised, matched case-insensitively after trimming:
 
-| Header | Goes to |
-|---|---|
-| `email` | The address. **Required** — a file without this column is refused |
-| `name` | The display name |
-| `status` | One of the four statuses, lowercased |
-| `timezone` | IANA zone name |
-| `language` | Locale code, lowercased |
+| Header     | Goes to                                                           |
+|------------|-------------------------------------------------------------------|
+| `email`    | The address. **Required** — a file without this column is refused |
+| `name`     | The display name                                                  |
+| `status`   | One of the four statuses, lowercased                              |
+| `timezone` | IANA zone name                                                    |
+| `language` | Locale code, lowercased                                           |
 
 **Every other column becomes a custom field**, keyed by its header. That is the whole mapping mechanism: rename the
 column and you rename the field. An empty cell is skipped rather than stored as an empty string, so a sparse column does
@@ -90,13 +90,13 @@ The same 10,000-row ceiling applies, counted over data rows.
 
 A malformed file is refused whole, before anything is written:
 
-| Response | Cause |
-|---|---|
-| `csv is empty or unreadable` | No header row could be read |
-| `csv header must include an email column` | No column named `email` |
-| `csv parse error at line N` | Unbalanced quoting or a ragged row |
-| `csv has no data rows` | Header only |
-| `csv exceeds the 10000 row import limit` | Too many rows |
+| Response                                  | Cause                              |
+|-------------------------------------------|------------------------------------|
+| `csv is empty or unreadable`              | No header row could be read        |
+| `csv header must include an email column` | No column named `email`            |
+| `csv parse error at line N`               | Unbalanced quoting or a ragged row |
+| `csv has no data rows`                    | Header only                        |
+| `csv exceeds the 10000 row import limit`  | Too many rows                      |
 
 ## What comes back
 

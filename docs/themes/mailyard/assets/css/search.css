@@ -15,24 +15,27 @@
   font-family: var(--font-sans);
   font-size: 13px;
   cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease-standard),
-    border-color var(--dur-fast) var(--ease-standard),
-    color var(--dur-fast) var(--ease-standard);
+  transition: background var(--dur-fast) var(--ease-standard),
+  border-color var(--dur-fast) var(--ease-standard),
+  color var(--dur-fast) var(--ease-standard);
 }
+
 .cs-search-trigger:hover {
   background: var(--bg-4);
   border-color: var(--line-3);
   color: var(--fg-0);
 }
+
 .cs-search-trigger-ico {
   width: 16px;
   height: 16px;
   flex: none;
 }
+
 .cs-search-trigger-label {
   padding-right: 4px;
 }
+
 .cs-search-kbd {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -43,6 +46,7 @@
   padding: 1px 5px;
   line-height: 1.4;
 }
+
 /* Collapse to an icon-only button where the nav links/CTA hide. */
 @media (max-width: 780px) {
   .cs-search-trigger {
@@ -50,6 +54,7 @@
     padding: 0;
     justify-content: center;
   }
+
   .cs-search-trigger-label,
   .cs-search-kbd {
     display: none;
@@ -60,6 +65,7 @@
 .cs-search[hidden] {
   display: none;
 }
+
 .cs-search {
   position: fixed;
   inset: 0;
@@ -69,6 +75,7 @@
   justify-content: center;
   padding: 12vh 16px 16px;
 }
+
 .cs-search-backdrop {
   position: fixed;
   inset: 0;
@@ -76,6 +83,7 @@
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
+
 .cs-search-dialog {
   position: relative;
   z-index: 1;
@@ -99,12 +107,14 @@
   padding: 12px 14px;
   border-bottom: 1px solid var(--line-1);
 }
+
 .cs-search-field-ico {
   width: 18px;
   height: 18px;
   color: var(--fg-3);
   flex: none;
 }
+
 .cs-search-input {
   flex: 1;
   min-width: 0;
@@ -116,14 +126,17 @@
   font-size: 16px;
   letter-spacing: var(--tracking-body);
 }
+
 .cs-search-input::placeholder {
   color: var(--fg-3);
 }
+
 /* Hide the native search clear/decoration for a consistent look. */
 .cs-search-input::-webkit-search-decoration,
 .cs-search-input::-webkit-search-cancel-button {
   -webkit-appearance: none;
 }
+
 .cs-search-close {
   flex: none;
   background: transparent;
@@ -131,6 +144,7 @@
   padding: 0;
   cursor: pointer;
 }
+
 .cs-search-close kbd {
   color: var(--fg-3);
   background: var(--bg-3);
@@ -149,6 +163,7 @@
   overflow-y: auto;
   flex: 1;
 }
+
 .cs-search-result a {
   display: flex;
   flex-direction: column;
@@ -158,12 +173,15 @@
   border-radius: var(--r-sm);
   color: inherit;
 }
+
 .cs-search-result a:hover {
   color: inherit;
 }
+
 .cs-search-result.is-active a {
   background: var(--bg-3);
 }
+
 .cs-search-r-title {
   display: flex;
   align-items: center;
@@ -172,9 +190,11 @@
   font-size: 14px;
   font-weight: 500;
 }
+
 .cs-search-result.is-active .cs-search-r-title {
   color: var(--brand-300);
 }
+
 .cs-search-sec {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -187,6 +207,7 @@
   padding: 1px 6px;
   flex: none;
 }
+
 .cs-search-r-snip {
   color: var(--fg-2);
   font-size: var(--fs-small);
@@ -212,6 +233,7 @@
   color: var(--fg-3);
   font-size: var(--fs-micro);
 }
+
 .cs-search-foot kbd {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -222,6 +244,7 @@
   padding: 0 5px;
   margin-right: 2px;
 }
+
 @media (max-width: 780px) {
   .cs-search-foot {
     display: none;

@@ -55,7 +55,7 @@ services:
       # -d matters: without it pg_isready reports ready during the brief
       # window when the entrypoint has started a temporary server to run
       # the init scripts, and `--wait` returns before the real one is up.
-      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
+      test: [ "CMD-SHELL", "pg_isready -U mailyard -d mailyard" ]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -73,7 +73,7 @@ services:
   # does not reach it.
   postgres-replica:
     image: postgres:17-alpine
-    profiles: ["replica"]
+    profiles: [ "replica" ]
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,7 +113,7 @@ services:
       # actually in recovery - otherwise a container that somehow came
       # up as a standalone primary would look healthy and quietly serve
       # its own divergent copy.
-      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard && psql -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
+      test: [ "CMD-SHELL", "pg_isready -U mailyard -d mailyard && psql -tAc 'SELECT pg_is_in_recovery()' | grep -q t" ]
       interval: 2s
       timeout: 3s
       retries: 30

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { emailsApi } from '../../api/emails'
 import { campaignsApi } from '../../api/campaigns'
 import { analyticsApi, type DayCount, type Engagement } from '../../api/analytics'
 import { useProjectStore } from '../../stores/project'
-import type { Email, Campaign } from '../../api/types'
+import type { Campaign, Email } from '../../api/types'
 import StatCard from '../../components/StatCard.vue'
 import SendingLimitCard from './SendingLimitCard.vue'
 import VolumeChart from './VolumeChart.vue'

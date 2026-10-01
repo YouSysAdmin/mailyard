@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { smtpCredentialsApi, type CreateCredentialPayload } from '../../api/smtpCredentials'
+import { type CreateCredentialPayload, smtpCredentialsApi } from '../../api/smtpCredentials'
 import { apiErrorMessage } from '../../api/client'
-import type { SubmissionInfo, SMTPCredential } from '../../api/types'
+import type { SMTPCredential, SubmissionInfo } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
 import { useConfirm } from '../../composables/useConfirm'

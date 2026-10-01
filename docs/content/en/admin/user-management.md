@@ -22,11 +22,11 @@ POST /api/v1/admin/users
 }
 ```
 
-| Field      | Notes                                                                                                                          |
-|------------|--------------------------------------------------------------------------------------------------------------------------------|
-| `email`    | Required. Normalized to lower case.                                                                                            |
+| Field      | Notes                                                                                                                           |
+|------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `email`    | Required. Normalized to lower case.                                                                                             |
 | `password` | Optional, minimum 12 characters. Leave it out for an account that signs in only through SSO - it then has no password to guess. |
-| `admin`    | Platform administration. Defaults to false.                                                                                    |
+| `admin`    | Platform administration. Defaults to false.                                                                                     |
 
 | `admin` | What it grants                                                                                                                           |
 |---------|------------------------------------------------------------------------------------------------------------------------------------------|

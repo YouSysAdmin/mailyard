@@ -287,7 +287,7 @@ func wantsHTML(c fiber.Ctx) bool {
 // keeps a cross-site request from carrying the victim's cookie, but a
 // top-level form POST from evil.example SETS one: the response is a
 // navigation, so the browser stores the attacker's session cookie and
-// the victim is now signed into the attacker's account, pasting SMTP
+// the victim is now signed in to the attacker's account, pasting SMTP
 // credentials into a project the attacker reads. An HTML form can send
 // text/plain, multipart or urlencoded and nothing else - it cannot
 // produce application/json - and the decoder never checked, so a form

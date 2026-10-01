@@ -44,7 +44,8 @@ and is usually the better choice: it survives an export and import into another 
 
 The values go in **`data`**. That is the field name on the wire.
 
-Everything a [plain send](/docs/email-sending/single-email) accepts is accepted here too: `cc` and `bcc`, `headers`, `attachments`,
+Everything a [plain send](/docs/email-sending/single-email) accepts is accepted here too: `cc` and `bcc`, `headers`,
+`attachments`,
 `send_at`, `dry_run`, `disable_tracking`, `unsubscribe_list_id`, the caller-supplied `list_unsubscribe_*` targets, the
 `smtp_group` and `smtp_server_id` routing selectors, and the sandbox controls.
 
@@ -58,7 +59,10 @@ Write them with double braces. The leading dot Go templates normally require is 
 ```
 
 ```json
-{ "name": "Alice", "activation_url": "https://example.com/activate?token=abc123" }
+{
+    "name": "Alice",
+    "activation_url": "https://example.com/activate?token=abc123"
+}
 ```
 
 {{< callout type="warning" title="A missing key fails the send" >}}

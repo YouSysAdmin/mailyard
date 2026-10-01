@@ -10,7 +10,7 @@
 // gets is SettingRow's problem, and the scheduled jobs below share
 // nothing with any of it - not a value, not a request, not a save.
 import { computed, onMounted, ref } from 'vue'
-import { settingsApi, type PlatformSetting } from '../../api/settings'
+import { type PlatformSetting, settingsApi } from '../../api/settings'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import LoadingBlock from '../../components/LoadingBlock.vue'

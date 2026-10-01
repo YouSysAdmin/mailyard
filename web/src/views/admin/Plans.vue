@@ -5,7 +5,7 @@
 // means unlimited everywhere, which is why a fresh install with no plans
 // at all is a working install rather than a locked one.
 import { onMounted, ref, useTemplateRef } from 'vue'
-import { plansApi, type Plan } from '../../api/plans'
+import { type Plan, plansApi } from '../../api/plans'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useConfirm } from '../../composables/useConfirm'

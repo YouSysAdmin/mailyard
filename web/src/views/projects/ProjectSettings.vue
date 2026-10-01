@@ -10,7 +10,7 @@
 // PERMISSIONS COME FROM THIS PAGE'S OWN REQUEST, not the project store:
 // the path id may name a project other than the store's current one, so
 // the store's can() would answer for the wrong one.
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { projectApi } from '../../api/projects'
 import { plansApi, type UsageReport } from '../../api/plans'

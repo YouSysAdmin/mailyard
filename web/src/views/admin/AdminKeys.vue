@@ -7,7 +7,7 @@
 // admin. What CAN be narrowed is where it may be used from and how
 // long it lives, so those two are given prominence instead.
 import { onMounted, ref } from 'vue'
-import { adminKeysApi, type AdminAPIKey, type CreateAdminKeyPayload } from '../../api/adminKeys'
+import { type AdminAPIKey, adminKeysApi, type CreateAdminKeyPayload } from '../../api/adminKeys'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useConfirm } from '../../composables/useConfirm'

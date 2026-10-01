@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/smallstep/pkcs7"
-	pkcs12 "software.sslmate.com/src/go-pkcs12"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 const (

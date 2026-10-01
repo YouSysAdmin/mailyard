@@ -17,12 +17,12 @@ Every route here is project-scoped and needs a `subscribers` permission.
 
 ## Status
 
-| Status | Meaning | Set by |
-|---|---|---|
-| `subscribed` | Receives campaigns | The default on create |
+| Status         | Meaning                     | Set by                                                                                |
+|----------------|-----------------------------|---------------------------------------------------------------------------------------|
+| `subscribed`   | Receives campaigns          | The default on create                                                                 |
 | `unsubscribed` | Opted out of every campaign | A one-click from a campaign message, the hosted page's all-newsletters button, or you |
-| `bounced` | The address failed | Delivery feedback |
-| `complained` | Reported as spam | Delivery feedback |
+| `bounced`      | The address failed          | Delivery feedback                                                                     |
+| `complained`   | Reported as spam            | Delivery feedback                                                                     |
 
 Only `subscribed` receives campaign mail. The last two are written by the delivery path rather than by hand, and
 resetting one to `subscribed` because the person asked you to is a decision, not a correction — the address failed or
@@ -59,13 +59,13 @@ The project's subscriber cap is checked first, so a create over the plan limit a
 GET /api/v1/subscribers?limit=20&offset=0&status=subscribed&q=acme
 ```
 
-| Parameter | Notes |
-|---|---|
-| `limit` | Default 50, clamped to the API ceiling |
-| `offset` | Rows to skip |
-| `status` | One of the four statuses |
-| `q` | Part of the address or the name, matched without regard to case |
-| `email` | One whole address. Answers that subscriber alone, in the same shape |
+| Parameter | Notes                                                               |
+|-----------|---------------------------------------------------------------------|
+| `limit`   | Default 50, clamped to the API ceiling                              |
+| `offset`  | Rows to skip                                                        |
+| `status`  | One of the four statuses                                            |
+| `q`       | Part of the address or the name, matched without regard to case     |
+| `email`   | One whole address. Answers that subscriber alone, in the same shape |
 
 `total` counts what the **filters** match, not the project — so a search hitting one row out of five thousand reports
 one, and the pager offers one page rather than fifty mostly empty ones.
@@ -79,8 +79,8 @@ GET /api/v1/subscribers/{id}/lists
 
 The second answers every list the subscriber is on **or opted out of**, as `subscriber_lists`. Each row carries
 `member` and, when set, `opted_out_at`. A dynamic list appears only through an opt-out, with `member: false`: a
-segment has no membership to read back, it has rules. The console shows the same on the subscriber's page, where
-**Add to list** puts them on several lists at once.
+segment has no membership to read back, it has rules. The console shows the same on the subscriber's page, where **Add
+to list** puts them on several lists at once.
 
 ## Update
 

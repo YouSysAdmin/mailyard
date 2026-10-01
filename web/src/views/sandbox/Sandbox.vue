@@ -10,7 +10,7 @@
 //
 // The route still carries the id, so a link to one capture opens the
 // page with it selected.
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   sandboxApi,

@@ -43,10 +43,10 @@ header, because the caller is a recipient or their mailbox provider.
 
 The token encodes what is being unsubscribed, and the two kinds cannot be swapped for each other:
 
-| Kind          | Payload                                               | Effect of a confirmed opt-out                                                                                                |
-|---------------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| Kind          | Payload                                               | Effect of a confirmed opt-out                                                                                                   |
+|---------------|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
 | Campaign      | the campaign message id                               | Records an opt-out from that campaign's list, stamps the message, and by default sets the subscriber's status to `unsubscribed` |
-| Transactional | the unsubscribe list id **and** the recipient address | Writes a suppression for that one address, scoped to that one list                                                           |
+| Transactional | the unsubscribe list id **and** the recipient address | Writes a suppression for that one address, scoped to that one list                                                              |
 
 Neither token expires. An unsubscribe link in a message already delivered has to keep working.
 

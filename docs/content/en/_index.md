@@ -36,7 +36,8 @@ weight: 0
 ## Before sending at volume
 
 Gmail, Yahoo and Microsoft hold a domain that sends around five thousand messages a day to a fixed list of
-requirements, and filter rather than bounce what misses one. [Bulk Sender Requirements](/docs/getting-started/bulk-sender-requirements)
+requirements, and filter rather than bounce what misses
+one. [Bulk Sender Requirements](/docs/getting-started/bulk-sender-requirements)
 is that list, with the Mailyard feature that answers each item.
 
 ## Every endpoint

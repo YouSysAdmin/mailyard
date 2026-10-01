@@ -11,19 +11,20 @@ become three different locales by accident.
 {{< callout type="warning" title="The registry does not decide what a send resolves" >}}
 Which localization a send picks is decided by the **template's** `default_language` field, not by this registry. Marking
 a language default here only preselects it in the console when you create a template — the console labels it
-**Fallback** for that reason. See [Overview](/docs/templates/overview#resolving-a-language) for the resolution order that
+**Fallback** for that reason. See [Overview](/docs/templates/overview#resolving-a-language) for the resolution order
+that
 actually runs.
 {{< /callout >}}
 
 ## The record
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | string | UUID, minted on create |
-| `code` | string | The locale code a localization references, 2-10 characters, lowercased on write |
-| `name` | string | What a person reads in the picker, up to 100 characters |
-| `is_default` | boolean | At most one per project — setting it clears whichever language held it |
-| `created_at` | timestamp | |
+| Field        | Type      | Notes                                                                           |
+|--------------|-----------|---------------------------------------------------------------------------------|
+| `id`         | string    | UUID, minted on create                                                          |
+| `code`       | string    | The locale code a localization references, 2-10 characters, lowercased on write |
+| `name`       | string    | What a person reads in the picker, up to 100 characters                         |
+| `is_default` | boolean   | At most one per project — setting it clears whichever language held it          |
+| `created_at` | timestamp |                                                                                 |
 
 Every route is project-scoped, so a session request needs the `X-Mailyard-Project-Id` header. An API key carries its
 project already and needs nothing extra.

@@ -92,7 +92,8 @@ literally the same function.
 
 ### Which headers travel
 
-The headers your client wrote are forwarded as the message's [custom headers](/docs/email-sending/single-email#three-layers-of-headers),
+The headers your client wrote are forwarded as the
+message's [custom headers](/docs/email-sending/single-email#three-layers-of-headers),
 with three exceptions:
 
 - **Structural headers the builder writes itself** are dropped, not refused: `From`, `To`, `Cc`, `Date`, `Message-ID`,
@@ -100,7 +101,8 @@ with three exceptions:
   `Sender` and the read-receipt headers among them. The recipients come from the envelope, the To and Cc
   headers are kept as the client wrote them, and `Reply-To` and `List-Unsubscribe` are lifted into their own fields.
 - **Mailyard's control headers** - anything under `X-Mailyard-` - are instructions to the listener
-  (`X-Mailyard-Sandbox`, `X-Mailyard-Disable-Tracking`, `X-Mailyard-Sandbox-Retention`) and never leave with the message.
+  (`X-Mailyard-Sandbox`, `X-Mailyard-Disable-Tracking`, `X-Mailyard-Sandbox-Retention`) and never leave with the
+  message.
 - **Names on the project's drop list** (`submission_drop_headers` in [project settings](/docs/projects/settings)) are
   removed before forwarding. Mail clients and libraries add `X-Mailer`, `X-Priority` or `User-Agent` on their own, and
   the drop list is where a project says it does not want them delivered. It applies to submission only: an API caller
@@ -108,7 +110,8 @@ with three exceptions:
 
 What survives is judged exactly as an API caller's `headers` are, so a message carrying more than twenty custom headers,
 a value with a control character in it, or one over 4096 characters, is refused with a 550 rather than trimmed. An
-RFC 2047 encoded word is decoded before that check, so a line break smuggled inside one is refused too. Header values are forwarded as the
+RFC 2047 encoded word is decoded before that check, so a line break smuggled inside one is refused too. Header values
+are forwarded as the
 decoded text of their first occurrence. The project's default headers are laid underneath, as for every other send.
 
 {{< callout type="info" title="A sandbox credential never reaches step 3" >}}
@@ -163,8 +166,8 @@ Response (`201`):
 }
 ```
 
-{{< callout type="warning" >}}
-**Save the password immediately.** Like an API key, the plaintext password is only returned once, at creation
+{{< callout type="warning" >}} **Save the password immediately.** Like an API key, the plaintext password is only
+returned once, at creation
 time. Mailyard stores only a hash of it.
 {{< /callout >}}
 

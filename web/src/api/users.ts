@@ -1,5 +1,5 @@
 import api from './client'
-import type { User, Project } from './types'
+import type { Project, User } from './types'
 
 export interface CreateUserPayload {
   email: string

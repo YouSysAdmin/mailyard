@@ -14,22 +14,22 @@ the `X-Mailyard-Project-Id` header.
 GET /api/v1/inbound-emails?limit=50&status=received
 ```
 
-| Param | Notes |
-|---|---|
-| `status` | One of the three below |
-| `limit` | Default 50, maximum 200 |
-| `cursor` | The `next_cursor` of the previous page |
-| `sender` | An address or part of one, matched against the From header without regard to case |
-| `recipient` | The same, against the envelope recipients |
-| `search` | Part of the subject, without regard to case |
+| Param       | Notes                                                                             |
+|-------------|-----------------------------------------------------------------------------------|
+| `status`    | One of the three below                                                            |
+| `limit`     | Default 50, maximum 200                                                           |
+| `cursor`    | The `next_cursor` of the previous page                                            |
+| `sender`    | An address or part of one, matched against the From header without regard to case |
+| `recipient` | The same, against the envelope recipients                                         |
+| `search`    | Part of the subject, without regard to case                                       |
 
 There are three statuses, and no others:
 
-| Status | Means |
-|---|---|
-| `received` | Stored and parsed |
+| Status     | Means                                                                              |
+|------------|------------------------------------------------------------------------------------|
+| `received` | Stored and parsed                                                                  |
 | `rejected` | Refused at ingest — a suppressed sender, or a DMARC failure on a `p=reject` domain |
-| `failed` | The MIME tree could not be parsed. The raw bytes are still there |
+| `failed`   | The MIME tree could not be parsed. The raw bytes are still there                   |
 
 Paging is a **keyset cursor**, like the outbound log, and for the same reason: this list grows on its own. Follow
 `next_cursor` until it comes back empty. The cursor encodes `received_at` and the id together, so two messages sharing
@@ -51,7 +51,13 @@ GET /api/v1/inbound-emails/stats?from=2026-08-01&to=2026-08-31
 `from` and `to` are optional and bound `received_at` the way the list's cursor does.
 
 ```json
-{ "counts": { "received": 812, "rejected": 40, "failed": 3 } }
+{
+    "counts": {
+        "received": 812,
+        "rejected": 40,
+        "failed": 3
+    }
+}
 ```
 
 ## Get an Inbound Email
@@ -130,7 +136,9 @@ POST /api/v1/inbound-emails/{id}/retry
 ```
 
 ```json
-{ "emitted": true }
+{
+    "emitted": true
+}
 ```
 
 {{< callout type="info" title="This re-sends the webhook, it does not re-process the mail" >}}

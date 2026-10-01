@@ -6,7 +6,7 @@
 // reader opening or clearing the panel - and keeping them in one place
 // is what stops them disagreeing about the number on the badge.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { notificationsApi, type Notification } from '../api/notifications'
+import { type Notification, notificationsApi } from '../api/notifications'
 import { connectEventStream } from '../api/eventstream'
 import { useProjectStore } from '../stores/project'
 import { useAutoRefresh } from './useAutoRefresh'

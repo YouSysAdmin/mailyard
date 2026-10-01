@@ -127,8 +127,11 @@ your SMTP route is wrong by way of their spam folder.
 
 ```json
 {
-  "email": { "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33", "status": "queued" },
-  "suppressed_recipients": []
+    "email": {
+        "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+        "status": "queued"
+    },
+    "suppressed_recipients": []
 }
 ```
 
@@ -143,11 +146,11 @@ curl http://localhost:3000/api/v1/emails/0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33/st
 
 ```json
 {
-  "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
-  "status": "sent",
-  "attempts": 1,
-  "error_message": "",
-  "sent_at": "2026-01-01T00:00:01Z"
+    "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+    "status": "sent",
+    "attempts": 1,
+    "error_message": "",
+    "sent_at": "2026-01-01T00:00:01Z"
 }
 ```
 

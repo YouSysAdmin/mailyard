@@ -34,20 +34,20 @@ curl "http://localhost:3000/api/v1/emails?limit=50&status=failed" \
 
 ## Parameters
 
-| Param            | Notes                                                                                         |
-|------------------|-----------------------------------------------------------------------------------------------|
-| `status`         | One status or several separated by commas — see [Email Status](/docs/email-sending/email-status) |
-| `sender`         | One whole From address, without regard to case                                                |
-| `recipient`      | One whole recipient address, Cc and Bcc included, without regard to case                     |
-| `template`       | The name of the template the message was rendered from                                        |
-| `tag`            | Only messages carrying this tag                                                               |
-| `api_key_id`     | Only mail accepted through this API key                                                       |
-| `smtp_server_id` | Only mail delivered through this server                                                       |
+| Param            | Notes                                                                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `status`         | One status or several separated by commas — see [Email Status](/docs/email-sending/email-status)                                             |
+| `sender`         | One whole From address, without regard to case                                                                                               |
+| `recipient`      | One whole recipient address, Cc and Bcc included, without regard to case                                                                     |
+| `template`       | The name of the template the message was rendered from                                                                                       |
+| `tag`            | Only messages carrying this tag                                                                                                              |
+| `api_key_id`     | Only mail accepted through this API key                                                                                                      |
+| `smtp_server_id` | Only mail delivered through this server                                                                                                      |
 | `from`, `to`     | A `created_at` window. Each is a date (`2026-08-01`) or an RFC 3339 instant, `to` exclusive, and a bare date on `to` includes that whole day |
-| `after`          | Created strictly after this instant. A poller passes the `created_at` of the newest row it has |
-| `search`         | A whole recipient address, or part of a subject, without regard to case                       |
-| `limit`          | Default 50, maximum 200                                                                       |
-| `cursor`         | The `next_cursor` of the previous page                                                        |
+| `after`          | Created strictly after this instant. A poller passes the `created_at` of the newest row it has                                               |
+| `search`         | A whole recipient address, or part of a subject, without regard to case                                                                      |
+| `limit`          | Default 50, maximum 200                                                                                                                      |
+| `cursor`         | The `next_cursor` of the previous page                                                                                                       |
 
 Every filter is ANDed with the others. Rows come back newest first, ordered by `created_at` then `id`. That order is
 fixed — there is no sort parameter. The response carries `next_cursor`, empty on the last page.
@@ -97,22 +97,26 @@ did not name. A message sent with `to` alone has everybody under `to` and the ot
 
 ```json
 "addressing": {
-  "to":  ["jane@customer.example"],
-  "cc":  [],
-  "bcc": ["archive@yourapp.example"]
+    "to": [
+        "jane@customer.example"
+    ],
+    "cc": [],
+    "bcc": [
+        "archive@yourapp.example"
+    ]
 }
 ```
 
 Related routes on the same message:
 
-| Route                                       | Answers                                                    |
-|---------------------------------------------|------------------------------------------------------------|
-| `GET /api/v1/emails/{id}/status`            | Just the delivery state — the cheap poll                   |
-| `GET /api/v1/emails/{id}/attachments/{idx}` | One attachment's bytes, by position                        |
+| Route                                       | Answers                                                         |
+|---------------------------------------------|-----------------------------------------------------------------|
+| `GET /api/v1/emails/{id}/status`            | Just the delivery state — the cheap poll                        |
+| `GET /api/v1/emails/{id}/attachments/{idx}` | One attachment's bytes, by position                             |
 | `GET /api/v1/emails/{id}/eml`               | The message as an `.eml` file, built the way delivery builds it |
-| `GET /api/v1/emails/{id}/tracked-links`     | The links rewritten for click tracking, with their tallies |
-| `POST /api/v1/emails/{id}/retry`            | Requeue a failed message                                   |
-| `POST /api/v1/emails/{id}/cancel`           | Withdraw a scheduled or still queued message               |
+| `GET /api/v1/emails/{id}/tracked-links`     | The links rewritten for click tracking, with their tallies      |
+| `POST /api/v1/emails/{id}/retry`            | Requeue a failed message                                        |
+| `POST /api/v1/emails/{id}/cancel`           | Withdraw a scheduled or still queued message                    |
 
 ## Counts
 

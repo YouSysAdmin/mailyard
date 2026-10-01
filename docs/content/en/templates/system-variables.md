@@ -9,10 +9,10 @@ particular message and a particular recipient — neither of which exists yet at
 
 ## The names
 
-| Variable | Resolves to |
-|---|---|
-| `{{ mailyard_web_view_url }}` | A signed link to read this message on the web |
-| `{{ mailyard_mail_web_link }}` | The same link, under an older name kept working |
+| Variable                         | Resolves to                                       |
+|----------------------------------|---------------------------------------------------|
+| `{{ mailyard_web_view_url }}`    | A signed link to read this message on the web     |
+| `{{ mailyard_mail_web_link }}`   | The same link, under an older name kept working   |
 | `{{ mailyard_unsubscribe_url }}` | The RFC 8058 one-click opt-out for this recipient |
 
 Using one is opt-in. A variable that no template references costs nothing and produces nothing.
@@ -38,11 +38,11 @@ templated send. Without them there is no origin to build an absolute signed link
 
 **`mailyard_unsubscribe_url`** needs something to unsubscribe *from*, and where that comes from depends on the send:
 
-| Send | Resolves when |
-|---|---|
-| Campaign | Always — the link is bound to the campaign's list and this recipient |
+| Send            | Resolves when                                                                                                            |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------|
+| Campaign        | Always — the link is bound to the campaign's list and this recipient                                                     |
 | `send-template` | `unsubscribe_list_id` names an [opt-out scope](/docs/contacts/unsubscribe-lists), and there is exactly **one** recipient |
-| Batch | Never — a batch has no opt-out scope, so use `list_unsubscribe_url` per item instead |
+| Batch           | Never — a batch has no opt-out scope, so use `list_unsubscribe_url` per item instead                                     |
 
 The one-recipient rule is not an implementation limit. A one-click link identifies a person, so on a message addressed
 to three people there is no correct link to embed — and minting one would unsubscribe whoever clicked it on behalf of

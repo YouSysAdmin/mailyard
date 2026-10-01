@@ -5,7 +5,7 @@
 // a LIST rather than fourteen blocks of markup - which is also what keeps
 // the field-error key matching the payload key without anybody checking.
 import { ref } from 'vue'
-import { plansApi, type Plan, type PlanPayload } from '../../api/plans'
+import { type Plan, type PlanPayload, plansApi } from '../../api/plans'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useFieldErrors } from '../../composables/fieldErrors'

@@ -10,17 +10,17 @@
 // and says `changed` when it made one. The four are separate questions:
 // what the listeners present, what a CA has signed, what the relay fleet
 // trusts, what the installation keeps for itself.
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
+  type ACMEStatus,
   certificatesApi,
+  type ListenerState,
   type ManagedCertificate,
   type SystemCertificate,
-  type ACMEStatus,
-  type ListenerState,
 } from '../../api/certificates'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
-import { expiryClass, expiryLabel, expiryTitle, expiringSoon } from '../../composables/certExpiry'
+import { expiringSoon, expiryClass, expiryLabel, expiryTitle } from '../../composables/certExpiry'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'

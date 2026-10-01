@@ -25,11 +25,11 @@ expected first-boot state, not a misconfiguration.
 
 ### What to change before using it
 
-| Setting | Why |
-|---------|-----|
-| `MAILYARD_SERVER_PUBLIC_URL` | Must match the scheme and host you browse, or sign-in silently fails - see the comment in the file |
-| `MAILYARD_AUTH_LOCAL_EMAIL` | The bootstrap admin address |
-| `MAILYARD_SUBMISSION_ENABLED` / `MAILYARD_INBOUND_ENABLED` | Both on in the example. Turn off what you do not publish - each is an open port |
+| Setting                                                    | Why                                                                                                |
+|------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `MAILYARD_SERVER_PUBLIC_URL`                               | Must match the scheme and host you browse, or sign-in silently fails - see the comment in the file |
+| `MAILYARD_AUTH_LOCAL_EMAIL`                                | The bootstrap admin address                                                                        |
+| `MAILYARD_SUBMISSION_ENABLED` / `MAILYARD_INBOUND_ENABLED` | Both on in the example. Turn off what you do not publish - each is an open port                    |
 
 ### Behind a reverse proxy instead
 

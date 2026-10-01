@@ -16,7 +16,7 @@
 // subject row the preview draws at the same height opposite.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { templatesApi, type RenderedPreview } from '../../api/templates'
+import { type RenderedPreview, templatesApi } from '../../api/templates'
 import { stylesheetsApi } from '../../api/stylesheets'
 import { languagesApi } from '../../api/languages'
 import { apiErrorMessage } from '../../api/client'

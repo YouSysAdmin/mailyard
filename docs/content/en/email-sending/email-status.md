@@ -36,15 +36,15 @@ or a client generator.
 
 ## The states
 
-| Status       | Meaning                                    | Moves on                 |
-|--------------|--------------------------------------------|--------------------------|
-| `queued`     | Accepted and waiting for a worker          | When a worker claims it  |
-| `scheduled`  | Held for a future `send_at`                | At that time             |
-| `processing` | Claimed and being handed to SMTP           | Within one attempt       |
-| `sent`       | An SMTP server accepted it                 | Terminal                 |
-| `failed`     | Every attempt was spent                    | Terminal, unless retried |
-| `suppressed` | Every recipient was blocked before sending | Terminal                 |
-| `cancelled`  | Withdrawn by the caller before a worker took it | Terminal            |
+| Status       | Meaning                                         | Moves on                 |
+|--------------|-------------------------------------------------|--------------------------|
+| `queued`     | Accepted and waiting for a worker               | When a worker claims it  |
+| `scheduled`  | Held for a future `send_at`                     | At that time             |
+| `processing` | Claimed and being handed to SMTP                | Within one attempt       |
+| `sent`       | An SMTP server accepted it                      | Terminal                 |
+| `failed`     | Every attempt was spent                         | Terminal, unless retried |
+| `suppressed` | Every recipient was blocked before sending      | Terminal                 |
+| `cancelled`  | Withdrawn by the caller before a worker took it | Terminal                 |
 
 A seventh value, `pending`, is accepted as a filter on the [email log](/docs/email-sending/email-log) for historical
 reasons and is never written. Filtering on it always returns nothing.

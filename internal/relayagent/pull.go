@@ -14,9 +14,9 @@ import (
 
 // Pull mode: the node fetches its mail instead of listening for it.
 //
-// A listener node is dialled by the delivery worker over mutual TLS. A
+// A listener node is dialed by the delivery worker over mutual TLS. A
 // node behind NAT, or one that may only egress through a proxy, cannot
-// be dialled - so the platform assigns it messages and the node claims
+// be dialed - so the platform assigns it messages and the node claims
 // them over the same HTTPS control channel it heartbeats on, which is
 // plain outbound and honours HTTPS_PROXY. What arrives is the finished
 // message - signed, headers set - and goes into the same spool the

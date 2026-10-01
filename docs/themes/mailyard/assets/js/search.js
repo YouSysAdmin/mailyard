@@ -27,13 +27,15 @@
     if (fuse || loading) return Promise.resolve();
     loading = true;
     return fetch(indexURL)
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (docs) {
         fuse = new Fuse(docs, {
           keys: [
-            { name: 'title', weight: 3 },
-            { name: 'desc', weight: 2 },
-            { name: 'body', weight: 1 }
+            {name: 'title', weight: 3},
+            {name: 'desc', weight: 2},
+            {name: 'body', weight: 1}
           ],
           includeMatches: true,
           ignoreLocation: true, // match anywhere, not just the start
@@ -42,8 +44,11 @@
           minMatchCharLength: 2
         });
       })
-      .catch(function () { /* leave fuse null, query() then no-ops */ })
-      .finally(function () { loading = false; });
+      .catch(function () { /* leave fuse null, query() then no-ops */
+      })
+      .finally(function () {
+        loading = false;
+      });
   }
 
   function open() {
@@ -66,7 +71,9 @@
   // Build a short snippet around the first body match, else fall back to desc.
   function snippet(res) {
     var page = res.item;
-    var m = (res.matches || []).filter(function (x) { return x.key === 'body'; })[0];
+    var m = (res.matches || []).filter(function (x) {
+      return x.key === 'body';
+    })[0];
     if (m && m.indices && m.indices.length) {
       var at = m.indices[0][0];
       var start = Math.max(0, at - 40);
@@ -94,22 +101,31 @@
         : '';
       li.innerHTML =
         '<a href="' + page.href + '">' +
-          '<span class="cs-search-r-title">' + sec + page.title + '</span>' +
-          '<span class="cs-search-r-snip">' + snippet(res) + '</span>' +
+        '<span class="cs-search-r-title">' + sec + page.title + '</span>' +
+        '<span class="cs-search-r-snip">' + snippet(res) + '</span>' +
         '</a>';
-      li.addEventListener('mousemove', function () { setActive(i); });
+      li.addEventListener('mousemove', function () {
+        setActive(i);
+      });
       list.appendChild(li);
     });
   }
 
   function query(q) {
-    if (!fuse || !q.trim()) { results = []; active = -1; render(); return; }
+    if (!fuse || !q.trim()) {
+      results = [];
+      active = -1;
+      render();
+      return;
+    }
     // Exact pass: every word must literally appear somewhere ('word is Fuse's
     // extended-search include-exact operator, space-separated terms are ANDed).
-    var exact = q.trim().split(/\s+/).map(function (w) { return "'" + w; }).join(' ');
-    results = fuse.search(exact, { limit: 12 });
+    var exact = q.trim().split(/\s+/).map(function (w) {
+      return "'" + w;
+    }).join(' ');
+    results = fuse.search(exact, {limit: 12});
     // Fuzzy fallback so typos still find something.
-    if (!results.length) results = fuse.search(q, { limit: 12 });
+    if (!results.length) results = fuse.search(q, {limit: 12});
     active = results.length ? 0 : -1;
     render();
   }
@@ -129,7 +145,7 @@
     if (!results.length) return;
     var next = (active + delta + results.length) % results.length;
     setActive(next);
-    list.children[next].scrollIntoView({ block: 'nearest' });
+    list.children[next].scrollIntoView({block: 'nearest'});
   }
 
   function go() {
@@ -145,12 +161,21 @@
     el.addEventListener('click', close);
   });
 
-  input.addEventListener('input', function () { query(input.value); });
+  input.addEventListener('input', function () {
+    query(input.value);
+  });
 
   input.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
-    else if (e.key === 'Enter') { e.preventDefault(); go(); }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      move(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      move(-1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      go();
+    }
   });
 
   // Global shortcuts: Cmd/Ctrl-K toggles, "/" opens (unless already typing),
@@ -161,11 +186,17 @@
       root.hidden ? open() : close();
       return;
     }
-    if (e.key === 'Escape' && !root.hidden) { close(); return; }
+    if (e.key === 'Escape' && !root.hidden) {
+      close();
+      return;
+    }
     if (e.key === '/' && root.hidden) {
       var t = e.target;
       var typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-      if (!typing) { e.preventDefault(); open(); }
+      if (!typing) {
+        e.preventDefault();
+        open();
+      }
     }
   });
 })();

@@ -9,7 +9,10 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!host || !window.Scalar || !host.dataset.url) return;
 
   var root = document.documentElement;
-  function dark() { return root.getAttribute('data-theme') !== 'light'; }
+
+  function dark() {
+    return root.getAttribute('data-theme') !== 'light';
+  }
 
   // Try-it sends ONLY what the reader put in the Authorization field.
   // The reference is same-origin with the console, so a plain fetch
@@ -21,10 +24,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // The document itself is still fetched with the session: it sits
   // behind the same gate as this page.
   var specURL = host.dataset.url;
+
   function fetchAsClient(input, init) {
     var url = typeof input === 'string' ? input : input.url;
     if (url === specURL || url.indexOf(specURL) !== -1) return fetch(input, init);
-    return fetch(input, Object.assign({}, init, { credentials: 'omit' }));
+    return fetch(input, Object.assign({}, init, {credentials: 'omit'}));
   }
 
   // FOUR OF THESE ARE LOAD-BEARING UNDER THE SITE'S CSP, not preferences:
@@ -41,8 +45,8 @@ document.addEventListener('DOMContentLoaded', function () {
     proxyUrl: '',
     telemetry: false,
     withDefaultFonts: false,
-    agent: { disabled: true },
-    mcp: { disabled: true },
+    agent: {disabled: true},
+    mcp: {disabled: true},
     showDeveloperTools: 'never',
     hideDarkModeToggle: true,
     hideClientButton: true,
@@ -61,5 +65,5 @@ document.addEventListener('DOMContentLoaded', function () {
       config.darkMode = dark();
       app.updateConfiguration(config);
     }
-  }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  }).observe(root, {attributes: true, attributeFilter: ['data-theme']});
 });

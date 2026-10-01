@@ -59,13 +59,13 @@ curl -X POST http://localhost:3000/api/v1/suppressions/import \
 GET /api/v1/suppressions?search=ada@&kind=bounce&limit=50
 ```
 
-| Parameter | Meaning                                                                 |
-|-----------|-------------------------------------------------------------------------|
-| `search`  | Matches the **start** of an address                                     |
+| Parameter | Meaning                                                                                          |
+|-----------|--------------------------------------------------------------------------------------------------|
+| `search`  | Matches the **start** of an address                                                              |
 | `email`   | One whole address. Every row blocking it, across lists, so an empty page means it is not blocked |
-| `kind`    | `bounce`, `complaint`, `manual` or `list_unsubscribe`                   |
-| `limit`   | Rows per page, default 50, capped at 200                                |
-| `cursor`  | Where to resume. Pass back the `next_cursor` from the previous response |
+| `kind`    | `bounce`, `complaint`, `manual` or `list_unsubscribe`                                            |
+| `limit`   | Rows per page, default 50, capped at 200                                                         |
+| `cursor`  | Where to resume. Pass back the `next_cursor` from the previous response                          |
 
 Response:
 
@@ -88,12 +88,12 @@ Response:
 
 `kind` records why the address is blocked:
 
-| Kind | Written by |
-|---|---|
-| `bounce` | A hard bounce: a permanent SMTP rejection during delivery, or a [bounce report](/docs/contacts/bounce-handling) classified hard |
-| `complaint` | A spam complaint from a feedback loop |
-| `manual` | You, through this API or the console |
-| `list_unsubscribe` | A recipient clicking a one-click link scoped to an [unsubscribe list](/docs/contacts/unsubscribe-lists) |
+| Kind               | Written by                                                                                                                      |
+|--------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `bounce`           | A hard bounce: a permanent SMTP rejection during delivery, or a [bounce report](/docs/contacts/bounce-handling) classified hard |
+| `complaint`        | A spam complaint from a feedback loop                                                                                           |
+| `manual`           | You, through this API or the console                                                                                            |
+| `list_unsubscribe` | A recipient clicking a one-click link scoped to an [unsubscribe list](/docs/contacts/unsubscribe-lists)                         |
 
 Only the first three can be **created** by a caller. `list_unsubscribe` is written by the hosted unsubscribe page and
 carries an `unsubscribe_list_id`, so it blocks that one scope rather than everything. All four are accepted as a
@@ -127,7 +127,7 @@ problem in reverse: a full index scan, on every page load, to produce a number n
 The tradeoff is that you can only go forward. For finding one address, use `search`
 
 - that is the question this list exists to answer, and no amount of paging answers it on a table this size.
-{{< /callout >}}
+  {{< /callout >}}
 
 ## Remove from Suppression List
 
@@ -159,8 +159,13 @@ refused:
 
 ```json
 {
-  "email": { "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33", "status": "queued" },
-  "suppressed_recipients": ["j.okafor@acme-industrial.example"]
+    "email": {
+        "id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33",
+        "status": "queued"
+    },
+    "suppressed_recipients": [
+        "j.okafor@acme-industrial.example"
+    ]
 }
 ```
 

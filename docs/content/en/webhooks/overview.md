@@ -24,11 +24,11 @@ curl -X POST http://localhost:3000/api/v1/webhooks \
   }'
 ```
 
-| Field | Notes |
-|---|---|
-| `url` | Required. Must be an `http` or `https` URL, up to 2048 characters |
-| `events` | Required. Between 1 and 10 [event types](/docs/webhooks/event-types), or `*` for all |
-| `filters` | Optional. Up to 20 sender addresses or domain patterns |
+| Field     | Notes                                                                                |
+|-----------|--------------------------------------------------------------------------------------|
+| `url`     | Required. Must be an `http` or `https` URL, up to 2048 characters                    |
+| `events`  | Required. Between 1 and 10 [event types](/docs/webhooks/event-types), or `*` for all |
+| `filters` | Optional. Up to 20 sender addresses or domain patterns                               |
 
 {{< callout type="warning" title="The signing secret is returned once" >}}
 Mailyard generates it and puts it in the **create response only**. Every later read omits it, and there is no route that
@@ -42,10 +42,10 @@ your receiver verifies against.
 
 `filters` restricts deliveries to messages from particular senders. An empty list means everything.
 
-| Pattern | Matches |
-|---|---|
-| `billing@example.com` | That address exactly |
-| `*@example.com` | Any address at that domain |
+| Pattern               | Matches                    |
+|-----------------------|----------------------------|
+| `billing@example.com` | That address exactly       |
+| `*@example.com`       | Any address at that domain |
 
 Matching is case-insensitive and runs against the bare envelope address, so a `From` of
 `Billing <billing@Example.com>` matches both patterns above.
@@ -140,16 +140,16 @@ when the attempts run out.
 
 ## Manage
 
-| Route | Does |
-|---|---|
-| `GET /api/v1/webhooks` | Every webhook in the project |
-| `GET /api/v1/webhooks/{id}` | One, without its secret |
-| `PATCH /api/v1/webhooks/{id}` | Change `url`, `events` or `filters`, each only when sent. `filters: []` clears the list |
-| `POST /api/v1/webhooks/{id}/disable` | Take it out of rotation by hand, with an optional `reason` |
-| `POST /api/v1/webhooks/{id}/enable` | Put it back, after a manual disable or after the dispatcher gave up on it |
-| `POST /api/v1/webhooks/{id}/test` | Post a `webhook.test` event now and answer with the attempt - see [Delivery Tracking](/docs/webhooks/delivery-tracking) |
-| `POST /api/v1/webhooks/{id}/rotate-secret` | A fresh secret, returned once |
-| `DELETE /api/v1/webhooks/{id}` | Remove it and its delivery log |
+| Route                                      | Does                                                                                                                    |
+|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/webhooks`                     | Every webhook in the project                                                                                            |
+| `GET /api/v1/webhooks/{id}`                | One, without its secret                                                                                                 |
+| `PATCH /api/v1/webhooks/{id}`              | Change `url`, `events` or `filters`, each only when sent. `filters: []` clears the list                                 |
+| `POST /api/v1/webhooks/{id}/disable`       | Take it out of rotation by hand, with an optional `reason`                                                              |
+| `POST /api/v1/webhooks/{id}/enable`        | Put it back, after a manual disable or after the dispatcher gave up on it                                               |
+| `POST /api/v1/webhooks/{id}/test`          | Post a `webhook.test` event now and answer with the attempt - see [Delivery Tracking](/docs/webhooks/delivery-tracking) |
+| `POST /api/v1/webhooks/{id}/rotate-secret` | A fresh secret, returned once                                                                                           |
+| `DELETE /api/v1/webhooks/{id}`             | Remove it and its delivery log                                                                                          |
 
 An edit leaves the secret alone, so a receiver keeps verifying through it. If the endpoint changed hands, rotate the
 secret as a separate act.

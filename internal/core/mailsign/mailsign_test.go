@@ -23,7 +23,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/smallstep/pkcs7"
-	pkcs12 "software.sslmate.com/src/go-pkcs12"
+	"software.sslmate.com/src/go-pkcs12"
 
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
 )

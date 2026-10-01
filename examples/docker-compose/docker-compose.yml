@@ -25,7 +25,7 @@ services:
     # --init applies the schema. Exactly ONE node in a fleet carries it,
     # and a single node always does - without it a fresh database gets no
     # schema and the boot fails saying so.
-    command: ["serve", "--init"]
+    command: [ "serve", "--init" ]
 
     ports:
       # HTTPS console and API. 443 because this process terminates TLS -
@@ -110,7 +110,7 @@ services:
       # --no-check-certificate because the listener may still be serving
       # the self-signed pair, and a health check is not the thing that
       # should decide whether a certificate is trusted.
-      test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:443/healthz"]
+      test: [ "CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:443/healthz" ]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -126,7 +126,7 @@ services:
     volumes:
       - mailyard_db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
+      test: [ "CMD-SHELL", "pg_isready -U mailyard -d mailyard" ]
       interval: 5s
       timeout: 5s
       retries: 10

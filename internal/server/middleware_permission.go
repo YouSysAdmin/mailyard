@@ -26,7 +26,7 @@ import (
 // The action is declared and not derived from the HTTP method: Fiber
 // runs group middleware before any route handler, so a group-level
 // check fires before a route could correct it - and derived,
-// `POST /templates/preview` would be a write.
+// `POST /templates/preview` would be written.
 
 // permLocal is where permOn leaves the resource for the action check.
 // A private type rather than a string key so nothing else in the
@@ -66,7 +66,7 @@ func permOn(r permission.Resource) fiber.Handler {
 // two routes on it honour the flag: batch refuses explicitly, and
 // retry was missed, so a credential handed out precisely so it could
 // not send real mail could re-queue a real failed message to a real
-// customer. Verified, not theorised.
+// customer. Verified, not theorized.
 //
 // Narrowing the resource removes that by construction rather than by
 // adding a third refusal to a list somebody has to keep complete. A
@@ -149,7 +149,7 @@ func refuseSandboxCredential(c fiber.Ctx) error {
 //
 // Three actions rather than two, so a project can say "may edit but not
 // remove" in a role of its own. There is no built-in admin tier to
-// borrow for that any more.
+// borrow for that anymore.
 //
 // The mapping is mechanical: a DELETE method takes permDelete. A POST
 // that erases has to say so itself, the same way /templates/preview has

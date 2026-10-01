@@ -8,7 +8,7 @@
 // here puts the whole of that act in one place.
 import { computed, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { useThemeStore, type ThemeMode } from '../stores/theme'
+import { type ThemeMode, useThemeStore } from '../stores/theme'
 import { beginLeaving, leaveConsole } from '../composables/session'
 
 const emit = defineEmits<{

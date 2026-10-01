@@ -15,10 +15,10 @@ import { useFieldErrors } from '../../../composables/fieldErrors'
 import FormField from '../../../components/FormField.vue'
 import HeaderEditor from '../../../components/HeaderEditor.vue'
 import {
+  type HeaderRow,
   headerRowsProblem,
   headersToRows,
   rowsToHeaders,
-  type HeaderRow,
 } from '../../../composables/headerRows'
 
 const props = defineProps<{

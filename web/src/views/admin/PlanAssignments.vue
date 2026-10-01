@@ -5,7 +5,7 @@
 // one decision and a page of thirty selects with a single button at the
 // bottom hides which of them changed.
 import { onMounted, ref } from 'vue'
-import { plansApi, type Plan } from '../../api/plans'
+import { type Plan, plansApi } from '../../api/plans'
 import { projectApi } from '../../api/projects'
 import { apiErrorMessage } from '../../api/client'
 import type { Project } from '../../api/types'

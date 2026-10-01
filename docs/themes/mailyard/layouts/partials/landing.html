@@ -7,10 +7,12 @@
       <p class="cs-lead">{{ site.Params.lead | default site.Params.description }}</p>
       <div class="cs-hero-ctas">
         {{ with $sections }}
-        <a class="cs-btn cs-btn-primary cs-btn-lg" href="{{ (index . 0).RelPermalink }}">{{ i18n "home_get_started" }} →</a>
+        <a class="cs-btn cs-btn-primary cs-btn-lg" href="{{ (index . 0).RelPermalink }}">{{ i18n "home_get_started" }}
+          →</a>
         {{ end }}
         {{ with site.Params.cta_url }}
-        <a class="cs-btn cs-btn-ghost cs-btn-lg" href="{{ . }}" target="_blank" rel="noopener">{{ site.Params.cta_label | default "GitHub" }} ↗</a>
+        <a class="cs-btn cs-btn-ghost cs-btn-lg" href="{{ . }}" target="_blank" rel="noopener">{{ site.Params.cta_label
+          | default "GitHub" }} ↗</a>
         {{ end }}
       </div>
       {{ with site.Params.trust_badges }}
@@ -24,7 +26,9 @@
         <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
         <span class="cs-terminal-title">{{ site.Params.terminal_title | default "~/mailyard" }}</span>
       </div>
-      <pre class="cs-terminal-body">{{ range site.Params.terminal_lines }}<span class="cs-line">{{ . | safeHTML }}</span>{{ end }}<span class="cs-line"><span class="cs-prefix cs-brand">$</span><span class="cs-cursor">▎</span></span></pre>
+      <pre class="cs-terminal-body">{{ range site.Params.terminal_lines }}<span
+        class="cs-line">{{ . | safeHTML }}</span>{{ end }}<span class="cs-line"><span
+        class="cs-prefix cs-brand">$</span><span class="cs-cursor">▎</span></span></pre>
     </div>
   </div>
 </section>
@@ -38,7 +42,9 @@
       {{ range . }}
       <div class="cs-list-card cs-feature-card">
         <div class="cs-list-card-h">{{ .title }}</div>
-        {{ with .description }}<div class="cs-list-card-d">{{ . }}</div>{{ end }}
+        {{ with .description }}
+        <div class="cs-list-card-d">{{ . }}</div>
+        {{ end }}
       </div>
       {{ end }}
     </div>
@@ -54,7 +60,9 @@
       {{ range $sections }}
       <a class="cs-list-card" href="{{ .RelPermalink }}">
         <div class="cs-list-card-h">{{ .Title }}</div>
-        {{ with .Description }}<div class="cs-list-card-d">{{ . }}</div>{{ end }}
+        {{ with .Description }}
+        <div class="cs-list-card-d">{{ . }}</div>
+        {{ end }}
         <div class="cs-list-card-arrow mono">→</div>
       </a>
       {{ end }}

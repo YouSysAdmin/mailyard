@@ -32,18 +32,18 @@ Reading needs membership. Writing needs `settings:write`.
 
 The settings that shape behaviour:
 
-| Field              | Type   | Default | What it does                                                                                                        |
-|--------------------|--------|---------|---------------------------------------------------------------------------------------------------------------------|
-| `name`             | string | —       | Display name                                                                                                        |
-| `slug`             | string | derived | URL-safe identifier, unique across the install                                                                      |
-| `description`      | string | —       | Free text                                                                                                           |
-| `default_language` | string | `en`    | Language used when a template send names none                                                                       |
-| `strict_senders`   | bool   | `false` | Refuse any From address not registered under [sender addresses](/docs/smtp-domains/sender-addresses)                |
-| `track_opens`      | bool   | `false` | Add the open pixel to non-campaign mail. See [Tracking](/docs/tracking/overview)                                    |
-| `track_clicks`     | bool   | `false` | Rewrite links in non-campaign mail                                                                                  |
-| `bounce_address`   | string | —       | Envelope return path for this project's own SMTP servers. See [Bounce handling](/docs/smtp-domains/bounce-handling) |
-| `default_headers`  | object | `{}`    | Custom headers under every message the project sends. A message or campaign naming the same header wins. Up to 20, same rules as a message's [own headers](/docs/email-sending/single-email#three-layers-of-headers) |
-| `submission_drop_headers` | list | `[]` | Header names the [SMTP submission](/docs/security/smtp-submission#which-headers-travel) listener removes from a client's message before forwarding. Submission only |
+| Field                     | Type   | Default | What it does                                                                                                                                                                                                         |
+|---------------------------|--------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `name`                    | string | —       | Display name                                                                                                                                                                                                         |
+| `slug`                    | string | derived | URL-safe identifier, unique across the install                                                                                                                                                                       |
+| `description`             | string | —       | Free text                                                                                                                                                                                                            |
+| `default_language`        | string | `en`    | Language used when a template send names none                                                                                                                                                                        |
+| `strict_senders`          | bool   | `false` | Refuse any From address not registered under [sender addresses](/docs/smtp-domains/sender-addresses)                                                                                                                 |
+| `track_opens`             | bool   | `false` | Add the open pixel to non-campaign mail. See [Tracking](/docs/tracking/overview)                                                                                                                                     |
+| `track_clicks`            | bool   | `false` | Rewrite links in non-campaign mail                                                                                                                                                                                   |
+| `bounce_address`          | string | —       | Envelope return path for this project's own SMTP servers. See [Bounce handling](/docs/smtp-domains/bounce-handling)                                                                                                  |
+| `default_headers`         | object | `{}`    | Custom headers under every message the project sends. A message or campaign naming the same header wins. Up to 20, same rules as a message's [own headers](/docs/email-sending/single-email#three-layers-of-headers) |
+| `submission_drop_headers` | list   | `[]`    | Header names the [SMTP submission](/docs/security/smtp-submission#which-headers-travel) listener removes from a client's message before forwarding. Submission only                                                  |
 
 `PATCH` takes any subset and leaves absent fields unchanged:
 
@@ -100,10 +100,10 @@ GET /api/v1/audit-log/{id}
 The configuration trail for the active project, needing `audit:read`. Every successful mutating request is recorded by
 middleware, so new routes are covered automatically.
 
-| Parameter | Type | Default | Description                                                                           |
-|-----------|------|---------|---------------------------------------------------------------------------------------|
-| `limit`   | int  | `20`    | Page size. Over-asking is clamped to the ceiling, never refused.                      |
-| `offset`  | int  | `0`     | Rows to skip. |
+| Parameter | Type | Default | Description                                                      |
+|-----------|------|---------|------------------------------------------------------------------|
+| `limit`   | int  | `20`    | Page size. Over-asking is clamped to the ceiling, never refused. |
+| `offset`  | int  | `0`     | Rows to skip.                                                    |
 
 ```bash
 curl "http://localhost:3000/api/v1/audit-log?limit=20" \

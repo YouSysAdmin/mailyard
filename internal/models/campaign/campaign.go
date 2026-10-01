@@ -8,7 +8,7 @@ package campaign
 import "time"
 
 // Campaign statuses. draft -> (scheduled ->) sending -> sent, with
-// paused and cancelled as operator exits. The runner only touches
+// paused and canceled as operator exits. The runner only touches
 // campaigns in sending.
 const (
 	StatusDraft     = "draft"

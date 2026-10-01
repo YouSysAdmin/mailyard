@@ -45,7 +45,7 @@ services:
 
     # --init applies the schema. Exactly ONE node in a fleet carries it,
     # and a single node always does.
-    command: ["serve", "--init"]
+    command: [ "serve", "--init" ]
 
     ports:
       # Only the SMTP listeners. 3000 and 8080 stay on the container
@@ -103,7 +103,7 @@ services:
       # would keep the container unhealthy forever. /healthz rather than
       # /readyz: a restart probe must not restart every node on a brief
       # database blip.
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/healthz" ]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -119,7 +119,7 @@ services:
     volumes:
       - mailyard_db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
+      test: [ "CMD-SHELL", "pg_isready -U mailyard -d mailyard" ]
       interval: 5s
       timeout: 5s
       retries: 10

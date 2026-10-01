@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import {
-  unsubscribeListsApi,
   type UnsubscribeList,
   type UnsubscribeListPayload,
+  unsubscribeListsApi,
 } from '../../api/unsubscribeLists'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'

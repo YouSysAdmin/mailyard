@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import {
-  oauthProvidersApi,
   type OAuthProvider,
+  oauthProvidersApi,
   type OAuthTestResult,
 } from '../../api/oauthProviders'
 import { apiErrorMessage } from '../../api/client'

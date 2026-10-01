@@ -86,7 +86,8 @@ that permission is refused.
 
 It is a resource of its own rather than part of `smtp`, because enrolling a node hands
 that machine the CONTENT of the project's outbound mail to deliver - a credential given
-to a deployment script for that one job should not also read the email log. The node appears under the project's own relay node
+to a deployment script for that one job should not also read the email log. The node appears under the project's own
+relay node
 list and an admin **of that project** approves it - not a platform admin.
 
 Two consequences follow without any further setup:
@@ -193,7 +194,8 @@ Three things to know:
 
 - **The platform decides who holds a message.** While an assignment stands the email row is `processing` and belongs to
   that node. The node says on every claim which messages it still has, which keeps the assignment alive. A node that
-  stops claiming - it crashed, it lost its link - loses its assignments after `relay_nodes.assignment_ttl` (five minutes)
+  stops claiming - it crashed, it lost its link - loses its assignments after `relay_nodes.assignment_ttl` (five
+  minutes)
   and the messages go to the next server in the group, the same failover a refused dial gets.
 - **Claiming is safe to repeat.** A claim changes nothing on the platform: a node that fetched a batch and crashed
   before writing it gets the same batch again. What ends an assignment is the node's report, recipient by recipient.
@@ -214,10 +216,10 @@ message went to.
 
 Two outcomes are final and they are not the same:
 
-| Outcome | Recorded as | Suppressed |
-|---|---|---|
-| Permanent refusal (5xx, null MX, no such domain) | hard bounce | yes |
-| Ran out of time after `max_lifetime` | soft bounce | no |
+| Outcome                                          | Recorded as | Suppressed |
+|--------------------------------------------------|-------------|------------|
+| Permanent refusal (5xx, null MX, no such domain) | hard bounce | yes        |
+| Ran out of time after `max_lifetime`             | soft bounce | no         |
 
 The second is deliberate. Running out of time is our failure, not the address's, and
 suppressing a good mailbox over it would be worse than the original delay.
@@ -276,9 +278,9 @@ Nothing about whose mail it is. A node has no database, so:
   uses, so a subdomain of a verified name is accepted here exactly as it would be
   there.
 - Before the list has ever arrived, an unknown recipient gets a **451**, not a
-  550. "I do not know yet" is not "no such domain", and a hard refusal would
-  bounce good mail for the minutes between a node starting and its first
-  heartbeat.
+    550. "I do not know yet" is not "no such domain", and a hard refusal would
+         bounce good mail for the minutes between a node starting and its first
+         heartbeat.
 - Everything else - suppression, SPF/DKIM/DMARC, dedup, whether a message is a
   delivery report - is decided by Mailyard when the message arrives, through the
   same pipeline the platform's own MX feeds.
@@ -354,35 +356,35 @@ it just files no bounce and suppresses nothing.
 
 ## Configuration
 
-| Key | Default | |
-|---|---|---|
-| `relay_node.control_url` | | Where the platform lives. Required. |
-| `relay_node.enroll_token` | | First run only. |
-| `relay_node.hostname` | | Certificate name AND the HELO announced to the internet. Must match PTR. |
-| `relay_node.mode` | `listen` | `listen` binds `addr` for workers to dial. `pull` binds nothing and claims assigned mail over the control channel - see above. |
-| `relay_node.addr` | `:2587` | Where workers connect. Listen mode only. |
-| `relay_node.server_group` | | Slug of the project [server group](/docs/smtp-domains/server-groups) to join. Empty uses the default. Project nodes only. |
-| `relay_node.spool_dir` | `./relay-spool` | The queue. Must survive a restart. |
-| `relay_node.max_lifetime` | `72h` | How long a message may keep failing. |
-| `relay_node.heartbeat_interval` | `2m` | Well under the ten minute stale window. |
-| `relay_node.delivery_concurrency` | `8` | Simultaneous outbound sessions. |
-| `relay_node.smtp_port` | `25` | Destination port. Change it only for testing. |
-| `relay_node.inbound.enabled` | `false` | Run an MX on this node and forward what it receives. |
-| `relay_node.inbound.addr` | `:25` | Where the internet delivers. An MX record carries no port. |
-| `relay_node.inbound.max_message_size` | `26214400` | Must not exceed the platform's `inbound.max_message_size`. |
-| `relay_node.inbound.rate_per_minute` | `120` | Per-IP session budget. The one listener here whose rate strangers set. |
-| `relay_node.inbound.proxy_protocol.enabled` | `false` | Read the real client address from a balancer in front of this port. |
-| `relay_node.inbound.proxy_protocol.trusted` | | Balancer addresses or CIDRs. Required when enabled - see [Rate Limiting](/docs/security/rate-limiting). |
-| `relay_node.inbound.tls.cert` / `.key` | | STARTTLS pair. Neither set generates a self-signed one. |
-| `relay_node.ipv6` | `false` | Off on purpose: a half-configured v6 address fails for reasons that look nothing like the cause. |
+| Key                                         | Default         |                                                                                                                                |
+|---------------------------------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `relay_node.control_url`                    |                 | Where the platform lives. Required.                                                                                            |
+| `relay_node.enroll_token`                   |                 | First run only.                                                                                                                |
+| `relay_node.hostname`                       |                 | Certificate name AND the HELO announced to the internet. Must match PTR.                                                       |
+| `relay_node.mode`                           | `listen`        | `listen` binds `addr` for workers to dial. `pull` binds nothing and claims assigned mail over the control channel - see above. |
+| `relay_node.addr`                           | `:2587`         | Where workers connect. Listen mode only.                                                                                       |
+| `relay_node.server_group`                   |                 | Slug of the project [server group](/docs/smtp-domains/server-groups) to join. Empty uses the default. Project nodes only.      |
+| `relay_node.spool_dir`                      | `./relay-spool` | The queue. Must survive a restart.                                                                                             |
+| `relay_node.max_lifetime`                   | `72h`           | How long a message may keep failing.                                                                                           |
+| `relay_node.heartbeat_interval`             | `2m`            | Well under the ten minute stale window.                                                                                        |
+| `relay_node.delivery_concurrency`           | `8`             | Simultaneous outbound sessions.                                                                                                |
+| `relay_node.smtp_port`                      | `25`            | Destination port. Change it only for testing.                                                                                  |
+| `relay_node.inbound.enabled`                | `false`         | Run an MX on this node and forward what it receives.                                                                           |
+| `relay_node.inbound.addr`                   | `:25`           | Where the internet delivers. An MX record carries no port.                                                                     |
+| `relay_node.inbound.max_message_size`       | `26214400`      | Must not exceed the platform's `inbound.max_message_size`.                                                                     |
+| `relay_node.inbound.rate_per_minute`        | `120`           | Per-IP session budget. The one listener here whose rate strangers set.                                                         |
+| `relay_node.inbound.proxy_protocol.enabled` | `false`         | Read the real client address from a balancer in front of this port.                                                            |
+| `relay_node.inbound.proxy_protocol.trusted` |                 | Balancer addresses or CIDRs. Required when enabled - see [Rate Limiting](/docs/security/rate-limiting).                        |
+| `relay_node.inbound.tls.cert` / `.key`      |                 | STARTTLS pair. Neither set generates a self-signed one.                                                                        |
+| `relay_node.ipv6`                           | `false`         | Off on purpose: a half-configured v6 address fails for reasons that look nothing like the cause.                               |
 
 A node needs none of `database.dsn`, `database.crypto.encryption_key` or `auth.jwt_secret`, and
 is refused at startup if it is missing what it does need.
 
 Platform side, for pull nodes:
 
-| Key | Default | |
-|---|---|---|
-| `relay_nodes.assignment_ttl` | `5m` | How long an assignment stands without the node claiming it, before the message goes to the next server. |
-| `relay_nodes.claim_max` | `20` | Messages handed over per claim. |
-| `relay_nodes.claim_wait_max` | `30s` | How long a claim may park waiting for an assignment. |
+| Key                          | Default |                                                                                                         |
+|------------------------------|---------|---------------------------------------------------------------------------------------------------------|
+| `relay_nodes.assignment_ttl` | `5m`    | How long an assignment stands without the node claiming it, before the message goes to the next server. |
+| `relay_nodes.claim_max`      | `20`    | Messages handed over per claim.                                                                         |
+| `relay_nodes.claim_wait_max` | `30s`   | How long a claim may park waiting for an assignment.                                                    |

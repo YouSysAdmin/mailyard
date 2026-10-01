@@ -7,7 +7,7 @@
 // senders rather than on domains. A member who may read domains is not
 // thereby somebody who may add a From address.
 import { onMounted, ref } from 'vue'
-import { sendersApi, type Sender } from '../../api/senders'
+import { type Sender, sendersApi } from '../../api/senders'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'

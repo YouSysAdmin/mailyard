@@ -17,7 +17,10 @@ export default defineConfig({
         // these groups are the Rolldown-native equivalent.
         advancedChunks: {
           groups: [
-            { name: 'codemirror', test: /[\\/]node_modules[\\/](?:@codemirror[\\/]|codemirror[\\/])/ },
+            {
+              name: 'codemirror',
+              test: /[\\/]node_modules[\\/](?:@codemirror[\\/]|codemirror[\\/])/,
+            },
             { name: 'grapesjs', test: /[\\/]node_modules[\\/]grapesjs/ },
           ],
         },

@@ -49,8 +49,8 @@ catalogue — there are no built-in roles to work around.
 **Running it.** A console for all of the above, an [admin area](/docs/admin/platform-settings) for platform settings,
 users, the shared pool and [certificates](/docs/admin/certificates) including an internal CA, and
 [scaling](/docs/getting-started/scaling) by putting more nodes behind one queue.
-| **Data portability**       | Project export and bulk erasure                                                                                    |
-| **Prometheus Metrics**     | Built-in observability for production monitoring                                                                   |
+| **Data portability**       | Project export and bulk erasure |
+| **Prometheus Metrics**     | Built-in observability for production monitoring |
 
 ## API Reference
 

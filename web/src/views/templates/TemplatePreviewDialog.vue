@@ -7,7 +7,7 @@
 // it. That is also why the data box is here: the interesting failures
 // are a field the template names and the data does not carry.
 import { ref } from 'vue'
-import { templatesApi, type RenderedPreview } from '../../api/templates'
+import { type RenderedPreview, templatesApi } from '../../api/templates'
 import { apiErrorMessage } from '../../api/client'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'

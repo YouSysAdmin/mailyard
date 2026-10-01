@@ -3,7 +3,7 @@
 // a message being composed, a campaign, a project's defaults. The rows
 // and their rules live in composables/headerRows.ts.
 import { computed } from 'vue'
-import { headerRowsProblem, type HeaderRow } from '../composables/headerRows'
+import { type HeaderRow, headerRowsProblem } from '../composables/headerRows'
 
 const props = withDefaults(
   defineProps<{

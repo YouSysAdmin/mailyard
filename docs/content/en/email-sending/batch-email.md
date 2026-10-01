@@ -72,14 +72,14 @@ Leave the template ref out and each item carries its own content:
 
 ## What an item may carry
 
-| Field                                                                      | Notes                                                                                                                |
-|----------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `to`                                                                       | Required, one or more addresses                                                                                      |
-| `cc`, `bcc`                                                                | The other two recipient lists, with the [same rules](/docs/email-sending/single-email#who-sees-whom) as a plain send |
-| `data`                                                                     | Template mode — the render values                                                                                    |
-| `language`                                                                 | Overrides the batch default                                                                                          |
-| `subject`, `html`, `text`                                                  | Raw mode                                                                                                             |
-| `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Per item, because an opt-out link identifies a recipient                                                             |
+| Field                                                                      | Notes                                                                                                                           |
+|----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `to`                                                                       | Required, one or more addresses                                                                                                 |
+| `cc`, `bcc`                                                                | The other two recipient lists, with the [same rules](/docs/email-sending/single-email#who-sees-whom) as a plain send            |
+| `data`                                                                     | Template mode — the render values                                                                                               |
+| `language`                                                                 | Overrides the batch default                                                                                                     |
+| `subject`, `html`, `text`                                                  | Raw mode                                                                                                                        |
+| `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Per item, because an opt-out link identifies a recipient                                                                        |
 | `tags`, `metadata`                                                         | Per item, the same as on a [single send](/docs/email-sending/single-email#optional-fields) - an order id belongs to one message |
 
 The opt-out fields are per item deliberately. A batch is where an application sends its bulk mail, and one link shared

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	tlsutils "github.com/yousysadmin/go-tlsutils"
+	"github.com/yousysadmin/go-tlsutils"
 	"github.com/yousysadmin/mailyard/internal/core/certstore"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"

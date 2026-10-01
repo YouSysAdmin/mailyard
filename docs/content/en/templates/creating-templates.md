@@ -145,7 +145,8 @@ curl -X POST http://localhost:3000/api/v1/emails/send-template \
   }'
 ```
 
-`from` is required and its domain must be [verified by this project](/docs/smtp-domains/domain-verification). Address the
+`from` is required and its domain must be [verified by this project](/docs/smtp-domains/domain-verification). Address
+the
 template by `template_name` or by `template_id` — one of the two. Everything a
 [plain send](/docs/email-sending/single-email) accepts is accepted here as well: `headers`, `attachments`, `send_at`,
 `dry_run`, the routing selectors and the sandbox controls.

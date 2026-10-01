@@ -25,12 +25,12 @@ Available on both surfaces: `/api/v1/contacts` with a session, and `/api/v1/cont
 GET /api/v1/contacts?search=alice&limit=25&offset=0
 ```
 
-| Parameter | Default | Description                                                 |
-|-----------|---------|-------------------------------------------------------------|
-| `search`  | -       | Matches the address or the display name, case-insensitively |
+| Parameter | Default | Description                                                      |
+|-----------|---------|------------------------------------------------------------------|
+| `search`  | -       | Matches the address or the display name, case-insensitively      |
 | `email`   | -       | One whole address. Answers that contact alone, in the same shape |
-| `limit`   | `20`    | Page size, capped at `200`                                  |
-| `offset`  | `0`     | Rows to skip                                                |
+| `limit`   | `20`    | Page size, capped at `200`                                       |
+| `offset`  | `0`     | Rows to skip                                                     |
 
 ```bash
 curl "http://localhost:3000/api/v1/contacts?search=alice" \

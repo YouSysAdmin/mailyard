@@ -47,7 +47,8 @@ Fixed-window counters on the HTTP edge, configured under `ratelimit`:
 Setting an individual value to `0` disables that limiter while leaving the others in place.
 
 The login limiter is per client address. The account counts its own failures too: ten wrong passwords in a row lock
-sign-in for that account for fifteen minutes, whatever addresses they came from, and the answer during the lockout is the
+sign-in for that account for fifteen minutes, whatever addresses they came from, and the answer during the lockout is
+the
 same `invalid credentials` a wrong password gets. The lock is held against the addresses that earned it: one that has
 not failed a password for the account is admitted to a single attempt, and a wrong one puts it under the lock too. That
 is what keeps a stranger who knows an administrator's address from locking the administrator out. Those fresh addresses
@@ -97,7 +98,8 @@ way of learning the real one, because HTTP and SMTP are not the same problem.
 `server.trusted_proxies` lists the IPs or CIDRs of your balancer, and `X-Forwarded-For` is then read - but only when the
 connection itself came from one of those hops. Without it, every request behind a proxy shares one bucket.
 
-**List every hop, not just the nearest one.** The header is a list, each hop appends the address it saw, and the entries on
+**List every hop, not just the nearest one.** The header is a list, each hop appends the address it saw, and the entries
+on
 the left are whatever the caller chose to send. So the address is resolved by reading the list **from the right** and
 stopping at the first entry that is not one of your proxies - a hop you leave out of the list becomes the answer, and a
 caller who sends the header cannot become someone else by doing it:

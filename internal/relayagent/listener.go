@@ -289,7 +289,7 @@ func NewServer(b *Backend, addr, hostname string, tlsCfg *tls.Config) *smtp.Serv
 	srv.MaxMessageBytes = b.MaxMessageSize
 	srv.AllowInsecureAuth = false
 	srv.TLSConfig = tlsCfg
-	// Into OUR log, not the library's stderr default: a failed
+	// Into OUR log, not the library stderr default: a failed
 	// handshake on this listener is a worker with the wrong
 	// certificate, which is exactly the thing somebody will be
 	// looking for here.

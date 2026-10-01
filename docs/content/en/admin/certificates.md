@@ -312,7 +312,8 @@ Two things make this work, and both are worth knowing when the proxy is not Cadd
   and it reads that name from the request. Caddy's `reverse_proxy` keeps it by default, nginx needs
   `proxy_set_header Host $host`.
 
-The CA follows a redirect from port 80 to 443, so a proxy that redirects plain HTTP to HTTPS needs no separate plain-HTTP
+The CA follows a redirect from port 80 to 443, so a proxy that redirects plain HTTP to HTTPS needs no separate
+plain-HTTP
 site: the request arrives over the proxy's own certificate and the route above still applies. A mail hostname that
 differs from the console's needs a site block of its own in the proxy, with the same challenge route.
 

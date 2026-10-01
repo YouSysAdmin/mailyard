@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { templatesApi, type TemplatePayload } from '../../api/templates'
+import { type TemplatePayload, templatesApi } from '../../api/templates'
 import { languagesApi } from '../../api/languages'
 import { apiErrorMessage } from '../../api/client'
-import type { Template, Language } from '../../api/types'
+import type { Language, Template } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
 import { useConfirm } from '../../composables/useConfirm'

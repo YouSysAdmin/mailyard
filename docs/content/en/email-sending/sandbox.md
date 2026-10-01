@@ -245,26 +245,26 @@ items individually.
 
 The sandbox has a console API under `/api/v1/sandbox`, session-authenticated like the rest of the console:
 
-| Route                                      | Purpose                                       |
-|--------------------------------------------|-----------------------------------------------|
-| `GET /api/v1/sandbox`                      | Page of captured messages, newest first, `?limit=` (50, at most 200) and `?offset=`. `?inbox=<id>` narrows it to one inbox's senders, `?sender=`, `?recipient=` and `?subject=` match a value or part of one, `?since=` keeps what was received after an RFC 3339 instant |
-| `GET /api/v1/sandbox/info`                 | Connection details and the retention settings |
-| `GET /api/v1/sandbox/:id`                  | One message, parsed                           |
-| `GET /api/v1/sandbox/:id/raw`              | The wire bytes as `text/plain`                |
-| `GET /api/v1/sandbox/:id/eml`              | The same bytes as an `.eml` download          |
-| `GET /api/v1/sandbox/:id/attachments/:idx` | One attachment                                |
-| `DELETE /api/v1/sandbox/:id`               | Delete one message                            |
-| `POST /api/v1/sandbox/clear`               | Empty the project's sandbox. A body of `senders` or `recipients` keeps it to captures from or to those addresses, `older_than` to what was received before that instant |
-| `GET /api/v1/sandbox/credentials`          | The project's sandbox credentials             |
-| `POST /api/v1/sandbox/credentials`         | Mint one: `name`. The password is returned once |
-| `GET /api/v1/sandbox/credentials/:id`      | One credential                                |
-| `PATCH /api/v1/sandbox/credentials/:id`    | Rename it                                     |
-| `POST /api/v1/sandbox/credentials/:id/revoke` | Retire it                                  |
-| `GET /api/v1/sandbox/inboxes`              | Every inbox in the project                    |
-| `POST /api/v1/sandbox/inboxes`             | Create an inbox: `name`, `description`, `addresses` |
-| `GET /api/v1/sandbox/inboxes/:id`          | One inbox                                     |
-| `PATCH /api/v1/sandbox/inboxes/:id`        | Edit an inbox                                 |
-| `DELETE /api/v1/sandbox/inboxes/:id`       | Delete an inbox. No captured mail is removed  |
+| Route                                         | Purpose                                                                                                                                                                                                                                                                   |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/sandbox`                         | Page of captured messages, newest first, `?limit=` (50, at most 200) and `?offset=`. `?inbox=<id>` narrows it to one inbox's senders, `?sender=`, `?recipient=` and `?subject=` match a value or part of one, `?since=` keeps what was received after an RFC 3339 instant |
+| `GET /api/v1/sandbox/info`                    | Connection details and the retention settings                                                                                                                                                                                                                             |
+| `GET /api/v1/sandbox/:id`                     | One message, parsed                                                                                                                                                                                                                                                       |
+| `GET /api/v1/sandbox/:id/raw`                 | The wire bytes as `text/plain`                                                                                                                                                                                                                                            |
+| `GET /api/v1/sandbox/:id/eml`                 | The same bytes as an `.eml` download                                                                                                                                                                                                                                      |
+| `GET /api/v1/sandbox/:id/attachments/:idx`    | One attachment                                                                                                                                                                                                                                                            |
+| `DELETE /api/v1/sandbox/:id`                  | Delete one message                                                                                                                                                                                                                                                        |
+| `POST /api/v1/sandbox/clear`                  | Empty the project's sandbox. A body of `senders` or `recipients` keeps it to captures from or to those addresses, `older_than` to what was received before that instant                                                                                                   |
+| `GET /api/v1/sandbox/credentials`             | The project's sandbox credentials                                                                                                                                                                                                                                         |
+| `POST /api/v1/sandbox/credentials`            | Mint one: `name`. The password is returned once                                                                                                                                                                                                                           |
+| `GET /api/v1/sandbox/credentials/:id`         | One credential                                                                                                                                                                                                                                                            |
+| `PATCH /api/v1/sandbox/credentials/:id`       | Rename it                                                                                                                                                                                                                                                                 |
+| `POST /api/v1/sandbox/credentials/:id/revoke` | Retire it                                                                                                                                                                                                                                                                 |
+| `GET /api/v1/sandbox/inboxes`                 | Every inbox in the project                                                                                                                                                                                                                                                |
+| `POST /api/v1/sandbox/inboxes`                | Create an inbox: `name`, `description`, `addresses`                                                                                                                                                                                                                       |
+| `GET /api/v1/sandbox/inboxes/:id`             | One inbox                                                                                                                                                                                                                                                                 |
+| `PATCH /api/v1/sandbox/inboxes/:id`           | Edit an inbox                                                                                                                                                                                                                                                             |
+| `DELETE /api/v1/sandbox/inboxes/:id`          | Delete an inbox. No captured mail is removed                                                                                                                                                                                                                              |
 
 ## What a sandbox credential may do
 

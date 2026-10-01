@@ -3,7 +3,7 @@
 // inboxes ticked. A dialog rather than a confirm sentence because once
 // captures can be filtered by sender, "empty" has more than one
 // meaning, and the person pressing it is the one who knows which.
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { sandboxApi, type SandboxInbox } from '../../api/sandbox'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'

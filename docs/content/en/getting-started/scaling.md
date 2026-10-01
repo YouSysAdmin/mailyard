@@ -66,7 +66,8 @@ time and retention drops one a week.
 
 Two things follow that are worth knowing:
 
-- **Partitions are created ahead of time**, four weeks out, by a job that runs hourly on every node that drains the queue, and once at start.
+- **Partitions are created ahead of time**, four weeks out, by a job that runs hourly on every node that drains the
+  queue, and once at start.
   If it stops running you have a month of warning. There is a default partition as a last resort, and rows landing in it
   are reported as a job failure - not because the rows are lost, but because each one blocks creating the proper
   partition for its week.

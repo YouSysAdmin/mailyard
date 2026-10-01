@@ -37,13 +37,13 @@ monitoring network is a legitimate place to skip the token.
 
 ## Counters
 
-| Metric | Labels | Counts |
-|---|---|---|
-| `mailyard_emails_accepted_total` | — | Sends accepted into the queue, from every surface: the API, the console, SMTP submission, campaigns |
-| `mailyard_emails_finalized_total` | `status` | Messages reaching a terminal state — `sent`, `failed` or `suppressed` |
-| `mailyard_sandbox_captures_total` | — | Messages captured into a [sandbox](/docs/email-sending/sandbox) instead of delivered |
-| `mailyard_inbound_received_total` | — | [Inbound](/docs/inbound/overview) messages stored for a verified domain |
-| `mailyard_webhook_deliveries_total` | `status` | [Webhook](/docs/webhooks/overview) delivery attempts by outcome |
+| Metric                              | Labels   | Counts                                                                                              |
+|-------------------------------------|----------|-----------------------------------------------------------------------------------------------------|
+| `mailyard_emails_accepted_total`    | —        | Sends accepted into the queue, from every surface: the API, the console, SMTP submission, campaigns |
+| `mailyard_emails_finalized_total`   | `status` | Messages reaching a terminal state — `sent`, `failed` or `suppressed`                               |
+| `mailyard_sandbox_captures_total`   | —        | Messages captured into a [sandbox](/docs/email-sending/sandbox) instead of delivered                |
+| `mailyard_inbound_received_total`   | —        | [Inbound](/docs/inbound/overview) messages stored for a verified domain                             |
+| `mailyard_webhook_deliveries_total` | `status` | [Webhook](/docs/webhooks/overview) delivery attempts by outcome                                     |
 
 Sandbox captures are counted separately rather than as a label on accepted mail. They never enter the queue, and folding
 them in would make a CI run that sends ten thousand test messages look like sending volume.
@@ -52,11 +52,11 @@ them in would make a CI run that sends ten thousand test messages look like send
 
 These are sampled **at scrape time** rather than tracked continuously, so they always reflect the moment you asked.
 
-| Metric | Labels | Reports |
-|---|---|---|
-| `mailyard_emails_by_status` | `status` | Current email rows per status, across all projects |
-| `mailyard_email_partitions` | — | Daily partitions on the emails table |
-| `mailyard_email_partitions_ceiling` | — | The count past which concurrent queue claims start failing |
+| Metric                              | Labels   | Reports                                                    |
+|-------------------------------------|----------|------------------------------------------------------------|
+| `mailyard_emails_by_status`         | `status` | Current email rows per status, across all projects         |
+| `mailyard_email_partitions`         | —        | Daily partitions on the emails table                       |
+| `mailyard_email_partitions_ceiling` | —        | The count past which concurrent queue claims start failing |
 
 `mailyard_emails_by_status{status="queued"}` is your queue depth, and the one to alert on: sending capacity is fine
 until it is not, and this is where that shows first.
@@ -88,12 +88,12 @@ The standard Go runtime and process collectors come along as well, so `go_gorout
 
 ```yaml
 scrape_configs:
-  - job_name: mailyard
-    metrics_path: /metrics
-    authorization:
-      credentials: a-long-random-string
-    static_configs:
-      - targets: ['mailyard:9090']
+    -   job_name: mailyard
+        metrics_path: /metrics
+        authorization:
+            credentials: a-long-random-string
+        static_configs:
+            -   targets: [ 'mailyard:9090' ]
 ```
 
 The target port is `metrics.addr`. With the loopback default, Prometheus reaches the process from the same host — a

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { emailsApi, type Addressing, type SentVia } from '../../api/emails'
+import { type Addressing, emailsApi, type SentVia } from '../../api/emails'
 import { apiErrorMessage, browserURL } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'

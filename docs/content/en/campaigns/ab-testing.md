@@ -30,12 +30,12 @@ curl -X POST http://localhost:3000/api/v1/campaigns \
 
 ## What a variant may change
 
-| Field | Notes |
-|---|---|
-| `name` | **Required**, 1-50 characters. It is the label in the results, so make it describe the arm |
-| `split_percentage` | **Required**, 1-100 |
-| `subject` | An alternative subject line. Rendered against the same data as the body |
-| `template_id` | An entirely different template for this arm |
+| Field              | Notes                                                                                      |
+|--------------------|--------------------------------------------------------------------------------------------|
+| `name`             | **Required**, 1-50 characters. It is the label in the results, so make it describe the arm |
+| `split_percentage` | **Required**, 1-100                                                                        |
+| `subject`          | An alternative subject line. Rendered against the same data as the body                    |
+| `template_id`      | An entirely different template for this arm                                                |
 
 `subject` is the usual test and the cheap one. `template_id` swaps the whole body, which tests layout or offer rather
 than wording — worth knowing that it makes the two arms differ in more ways than one, so a result tells you which
@@ -77,12 +77,25 @@ GET /api/v1/campaigns/{id}
 
 ```json
 {
-  "stats": { "sent": 4600, "failed": 50, "skipped": 50 },
-  "stats_by_variant": {
-    "question": { "sent": 2300, "failed": 25 },
-    "direct":   { "sent": 2300, "failed": 25 }
-  },
-  "engagement": { "opened": 939, "clicked": 217 }
+    "stats": {
+        "sent": 4600,
+        "failed": 50,
+        "skipped": 50
+    },
+    "stats_by_variant": {
+        "question": {
+            "sent": 2300,
+            "failed": 25
+        },
+        "direct": {
+            "sent": 2300,
+            "failed": 25
+        }
+    },
+    "engagement": {
+        "opened": 939,
+        "clicked": 217
+    }
 }
 ```
 

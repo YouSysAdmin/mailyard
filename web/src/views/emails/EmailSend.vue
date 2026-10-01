@@ -1,27 +1,27 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   emailsApi,
   type SendEmailPayload,
-  type SendTemplatePayload,
   type SendLimits,
+  type SendTemplatePayload,
 } from '../../api/emails'
 import { templatesApi } from '../../api/templates'
 import { languagesApi } from '../../api/languages'
-import { sendersApi, type Sender } from '../../api/senders'
+import { type Sender, sendersApi } from '../../api/senders'
 import { smtpGroupApi } from '../../api/smtpGroups'
-import { unsubscribeListsApi, type UnsubscribeList } from '../../api/unsubscribeLists'
+import { type UnsubscribeList, unsubscribeListsApi } from '../../api/unsubscribeLists'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
 import SenderSelect from '../../components/SenderSelect.vue'
-import type { Template, Language, EmailAttachment, SMTPServerGroup } from '../../api/types'
+import type { EmailAttachment, Language, SMTPServerGroup, Template } from '../../api/types'
 import PageHeader from '../../components/PageHeader.vue'
 import FormField from '../../components/FormField.vue'
 import AttachmentPicker, { type PendingAttachment } from './AttachmentPicker.vue'
 import HeaderEditor from '../../components/HeaderEditor.vue'
-import { headerRowsProblem, rowsToHeaders, type HeaderRow } from '../../composables/headerRows'
+import { type HeaderRow, headerRowsProblem, rowsToHeaders } from '../../composables/headerRows'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import Notice from '../../components/Notice.vue'
 

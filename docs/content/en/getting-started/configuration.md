@@ -16,13 +16,13 @@ Put secrets in the environment rather than the file: `MAILYARD_AUTH_JWT_SECRET`,
 
 ## Server
 
-| Variable                          | Default | Description                                                                                                                                                                                                                                                                                     |
-|-----------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MAILYARD_SERVER_ADDR`            | `:3000` | Bind address for the HTTP console and API                                                                                                                                                                                                                                                       |
-| `MAILYARD_SERVER_PUBLIC_URL`      | —       | Public base URL, e.g. `https://mail.example.com`. Required for anything that has to build an absolute link: invitations, password resets, OIDC redirects, tracking links and hosted unsubscribe pages. It also decides the `Secure` flag on the session cookie                                  |
-| `MAILYARD_SERVER_TRUSTED_PROXIES` | —       | Proxy IPs or CIDRs whose `X-Forwarded-For` is believed. Empty means the direct peer is the client, which is correct for direct exposure. Set it to your load balancer's CIDRs when TLS terminates upstream, otherwise the rate limiter, audit log and access log all record the proxy's address. **List every hop**, not just the nearest one — see [Trusting a proxy](/docs/security/rate-limiting) |
-| `MAILYARD_SERVER_MAX_CONCURRENT_REQUESTS` | `4096` | Requests served at once. A request body is read into memory before any handler runs, so this is what bounds how many large uploads can exist at the same time. `0` removes the cap |
-| `MAILYARD_SERVER_TLS_ENABLED`     | `false` | Terminate TLS here rather than at a proxy in front — see [TLS](#tls)                                                                                                                                                                                                                            |
+| Variable                                  | Default | Description                                                                                                                                                                                                                                                                                                                                                                                          |
+|-------------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `MAILYARD_SERVER_ADDR`                    | `:3000` | Bind address for the HTTP console and API                                                                                                                                                                                                                                                                                                                                                            |
+| `MAILYARD_SERVER_PUBLIC_URL`              | —       | Public base URL, e.g. `https://mail.example.com`. Required for anything that has to build an absolute link: invitations, password resets, OIDC redirects, tracking links and hosted unsubscribe pages. It also decides the `Secure` flag on the session cookie                                                                                                                                       |
+| `MAILYARD_SERVER_TRUSTED_PROXIES`         | —       | Proxy IPs or CIDRs whose `X-Forwarded-For` is believed. Empty means the direct peer is the client, which is correct for direct exposure. Set it to your load balancer's CIDRs when TLS terminates upstream, otherwise the rate limiter, audit log and access log all record the proxy's address. **List every hop**, not just the nearest one — see [Trusting a proxy](/docs/security/rate-limiting) |
+| `MAILYARD_SERVER_MAX_CONCURRENT_REQUESTS` | `4096`  | Requests served at once. A request body is read into memory before any handler runs, so this is what bounds how many large uploads can exist at the same time. `0` removes the cap                                                                                                                                                                                                                   |
+| `MAILYARD_SERVER_TLS_ENABLED`             | `false` | Terminate TLS here rather than at a proxy in front — see [TLS](#tls)                                                                                                                                                                                                                                                                                                                                 |
 
 {{< callout type="warning" title="public_url must match the scheme and host you actually browse" >}}
 Two ways to get locked out of a console that is working perfectly, neither of which reports anything:
@@ -80,14 +80,14 @@ are directed to a file.
 
 ## Authentication
 
-| Variable                             | Default | Description                                                                                                                                                                                                                                                     |
-|--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MAILYARD_AUTH_JWT_SECRET`           | —       | **Required.** Signs session JWTs. Generate with `openssl rand -hex 32`. The OIDC state cookie uses a separate subkey derived from it, never the raw value. Rotating it ends every session. Tracking and unsubscribe links are keyed on the encryption key instead, so they survive a rotation                                                         |
-| `MAILYARD_AUTH_LOCAL_ENABLED`        | `false` | Email and password sign-in                                                                                                                                                                                                                                      |
-| `MAILYARD_AUTH_LOCAL_EMAIL`          | —       | Bootstrap admin address. On first start against an empty users table this account is created with a generated password, printed to stderr once                                                                                                                  |
-| `MAILYARD_AUTH_SESSION_TTL`          | `12h`   | Session cookie lifetime, as a Go duration                                                                                                                                                                                                                       |
-| `MAILYARD_AUTH_REGISTRATION_ENABLED` | `false` | Opens `POST /app/api/auth/register` for public self-signup. Off by default: this is an operator console, and an open signup on an internet-facing install means strangers with accounts. New accounts are always plain users — an admin grants roles afterwards |
-| `MAILYARD_AUTH_DISABLED`             | `false` | Removes the authentication gate from every API surface. Local development only                                                                                                                                                                                  |
+| Variable                             | Default | Description                                                                                                                                                                                                                                                                                   |
+|--------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `MAILYARD_AUTH_JWT_SECRET`           | —       | **Required.** Signs session JWTs. Generate with `openssl rand -hex 32`. The OIDC state cookie uses a separate subkey derived from it, never the raw value. Rotating it ends every session. Tracking and unsubscribe links are keyed on the encryption key instead, so they survive a rotation |
+| `MAILYARD_AUTH_LOCAL_ENABLED`        | `false` | Email and password sign-in                                                                                                                                                                                                                                                                    |
+| `MAILYARD_AUTH_LOCAL_EMAIL`          | —       | Bootstrap admin address. On first start against an empty users table this account is created with a generated password, printed to stderr once                                                                                                                                                |
+| `MAILYARD_AUTH_SESSION_TTL`          | `12h`   | Session cookie lifetime, as a Go duration                                                                                                                                                                                                                                                     |
+| `MAILYARD_AUTH_REGISTRATION_ENABLED` | `false` | Opens `POST /app/api/auth/register` for public self-signup. Off by default: this is an operator console, and an open signup on an internet-facing install means strangers with accounts. New accounts are always plain users — an admin grants roles afterwards                               |
+| `MAILYARD_AUTH_DISABLED`             | `false` | Removes the authentication gate from every API surface. Local development only                                                                                                                                                                                                                |
 
 {{< callout type="danger" >}}
 `MAILYARD_AUTH_DISABLED=true` makes every console endpoint reachable without credentials, including the platform-admin
@@ -101,8 +101,8 @@ because the settings are stored in the database and editable at runtime. See
 
 ## Encryption at rest
 
-| Variable                                  | Default      | Description                                                                                                                                                                                                                                                                                                                                    |
-|-------------------------------------------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Variable                                  | Default      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|-------------------------------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY` | **required** | Keys the at-rest encryption of secrets stored in the database: tenant SMTP passwords, DKIM private keys, TOTP secrets, OAuth client secrets, certificate private keys. At least 32 characters - generate with `openssl rand -hex 32`. The AES-256 key is derived with HKDF-SHA256, which stretches a short secret without adding entropy to it. To rotate it, stop every node and run `mailyard rekey`, which re-encrypts every sealed column under the new key. It also signs the tracking links: unsubscribe links already delivered keep working after a rekey, while web view, open and click links signed under the old key do not. Pass `--forget-tracking` to refuse the old unsubscribe links too, when the old key may have been used to forge them |
 
 **Required.** Mailyard refuses to start without it.
@@ -138,11 +138,11 @@ topic. Attribution still comes from the
 
 ## Metrics
 
-| Variable                   | Default | Description                                                                                 |
-|----------------------------|---------|---------------------------------------------------------------------------------------------|
-| `MAILYARD_METRICS_ENABLED` | `false` | Binds the Prometheus scrape listener and serves `GET /metrics` on it                        |
-| `MAILYARD_METRICS_ADDR`    | `127.0.0.1:9090` | Where that listener binds. Its own port                                            |
-| `MAILYARD_METRICS_TOKEN`   | —       | When set, the endpoint requires it as a bearer token. Needed once the bind is widened       |
+| Variable                   | Default          | Description                                                                           |
+|----------------------------|------------------|---------------------------------------------------------------------------------------|
+| `MAILYARD_METRICS_ENABLED` | `false`          | Binds the Prometheus scrape listener and serves `GET /metrics` on it                  |
+| `MAILYARD_METRICS_ADDR`    | `127.0.0.1:9090` | Where that listener binds. Its own port                                               |
+| `MAILYARD_METRICS_TOKEN`   | —                | When set, the endpoint requires it as a bearer token. Needed once the bind is widened |
 
 ## Rate Limiting
 
@@ -172,15 +172,15 @@ schema says so rather than failing on the first query. See [Scaling out](/docs/g
 
 These settings are **per node**. Three nodes at concurrency 4 give you twelve parallel deliveries, not four.
 
-| Variable                           | Default | Description                                                                                                                                                                                                         |
-|------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MAILYARD_WORKER_CONCURRENCY`      | `4`     | Parallel delivery goroutines                                                                                                                                                                                        |
-| `MAILYARD_WORKER_POLL_INTERVAL`    | `2s`    | How often the queue is checked for due work. A send also wakes the worker immediately - on every node, not just the one that accepted it - so this only governs scheduled and retried mail                          |
-| `MAILYARD_WORKER_MAX_ATTEMPTS`     | `5`     | Delivery attempts before an email is marked failed                                                                                                                                                                  |
-| `MAILYARD_WORKER_RETRY_BASE_DELAY` | `30s`   | Seeds the exponential backoff: base × 2^(attempt−1)                                                                                                                                                                 |
-| `MAILYARD_WORKER_RETRY_MAX_DELAY`  | `1h`    | Ceiling for that backoff                                                                                                                                                                                            |
+| Variable                           | Default | Description                                                                                                                                                                                                                                            |
+|------------------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `MAILYARD_WORKER_CONCURRENCY`      | `4`     | Parallel delivery goroutines                                                                                                                                                                                                                           |
+| `MAILYARD_WORKER_POLL_INTERVAL`    | `2s`    | How often the queue is checked for due work. A send also wakes the worker immediately - on every node, not just the one that accepted it - so this only governs scheduled and retried mail                                                             |
+| `MAILYARD_WORKER_MAX_ATTEMPTS`     | `5`     | Delivery attempts before an email is marked failed                                                                                                                                                                                                     |
+| `MAILYARD_WORKER_RETRY_BASE_DELAY` | `30s`   | Seeds the exponential backoff: base × 2^(attempt−1)                                                                                                                                                                                                    |
+| `MAILYARD_WORKER_RETRY_MAX_DELAY`  | `1h`    | Ceiling for that backoff                                                                                                                                                                                                                               |
 | `MAILYARD_WORKER_CLAIM_TIMEOUT`    | `15m`   | Re-queues `processing` rows older than this, which is how a crashed node's in-flight mail is recovered. Must be longer than `MAILYARD_WORKER_ATTEMPT_TIMEOUT`, or a running attempt is requeued and sent twice - the server refuses to start otherwise |
-| `MAILYARD_WORKER_ATTEMPT_TIMEOUT`  | `10m`   | Ceiling on one delivery attempt, connect to QUIT. Two minutes of silence on the connection also ends it. An attempt that runs out is scored as a transient failure and retried |
+| `MAILYARD_WORKER_ATTEMPT_TIMEOUT`  | `10m`   | Ceiling on one delivery attempt, connect to QUIT. Two minutes of silence on the connection also ends it. An attempt that runs out is scored as a transient failure and retried                                                                         |
 
 ## Campaigns
 
@@ -326,11 +326,11 @@ Point the MX record at the node rather than at Mailyard. See
 
 Caps applied to every send, on both the console API and the machine API.
 
-| Variable                                     | Default    | Description                               |
-|----------------------------------------------|------------|-------------------------------------------|
-| `MAILYARD_SENDING_MAX_RECIPIENTS`            | `50`       | Recipients per message                    |
-| `MAILYARD_SENDING_MAX_ATTACHMENT_SIZE`       | `10485760` | Bytes per attachment (10 MiB)             |
-| `MAILYARD_SENDING_MAX_TOTAL_ATTACHMENT_SIZE` | `26214400` | Bytes of attachments per message (25 MiB) |
+| Variable                                      | Default    | Description                                                        |
+|-----------------------------------------------|------------|--------------------------------------------------------------------|
+| `MAILYARD_SENDING_MAX_RECIPIENTS`             | `50`       | Recipients per message                                             |
+| `MAILYARD_SENDING_MAX_ATTACHMENT_SIZE`        | `10485760` | Bytes per attachment (10 MiB)                                      |
+| `MAILYARD_SENDING_MAX_TOTAL_ATTACHMENT_SIZE`  | `26214400` | Bytes of attachments per message (25 MiB)                          |
 | `MAILYARD_SENDING_ALLOW_PRIVATE_SMTP_TARGETS` | `false`    | Let a project's SMTP server point at a private or reserved address |
 
 {{< callout type="warning" title="These size limits set the HTTP body limit" >}}
@@ -487,7 +487,8 @@ A name that is not in `acme_hosts` falls through to the self-signed pair rather 
 ordinary state of an MX: the list is what somebody typed for the console, and the mail listeners may answer under a
 different hostname.
 
-Issued certificates are stored in the database, so every node serves the same one and a restart re-issues nothing. Renewal happens about 30 days before expiry, and Mailyard touches each configured host at startup and
+Issued certificates are stored in the database, so every node serves the same one and a restart re-issues nothing.
+Renewal happens about 30 days before expiry, and Mailyard touches each configured host at startup and
 hourly after that, so a listener that has seen no traffic still renews.
 
 ## Example environment

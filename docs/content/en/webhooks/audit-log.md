@@ -15,12 +15,12 @@ edited. Requires `audit:read`.
 GET /api/v1/audit-log?limit=50&offset=0
 ```
 
-| Param | Notes |
-|---|---|
-| `type` | One event type exactly, such as `apikey.created` |
-| `actor` | An account id or its address |
-| `from`, `to` | A window. Each is a date (`2026-08-01`) or an RFC 3339 instant, `to` exclusive, and a bare date on `to` includes that whole day |
-| `limit`, `offset` | Default 50, maximum 200 |
+| Param             | Notes                                                                                                                           |
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `type`            | One event type exactly, such as `apikey.created`                                                                                |
+| `actor`           | An account id or its address                                                                                                    |
+| `from`, `to`      | A window. Each is a date (`2026-08-01`) or an RFC 3339 instant, `to` exclusive, and a bare date on `to` includes that whole day |
+| `limit`, `offset` | Default 50, maximum 200                                                                                                         |
 
 The same four filters narrow `GET /app/api/security-log`, where `actor` is read only together with `all=true`.
 

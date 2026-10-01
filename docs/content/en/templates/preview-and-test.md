@@ -7,11 +7,11 @@ weight: 70
 There are three preview routes and one test send. They differ in what they render, and picking the wrong one is how you
 end up previewing something the send path would never produce.
 
-| Route | Renders | Use it for |
-|---|---|---|
-| `POST /api/v1/templates/preview` | Content in the request body | The editor, while somebody types |
-| `POST /api/v1/templates/{id}/versions/{versionId}/preview` | A stored version, in one language | Checking a draft before activating |
-| `POST /api/v1/emails/preview` | What a send would produce, from the **active** version | Confirming what your integration will actually mail |
+| Route                                                      | Renders                                                | Use it for                                          |
+|------------------------------------------------------------|--------------------------------------------------------|-----------------------------------------------------|
+| `POST /api/v1/templates/preview`                           | Content in the request body                            | The editor, while somebody types                    |
+| `POST /api/v1/templates/{id}/versions/{versionId}/preview` | A stored version, in one language                      | Checking a draft before activating                  |
+| `POST /api/v1/emails/preview`                              | What a send would produce, from the **active** version | Confirming what your integration will actually mail |
 
 They also differ in how they treat missing data, and that difference is deliberate:
 
@@ -128,7 +128,8 @@ curl -X POST http://localhost:3000/api/v1/templates/$TPL/send-test \
   }'
 ```
 
-`from` is required and its domain must be verified by the project, exactly as on a real send. `to` accepts up to **five**
+`from` is required and its domain must be verified by the project, exactly as on a real send. `to` accepts up to
+**five**
 addresses.
 
 This is a genuine send. It renders the active version, attaches the template's files, checks suppressions and quota, and

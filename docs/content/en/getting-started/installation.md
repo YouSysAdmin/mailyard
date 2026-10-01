@@ -15,50 +15,50 @@ config. See [Scaling out](/docs/getting-started/scaling).
 
 ```yaml
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: mailyard
-      POSTGRES_PASSWORD: change-me
-      POSTGRES_DB: mailyard
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mailyard -d mailyard"]
-      interval: 5s
-      retries: 10
-    restart: unless-stopped
+    postgres:
+        image: postgres:17-alpine
+        environment:
+            POSTGRES_USER: mailyard
+            POSTGRES_PASSWORD: change-me
+            POSTGRES_DB: mailyard
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready -U mailyard -d mailyard" ]
+            interval: 5s
+            retries: 10
+        restart: unless-stopped
 
-  mailyard:
-    image: mailyard:latest
-    # --init applies pending migrations. See the note below.
-    command: ["serve", "--init"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "3000:3000"
-      # Only if you enable the SMTP listeners.
-      - "587:587"
-      - "25:25"
-    environment:
-      MAILYARD_DATABASE_DSN: postgres://mailyard:change-me@postgres:5432/mailyard?sslmode=disable
-      # Both from `openssl rand -hex 32`. The encryption key is what
-      # seals stored secrets - losing it means losing them.
-      MAILYARD_AUTH_JWT_SECRET: change-me
-      MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: change-me-to-a-long-random-string-32b
-      MAILYARD_AUTH_LOCAL_ENABLED: "true"
-      MAILYARD_AUTH_LOCAL_EMAIL: admin@example.com
-      MAILYARD_SERVER_PUBLIC_URL: https://mail.example.com
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
-      interval: 30s
-      start_period: 15s
-      retries: 3
-    restart: unless-stopped
+    mailyard:
+        image: mailyard:latest
+        # --init applies pending migrations. See the note below.
+        command: [ "serve", "--init" ]
+        depends_on:
+            postgres:
+                condition: service_healthy
+        ports:
+            - "3000:3000"
+            # Only if you enable the SMTP listeners.
+            - "587:587"
+            - "25:25"
+        environment:
+            MAILYARD_DATABASE_DSN: postgres://mailyard:change-me@postgres:5432/mailyard?sslmode=disable
+            # Both from `openssl rand -hex 32`. The encryption key is what
+            # seals stored secrets - losing it means losing them.
+            MAILYARD_AUTH_JWT_SECRET: change-me
+            MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: change-me-to-a-long-random-string-32b
+            MAILYARD_AUTH_LOCAL_ENABLED: "true"
+            MAILYARD_AUTH_LOCAL_EMAIL: admin@example.com
+            MAILYARD_SERVER_PUBLIC_URL: https://mail.example.com
+        healthcheck:
+            test: [ "CMD", "wget", "-qO-", "http://localhost:3000/healthz" ]
+            interval: 30s
+            start_period: 15s
+            retries: 3
+        restart: unless-stopped
 
 volumes:
-  pgdata:
+    pgdata:
 ```
 
 ```bash
@@ -151,14 +151,14 @@ ACME is turned on in the console under **Administration → Certificates**, not 
 [Certificates](/docs/admin/certificates#acme). The order is:
 
 1. Make sure the CA can reach this installation, which is one of two ways:
-   - **`tls-alpn-01`**, when the TLS handshake on port 443 reaches Mailyard — bound directly with
-     `MAILYARD_SERVER_TLS_ENABLED: "true"` as above, or through a TCP-passthrough proxy, which preserves ALPN. The
-     handshake **is** the validation, and port 80 is never used.
-   - **`http-01`**, behind a proxy that *terminates* TLS, where the handshake never gets to us. Set
-     `MAILYARD_ACME_CHALLENGE_ADDR` (empty by default) and have the proxy forward `/.well-known/acme-challenge/*` for
-     the mail hostname to it. The port is bound at startup whether ACME is on or not, so this is the one step that
-     needs a restart. The proxy route, with a Caddy example, is in
-     [Certificates](/docs/admin/certificates#behind-a-proxy-that-terminates-tls).
+    - **`tls-alpn-01`**, when the TLS handshake on port 443 reaches Mailyard — bound directly with
+      `MAILYARD_SERVER_TLS_ENABLED: "true"` as above, or through a TCP-passthrough proxy, which preserves ALPN. The
+      handshake **is** the validation, and port 80 is never used.
+    - **`http-01`**, behind a proxy that *terminates* TLS, where the handshake never gets to us. Set
+      `MAILYARD_ACME_CHALLENGE_ADDR` (empty by default) and have the proxy forward `/.well-known/acme-challenge/*` for
+      the mail hostname to it. The port is bound at startup whether ACME is on or not, so this is the one step that
+      needs a restart. The proxy route, with a Caddy example, is in
+      [Certificates](/docs/admin/certificates#behind-a-proxy-that-terminates-tls).
 2. Sign in, open **Administration → Certificates → Settings**, and set
    `acme_enabled`, then `acme_hosts` — one hostname per line. Optionally
    `acme_email`, where the CA sends expiry warnings.
@@ -175,11 +175,11 @@ mail listener answering under a name the certificate does not cover still offers
 
 ## Ports
 
-| Port        | Listener               | Notes                                   |
-|-------------|------------------------|-----------------------------------------|
-| 3000 or 443 | HTTP console and API   | 443 only if this process terminates TLS |
-| 587         | SMTP submission        | Off by default                          |
-| 25          | Inbound MX             | Off by default                          |
+| Port        | Listener               | Notes                                                                                         |
+|-------------|------------------------|-----------------------------------------------------------------------------------------------|
+| 3000 or 443 | HTTP console and API   | 443 only if this process terminates TLS                                                       |
+| 587         | SMTP submission        | Off by default                                                                                |
+| 25          | Inbound MX             | Off by default                                                                                |
 | 80          | ACME HTTP-01 challenge | Only when ACME cannot use `tls-alpn-01`, and any unpublished port when a proxy forwards to it |
 
 443, 587, 25 and 80 are all privileged. Docker sets

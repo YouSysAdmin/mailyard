@@ -10,7 +10,7 @@
 // It owns its own fetch for the same reason. Running a job answers with
 // the whole list, so this component never needs the page to reload it.
 import { onMounted, ref } from 'vue'
-import { settingsApi, type ScheduledJob } from '../../../api/settings'
+import { type ScheduledJob, settingsApi } from '../../../api/settings'
 import { apiErrorMessage } from '../../../api/client'
 import { useNotificationStore } from '../../../stores/notification'
 import { formatDate } from '../../../composables/formatDate'

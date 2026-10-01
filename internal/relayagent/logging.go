@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// The library's logging, rerouted into ours.
+// The library logging, rerouted into ours.
 //
 // go-smtp defaults ErrorLog to a std-log writer on stderr, so a failed
 // TLS handshake - a worker presenting the wrong certificate, a

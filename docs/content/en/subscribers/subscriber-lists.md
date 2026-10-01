@@ -57,16 +57,16 @@ name outside that set never matches, so a typo produces a segment of nobody rath
 
 ### Operators
 
-| Operator | Matches when |
-|---|---|
-| `eq` | Values are equal. Numeric if both parse as numbers, otherwise a case-insensitive string compare |
-| `neq` | The opposite — and **true when the field is absent**, which is how you select subscribers missing a field |
-| `contains` | The value appears anywhere in the field, case-insensitively |
-| `starts_with` | Case-insensitive prefix |
-| `ends_with` | Case-insensitive suffix |
-| `gt` | Numerically greater. Both sides must parse as numbers, or the rule is false |
-| `lt` | Numerically less, same condition |
-| `exists` | The field is present and not null |
+| Operator      | Matches when                                                                                              |
+|---------------|-----------------------------------------------------------------------------------------------------------|
+| `eq`          | Values are equal. Numeric if both parse as numbers, otherwise a case-insensitive string compare           |
+| `neq`         | The opposite — and **true when the field is absent**, which is how you select subscribers missing a field |
+| `contains`    | The value appears anywhere in the field, case-insensitively                                               |
+| `starts_with` | Case-insensitive prefix                                                                                   |
+| `ends_with`   | Case-insensitive suffix                                                                                   |
+| `gt`          | Numerically greater. Both sides must parse as numbers, or the rule is false                               |
+| `lt`          | Numerically less, same condition                                                                          |
+| `exists`      | The field is present and not null                                                                         |
 
 Anything else is refused with `unknown operator <name>`.
 

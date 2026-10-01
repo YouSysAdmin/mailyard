@@ -39,14 +39,14 @@ curl "http://localhost:3000/api/v1/webhooks/0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33
 
 ## Reading a row
 
-| Field | Notes |
-|---|---|
-| `event` | Which event triggered this delivery |
-| `status` | `success` or `failed` — nothing else |
-| `http_status` | What your endpoint answered. Absent when the request never got a response |
-| `error_message` | Why it failed: an HTTP status, a timeout, a dial error |
-| `attempt` | Which attempt this row is, counting from 1 |
-| `payload` | The body this attempt posted, as sent. Absent on rows from before it was kept |
+| Field           | Notes                                                                         |
+|-----------------|-------------------------------------------------------------------------------|
+| `event`         | Which event triggered this delivery                                           |
+| `status`        | `success` or `failed` — nothing else                                          |
+| `http_status`   | What your endpoint answered. Absent when the request never got a response     |
+| `error_message` | Why it failed: an HTTP status, a timeout, a dial error                        |
+| `attempt`       | Which attempt this row is, counting from 1                                    |
+| `payload`       | The body this attempt posted, as sent. Absent on rows from before it was kept |
 
 **One row per attempt.** A message that took three tries leaves three rows, so a webhook that eventually succeeded looks
 like two failures followed by a success — read `attempt` alongside `status` before concluding anything is broken.
@@ -97,11 +97,11 @@ enabling it again.
 
 ## Retry policy
 
-| Setting | Default | Does |
-|---|---|---|
-| `webhook.max_attempts` | 3 | Total attempts **including the first**, so the default is one delivery and two retries |
-| `webhook.retry_delay` | 10s | A **fixed** wait between attempts, not exponential backoff |
-| `webhook.timeout` | 10s | Bounds each individual request |
+| Setting                | Default | Does                                                                                   |
+|------------------------|---------|----------------------------------------------------------------------------------------|
+| `webhook.max_attempts` | 3       | Total attempts **including the first**, so the default is one delivery and two retries |
+| `webhook.retry_delay`  | 10s     | A **fixed** wait between attempts, not exponential backoff                             |
+| `webhook.timeout`      | 10s     | Bounds each individual request                                                         |
 
 Any `2xx` counts as success. Everything else is retried until the attempts run out, at which point the event is dropped
 and logged — there is no dead-letter queue to drain later.

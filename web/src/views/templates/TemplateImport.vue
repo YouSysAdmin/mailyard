@@ -9,7 +9,7 @@
 // The JSON is parsed HERE so an unparseable paste says so plainly. The
 // server would answer "invalid body", which is true and useless.
 import { ref } from 'vue'
-import { templatesApi, type TemplateExportDoc } from '../../api/templates'
+import { type TemplateExportDoc, templatesApi } from '../../api/templates'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import BaseModal from '../../components/BaseModal.vue'

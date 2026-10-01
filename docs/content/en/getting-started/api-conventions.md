@@ -9,9 +9,9 @@ same everywhere.
 
 ## Two Surfaces
 
-| Surface           | Prefix         | Authentication                                            | Project                                                     |
-|-------------------|----------------|-----------------------------------------------------------|-------------------------------------------------------------|
-| **Product**       | `/api/v1/...`  | `Authorization: Bearer myk_...` **or** the session cookie | Implied by the key, else the `X-Mailyard-Project-Id` header |
+| Surface           | Prefix         | Authentication                                                                | Project                                                     |
+|-------------------|----------------|-------------------------------------------------------------------------------|-------------------------------------------------------------|
+| **Product**       | `/api/v1/...`  | `Authorization: Bearer myk_...` **or** the session cookie                     | Implied by the key, else the `X-Mailyard-Project-Id` header |
 | **Console's own** | `/app/api/...` | Session cookie `__Host-mailyard_session` (`mailyard_session` over plain HTTP) | `X-Mailyard-Project-Id` header                              |
 
 They are split by what an operation **is**, not by who calls it.

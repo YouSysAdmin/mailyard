@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { domainsApi, type InboundDomain, type DNSRecord } from '../../api/domains'
+import { onMounted, ref, watch } from 'vue'
+import { type DNSRecord, domainsApi, type InboundDomain } from '../../api/domains'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'

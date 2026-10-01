@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+import { onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
 
 // Keeping a page fresh without reloading it.
 //

@@ -235,8 +235,7 @@
   /* Loaded in main.ts from @fontsource-variable. A family named here
      must be loaded somewhere, or the stack silently falls through to
      the system font. */
-  --font-sans:
-    'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* The -50 tints are DERIVED, not listed per theme. The light block
@@ -291,9 +290,8 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition:
-    background var(--transition-slow),
-    color var(--transition-slow);
+  transition: background var(--transition-slow),
+  color var(--transition-slow);
 }
 
 /* --accent-fg, not --primary-500: the ramp value does not reach
@@ -309,6 +307,7 @@ a {
   color: var(--accent-fg);
   text-decoration: none;
 }
+
 a:not([class]) {
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -318,6 +317,7 @@ a:not([class]) {
   text-decoration-color: var(--border-strong);
   transition: text-decoration-color var(--transition);
 }
+
 a:not([class]):hover {
   text-decoration-color: currentColor;
 }
@@ -337,19 +337,20 @@ a:not([class]):hover {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition:
-    color var(--transition),
-    background-color var(--transition),
-    border-color var(--transition),
-    box-shadow var(--transition);
+  transition: color var(--transition),
+  background-color var(--transition),
+  border-color var(--transition),
+  box-shadow var(--transition);
   line-height: 1;
   white-space: nowrap;
   font-family: inherit;
 }
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .btn:focus-visible {
   outline: none;
   border-color: var(--border-focus);
@@ -361,6 +362,7 @@ a:not([class]):hover {
   color: var(--text-on-primary);
   border-color: var(--primary-600);
 }
+
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-700);
   border-color: var(--primary-700);
@@ -371,6 +373,7 @@ a:not([class]):hover {
   color: var(--accent-fg);
   border-color: var(--accent-fg);
 }
+
 .btn-outline-primary:hover:not(:disabled) {
   background: var(--bg-active);
 }
@@ -380,6 +383,7 @@ a:not([class]):hover {
   color: var(--text-secondary);
   border-color: var(--border-button);
 }
+
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--border-strong);
@@ -391,6 +395,7 @@ a:not([class]):hover {
   color: var(--text-on-status);
   border-color: var(--danger-600);
 }
+
 .btn-danger:hover:not(:disabled) {
   background: var(--danger-700);
   border-color: var(--danger-700);
@@ -451,9 +456,8 @@ a:not([class]):hover {
   font-family: inherit;
   color: var(--text-primary);
   background: var(--bg-input);
-  transition:
-    border-color var(--transition),
-    box-shadow var(--transition);
+  transition: border-color var(--transition),
+  box-shadow var(--transition);
   outline: none;
 }
 
@@ -520,11 +524,13 @@ a:not([class]):hover {
 .form-select::picker(select) {
   appearance: base-select;
 }
+
 .form-select {
   background-color: var(--bg-input);
   cursor: pointer;
   align-items: center;
 }
+
 .form-select::picker(select) {
   background-color: var(--bg-popover);
   border: 1px solid var(--border-primary);
@@ -536,6 +542,7 @@ a:not([class]):hover {
   scrollbar-width: thin;
   scrollbar-color: var(--ring-neutral) transparent;
 }
+
 /* The default icon under base-select is a filled triangle, not the
    chevron the native control drew. Feather chevron-down through a mask,
    the same way the checkmark below is drawn, so it follows the text
@@ -553,6 +560,7 @@ a:not([class]):hover {
   mask-repeat: no-repeat;
   mask-size: contain;
 }
+
 .form-select option {
   padding: 8px 12px;
   border-radius: calc(var(--radius) - 2px);
@@ -566,6 +574,7 @@ a:not([class]):hover {
 .form-select option:hover {
   background-color: var(--bg-hover);
 }
+
 .form-select option:checked {
   background-color: var(--bg-active);
   color: var(--primary-700);
@@ -575,6 +584,7 @@ a:not([class]):hover {
 [data-theme='dark'] .form-select option:checked {
   color: var(--primary-300);
 }
+
 option::checkmark {
   order: 1;
   margin-left: auto;
@@ -594,6 +604,7 @@ option::checkmark {
   color: var(--text-muted);
   margin-top: 4px;
 }
+
 /* A text button inside a hint that reveals more of the form - the
    optional fields most sends leave empty. Inherits the hint's size so
    it reads as part of the sentence, coloured so it reads as a control. */
@@ -605,9 +616,11 @@ option::checkmark {
   font: inherit;
   cursor: pointer;
 }
+
 .form-reveal:hover {
   text-decoration: underline;
 }
+
 .form-error {
   font-size: 12px;
   color: var(--danger-fg);
@@ -623,9 +636,8 @@ option::checkmark {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition:
-    background var(--transition-slow),
-    border-color var(--transition-slow);
+  transition: background var(--transition-slow),
+  border-color var(--transition-slow);
 }
 
 .card-header {
@@ -636,6 +648,7 @@ option::checkmark {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border-primary);
 }
+
 /* Every heading level, the way .modal-header does it, so a card
    heading written as h3 cannot render at the browser's own size. */
 .card-header h1,
@@ -656,10 +669,12 @@ option::checkmark {
 .stats-grid + .card {
   margin-top: 24px;
 }
+
 /* A tab strip is a page control, a flush card header, or a card-body opener. */
 .card-header .tabs {
   margin-bottom: 0;
 }
+
 .card-body > .tabs {
   margin-bottom: 16px;
 }
@@ -669,6 +684,7 @@ option::checkmark {
 .table-wrapper {
   overflow-x: auto;
 }
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -706,6 +722,7 @@ tbody tr:last-child td {
 tr {
   transition: background var(--transition);
 }
+
 tbody tr:hover td {
   background: var(--bg-hover);
 }
@@ -735,26 +752,31 @@ tbody tr:hover td {
   color: var(--success-fg);
   border-color: color-mix(in srgb, var(--success-500) 22%, transparent);
 }
+
 .badge-danger {
   background: var(--danger-50);
   color: var(--danger-fg);
   border-color: color-mix(in srgb, var(--danger-500) 22%, transparent);
 }
+
 .badge-warning {
   background: var(--warning-50);
   color: var(--warning-fg);
   border-color: color-mix(in srgb, var(--warning-500) 22%, transparent);
 }
+
 .badge-info {
   background: var(--info-50);
   color: var(--info-fg);
   border-color: color-mix(in srgb, var(--info-500) 22%, transparent);
 }
+
 .badge-neutral {
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
   border-color: var(--border-primary);
 }
+
 .badge-secondary {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
@@ -807,16 +829,19 @@ tbody tr:hover td {
   color: var(--info-fg);
   border-color: color-mix(in srgb, var(--info-500) 22%, transparent);
 }
+
 .notice-success {
   background: var(--success-50);
   color: var(--success-fg);
   border-color: color-mix(in srgb, var(--success-500) 22%, transparent);
 }
+
 .notice-warning {
   background: var(--warning-50);
   color: var(--warning-fg);
   border-color: color-mix(in srgb, var(--warning-500) 22%, transparent);
 }
+
 .notice-danger {
   background: var(--danger-50);
   color: var(--danger-fg);
@@ -838,32 +863,36 @@ tbody tr:hover td {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   padding: 16px;
-  transition:
-    background var(--transition-slow),
-    border-color var(--transition-slow);
+  transition: background var(--transition-slow),
+  border-color var(--transition-slow);
 }
+
 .stat-card .stat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
+
 .stat-card .stat-label {
   font-size: 13px;
   color: var(--text-muted);
   font-weight: 500;
 }
+
 .stat-card .stat-value {
   font-size: 24px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.02em;
 }
+
 .stat-card .stat-sub {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 4px;
 }
+
 /* A STAT ICON IS DECORATION AND IS NOT COLOURED, and there are no
    colour variants of it. Colour means STATUS: a stat card already
    says "Failed" in words with the number beside it, so a tint under
@@ -889,6 +918,7 @@ tbody tr:hover td {
   margin-bottom: 24px;
   gap: 12px;
 }
+
 /* The header's right-hand group: refresh, export, the primary action.
    .page-header is space-between and expects exactly TWO children, so a
    third one lands in the middle of the page. Everything that is not
@@ -918,21 +948,25 @@ tbody tr:hover td {
   font-size: 13px;
   margin-bottom: 16px;
 }
+
 .alert-danger {
   background: var(--danger-50);
   color: var(--danger-700);
   border: 1px solid color-mix(in srgb, var(--danger-500) 25%, transparent);
 }
+
 .alert-warning {
   background: color-mix(in srgb, var(--warning-500) 10%, transparent);
   color: var(--warning-fg);
   border: 1px solid color-mix(in srgb, var(--warning-500) 25%, transparent);
 }
+
 .alert-success {
   background: color-mix(in srgb, var(--success-500) 10%, transparent);
   color: var(--success-fg);
   border: 1px solid color-mix(in srgb, var(--success-500) 25%, transparent);
 }
+
 /* A form's own submit button, full width. */
 .btn-block {
   width: 100%;
@@ -962,10 +996,12 @@ tbody tr:hover td {
   padding: 12px 16px;
   border-top: 1px solid var(--border-primary);
 }
+
 .pagination-info {
   font-size: 13px;
   color: var(--text-muted);
 }
+
 .pagination-buttons {
   display: flex;
   gap: 8px;
@@ -1009,27 +1045,35 @@ tbody tr:hover td {
 .modal-w440 {
   max-width: 440px;
 }
+
 .modal-w480 {
   max-width: 480px;
 }
+
 .modal-w560 {
   max-width: 560px;
 }
+
 .modal-w640 {
   max-width: 640px;
 }
+
 .modal-w720 {
   max-width: 720px;
 }
+
 .modal-w760 {
   max-width: 760px;
 }
+
 .modal-w800 {
   max-width: 800px;
 }
+
 .modal-w860 {
   max-width: 860px;
 }
+
 .modal-w900 {
   max-width: 900px;
 }
@@ -1041,6 +1085,7 @@ tbody tr:hover td {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border-primary);
 }
+
 /* Every heading level, so a modal cannot get a bigger title by
    being written with h2. */
 .modal-header h1,
@@ -1072,6 +1117,7 @@ tbody tr:hover td {
     opacity: 1;
   }
 }
+
 @keyframes modalSlideUp {
   from {
     opacity: 0;
@@ -1118,6 +1164,7 @@ tbody tr:hover td {
   max-width: 420px;
   cursor: pointer;
 }
+
 /* The severity stripe, a BAR rather than a thick border-left. A border
    follows the box's radius and reads as a second outline rather than as
    a mark down the side. Inset by the radius at both ends, it is a
@@ -1135,9 +1182,11 @@ tbody tr:hover td {
 .toast-success::before {
   background: var(--success-fg);
 }
+
 .toast-error::before {
   background: var(--danger-fg);
 }
+
 .toast-info::before {
   background: var(--info-fg);
 }
@@ -1269,12 +1318,14 @@ tbody tr:hover td {
   padding: 48px 24px;
   color: var(--text-muted);
 }
+
 .empty-state h3 {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 6px;
 }
+
 .empty-state p {
   font-size: 14px;
 }
@@ -1288,6 +1339,7 @@ tbody tr:hover td {
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1310,6 +1362,7 @@ tbody tr:hover td {
   color: var(--text-secondary);
   cursor: pointer;
 }
+
 .checkbox-label input[type='checkbox'] {
   width: 16px;
   height: 16px;
@@ -1330,9 +1383,8 @@ input[type='checkbox'] {
   display: inline-grid;
   place-content: center;
   cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+  transition: background-color 0.15s ease,
+  border-color 0.15s ease;
 }
 
 input[type='checkbox']:hover:not(:disabled) {
@@ -1389,6 +1441,7 @@ input[type='checkbox']:checked::before {
 .verified {
   color: var(--success-fg);
 }
+
 .unverified {
   color: var(--text-muted);
 }
@@ -1408,6 +1461,7 @@ input[type='checkbox']:checked::before {
   border-radius: var(--radius);
   width: fit-content;
 }
+
 .tab {
   padding: 6px 14px;
   border-radius: var(--radius-sm);
@@ -1417,15 +1471,16 @@ input[type='checkbox']:checked::before {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-tertiary);
-  transition:
-    color var(--transition),
-    background-color var(--transition),
-    border-color var(--transition);
+  transition: color var(--transition),
+  background-color var(--transition),
+  border-color var(--transition);
   font-family: inherit;
 }
+
 .tab:hover {
   color: var(--text-primary);
 }
+
 .tab.active {
   background: var(--bg-primary);
   border-color: var(--border-primary);
@@ -1520,32 +1575,41 @@ input[type='checkbox']:checked::before {
 .text-center {
   text-align: center;
 }
+
 .text-right {
   text-align: right;
 }
+
 .text-sm {
   font-size: 13px;
 }
+
 .text-xs {
   font-size: 12px;
 }
+
 .text-muted {
   color: var(--text-muted);
 }
+
 /* The -fg tokens, never the ramp: a ramp value does not reach 4.5:1
    on a neutral surface (rule 2 at the top of this file). */
 .text-danger {
   color: var(--danger-fg);
 }
+
 .text-success {
   color: var(--success-fg);
 }
+
 .text-accent {
   color: var(--accent-fg);
 }
+
 .fw-medium {
   font-weight: 500;
 }
+
 .fw-semibold {
   font-weight: 600;
 }
@@ -1553,51 +1617,67 @@ input[type='checkbox']:checked::before {
 .m-0 {
   margin: 0;
 }
+
 .mt-1 {
   margin-top: 4px;
 }
+
 .mt-2 {
   margin-top: 8px;
 }
+
 .mt-3 {
   margin-top: 12px;
 }
+
 .mt-4 {
   margin-top: 16px;
 }
+
 .mt-5 {
   margin-top: 20px;
 }
+
 .mb-1 {
   margin-bottom: 4px;
 }
+
 .mb-2 {
   margin-bottom: 8px;
 }
+
 .mb-3 {
   margin-bottom: 12px;
 }
+
 .mb-4 {
   margin-bottom: 16px;
 }
+
 .mb-5 {
   margin-bottom: 20px;
 }
+
 .ml-2 {
   margin-left: 8px;
 }
+
 .ml-auto {
   margin-left: auto;
 }
+
 .mr-1 {
   margin-right: 4px;
 }
+
 .mr-2 {
   margin-right: 8px;
 }
+
 .pt-0 {
   padding-top: 0;
 }
+
 .pb-0 {
   padding-bottom: 0;
 }
@@ -1605,42 +1685,55 @@ input[type='checkbox']:checked::before {
 .flex {
   display: flex;
 }
+
 .hidden {
   display: none;
 }
+
 .items-center {
   align-items: center;
 }
+
 .items-start {
   align-items: flex-start;
 }
+
 .justify-between {
   justify-content: space-between;
 }
+
 .justify-end {
   justify-content: flex-end;
 }
+
 .flex-wrap {
   flex-wrap: wrap;
 }
+
 .flex-1 {
   flex: 1;
 }
+
 .flex-2 {
   flex: 2;
 }
+
 .gap-1 {
   gap: 4px;
 }
+
 .gap-2 {
   gap: 8px;
 }
+
 .gap-3 {
   gap: 12px;
 }
+
 .gap-4 {
   gap: 16px;
 }
+
 .gap-6 {
   gap: 24px;
 }
@@ -1651,6 +1744,7 @@ input[type='checkbox']:checked::before {
 .w-search {
   max-width: 320px;
 }
+
 .w-filter {
   max-width: 200px;
 }
@@ -1660,6 +1754,7 @@ input[type='checkbox']:checked::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 /* There is no .cursor-pointer. A clickable row is .row-clickable,
    which sets the pointer AND the hover. */
 
@@ -1678,6 +1773,7 @@ input[type='checkbox']:checked::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 /* A row title that opens the thing it names. Most are a router-link,
    the API keys one is a button because its target is a modal with no
    URL - one class so the two are indistinguishable to a reader. */
@@ -1691,12 +1787,15 @@ input[type='checkbox']:checked::before {
   text-align: left;
   cursor: pointer;
 }
+
 .cell-link:hover {
   color: var(--primary-800);
 }
+
 [data-theme='dark'] .cell-link:hover {
   color: var(--primary-300);
 }
+
 /* Right-aligned row action cluster --- keeps icon buttons from wrapping oddly. */
 .table-actions {
   display: flex;
@@ -1712,9 +1811,11 @@ input[type='checkbox']:checked::before {
 .action-menu-trigger {
   display: inline-flex;
 }
+
 .action-menu-trigger .btn svg {
   margin-left: 4px;
 }
+
 .action-menu {
   position: fixed;
   z-index: 50;
@@ -1725,6 +1826,7 @@ input[type='checkbox']:checked::before {
   background: var(--bg-popover);
   box-shadow: var(--shadow-lg);
 }
+
 .action-menu-item {
   display: block;
   width: 100%;
@@ -1738,9 +1840,11 @@ input[type='checkbox']:checked::before {
   text-align: left;
   cursor: pointer;
 }
+
 .action-menu-item:hover {
   background: var(--bg-tertiary);
 }
+
 .action-menu-item-danger {
   color: var(--danger-600);
 }
@@ -1751,6 +1855,7 @@ input[type='checkbox']:checked::before {
 .row-clickable {
   cursor: pointer;
 }
+
 .row-clickable:hover td {
   background: var(--bg-hover);
 }
@@ -1774,6 +1879,7 @@ input[type='checkbox']:checked::before {
   color: var(--warning-fg);
   border-color: var(--warning-fg);
 }
+
 .btn-warning:hover:not(:disabled) {
   background: var(--warning-50);
 }
@@ -1783,15 +1889,18 @@ input[type='checkbox']:checked::before {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 /* A neutral, not a text colour. --text-muted is sized for readable
    type, which makes a permanently visible bar far too heavy. */
 ::-webkit-scrollbar-thumb {
   background: var(--ring-neutral);
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
@@ -1813,6 +1922,7 @@ input[type='checkbox']:checked::before {
   line-height: 1.5;
   color: var(--text-secondary);
 }
+
 /* The quiet line under a form - "Forgot your password?", "No account
    yet?". Centred, because the button above it is full width. */
 .auth-aside {
@@ -1820,6 +1930,7 @@ input[type='checkbox']:checked::before {
   text-align: center;
   font-size: 13px;
 }
+
 /* "or", ruled off on both sides, between the password form and the
    passkey and SSO buttons. */
 .auth-or {
@@ -1830,6 +1941,7 @@ input[type='checkbox']:checked::before {
   color: var(--text-muted);
   font-size: 12px;
 }
+
 .auth-or::before,
 .auth-or::after {
   content: '';
@@ -1837,6 +1949,7 @@ input[type='checkbox']:checked::before {
   height: 1px;
   background: var(--border-primary);
 }
+
 /* Tighter than a settings page: an auth card is two fields read in one
    glance, where a form full of them wants the air. */
 .auth-form .form-group {

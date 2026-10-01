@@ -5,7 +5,7 @@
 // reader and its own error handling - none of which the list page it
 // opens from has any reason to hold.
 import { computed, ref } from 'vue'
-import { subscribersApi, type SubscriberPayload } from '../../api/subscribers'
+import { type SubscriberPayload, subscribersApi } from '../../api/subscribers'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import BaseModal from '../../components/BaseModal.vue'

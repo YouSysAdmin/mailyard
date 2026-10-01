@@ -5,7 +5,8 @@ weight: 10
 ---
 
 A template is a named piece of content you address from the send API instead of pasting a body into every request. What
-makes it more than a snippet store is that the content is **versioned** and **per-language**, and that the version a send
+makes it more than a snippet store is that the content is **versioned** and **per-language**, and that the version a
+send
 resolves is a deliberate choice rather than whatever was saved last.
 
 ## The three levels
@@ -13,11 +14,11 @@ resolves is a deliberate choice rather than whatever was saved last.
 Content does not live on the template. It lives two levels down, and knowing which level holds what is most of
 understanding this section.
 
-| Level | Holds | Changes how often |
-|---|---|---|
-| **Template** | Name, description, default language, sample data, the attachments | Rarely — it is the identity |
-| **Version** | A numbered revision, plus the stylesheet its content was written against | Per edit round |
-| **Localization** | The actual subject, HTML and text, for one language | Per language, per version |
+| Level            | Holds                                                                    | Changes how often           |
+|------------------|--------------------------------------------------------------------------|-----------------------------|
+| **Template**     | Name, description, default language, sample data, the attachments        | Rarely — it is the identity |
+| **Version**      | A numbered revision, plus the stylesheet its content was written against | Per edit round              |
+| **Localization** | The actual subject, HTML and text, for one language                      | Per language, per version   |
 
 The name is unique within a project and is what `POST /api/v1/emails/send-template` accepts as `template_name`. The `id`
 works too, and is what the console uses.

@@ -5,8 +5,8 @@ weight: 50
 ---
 
 Every other delivery path in Mailyard hands a message to somebody else's mail
-server - a tenant's postfix, Amazon SES, a server you pasted credentials for. A
-**relay node** is different: it is a machine you run that resolves the recipient's
+server - a tenant's postfix, Amazon SES, a server you pasted credentials for. A **relay node** is different: it is a
+machine you run that resolves the recipient's
 own mail exchangers and delivers to them from its own address.
 
 That address is the point. A receiver judges mail by the IP that connected, so

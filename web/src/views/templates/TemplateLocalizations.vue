@@ -11,7 +11,7 @@
 // record, so the choice is the reader's.
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { templatesApi, type LocalizationPayload } from '../../api/templates'
+import { type LocalizationPayload, templatesApi } from '../../api/templates'
 import { apiErrorMessage } from '../../api/client'
 import type { Language, TemplateLocalization, TemplateVersion } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'

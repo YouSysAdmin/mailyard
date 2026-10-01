@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 // The expiry half of a credential form, shared by the two key pages.
 //

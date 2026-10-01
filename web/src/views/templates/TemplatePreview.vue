@@ -7,7 +7,7 @@
 // reopen is the wrong shape.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { templatesApi, type RenderedPreview } from '../../api/templates'
+import { type RenderedPreview, templatesApi } from '../../api/templates'
 import { apiErrorMessage } from '../../api/client'
 import type { Template, TemplateLocalization, TemplateVersion } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'
