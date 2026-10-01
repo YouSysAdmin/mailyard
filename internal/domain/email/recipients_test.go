@@ -38,7 +38,18 @@ func buildAsProcessed(req *SendRequest) []byte {
 		Text:     req.Text,
 	}
 
-	return msg.Build()
+	return mustBuild(msg)
+}
+
+// mustBuild renders an unsigned message, which nothing can make
+// Build refuse.
+func mustBuild(msg *smtpclient.Message) []byte {
+	raw, err := msg.Build()
+	if err != nil {
+		panic(err)
+	}
+
+	return raw
 }
 
 // A send naming to alone is exactly what it was before cc and bcc
@@ -100,7 +111,7 @@ func TestABccRecipientIsDeliveredAndNeverDisplayed(t *testing.T) {
 	// The sandbox renders the same message, off the request rather
 	// than the row, and its raw record is what a developer reads to
 	// see what would have gone out.
-	if raw := captureMessage(req).Build(); strings.Contains(headerBlock(t, raw), "hidden@example.com") {
+	if raw := mustBuild(captureMessage(req)); strings.Contains(headerBlock(t, raw), "hidden@example.com") {
 		t.Fatalf("the sandbox capture printed a bcc recipient:\n%s", raw)
 	}
 }

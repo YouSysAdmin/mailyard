@@ -45,6 +45,11 @@ func TestRekeyRewritesEverySealedColumn(t *testing.T) {
 	exec(`INSERT INTO domains (id, project_id, domain, verification_token, dkim_private_key, dkim_next_private_key)
 	      VALUES ('8d2c5b6a-1e4f-4a7b-9c3d-2e1f0a9b8c7d', 'e66e7a4d-9e6c-4884-869a-cf9ffcf22181', 'example.com', 'tok', ?, ?)`,
 		seal("dkim-pem"), seal("next-pem"))
+	exec(`INSERT INTO senders (id, project_id, email)
+	      VALUES ('3e4a1c2b-7d8f-4e9a-b1c2-d3e4f5a6b7c8', 'e66e7a4d-9e6c-4884-869a-cf9ffcf22181', 'billing@example.com')`)
+	exec(`INSERT INTO sender_signing_keys (sender_id, project_id, kind, private_key, public_key, fingerprint)
+	      VALUES ('3e4a1c2b-7d8f-4e9a-b1c2-d3e4f5a6b7c8', 'e66e7a4d-9e6c-4884-869a-cf9ffcf22181', 'pgp', ?, 'pub', 'FPR')`,
+		seal("pgp-armored"))
 
 	counts, err := rekeyAll(t.Context(), db, old, fresh, "")
 	if err != nil {
@@ -53,6 +58,7 @@ func TestRekeyRewritesEverySealedColumn(t *testing.T) {
 
 	for col, want := range map[string]int{
 		"users.totp_secret": 1, "domains.dkim_private_key": 1, "domains.dkim_next_private_key": 1, "webhooks.secret": 0,
+		"sender_signing_keys.private_key": 1,
 	} {
 		if counts[col] != want {
 			t.Errorf("%s: rewrote %d rows, want %d", col, counts[col], want)
@@ -74,6 +80,7 @@ func TestRekeyRewritesEverySealedColumn(t *testing.T) {
 		`SELECT totp_secret FROM users WHERE email = 'a@example.com'`:            "totp-a",
 		`SELECT dkim_private_key FROM domains WHERE domain = 'example.com'`:      "dkim-pem",
 		`SELECT dkim_next_private_key FROM domains WHERE domain = 'example.com'`: "next-pem",
+		`SELECT private_key FROM sender_signing_keys WHERE fingerprint = 'FPR'`:  "pgp-armored",
 	} {
 		sealed := read(q)
 		if got, err := fresh.Decrypt(sealed); err != nil || got != want {

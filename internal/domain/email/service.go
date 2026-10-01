@@ -26,6 +26,7 @@ import (
 	coretracking "github.com/yousysadmin/mailyard/internal/core/tracking"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
+	smodel "github.com/yousysadmin/mailyard/internal/models/sender"
 	whmodel "github.com/yousysadmin/mailyard/internal/models/webhook"
 )
 
@@ -260,6 +261,10 @@ type SendRequest struct {
 	// whatever the project default says.
 	Track TrackPref
 
+	// DisableSigning leaves the sender's S/MIME or PGP signature off
+	// this one message.
+	DisableSigning bool
+
 	// Tracked says the body ALREADY carries tracking, applied by the
 	// campaign runner. It stops Send processing the same body twice,
 	// which would wrap the click redirects in click redirects.
@@ -470,35 +475,47 @@ func (s *Service) ValidateShape(req *SendRequest) error {
 	return normalizeUnsubscribeLinks(req)
 }
 
-// withRegisteredName returns the From to store: the caller's own if it
-// already names somebody, otherwise the registered sender's name over
-// the same address.
+// registeredSender is the project's record for a From address, nil
+// when there is none or when the address carries its own display name
+// - the record's name is a default for a bare address, never an
+// override of what the caller wrote, and the one read here serves both
+// the name and the signing decision.
 //
-// A caller who writes their own name keeps it - the registered one is a
-// default for an address, not an override of the message. A bare address
-// with no registered sender, or one registered without a name, comes back
-// unchanged, and a lookup failure is not fatal: a missing display name
-// must never be the reason mail does not go out.
-func (s *Service) withRegisteredName(ctx context.Context, projID, from string) (string, error) {
+// A lookup failure is not fatal: a missing display name or signature
+// must never be the reason mail does not go out, and a sender whose
+// key cannot be read is logged and sent unsigned.
+func (s *Service) registeredSender(ctx context.Context, projID, from string) *smodel.Sender {
 	addr := smtpclient.EnvelopeAddress(from)
-	if addr != strings.TrimSpace(from) {
-		// The caller sent "Name <addr>" - theirs wins.
-		return from, nil
+	if addr == "" {
+		return nil
 	}
 
 	reg, err := s.Store.Sender.GetByEmail(ctx, projID, strings.ToLower(addr))
 	if err != nil {
-		slog.Warn("could not read the registered sender for a display name",
+		slog.Warn("could not read the registered sender",
 			"project_id", projID, "sender", addr, "err", err)
 
-		return from, nil
+		return nil
 	}
 
+	return reg
+}
+
+// withRegisteredName returns the From to store: the caller's own if it
+// already names somebody, otherwise the registered sender's name over
+// the same address.
+func withRegisteredName(reg *smodel.Sender, from string) string {
 	if reg == nil || reg.Name == "" {
-		return from, nil
+		return from
 	}
 
-	return smtpclient.FormatAddress(reg.Name, addr), nil
+	addr := smtpclient.EnvelopeAddress(from)
+	if addr != strings.TrimSpace(from) {
+		// The caller sent "Name <addr>" - theirs wins.
+		return from
+	}
+
+	return smtpclient.FormatAddress(reg.Name, addr)
 }
 
 // resolveSystemLinks swaps the reserved {{ mailyard_* }} placeholders
@@ -596,10 +613,8 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	// inbox. Applied here rather than in the console because the API and
 	// the console both send one field, and the name belongs to the
 	// ADDRESS, not to whoever is composing.
-	from, err := s.withRegisteredName(ctx, projID, req.From)
-	if err != nil {
-		return nil, nil, err
-	}
+	reg := s.registeredSender(ctx, projID, req.From)
+	from := withRegisteredName(reg, req.From)
 
 	if err := s.withProjectDefaults(ctx, projID, req); err != nil {
 		return nil, nil, err
@@ -627,6 +642,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		UnsubscribeListID:     req.UnsubscribeListID,
 		ListUnsubscribePost:   req.ListUnsubscribePost,
 		Tracked:               req.Tracked,
+		Signing:               signingFor(reg, req.DisableSigning),
 		Status:                emailmodel.StatusQueued,
 		MaxAttempts:           s.MaxAttempts,
 		NextAttemptAt:         &now,

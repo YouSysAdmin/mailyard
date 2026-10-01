@@ -18,7 +18,7 @@ func TestBuildMessageAlternative(t *testing.T) {
 		HTML:    "<p>hi</p>",
 		Text:    "hi",
 	}
-	out := string(m.Build())
+	out := build(t, m)
 	boundary := boundaryOf(t, out, "multipart/alternative")
 	for _, want := range []string{
 		"From: Sender <s@example.com>\r\n",
@@ -63,7 +63,7 @@ func TestBuildMessageBoundariesAreUnique(t *testing.T) {
 			Subject: "x", HTML: "<p>hi</p>", Text: "hi",
 		}
 
-		return boundaryOf(t, string(m.Build()), "multipart/alternative")
+		return boundaryOf(t, build(t, m), "multipart/alternative")
 	}
 	if a, b := build(), build(); a == b {
 		t.Fatalf("two messages shared boundary %q", a)
@@ -72,7 +72,7 @@ func TestBuildMessageBoundariesAreUnique(t *testing.T) {
 
 func TestBuildMessageNonASCIIUsesQuotedPrintable(t *testing.T) {
 	m := &Message{From: "s@example.com", To: []string{"r@example.com"}, Subject: "Grüße", Text: "Grüße aus Köln"}
-	out := string(m.Build())
+	out := build(t, m)
 	if !strings.Contains(out, "Content-Transfer-Encoding: quoted-printable") {
 		t.Error("non-ascii body must be quoted-printable")
 	}
@@ -92,7 +92,7 @@ func TestBuildMessageAttachments(t *testing.T) {
 		From: "s@example.com", To: []string{"r@example.com"}, Subject: "att", Text: "body",
 		Attachments: []Attachment{{Filename: "file.txt", Content: content, ContentType: "text/plain"}},
 	}
-	out := string(m.Build())
+	out := build(t, m)
 	boundary := boundaryOf(t, out, "multipart/mixed")
 	for _, want := range []string{
 		`Content-Disposition: attachment; filename=file.txt`,
@@ -119,7 +119,7 @@ func TestBuildMessageListUnsubscribe(t *testing.T) {
 		ListUnsubscribeMailto: "mailto:unsub@example.com",
 		ListUnsubscribePost:   true,
 	}
-	out := string(m.Build())
+	out := build(t, m)
 	if !strings.Contains(out, "List-Unsubscribe: <mailto:unsub@example.com>, <https://mail.example.com/u/tok>\r\n") {
 		t.Errorf("list-unsubscribe header wrong:\n%s", out)
 	}

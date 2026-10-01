@@ -311,7 +311,21 @@ func (h *Handler) EML(c fiber.Ctx) error {
 	// id was never on the wire - the sent one is minted per attempt.
 	msg.MessageID = e.ID + "@outbound.invalid"
 
-	return response.Attachment(c, e.ID+".eml", "message/rfc822", msg.Build())
+	// Signed as the delivery was, with the sender's current key - the
+	// signature itself is minted per build, so this one is fresh, and
+	// verifies the same way.
+	if e.Signing != "" {
+		if err := signAs(c.Context(), h.Runtime.Store, e.ProjectID, e.Sender, msg); err != nil {
+			return response.Internal(c, err)
+		}
+	}
+
+	raw, err := msg.Build()
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Attachment(c, e.ID+".eml", "message/rfc822", raw)
 }
 
 // Status is the cheap polling endpoint: just the delivery state.
@@ -370,6 +384,10 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 		ListUnsubscribeURL:    in.ListUnsubscribeURL,
 		ListUnsubscribeMailto: in.ListUnsubscribeMailto,
 		ListUnsubscribePost:   in.ListUnsubscribePost,
+		// With the request rather than beside DisableTracking in the
+		// handler: the sandbox capture reads it, and that runs before
+		// the delivery questions.
+		DisableSigning: in.DisableSigning,
 	}
 	req.To, req.HeaderTo, req.Cc = foldRecipients(in.To, in.Cc, in.Bcc)
 	if in.SendAt != "" {

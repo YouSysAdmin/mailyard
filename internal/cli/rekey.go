@@ -157,6 +157,9 @@ var sealedColumns = []sealedColumn{
 	{"tracking_keys", "key", 1,
 		`SELECT id, key FROM tracking_keys FOR UPDATE`,
 		`UPDATE tracking_keys SET key = ? WHERE id = ?`},
+	{"sender_signing_keys", "private_key", 1,
+		`SELECT sender_id, private_key FROM sender_signing_keys WHERE private_key <> '' FOR UPDATE`,
+		`UPDATE sender_signing_keys SET private_key = ? WHERE sender_id = ?`},
 }
 
 // rekeyAll rewrites every sealed column from current to fresh in one

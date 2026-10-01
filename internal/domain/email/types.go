@@ -80,6 +80,12 @@ type sendInput struct {
 	// owner's decision, not a caller's.
 	DisableTracking bool `json:"disable_tracking"`
 
+	// DisableSigning leaves the S/MIME or PGP signature off this one
+	// message, when the sender address carries a key. The same shape
+	// as DisableTracking and for the same reason: whether an address
+	// signs is decided where the key is, and a caller may only decline.
+	DisableSigning bool `json:"disable_signing"`
+
 	// SMTPServerID pins one server exactly and overrides the group.
 	// Mostly for testing a specific server end to end.
 	SMTPServerID string `json:"smtp_server_id" validate:"omitempty,max=64" normalize:"trim"`
@@ -118,6 +124,7 @@ type templateSendInput struct {
 	SendAt          string                  `json:"send_at"       validate:"omitempty"`
 	DryRun          bool                    `json:"dry_run"`
 	DisableTracking bool                    `json:"disable_tracking"`
+	DisableSigning  bool                    `json:"disable_signing"`
 
 	// Same routing selectors as a plain send. See sendInput.
 	SMTPGroup    string `json:"smtp_group"     validate:"omitempty,max=100" normalize:"normalize"`

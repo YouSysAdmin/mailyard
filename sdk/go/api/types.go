@@ -575,6 +575,7 @@ type Email struct {
 	OpenCount             int64             `json:"open_count"`
 	ClickCount            int64             `json:"click_count"`
 	ListUnsubscribePost   bool              `json:"list_unsubscribe_post,omitzero"`
+	Signing               string            `json:"signing,omitempty"`
 	Status                string            `json:"status"`
 	ErrorMessage          string            `json:"error_message,omitempty"`
 	Attempts              int64             `json:"attempts"`
@@ -623,6 +624,7 @@ type EmailSendInput struct {
 	ListUnsubscribePost   bool              `json:"list_unsubscribe_post"`
 	SMTPGroup             string            `json:"smtp_group"`
 	DisableTracking       bool              `json:"disable_tracking"`
+	DisableSigning        bool              `json:"disable_signing"`
 	SMTPServerID          string            `json:"smtp_server_id"`
 	Sandbox               *bool             `json:"sandbox"`
 	SandboxRetentionDays  int64             `json:"sandbox_retention_days"`
@@ -1429,6 +1431,12 @@ type ProviderView struct {
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
+// PublicKeyResponse is the response body.
+type PublicKeyResponse struct {
+	Kind      string `json:"kind"`
+	PublicKey string `json:"public_key"`
+}
+
 // ReadResponse is the response body.
 type ReadResponse struct {
 	Read bool `json:"read"`
@@ -1605,12 +1613,13 @@ type SendResponse struct {
 
 // Sender is the wire body.
 type Sender struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	CreatedBy string    `json:"created_by,omitempty"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string      `json:"id"`
+	ProjectID string      `json:"project_id"`
+	CreatedBy string      `json:"created_by,omitempty"`
+	Email     string      `json:"email"`
+	Name      string      `json:"name,omitempty"`
+	CreatedAt time.Time   `json:"created_at"`
+	Signing   *SigningKey `json:"signing,omitempty"`
 }
 
 // SenderCreateInput is the request body.
@@ -1791,6 +1800,36 @@ type SharedUpdateInput struct {
 	Status         string             `json:"status"`
 	PlatformOnly   *bool              `json:"platform_only"`
 	ProviderConfig *map[string]string `json:"provider_config"`
+}
+
+// SigningFlagsInput is the request body.
+type SigningFlagsInput struct {
+	Sign      *bool `json:"sign"`
+	AttachKey *bool `json:"attach_key"`
+}
+
+// SigningInput is the request body.
+type SigningInput struct {
+	Kind        string `json:"kind"`
+	Mode        string `json:"mode"`
+	PrivateKey  string `json:"private_key"`
+	Certificate string `json:"certificate"`
+	PKCS12      string `json:"pkcs12"`
+	Passphrase  string `json:"passphrase"`
+}
+
+// SigningKey is the wire body.
+type SigningKey struct {
+	Kind        string     `json:"kind"`
+	Fingerprint string     `json:"fingerprint"`
+	Algorithm   string     `json:"algorithm"`
+	Subject     string     `json:"subject"`
+	Issuer      string     `json:"issuer,omitempty"`
+	NotAfter    *time.Time `json:"not_after,omitempty"`
+	Sign        bool       `json:"sign"`
+	AttachKey   bool       `json:"attach_key"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // SmtpcredentialCreateInput is the request body.
@@ -2187,6 +2226,7 @@ type TemplateSendInput struct {
 	SendAt                string            `json:"send_at"`
 	DryRun                bool              `json:"dry_run"`
 	DisableTracking       bool              `json:"disable_tracking"`
+	DisableSigning        bool              `json:"disable_signing"`
 	SMTPGroup             string            `json:"smtp_group"`
 	SMTPServerID          string            `json:"smtp_server_id"`
 	UnsubscribeListID     string            `json:"unsubscribe_list_id"`

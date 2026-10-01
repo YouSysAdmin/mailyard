@@ -130,5 +130,5 @@ func rebuild(ctx context.Context, bs blob.Store, e *imodel.Email) ([]byte, error
 		})
 	}
 
-	return msg.Build(), nil
+	return msg.Build()
 }

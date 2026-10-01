@@ -679,6 +679,22 @@ class API:
         "Delete"
         return self._t.request("DELETE", f"/senders/{_esc(id)}", body=None, query=query)
 
+    def delete_sender_signing(self, id, **query: Any) -> Any:
+        "Remove the signing key"
+        return self._t.request("DELETE", f"/senders/{_esc(id)}/signing", body=None, query=query)
+
+    def update_sender_signing(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Switch signing or key attachment on or off"
+        return self._t.request("PATCH", f"/senders/{_esc(id)}/signing", body=body, query=query)
+
+    def signing_sender(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Give the address a signing key"
+        return self._t.request("POST", f"/senders/{_esc(id)}/signing", body=body, query=query)
+
+    def get_sender_signing_public_key(self, id, **query: Any) -> Any:
+        "The public half of the signing key"
+        return self._t.request("GET", f"/senders/{_esc(id)}/signing/public-key", body=None, query=query)
+
     def list_smtp_credentials(self, **query: Any) -> Any:
         "List"
         return self._t.request("GET", "/smtp-credentials", body=None, query=query)

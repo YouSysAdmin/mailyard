@@ -85,6 +85,17 @@ const dataText = ref('')
 // tolerated as an empty list, which keeps the free-text input.
 const senders = ref<Sender[]>([])
 
+// The registered sender the From address names, when it signs its
+// mail. The checkbox below the picker exists only then, and only to
+// decline: whether an address signs is decided where its key is.
+const signingSender = computed(() => {
+  const addr = from.value.trim().toLowerCase()
+  const s = senders.value.find((x) => x.email === addr)
+
+  return s?.signing?.sign ? s : null
+})
+const signThis = ref(true)
+
 // Attachments. These ride along in the JSON body as base64 and are
 // stored with the email row - there is no staging upload, so nothing
 // is left behind if the form is abandoned.
@@ -297,6 +308,7 @@ async function sendRaw() {
   if (smtpGroup.value) payload.smtp_group = smtpGroup.value
   payload.headers = rowsToHeaders(headerRows.value)
   unsubscribeFields(payload)
+  if (signingSender.value && !signThis.value) payload.disable_signing = true
   await submit(() => emailsApi.send(payload))
 }
 
@@ -338,6 +350,7 @@ async function sendTemplate() {
   if (smtpGroup.value) payload.smtp_group = smtpGroup.value
   payload.headers = rowsToHeaders(headerRows.value)
   unsubscribeFields(payload)
+  if (signingSender.value && !signThis.value) payload.disable_signing = true
   await submit(() => emailsApi.sendTemplate(payload))
 }
 
@@ -390,6 +403,18 @@ function handleSubmit() {
         <form @submit.prevent="handleSubmit">
           <FormField label="From" for="send-from" :error="fieldErrors.from">
             <SenderSelect id="send-from" v-model="from" :senders="senders" />
+          </FormField>
+
+          <FormField
+            v-if="signingSender"
+            hint="The address carries a signing key. Untick to send this one message unsigned."
+          >
+            <label class="checkbox-label">
+              <input v-model="signThis" type="checkbox" />
+              <span>
+                Sign this message ({{ signingSender.signing?.kind === 'pgp' ? 'PGP' : 'S/MIME' }})
+              </span>
+            </label>
           </FormField>
 
           <FormField

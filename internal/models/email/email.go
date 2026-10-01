@@ -114,6 +114,13 @@ type Email struct {
 
 	ListUnsubscribePost bool `json:"list_unsubscribe_post,omitzero"`
 
+	// Signing is the kind of signature this message was accepted to
+	// carry - pgp or smime - or empty for none. Decided at accept
+	// time from the sender's key, so the log can say what went out.
+	// The key itself is read at delivery, which is why a replaced key
+	// applies to what is still queued.
+	Signing string `json:"signing,omitempty"`
+
 	Status        string     `json:"status"`
 	ErrorMessage  string     `json:"error_message,omitempty"`
 	Attempts      int        `json:"attempts"`

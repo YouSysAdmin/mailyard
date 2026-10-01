@@ -810,6 +810,12 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	snd.Get("/", permRead, snh.List)
 	snd.Post("/", permWrite, snh.Create)
 	snd.Delete("/:id", permDelete, snh.Delete)
+	// The key an address signs its mail with. A sender resource like
+	// the address itself, so the same tier governs both.
+	snd.Post("/:id/signing", permWrite, snh.SetSigning)
+	snd.Patch("/:id/signing", permWrite, snh.SetSigningFlags)
+	snd.Delete("/:id/signing", permDelete, snh.DeleteSigning)
+	snd.Get("/:id/signing/public-key", permRead, snh.PublicKey)
 
 	// Inbound routing domains - claim + DNS TXT verification.
 	// Project-admin tier throughout: a claimed domain governs DKIM

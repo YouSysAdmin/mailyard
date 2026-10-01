@@ -310,6 +310,17 @@ async function retryEmail() {
                   <span v-else class="text-muted">no clicks</span>
                 </td>
               </tr>
+              <!-- The sender address's own signature, S/MIME or PGP, as the
+                   message was accepted to carry it. -->
+              <tr>
+                <td class="meta-label">Signature</td>
+                <td>
+                  <span v-if="email.signing" class="badge badge-success">
+                    {{ email.signing === 'pgp' ? 'PGP' : 'S/MIME' }}
+                  </span>
+                  <span v-else class="text-muted">not signed</span>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

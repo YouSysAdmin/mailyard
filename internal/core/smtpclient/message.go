@@ -10,6 +10,8 @@ import (
 	"mime/quotedprintable"
 	"strings"
 	"time"
+
+	"github.com/yousysadmin/mailyard/internal/core/mailsign"
 )
 
 // Attachment is a file carried inline in the message. Content is
@@ -87,6 +89,27 @@ type Message struct {
 	// package keeps no opinion about signing - the caller decides
 	// whether a message gets signed and with whose key.
 	Sign func([]byte) ([]byte, error)
+
+	// Signing wraps the body in multipart/signed as the sender address,
+	// S/MIME or PGP. Unlike Sign it lives INSIDE Build: the signature
+	// is a part of the body, and the DKIM signature then covers it.
+	// Nil means an unsigned body.
+	Signing *Signing
+}
+
+// Signing is what a message signed as its sender carries, set by the
+// caller that holds the sender's key.
+type Signing struct {
+	Signer mailsign.Signer
+
+	// AutocryptKey is the keydata of an Autocrypt header, empty for
+	// none. PGP only: the header is how a client learns the key.
+	AutocryptKey string
+
+	// PublicKey, when set, is attached inside the signed entity, so it
+	// is covered by the signature. PGP only, for the clients that read
+	// a key from a file rather than from the header.
+	PublicKey *Attachment
 }
 
 func (m *Message) date() time.Time {
@@ -154,8 +177,11 @@ func headerSafe(v string) string {
 
 // Build renders the RFC 5322 message bytes: headers, then
 // multipart/mixed when attachments are present, with a
-// multipart/alternative body when both HTML and text exist.
-func (m *Message) Build() []byte {
+// multipart/alternative body when both HTML and text exist. The
+// only error is a signature that could not be made, and a caller
+// treats that as a message that cannot be sent, never as one that
+// goes out unsigned.
+func (m *Message) Build() ([]byte, error) {
 	var b strings.Builder
 
 	// Validation refuses a line break in any of these upstream. This
@@ -222,6 +248,10 @@ func (m *Message) Build() []byte {
 		fmt.Fprintf(&b, "%s: %s\r\n", headerSafe(key), headerSafe(value))
 	}
 
+	if m.Signing != nil && m.Signing.AutocryptKey != "" {
+		m.writeAutocrypt(&b)
+	}
+
 	var embedded, files []Attachment
 	for _, att := range m.Attachments {
 		if att.ContentID != "" {
@@ -231,22 +261,124 @@ func (m *Message) Build() []byte {
 		}
 	}
 
-	if len(files) > 0 {
-		mixedBoundary := newBoundary()
-		fmt.Fprintf(&b, "Content-Type: multipart/mixed; boundary=%q\r\n\r\n", mixedBoundary)
-		fmt.Fprintf(&b, "--%s\r\n", mixedBoundary)
-		m.writeRelated(&b, embedded)
-		for _, att := range files {
-			fmt.Fprintf(&b, "\r\n--%s\r\n", mixedBoundary)
-			writeAttachment(&b, att)
-		}
+	if m.Signing == nil || m.Signing.Signer == nil {
+		m.writeEntity(&b, embedded, files, false)
 
-		fmt.Fprintf(&b, "\r\n--%s--\r\n", mixedBoundary)
-	} else {
-		m.writeRelated(&b, embedded)
+		return []byte(b.String()), nil
 	}
 
-	return []byte(b.String())
+	if m.Signing.PublicKey != nil {
+		files = append(files, *m.Signing.PublicKey)
+	}
+
+	if err := m.writeSigned(&b, embedded, files); err != nil {
+		return nil, err
+	}
+
+	return []byte(b.String()), nil
+}
+
+// writeEntity emits the body as one MIME entity, headers and all:
+// multipart/mixed when files are attached, the related or alternative
+// body on its own otherwise. This is what a signature covers, which is
+// why it is written by one function and not inline in Build.
+//
+// qp forces every text part into quoted-printable. A signed entity
+// needs it: a bare line ending in a space, or a line a hop re-wraps,
+// changes the bytes the signature was made over (RFC 3156 section 3).
+func (m *Message) writeEntity(b *strings.Builder, embedded, files []Attachment, qp bool) {
+	if len(files) == 0 {
+		m.writeRelated(b, embedded, qp)
+
+		return
+	}
+
+	mixedBoundary := newBoundary()
+	fmt.Fprintf(b, "Content-Type: multipart/mixed; boundary=%q\r\n\r\n", mixedBoundary)
+	fmt.Fprintf(b, "--%s\r\n", mixedBoundary)
+	m.writeRelated(b, embedded, qp)
+	for _, att := range files {
+		fmt.Fprintf(b, "\r\n--%s\r\n", mixedBoundary)
+		writeAttachment(b, att)
+	}
+
+	fmt.Fprintf(b, "\r\n--%s--\r\n", mixedBoundary)
+}
+
+// writeSigned emits the RFC 1847 multipart/signed wrapper: the entity
+// as the first part, byte for byte what the signer saw, and the
+// detached signature as the second.
+//
+// The entity is rendered on its own first and canonicalized to CRLF
+// before signing, because the signature covers the bytes the receiver
+// gets and an SMTP DATA writer turns a bare LF into CRLF on the way.
+func (m *Message) writeSigned(b *strings.Builder, embedded, files []Attachment) error {
+	var inner strings.Builder
+	m.writeEntity(&inner, embedded, files, true)
+	entity := canonicalCRLF(inner.String())
+
+	part, err := m.Signing.Signer.Sign([]byte(entity))
+	if err != nil {
+		return err
+	}
+
+	boundary := newBoundary()
+	fmt.Fprintf(b, "Content-Type: multipart/signed; protocol=%q; micalg=%s; boundary=%q\r\n\r\n",
+		m.Signing.Signer.Protocol(), m.Signing.Signer.MicAlg(), boundary)
+	fmt.Fprintf(b, "--%s\r\n", boundary)
+	b.WriteString(entity)
+	fmt.Fprintf(b, "\r\n--%s\r\n", boundary)
+	fmt.Fprintf(b, "Content-Type: %s\r\n", part.ContentType)
+	fmt.Fprintf(b, "Content-Transfer-Encoding: %s\r\n", part.TransferEncoding)
+	fmt.Fprintf(b, "Content-Disposition: %s\r\n\r\n",
+		mime.FormatMediaType("attachment", map[string]string{"filename": part.Filename}))
+	if part.TransferEncoding == "base64" {
+		writeBase64Lines(b, base64.StdEncoding.EncodeToString(part.Body))
+	} else {
+		b.WriteString(canonicalCRLF(string(part.Body)))
+	}
+
+	fmt.Fprintf(b, "\r\n--%s--\r\n", boundary)
+
+	return nil
+}
+
+// writeAutocrypt emits the Autocrypt header (autocrypt.org level 1):
+// the sender address and its key, folded, because the key is a few
+// kilobytes of base64 and a header line has a length.
+func (m *Message) writeAutocrypt(b *strings.Builder) {
+	addr := EnvelopeAddress(m.From)
+	if addr == "" {
+		return
+	}
+
+	fmt.Fprintf(b, "Autocrypt: addr=%s; keydata=\r\n", headerSafe(addr))
+	key := headerSafe(m.Signing.AutocryptKey)
+	for len(key) > 76 {
+		b.WriteString(" " + key[:76] + "\r\n")
+		key = key[76:]
+	}
+
+	b.WriteString(" " + key + "\r\n")
+}
+
+// canonicalCRLF turns every bare LF into CRLF and leaves CRLF alone.
+func canonicalCRLF(s string) string {
+	if !strings.Contains(s, "\n") {
+		return s
+	}
+
+	var out strings.Builder
+	out.Grow(len(s) + len(s)/40)
+	for i := range len(s) {
+		if s[i] == '\n' && (i == 0 || s[i-1] != '\r') {
+			out.WriteByte('\r')
+		}
+
+		out.WriteByte(s[i])
+	}
+
+	return out.String()
 }
 
 // writeRelated emits the body, wrapped in multipart/related with the
@@ -254,9 +386,9 @@ func (m *Message) Build() []byte {
 // the related container the body sits in (RFC 2387), so an embedded
 // image written as a plain sibling shows as a broken image and a loose
 // file in clients that follow it.
-func (m *Message) writeRelated(b *strings.Builder, embedded []Attachment) {
+func (m *Message) writeRelated(b *strings.Builder, embedded []Attachment, qp bool) {
 	if len(embedded) == 0 {
-		m.writeBody(b)
+		m.writeBody(b, qp)
 
 		return
 	}
@@ -264,7 +396,7 @@ func (m *Message) writeRelated(b *strings.Builder, embedded []Attachment) {
 	boundary := newBoundary()
 	fmt.Fprintf(b, "Content-Type: multipart/related; boundary=%q\r\n\r\n", boundary)
 	fmt.Fprintf(b, "--%s\r\n", boundary)
-	m.writeBody(b)
+	m.writeBody(b, qp)
 	for _, att := range embedded {
 		fmt.Fprintf(b, "\r\n--%s\r\n", boundary)
 		writeAttachment(b, att)
@@ -305,30 +437,31 @@ func newBoundary() string {
 
 // writeBody emits the text/html body, wrapped in
 // multipart/alternative when both variants exist.
-func (m *Message) writeBody(b *strings.Builder) {
+func (m *Message) writeBody(b *strings.Builder, qp bool) {
 	altBoundary := newBoundary()
 	switch {
 	case m.HTML != "" && m.Text != "":
 		fmt.Fprintf(b, "Content-Type: multipart/alternative; boundary=%q\r\n\r\n", altBoundary)
 		fmt.Fprintf(b, "--%s\r\n", altBoundary)
-		writeTextPart(b, contentTypeTextPlain, m.Text)
+		writeTextPart(b, contentTypeTextPlain, m.Text, qp)
 		fmt.Fprintf(b, "\r\n--%s\r\n", altBoundary)
-		writeTextPart(b, contentTypeTextHTML, m.HTML)
+		writeTextPart(b, contentTypeTextHTML, m.HTML, qp)
 		fmt.Fprintf(b, "\r\n--%s--\r\n", altBoundary)
 	case m.HTML != "":
-		writeTextPart(b, contentTypeTextHTML, m.HTML)
+		writeTextPart(b, contentTypeTextHTML, m.HTML, qp)
 	default:
-		writeTextPart(b, contentTypeTextPlain, m.Text)
+		writeTextPart(b, contentTypeTextPlain, m.Text, qp)
 	}
 }
 
 // writeTextPart writes a text body part. Non-ASCII bodies are
 // quoted-printable encoded: with no Content-Transfer-Encoding the
 // part defaults to 7bit, so raw UTF-8 would be a lie the next hop is
-// free to mangle.
-func writeTextPart(b *strings.Builder, mediaType, body string) {
+// free to mangle. qp forces the encoding for an ASCII body too, which
+// a signed entity needs.
+func writeTextPart(b *strings.Builder, mediaType, body string, qp bool) {
 	fmt.Fprintf(b, "Content-Type: %s; charset=\"UTF-8\"\r\n", mediaType)
-	if isASCII(body) {
+	if !qp && isASCII(body) {
 		b.WriteString("\r\n")
 		b.WriteString(body)
 
@@ -372,7 +505,12 @@ func writeAttachment(b *strings.Builder, att Attachment) {
 
 	fmt.Fprintf(b, "Content-Disposition: %s\r\n\r\n",
 		mime.FormatMediaType(disposition, map[string]string{"filename": att.Filename}))
-	content := att.Content
+	writeBase64Lines(b, att.Content)
+}
+
+// writeBase64Lines re-wraps already-encoded content at 76 columns per
+// RFC 2045.
+func writeBase64Lines(b *strings.Builder, content string) {
 	for len(content) > 76 {
 		b.WriteString(content[:76])
 		b.WriteString("\r\n")

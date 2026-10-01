@@ -841,6 +841,26 @@ module Mailyard
       @t.request("DELETE", "/senders/#{esc(id)}", body: nil, query: query)
     end
 
+    # Remove the signing key
+    def delete_sender_signing(id, **query)
+      @t.request("DELETE", "/senders/#{esc(id)}/signing", body: nil, query: query)
+    end
+
+    # Switch signing or key attachment on or off
+    def update_sender_signing(id, body: nil, **query)
+      @t.request("PATCH", "/senders/#{esc(id)}/signing", body: body, query: query)
+    end
+
+    # Give the address a signing key
+    def signing_sender(id, body: nil, **query)
+      @t.request("POST", "/senders/#{esc(id)}/signing", body: body, query: query)
+    end
+
+    # The public half of the signing key
+    def get_sender_signing_public_key(id, **query)
+      @t.request("GET", "/senders/#{esc(id)}/signing/public-key", body: nil, query: query)
+    end
+
     # List
     def list_smtp_credentials(**query)
       @t.request("GET", "/smtp-credentials", body: nil, query: query)

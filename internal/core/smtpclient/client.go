@@ -264,7 +264,11 @@ func sendViaClient(client *smtp.Client, auth smtp.Auth, msg *Message) error {
 		}
 	}
 
-	raw := msg.Build()
+	raw, err := msg.Build()
+	if err != nil {
+		return wrapSendError("DATA", "", fmt.Errorf("build message: %w", err))
+	}
+
 	if msg.Sign != nil {
 		signed, serr := msg.Sign(raw)
 		if serr != nil {

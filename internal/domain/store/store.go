@@ -282,13 +282,26 @@ type SMTPCredentialStore interface {
 	Count(ctx context.Context, projID string) (int, error)
 }
 
-// SenderStore persists approved sender addresses.
+// SenderStore persists approved sender addresses and their signing
+// keys. Get, GetByEmail and List carry the key's DESCRIPTION on the
+// sender and never its material, which only GetSigning returns.
 type SenderStore interface {
 	Get(ctx context.Context, projID, id string) (*sender.Sender, error)
 	GetByEmail(ctx context.Context, projID, email string) (*sender.Sender, error)
 	List(ctx context.Context, projID string) ([]*sender.Sender, error)
 	Put(ctx context.Context, m *sender.Sender) error
 	Delete(ctx context.Context, projID, id string) error
+
+	// GetSigning is the one reader of the private half, for delivery.
+	GetSigning(ctx context.Context, projID, senderID string) (*sender.SigningKey, error)
+
+	// PutSigning replaces whatever key the sender had.
+	PutSigning(ctx context.Context, k *sender.SigningKey) error
+	SetSigningFlags(ctx context.Context, projID, senderID string, sign, attachKey bool) error
+	DeleteSigning(ctx context.Context, projID, senderID string) error
+
+	// SigningExpiringBefore is cross-project, for the expiry sweep.
+	SigningExpiringBefore(ctx context.Context, t time.Time) ([]*sender.SigningKey, error)
 }
 
 // PlanStore persists platform-wide usage plans (not tenant scoped).

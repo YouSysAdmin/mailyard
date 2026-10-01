@@ -229,6 +229,16 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 
 	msg := newMessage(e, attachments)
 
+	// The sender's own signature, S/MIME or PGP, decided at accept
+	// time and applied with whatever key the address holds NOW. Inside
+	// the message, before DKIM, which then covers it. A key that cannot
+	// be read is a retry for the reason the DKIM signer below is.
+	if e.Signing != "" {
+		if err := signAs(ctx, p.Store, e.ProjectID, e.Sender, msg); err != nil {
+			return queue.Retry(fmt.Errorf("sender signature: %w", err))
+		}
+	}
+
 	// DKIM. A signer is attached only when the sender's domain is
 	// verified to this project AND holds a key - and only when the
 	// server it goes through wants one. Providers that rewrite

@@ -314,7 +314,11 @@ func RawMessage(msg *smtpclient.Message) ([]byte, error) { return rawMessage(msg
 //
 // Shared so a second provider cannot get that order wrong.
 func rawMessage(msg *smtpclient.Message) ([]byte, error) {
-	raw := msg.Build()
+	raw, err := msg.Build()
+	if err != nil {
+		return nil, fmt.Errorf("build message: %w", err)
+	}
+
 	if msg.Sign == nil {
 		return raw, nil
 	}

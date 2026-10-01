@@ -7,6 +7,12 @@
 import type { CertificateDetails } from '../api/certificates'
 import { formatDate } from './formatDate'
 
+/**
+ * Anything with an end date. A certificate's details, or a sender's
+ * signing key, which carries the same question without the rest.
+ */
+export type Expiring = { not_after?: CertificateDetails['not_after'] }
+
 /** Amber from here. A month is time to arrange a renewal. */
 const SOON_DAYS = 30
 
@@ -20,14 +26,14 @@ const URGENT_DAYS = 7
  * state from expired and has to stay tellable apart: one is a date, the
  * other is a file nothing can read.
  */
-export function daysLeft(d?: CertificateDetails): number | null {
-  if (!d) return null
+export function daysLeft(d?: Expiring): number | null {
+  if (!d?.not_after) return null
 
   return Math.floor((new Date(d.not_after).getTime() - Date.now()) / 86400000)
 }
 
 /** The badge class for that number. */
-export function expiryClass(d?: CertificateDetails): string {
+export function expiryClass(d?: Expiring): string {
   const days = daysLeft(d)
   if (days === null) return 'badge badge-neutral'
   if (days <= URGENT_DAYS) return 'badge badge-danger'
@@ -37,7 +43,7 @@ export function expiryClass(d?: CertificateDetails): string {
 }
 
 /** What the badge says. Short, because it sits in a narrow column. */
-export function expiryLabel(d?: CertificateDetails): string {
+export function expiryLabel(d?: Expiring): string {
   const days = daysLeft(d)
   if (days === null) return 'unreadable'
   if (days < 0) return 'expired'
@@ -52,7 +58,7 @@ export function expiryLabel(d?: CertificateDetails): string {
  * a column two characters wide, and the number of days is what anybody
  * actually scans for.
  */
-export function expiryTitle(d?: CertificateDetails): string {
+export function expiryTitle(d?: Expiring): string {
   if (!d) return 'The stored certificate will not parse'
 
   const when = formatDate(d.not_after)

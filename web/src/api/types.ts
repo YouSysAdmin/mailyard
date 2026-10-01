@@ -366,6 +366,9 @@ export interface Email {
   unsubscribe_list_id?: string
   status: EmailStatus
   error_message?: string
+  // signing is the kind of signature the message was accepted to
+  // carry, pgp or smime, absent for none.
+  signing?: string
   // tracked says the message went out with tracking applied, so a
   // zero open_count means nobody opened it rather than that nobody
   // was counting.

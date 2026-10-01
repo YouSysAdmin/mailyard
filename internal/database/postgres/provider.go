@@ -93,7 +93,7 @@ func BindStore(p *Postgres, cr *crypto.Service, reads env.ReplicaReadsConfig) *s
 		Sandbox:         sandbox.NewStore(p.db, ro(reads.Sandbox)...),
 		SandboxInbox:    sandbox.NewInboxStore(p.db),
 		Plan:            plan.NewStore(p.db),
-		Sender:          sender.NewStore(p.db),
+		Sender:          sender.NewStore(p.db, cr),
 		SMTPCredential:  smtpcredential.NewStore(p.db),
 		PasswordReset:   passwordreset.NewStore(p.db),
 		SignupVerify:    signupverify.NewStore(p.db),

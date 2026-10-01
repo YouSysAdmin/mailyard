@@ -54,6 +54,10 @@ export interface SendEmailPayload {
   list_unsubscribe_url?: string
   list_unsubscribe_mailto?: string
   list_unsubscribe_post?: boolean
+  // Leaves the sender address's S/MIME or PGP signature off this one
+  // message. Only ever off: whether an address signs is decided where
+  // its key is.
+  disable_signing?: boolean
 }
 
 export interface SendTemplatePayload {
@@ -81,6 +85,7 @@ export interface SendTemplatePayload {
   list_unsubscribe_url?: string
   list_unsubscribe_mailto?: string
   list_unsubscribe_post?: boolean
+  disable_signing?: boolean
 }
 
 // What a send will accept. Served rather than hardcoded because

@@ -25,7 +25,8 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		ListUnsubscribeMailto: in.ListUnsubscribeMailto,
 		ListUnsubscribePost:   in.ListUnsubscribePost,
 		Sandbox:               in.Sandbox,
-		SandboxRetentionDays:  in.SandboxRetentionDays}
+		SandboxRetentionDays:  in.SandboxRetentionDays,
+		DisableSigning:        in.DisableSigning}
 	req, err := base.toRequest()
 	if err != nil {
 		return response.BadRequest(c, err.Error())

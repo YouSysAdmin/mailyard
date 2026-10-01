@@ -33,6 +33,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/eventbus"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
+	"github.com/yousysadmin/mailyard/internal/core/keyexpiry"
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
 	"github.com/yousysadmin/mailyard/internal/core/notify"
 	coreoidc "github.com/yousysadmin/mailyard/internal/core/oidc"
@@ -677,6 +678,20 @@ func runServe(cmd *cobra.Command, r role) error {
 			// day inside the checker.
 			Schedule: cron.EveryInterval(6 * time.Hour),
 			Run:      expiry.Run,
+		})
+
+		// The same sweep for sender signing certificates, aimed at the
+		// project that owns the address: renewing one is its errand.
+		keys := &keyexpiry.Checker{
+			Store:      st.Sender,
+			Mail:       rt.SystemMail,
+			Recipients: st.AlertRecipients.ProjectAlert,
+			Log:        log,
+		}
+		rt.Cron.Register(cron.Job{
+			Name:     "signing-key-expiry",
+			Schedule: cron.EveryInterval(6 * time.Hour),
+			Run:      keys.Run,
 		})
 	}
 

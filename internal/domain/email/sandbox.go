@@ -97,13 +97,26 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 		apiKeyID = rc.APIKey.ID
 	}
 
+	// Signed as a delivery would be, so the captured record shows the
+	// multipart/signed shape a recipient's client would see.
+	if reg := NewService(h.Runtime).registeredSender(c.Context(), rc.Project.ID, req.From); signingFor(reg, req.DisableSigning) != "" {
+		if err := signAs(c.Context(), h.Runtime.Store, rc.Project.ID, req.From, msg); err != nil {
+			return true, response.Internal(c, err)
+		}
+	}
+
+	raw, err := msg.Build()
+	if err != nil {
+		return true, response.Internal(c, err)
+	}
+
 	e, err := svc.Capture(c.Context(), &sandbox.Request{
 		ProjectID:     rc.Project.ID,
 		Source:        sbmodel.SourceAPI,
 		APIKeyID:      apiKeyID,
 		EnvelopeFrom:  req.From,
 		Recipients:    req.To,
-		Raw:           msg.Build(),
+		Raw:           raw,
 		RetentionDays: retentionDays,
 	})
 	if err != nil {

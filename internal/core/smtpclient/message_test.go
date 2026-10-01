@@ -24,7 +24,7 @@ func TestBuildNeverEmitsAnInjectedHeader(t *testing.T) {
 		MessageID:             "id@x.test>\r\nBcc: f@evil.test",
 		EmailID:               "0195\r\nBcc: g@evil.test",
 	}
-	raw := string(m.Build())
+	raw := build(t, m)
 	for _, bad := range []string{"\r\nBcc:", "\nBcc:", "\r\nReply-To:"} {
 		if strings.Contains(raw, bad) {
 			t.Fatalf("injected header %q survived Build:\n%s", bad, raw)
@@ -44,7 +44,7 @@ func TestBuildKeepsTheClientsToHeaderOverTheEnvelope(t *testing.T) {
 		Subject:  "s",
 		Text:     "body",
 	}
-	raw := string(m.Build())
+	raw := build(t, m)
 	if strings.Contains(raw, "hidden@example.com") {
 		t.Fatalf("a Bcc recipient was printed in the headers:\n%s", raw)
 	}
@@ -64,7 +64,7 @@ func TestBuildWritesReplyToOnceAndSafely(t *testing.T) {
 		Subject: "s",
 		Text:    "body",
 	}
-	raw := string(m.Build())
+	raw := build(t, m)
 	if strings.Count(raw, "Reply-To:") != 1 {
 		t.Fatalf("Reply-To written %d times:\n%s", strings.Count(raw, "Reply-To:"), raw)
 	}
@@ -74,7 +74,7 @@ func TestBuildWritesReplyToOnceAndSafely(t *testing.T) {
 	}
 
 	m.ReplyTo = ""
-	if strings.Contains(string(m.Build()), "Reply-To") {
+	if strings.Contains(build(t, m), "Reply-To") {
 		t.Fatal("an empty ReplyTo wrote a header")
 	}
 }
@@ -93,7 +93,7 @@ func TestBuildWritesAnEmbeddedPartUnderItsContentID(t *testing.T) {
 			{Filename: "rows.csv", ContentType: "text/csv", Content: "YSxi"},
 		},
 	}
-	raw := string(m.Build())
+	raw := build(t, m)
 	for _, want := range []string{
 		"Content-Type: multipart/mixed;",
 		"Content-Type: multipart/related;",
@@ -122,7 +122,7 @@ func TestBuildWritesAnEmbeddedPartUnderItsContentID(t *testing.T) {
 
 	// A malformed id cannot end the token early.
 	m.Attachments = []Attachment{{Filename: "x.png", ContentType: "image/png", Content: "UE5H", ContentID: "ab>c d"}}
-	if raw := string(m.Build()); !strings.Contains(raw, "Content-ID: <abcd>\r\n") {
+	if raw := build(t, m); !strings.Contains(raw, "Content-ID: <abcd>\r\n") {
 		t.Errorf("Content-ID was not sanitised:\n%s", raw)
 	}
 }
@@ -137,7 +137,7 @@ func TestAttachmentContentTypeParametersSurvive(t *testing.T) {
 			Content: base64.StdEncoding.EncodeToString([]byte("hello")),
 		}},
 	}
-	raw := string(msg.Build())
+	raw := build(t, msg)
 	if !strings.Contains(raw, "Content-Type: text/plain; charset=utf-8; name=a.txt") {
 		t.Errorf("attachment content type lost its parameter:\n%s", raw)
 	}
@@ -150,4 +150,16 @@ func TestAttachmentContentTypeParametersSurvive(t *testing.T) {
 	if err == nil {
 		t.Error("an unparseable content type was accepted")
 	}
+}
+
+// build renders the message or fails the test, for the cases where
+// nothing about the message can make Build refuse.
+func build(t *testing.T, m *Message) string {
+	t.Helper()
+	raw, err := m.Build()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	return string(raw)
 }

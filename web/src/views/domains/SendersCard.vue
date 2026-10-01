@@ -14,8 +14,10 @@ import { useProjectStore } from '../../stores/project'
 import { useConfirm } from '../../composables/useConfirm'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import { formatDate } from '../../composables/formatDate'
+import { daysLeft, expiryClass } from '../../composables/certExpiry'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
+import SenderSigning from './SenderSigning.vue'
 
 const notify = useNotificationStore()
 const projStore = useProjectStore()
@@ -29,6 +31,40 @@ const deletingId = ref<string | null>(null)
 
 const email = ref('')
 const name = ref('')
+
+// The sender whose signing dialog is open.
+const signingFor = ref<Sender | null>(null)
+
+/** The dialog wrote: the row follows without a reload. */
+function signingChanged(s: Sender) {
+  senders.value = senders.value.map((x) => (x.id === s.id ? s : x))
+  signingFor.value = s
+}
+
+/**
+ * The badge for a key: its kind, red or amber as it runs out, and
+ * grey once signing is switched off.
+ */
+function signingClass(s: Sender): string {
+  const k = s.signing
+  if (!k) return ''
+  if (!k.sign) return 'badge badge-neutral'
+  if (k.not_after && (daysLeft(k) ?? 0) <= 30) return expiryClass(k)
+
+  return 'badge badge-success'
+}
+
+function signingLabel(s: Sender): string {
+  const k = s.signing
+  if (!k) return ''
+  const kind = k.kind === 'pgp' ? 'PGP' : 'S/MIME'
+  if (!k.sign) return `${kind} off`
+  const days = k.not_after ? daysLeft(k) : null
+  if (days !== null && days < 0) return `${kind} expired`
+  if (days !== null && days <= 30) return `${kind} ${days}d`
+
+  return kind
+}
 
 async function load() {
   loading.value = true
@@ -117,6 +153,7 @@ defineExpose({ reload: load })
             <tr>
               <th>Email</th>
               <th>Name</th>
+              <th>Signing</th>
               <th>Created</th>
               <th class="col-actions"></th>
             </tr>
@@ -127,16 +164,26 @@ defineExpose({ reload: load })
                 <code>{{ s.email }}</code>
               </td>
               <td>{{ s.name || '-' }}</td>
+              <td>
+                <template v-if="s.signing">
+                  <span :class="signingClass(s)">{{ signingLabel(s) }}</span>
+                  <code class="fingerprint">{{ s.signing.fingerprint.slice(-16) }}</code>
+                </template>
+                <span v-else class="text-muted">-</span>
+              </td>
               <td>{{ formatDate(s.created_at) }}</td>
               <td class="col-actions">
-                <button
-                  v-if="projStore.can('senders:delete')"
-                  class="btn btn-danger btn-sm"
-                  :disabled="deletingId === s.id"
-                  @click="remove(s)"
-                >
-                  Delete
-                </button>
+                <div class="row-actions">
+                  <button class="btn btn-secondary btn-sm" @click="signingFor = s">Signing</button>
+                  <button
+                    v-if="projStore.can('senders:delete')"
+                    class="btn btn-danger btn-sm"
+                    :disabled="deletingId === s.id"
+                    @click="remove(s)"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -170,6 +217,13 @@ defineExpose({ reload: load })
         </p>
       </div>
     </template>
+
+    <SenderSigning
+      v-if="signingFor"
+      :sender="signingFor"
+      @changed="signingChanged"
+      @close="signingFor = null"
+    />
   </div>
 </template>
 
@@ -192,7 +246,20 @@ defineExpose({ reload: load })
 }
 
 .col-actions {
-  width: 110px;
+  width: 180px;
   text-align: right;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* The key id beside its badge: small, because it is there to be
+   compared against a client's display, not read. */
+.fingerprint {
+  margin-left: 8px;
+  font-size: 0.74rem;
 }
 </style>

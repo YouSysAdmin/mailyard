@@ -1164,6 +1164,35 @@ func (c *Client) DeleteSender(ctx context.Context, id string, opts ...RequestOpt
 	return err
 }
 
+// DeleteSenderSigning Remove the signing key.
+//
+// DELETE /senders/:id/signing
+func (c *Client) DeleteSenderSigning(ctx context.Context, id string, opts ...RequestOption) error {
+	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/senders/%s/signing", escape(id)), nil, opts)
+	return err
+}
+
+// UpdateSenderSigning Switch signing or key attachment on or off.
+//
+// PATCH /senders/:id/signing
+func (c *Client) UpdateSenderSigning(ctx context.Context, id string, body SigningFlagsInput, opts ...RequestOption) (SenderResponse, error) {
+	return do[SenderResponse](ctx, c, "PATCH", fmt.Sprintf("/senders/%s/signing", escape(id)), body, opts)
+}
+
+// SigningSender Give the address a signing key.
+//
+// POST /senders/:id/signing
+func (c *Client) SigningSender(ctx context.Context, id string, body SigningInput, opts ...RequestOption) (SenderResponse, error) {
+	return do[SenderResponse](ctx, c, "POST", fmt.Sprintf("/senders/%s/signing", escape(id)), body, opts)
+}
+
+// GetSenderSigningPublicKey The public half of the signing key.
+//
+// GET /senders/:id/signing/public-key
+func (c *Client) GetSenderSigningPublicKey(ctx context.Context, id string, opts ...RequestOption) (PublicKeyResponse, error) {
+	return do[PublicKeyResponse](ctx, c, "GET", fmt.Sprintf("/senders/%s/signing/public-key", escape(id)), nil, opts)
+}
+
 // ListSmtpCredentials List.
 //
 // GET /smtp-credentials/

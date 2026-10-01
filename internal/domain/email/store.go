@@ -43,7 +43,7 @@ const emailColumns = `id, project_id, created_by, api_key_id, credential_id, smt
        list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
        status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
        created_at, scheduled_at, sent_at,
-       tracked, opened_at, clicked_at, open_count, click_count, delivered_via`
+       tracked, opened_at, clicked_at, open_count, click_count, delivered_via, signing`
 
 const emailSelect = `
 SELECT ` + emailColumns + `
@@ -326,8 +326,8 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
             subject, template_name, html_body, text_body, attachments_json, headers_json,
             list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
             status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
-            created_at, scheduled_at, sent_at, tracked
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            created_at, scheduled_at, sent_at, tracked, signing
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING project_id, created_at
         )
         INSERT INTO email_volume (project_id, minute, accepted)
@@ -344,7 +344,7 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
 		e.Status, e.ErrorMessage, e.Attempts, e.MaxAttempts,
 		database.NullTime(e.NextAttemptAt), database.NullTime(e.ClaimedAt),
 		e.CreatedAt, database.NullTime(e.ScheduledAt), database.NullTime(e.SentAt),
-		e.Tracked,
+		e.Tracked, e.Signing,
 	)
 
 	return err
@@ -519,7 +519,7 @@ func scanEmail(r interface{ Scan(...any) error }) (*emailmodel.Email, error) {
 		&e.Status, &e.ErrorMessage, &e.Attempts, &e.MaxAttempts,
 		&nextAt, &claimedAt, &e.CreatedAt, &scheduledAt, &sentAt,
 		&e.Tracked, &openedAt, &clickedAt, &e.OpenCount, &e.ClickCount,
-		&e.DeliveredVia); err != nil {
+		&e.DeliveredVia, &e.Signing); err != nil {
 		return nil, err
 	}
 
