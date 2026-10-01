@@ -247,7 +247,7 @@ The sandbox has a console API under `/api/v1/sandbox`, session-authenticated lik
 
 | Route                                      | Purpose                                       |
 |--------------------------------------------|-----------------------------------------------|
-| `GET /api/v1/sandbox`                      | Page of captured messages, newest first. `?inbox=<id>` narrows it to one inbox's senders |
+| `GET /api/v1/sandbox`                      | Page of captured messages, newest first. `?inbox=<id>` narrows it to one inbox's senders, `?sender=` and `?recipient=` match an address or part of one |
 | `GET /api/v1/sandbox/info`                 | Connection details and the retention settings |
 | `GET /api/v1/sandbox/:id`                  | One message, parsed                           |
 | `GET /api/v1/sandbox/:id/raw`              | The wire bytes as `text/plain`                |

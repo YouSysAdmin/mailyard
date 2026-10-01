@@ -64,6 +64,7 @@ copy where the copy lives.
 | `ab_test_enabled` | `false` | Turn on [A/B testing](/docs/campaigns/ab-testing) |
 | `ab_variants` | — | Up to 5 variants |
 | `unsubscribe_disabled` | `false` | Send with no `List-Unsubscribe` headers and no unsubscribe link |
+| `disable_signing` | `false` | Send without the From address's S/MIME or PGP signature, when the address holds one - see [Signed Mail](/docs/email-sending/signing) |
 
 {{< callout type="warning" title="`unsubscribe_disabled` makes the mail worse" >}}
 Gmail and Yahoo filter bulk mail that lacks `List-Unsubscribe` rather than bouncing it, so the failure is invisible

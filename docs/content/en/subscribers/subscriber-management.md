@@ -64,7 +64,7 @@ GET /api/v1/subscribers?limit=20&offset=0&status=subscribed&q=acme
 | `limit` | Default 50, clamped to the API ceiling |
 | `offset` | Rows to skip. `page` is honoured as a zero-based alias when `offset` is absent |
 | `status` | One of the four statuses |
-| `q` | Part of the address, matched without regard to case |
+| `q` | Part of the address or the name, matched without regard to case |
 
 `total` counts what the **filters** match, not the project — so a search hitting one row out of five thousand reports
 one, and the pager offers one page rather than fifty mostly empty ones.

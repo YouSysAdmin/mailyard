@@ -19,6 +19,10 @@ A project key names its own project, so no `X-Mailyard-Project-Id` header is nee
 is refused with `403`. Minting and managing keys:
 [API Keys](/docs/security/api-keys).
 
+Every `/api/v1` answer carries `X-Mailyard-Auth: api-key`, `admin-key` or `session`, naming which credential
+authenticated it. A browser on the console's origin holds both a session cookie and, in a script, a bearer, and the
+header is how a caller sees which one the server judged.
+
 What a key may do comes from the permission catalogue, the same one that governs project members. See [Roles](#roles)
 below.
 

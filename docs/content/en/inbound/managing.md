@@ -20,6 +20,8 @@ GET /api/v1/inbound-emails?limit=50&status=received
 | `limit` | Default 50, maximum 200 |
 | `before` | Cursor: RFC 3339 `received_at` of the last row you saw |
 | `before_id` | The id of that row. Send it with `before` |
+| `sender` | An address or part of one, matched against the From header without regard to case |
+| `recipient` | The same, against the envelope recipients |
 
 There are three statuses, and no others:
 
@@ -103,7 +105,8 @@ GET /api/v1/inbound-emails/{id}
 `sender` is the From header, who the message says it is from, and it is empty when the message could not be parsed.
 `bounce_address` is the SMTP `MAIL FROM` - where bounces for the message go and what SPF is checked against - which is
 often not the sender. The stored headers carry it as `Return-Path`, written at receipt. `domain` is the name of the
-domain the mail arrived for. The `sender` search parameter on the list matches `sender` only.
+domain the mail arrived for. The `sender` search parameter on the list matches `sender` only, and `recipient` the
+envelope recipients.
 
 `auth` carries the SPF, DKIM and DMARC verdicts stamped at ingest. `aligned` is the field worth acting on - a valid
 signature from some other domain is not authentication. See [Receiving](/docs/inbound/receiving).
