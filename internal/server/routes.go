@@ -694,10 +694,16 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	hooks := v1.Group("/webhooks", permOn(perm.ResourceWebhook))
 	hooks.Get("/", permRead, whh.List)
 	hooks.Post("/", permWrite, whh.Create)
+	hooks.Get("/:id", permRead, whh.Get)
+	hooks.Patch("/:id", permWrite, whh.Update)
 	hooks.Delete("/:id", permDelete, whh.Delete)
 	hooks.Post("/:id/enable", permWrite, whh.Enable)
+	hooks.Post("/:id/disable", permWrite, whh.Disable)
 	hooks.Post("/:id/rotate-secret", permWrite, whh.RotateSecret)
+	// A test is a write: it posts to the receiver and files a delivery.
+	hooks.Post("/:id/test", permWrite, whh.Test)
 	hooks.Get("/:id/deliveries", permRead, whh.Deliveries)
+	hooks.Post("/:id/deliveries/:deliveryId/redeliver", permWrite, whh.Redeliver)
 
 	// Data portability and erasure. Export is any member's read of
 	// their own project. Erasure is destructive and irreversible,

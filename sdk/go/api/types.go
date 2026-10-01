@@ -490,6 +490,12 @@ type Delivery struct {
 	ErrorMessage string    `json:"error_message,omitempty"`
 	Attempt      int64     `json:"attempt"`
 	CreatedAt    time.Time `json:"created_at"`
+	Payload      string    `json:"payload,omitempty"`
+}
+
+// DeliveryResponse is the response body.
+type DeliveryResponse struct {
+	Delivery *Delivery `json:"delivery"`
 }
 
 // Descriptor is the wire body.
@@ -523,6 +529,11 @@ type Details struct {
 	SubjectKeyID   string    `json:"subject_key_id,omitempty"`
 	AuthorityKeyID string    `json:"authority_key_id,omitempty"`
 	Chain          int64     `json:"chain_length"`
+}
+
+// DisableInput is the request body.
+type DisableInput struct {
+	Reason string `json:"reason"`
 }
 
 // Domain is the wire body.
@@ -2522,4 +2533,16 @@ type WebhookCreateResponse struct {
 // WebhookListResponse is the response body.
 type WebhookListResponse struct {
 	Webhooks []*Webhook `json:"webhooks"`
+}
+
+// WebhookResponse is the response body.
+type WebhookResponse struct {
+	Webhook *Webhook `json:"webhook"`
+}
+
+// WebhookUpdateInput is the request body.
+type WebhookUpdateInput struct {
+	URL     string   `json:"url"`
+	Events  []string `json:"events"`
+	Filters []string `json:"filters"`
 }

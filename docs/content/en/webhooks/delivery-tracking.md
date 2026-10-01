@@ -46,6 +46,7 @@ curl "http://localhost:3000/api/v1/webhooks/0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33
 | `http_status` | What your endpoint answered. Absent when the request never got a response |
 | `error_message` | Why it failed: an HTTP status, a timeout, a dial error |
 | `attempt` | Which attempt this row is, counting from 1 |
+| `payload` | The body this attempt posted, as sent. Absent on rows from before it was kept |
 
 **One row per attempt.** A message that took three tries leaves three rows, so a webhook that eventually succeeded looks
 like two failures followed by a success — read `attempt` alongside `status` before concluding anything is broken.
@@ -70,6 +71,29 @@ a cursor it cannot parse is answered with the **first page** rather than an erro
 tab should not fail a list request.
 
 There is no total. The cursor coming back empty is how you know you have reached the end.
+
+`status=failed` narrows the log to what did not get through, `event=email.sent` to one event name.
+
+## Sending one again
+
+```
+POST /api/v1/webhooks/{id}/deliveries/{deliveryId}/redeliver
+```
+
+Posts the body that attempt sent, again, now, and answers with the new attempt as a row of this same log. One try,
+during the request, no retry and no disabling: a person is watching and will act on the answer. A row recorded
+before bodies were kept answers `409`, because the record is what the receiver was sent and nothing rebuilt now would
+be.
+
+## Testing an endpoint
+
+```
+POST /api/v1/webhooks/{id}/test
+```
+
+One signed delivery of a `webhook.test` event, with `data` carrying the webhook's id and url, answered the same way
+and filed in the log. It works on a disabled webhook, which is how its owner finds out the receiver is fixed before
+enabling it again.
 
 ## Retry policy
 

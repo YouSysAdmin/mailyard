@@ -1753,11 +1753,39 @@ func (c *Client) DeleteWebhook(ctx context.Context, id string, opts ...RequestOp
 	return err
 }
 
+// GetWebhook One webhook.
+//
+// GET /webhooks/:id
+func (c *Client) GetWebhook(ctx context.Context, id string, opts ...RequestOption) (WebhookResponse, error) {
+	return do[WebhookResponse](ctx, c, "GET", fmt.Sprintf("/webhooks/%s", escape(id)), nil, opts)
+}
+
+// UpdateWebhook Change a webhook.
+//
+// PATCH /webhooks/:id
+func (c *Client) UpdateWebhook(ctx context.Context, id string, body WebhookUpdateInput, opts ...RequestOption) (WebhookResponse, error) {
+	return do[WebhookResponse](ctx, c, "PATCH", fmt.Sprintf("/webhooks/%s", escape(id)), body, opts)
+}
+
 // ListWebhookDeliveries Delivery log of one webhook.
 //
 // GET /webhooks/:id/deliveries
 func (c *Client) ListWebhookDeliveries(ctx context.Context, id string, opts ...RequestOption) (DeliveriesResponse, error) {
 	return do[DeliveriesResponse](ctx, c, "GET", fmt.Sprintf("/webhooks/%s/deliveries", escape(id)), nil, opts)
+}
+
+// DeliveriesRedeliverWebhook Send one delivery again.
+//
+// POST /webhooks/:id/deliveries/:deliveryId/redeliver
+func (c *Client) DeliveriesRedeliverWebhook(ctx context.Context, id string, deliveryId string, opts ...RequestOption) (DeliveryResponse, error) {
+	return do[DeliveryResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/deliveries/%s/redeliver", escape(id), escape(deliveryId)), nil, opts)
+}
+
+// DisableWebhook Take a webhook out of rotation.
+//
+// POST /webhooks/:id/disable
+func (c *Client) DisableWebhook(ctx context.Context, id string, body DisableInput, opts ...RequestOption) (WebhookResponse, error) {
+	return do[WebhookResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/disable", escape(id)), body, opts)
 }
 
 // EnableWebhook Re-enable a disabled webhook.
@@ -1772,6 +1800,13 @@ func (c *Client) EnableWebhook(ctx context.Context, id string, opts ...RequestOp
 // POST /webhooks/:id/rotate-secret
 func (c *Client) RotateSecretWebhook(ctx context.Context, id string, opts ...RequestOption) (WebhookCreateResponse, error) {
 	return do[WebhookCreateResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/rotate-secret", escape(id)), nil, opts)
+}
+
+// TestWebhook Post a test event now.
+//
+// POST /webhooks/:id/test
+func (c *Client) TestWebhook(ctx context.Context, id string, opts ...RequestOption) (DeliveryResponse, error) {
+	return do[DeliveryResponse](ctx, c, "POST", fmt.Sprintf("/webhooks/%s/test", escape(id)), nil, opts)
 }
 
 // BounceWebhook Ingest a bounce report.

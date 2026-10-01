@@ -140,13 +140,19 @@ when the attempts run out.
 
 ## Manage
 
-```
-GET    /api/v1/webhooks
-DELETE /api/v1/webhooks/{id}
-```
+| Route | Does |
+|---|---|
+| `GET /api/v1/webhooks` | Every webhook in the project |
+| `GET /api/v1/webhooks/{id}` | One, without its secret |
+| `PATCH /api/v1/webhooks/{id}` | Change `url`, `events` or `filters`, each only when sent. `filters: []` clears the list |
+| `POST /api/v1/webhooks/{id}/disable` | Take it out of rotation by hand, with an optional `reason` |
+| `POST /api/v1/webhooks/{id}/enable` | Put it back, after a manual disable or after the dispatcher gave up on it |
+| `POST /api/v1/webhooks/{id}/test` | Post a `webhook.test` event now and answer with the attempt - see [Delivery Tracking](/docs/webhooks/delivery-tracking) |
+| `POST /api/v1/webhooks/{id}/rotate-secret` | A fresh secret, returned once |
+| `DELETE /api/v1/webhooks/{id}` | Remove it and its delivery log |
 
-There is no update route. Change a URL or an event list by creating a new webhook and deleting the old one, so the
-secret does not stay valid for an endpoint that has moved. A secret on its own is rotated in place - see above.
+An edit leaves the secret alone, so a receiver keeps verifying through it. If the endpoint changed hands, rotate the
+secret as a separate act.
 
 {{< callout type="warning" title="Private network targets are refused" >}}
 By default a webhook URL cannot resolve to loopback, RFC 1918, or other reserved address space. URLs are chosen by

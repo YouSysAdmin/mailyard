@@ -1007,9 +1007,25 @@ class API:
         "Delete a webhook Needs webhooks:delete."
         return self._t.request("DELETE", f"/webhooks/{_esc(id)}", body=None, query=query)
 
+    def get_webhook(self, id, **query: Any) -> Any:
+        "One webhook Needs webhooks:read."
+        return self._t.request("GET", f"/webhooks/{_esc(id)}", body=None, query=query)
+
+    def update_webhook(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Change a webhook Needs webhooks:write."
+        return self._t.request("PATCH", f"/webhooks/{_esc(id)}", body=body, query=query)
+
     def list_webhook_deliveries(self, id, **query: Any) -> Any:
         "Delivery log of one webhook Needs webhooks:read."
         return self._t.request("GET", f"/webhooks/{_esc(id)}/deliveries", body=None, query=query)
+
+    def deliveries_redeliver_webhook(self, id, delivery_id, **query: Any) -> Any:
+        "Send one delivery again Needs webhooks:write."
+        return self._t.request("POST", f"/webhooks/{_esc(id)}/deliveries/{_esc(delivery_id)}/redeliver", body=None, query=query)
+
+    def disable_webhook(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Take a webhook out of rotation Needs webhooks:write."
+        return self._t.request("POST", f"/webhooks/{_esc(id)}/disable", body=body, query=query)
 
     def enable_webhook(self, id, **query: Any) -> Any:
         "Re-enable a disabled webhook Needs webhooks:write."
@@ -1018,6 +1034,10 @@ class API:
     def rotate_secret_webhook(self, id, **query: Any) -> Any:
         "Rotate a webhook's signing secret Needs webhooks:write."
         return self._t.request("POST", f"/webhooks/{_esc(id)}/rotate-secret", body=None, query=query)
+
+    def test_webhook(self, id, **query: Any) -> Any:
+        "Post a test event now Needs webhooks:write."
+        return self._t.request("POST", f"/webhooks/{_esc(id)}/test", body=None, query=query)
 
     def bounce_webhook(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
         "Ingest a bounce report Needs bounces:write."

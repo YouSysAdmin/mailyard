@@ -1251,9 +1251,29 @@ module Mailyard
       @t.request("DELETE", "/webhooks/#{esc(id)}", body: nil, query: query)
     end
 
+    # One webhook Needs webhooks:read.
+    def get_webhook(id, **query)
+      @t.request("GET", "/webhooks/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Change a webhook Needs webhooks:write.
+    def update_webhook(id, body: nil, **query)
+      @t.request("PATCH", "/webhooks/#{esc(id)}", body: body, query: query)
+    end
+
     # Delivery log of one webhook Needs webhooks:read.
     def list_webhook_deliveries(id, **query)
       @t.request("GET", "/webhooks/#{esc(id)}/deliveries", body: nil, query: query)
+    end
+
+    # Send one delivery again Needs webhooks:write.
+    def deliveries_redeliver_webhook(id, delivery_id, **query)
+      @t.request("POST", "/webhooks/#{esc(id)}/deliveries/#{esc(delivery_id)}/redeliver", body: nil, query: query)
+    end
+
+    # Take a webhook out of rotation Needs webhooks:write.
+    def disable_webhook(id, body: nil, **query)
+      @t.request("POST", "/webhooks/#{esc(id)}/disable", body: body, query: query)
     end
 
     # Re-enable a disabled webhook Needs webhooks:write.
@@ -1264,6 +1284,11 @@ module Mailyard
     # Rotate a webhook's signing secret Needs webhooks:write.
     def rotate_secret_webhook(id, **query)
       @t.request("POST", "/webhooks/#{esc(id)}/rotate-secret", body: nil, query: query)
+    end
+
+    # Post a test event now Needs webhooks:write.
+    def test_webhook(id, **query)
+      @t.request("POST", "/webhooks/#{esc(id)}/test", body: nil, query: query)
     end
 
     # Ingest a bounce report Needs bounces:write.

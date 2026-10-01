@@ -18,6 +18,10 @@ const (
 	EventCampaignStarted   = "campaign.started"
 	EventCampaignCompleted = "campaign.completed"
 	EventInboundReceived   = "inbound.received"
+
+	// EventWebhookTest is what the test route posts. Not subscribable:
+	// it is sent to the one webhook being tested, whatever its list.
+	EventWebhookTest = "webhook.test"
 )
 
 // ValidEvents enumerates subscribable events for input validation.
@@ -80,4 +84,8 @@ type Delivery struct {
 	ErrorMessage string    `json:"error_message,omitempty"`
 	Attempt      int       `json:"attempt"`
 	CreatedAt    time.Time `json:"created_at"`
+
+	// Payload is the body this attempt posted, as sent, so it can be
+	// read back and redelivered. Empty on rows from before it was kept.
+	Payload string `json:"payload,omitempty"`
 }

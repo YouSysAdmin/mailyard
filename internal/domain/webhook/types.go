@@ -29,8 +29,34 @@ type createInput struct {
 // ----------------------------------------------------------------------------
 
 // ListResponse is every webhook in the project.
+// updateInput changes what is sent and leaves the rest. Filters is a
+// list even when empty, so a caller can clear it, and absent when not
+// sent.
+type updateInput struct {
+	URL     string   `json:"url"     validate:"omitempty,url,startswith=http,max=2048" normalize:"trim"`
+	Events  []string `json:"events"  validate:"omitempty,min=1,max=10"`
+	Filters []string `json:"filters" validate:"omitempty,max=20,dive,min=3,max=320"`
+}
+
+// disableInput is the reason recorded on the hook, shown wherever the
+// dispatcher's own reason would be.
+type disableInput struct {
+	Reason string `json:"reason" validate:"omitempty,max=500" normalize:"trim"`
+}
+
 type ListResponse struct {
 	Webhooks []*wmodel.Webhook `json:"webhooks"`
+}
+
+// WebhookResponse is one webhook, without its secret.
+type WebhookResponse struct {
+	Webhook *wmodel.Webhook `json:"webhook"`
+}
+
+// DeliveryResponse is one attempt, the one a test or a redelivery
+// just made.
+type DeliveryResponse struct {
+	Delivery *wmodel.Delivery `json:"delivery"`
 }
 
 // CreateResponse carries the signing secret, which appears here and

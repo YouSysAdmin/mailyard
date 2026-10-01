@@ -504,6 +504,8 @@ export interface WebhookDelivery {
   error_message?: string
   attempt: number
   created_at: string
+  // The body this attempt posted. Absent on rows from before it was kept.
+  payload?: string
 }
 
 export type SubscriberStatus = 'subscribed' | 'unsubscribed' | 'bounced' | 'complained'

@@ -18,6 +18,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
+	"github.com/yousysadmin/mailyard/internal/core/dispatch"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/keyset"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
@@ -26,6 +27,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	whmodel "github.com/yousysadmin/mailyard/internal/models/webhook"
 )
 
@@ -195,18 +197,40 @@ func (s *Store) RecordDelivery(ctx context.Context, d *whmodel.Delivery) error {
 	_, err := s.Exec(ctx, `
         INSERT INTO webhook_deliveries (
             id, webhook_id, project_id, event, status, http_status,
-            error_message, attempt, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            error_message, attempt, created_at, payload
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, d.ID, d.WebhookID, d.ProjectID, d.Event, d.Status, d.HTTPStatus,
-		d.ErrorMessage, d.Attempt, d.CreatedAt)
+		d.ErrorMessage, d.Attempt, d.CreatedAt, d.Payload)
 
 	return err
 }
 
 const deliverySelect = `
 SELECT id, webhook_id, project_id, event, status, http_status,
-       error_message, attempt, created_at
+       error_message, attempt, created_at, payload
 FROM webhook_deliveries`
+
+// GetDelivery returns one attempt, or nil.
+func (s *Store) GetDelivery(ctx context.Context, projID, webhookID, id string) (*whmodel.Delivery, error) {
+	row := s.ReadQueryRow(ctx, deliverySelect+` WHERE project_id = ? AND webhook_id = ? AND id = ?`,
+		projID, webhookID, id)
+	d, err := scanDelivery(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return d, err
+}
+
+func scanDelivery(r interface{ Scan(...any) error }) (*whmodel.Delivery, error) {
+	var d whmodel.Delivery
+	if err := r.Scan(&d.ID, &d.WebhookID, &d.ProjectID, &d.Event, &d.Status,
+		&d.HTTPStatus, &d.ErrorMessage, &d.Attempt, &d.CreatedAt, &d.Payload); err != nil {
+		return nil, err
+	}
+
+	return &d, nil
+}
 
 // ListDeliveries returns one keyset page, newest first.
 //
@@ -218,15 +242,26 @@ FROM webhook_deliveries`
 //
 // It does have a retention window, unlike suppressions, so it is
 // bounded in time. Bounded in time is not the same as small.
-func (s *Store) ListDeliveries(ctx context.Context, projID, webhookID string, limit int, cur keyset.Cursor) ([]*whmodel.Delivery, error) {
+func (s *Store) ListDeliveries(ctx context.Context, projID, webhookID string, f store.DeliveryFilter) ([]*whmodel.Delivery, error) {
 	query := deliverySelect + ` WHERE project_id = ? AND webhook_id = ?`
 	args := []any{projID, webhookID}
-	if !cur.IsZero() {
+	if f.Status != "" {
+		query += ` AND status = ?`
+		args = append(args, f.Status)
+	}
+
+	if f.Event != "" {
+		query += ` AND event = ?`
+		args = append(args, f.Event)
+	}
+
+	if !f.Cursor.IsZero() {
 		query += ` AND (created_at, id) < (?, ?)`
-		args = append(args, cur.CreatedAt.UTC(), cur.ID)
+		args = append(args, f.Cursor.CreatedAt.UTC(), f.Cursor.ID)
 	}
 
 	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
+	limit := f.Limit
 	if limit < 1 || limit > 201 {
 		limit = 51
 	}
@@ -241,13 +276,12 @@ func (s *Store) ListDeliveries(ctx context.Context, projID, webhookID string, li
 	defer func() { _ = rows.Close() }()
 	var out []*whmodel.Delivery
 	for rows.Next() {
-		var d whmodel.Delivery
-		if err := rows.Scan(&d.ID, &d.WebhookID, &d.ProjectID, &d.Event, &d.Status,
-			&d.HTTPStatus, &d.ErrorMessage, &d.Attempt, &d.CreatedAt); err != nil {
+		d, err := scanDelivery(rows)
+		if err != nil {
 			return nil, err
 		}
 
-		out = append(out, &d)
+		out = append(out, d)
 	}
 
 	return out, rows.Err()
@@ -314,27 +348,12 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
-	for _, e := range in.Events {
-		if _, ok := whmodel.ValidEvents[e]; !ok && e != "*" {
-			return response.BadRequest(c, "unknown event "+e)
-		}
+	if refusal := validEvents(in.Events); refusal != "" {
+		return response.BadRequest(c, refusal)
 	}
 
-	// Reject a private destination here so the operator finds out now
-	// instead of watching every delivery fail. This is a courtesy
-	// check, not the control: the dialer in internal/core/safedial is
-	// what actually enforces it, because a name can resolve
-	// differently between this moment and the first delivery.
-	if !h.Runtime.Config.Webhook.AllowPrivateTargets {
-		u, perr := url.Parse(in.URL)
-		if perr != nil || u.Hostname() == "" {
-			return response.BadRequest(c, "url is not a valid absolute http(s) url")
-		}
-
-		if !safedial.HostAllowed(c.Context(), u.Hostname()) {
-			return response.BadRequest(c,
-				"webhook targets a private or reserved address, which is refused (set webhook.allow_private_targets to permit it)")
-		}
+	if refusal := h.refuseTarget(c, in.URL); refusal != "" {
+		return response.BadRequest(c, refusal)
 	}
 
 	secret, err := newSecret()
@@ -365,6 +384,220 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	}
 
 	return response.Created(c, CreateResponse{Webhook: hook, Secret: secret})
+}
+
+// refuseTarget says why a destination is not accepted, or nothing.
+//
+// A private destination is rejected here so the operator finds out now
+// instead of watching every delivery fail. This is a courtesy check,
+// not the control: the dialer in internal/core/safedial is what
+// actually enforces it, because a name can resolve differently between
+// this moment and the first delivery.
+func (h *Handler) refuseTarget(c fiber.Ctx, target string) string {
+	if h.Runtime.Config.Webhook.AllowPrivateTargets {
+		return ""
+	}
+
+	u, err := url.Parse(target)
+	if err != nil || u.Hostname() == "" {
+		return "url is not a valid absolute http(s) url"
+	}
+
+	if !safedial.HostAllowed(c.Context(), u.Hostname()) {
+		return "webhook targets a private or reserved address, which is refused (set webhook.allow_private_targets to permit it)"
+	}
+
+	return ""
+}
+
+// validEvents says which name in events is not one, or nothing.
+func validEvents(events []string) string {
+	for _, e := range events {
+		if _, ok := whmodel.ValidEvents[e]; !ok && e != "*" {
+			return "unknown event " + e
+		}
+	}
+
+	return ""
+}
+
+// Get serves GET /api/v1/webhooks/:id.
+func (h *Handler) Get(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if hook == nil {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	return response.Success(c, WebhookResponse{Webhook: hook})
+}
+
+// Update serves PATCH /api/v1/webhooks/:id: the url, the event list or
+// the filters, each only when sent. The secret is untouched - Put
+// leaves the column alone - so a receiver keeps verifying through an
+// edit, and rotation stays its own deliberate act.
+func (h *Handler) Update(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	in, resp, ok := validation.Bind[updateInput](c)
+	if !ok {
+		return resp
+	}
+
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if hook == nil {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	if in.URL != "" {
+		if refusal := h.refuseTarget(c, in.URL); refusal != "" {
+			return response.BadRequest(c, refusal)
+		}
+
+		hook.URL = in.URL
+	}
+
+	if len(in.Events) > 0 {
+		if refusal := validEvents(in.Events); refusal != "" {
+			return response.BadRequest(c, refusal)
+		}
+
+		hook.Events = in.Events
+	}
+
+	// nil is "not sent", an empty list is "no filters": the two decode
+	// differently, which is what lets a caller clear the list.
+	if in.Filters != nil {
+		hook.Filters = in.Filters
+	}
+
+	if err := h.Runtime.Store.Webhook.Put(c.Context(), hook); err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, WebhookResponse{Webhook: hook})
+}
+
+// Disable serves POST /api/v1/webhooks/:id/disable: takes a hook out
+// of rotation by hand, the way the dispatcher does after a dead
+// endpoint, with the reason the caller gives. Idempotent on a
+// disabled one, which keeps its first reason.
+func (h *Handler) Disable(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	reason := "disabled by the project"
+	if len(c.Body()) > 0 {
+		in, resp, ok := validation.Bind[disableInput](c)
+		if !ok {
+			return resp
+		}
+
+		if in.Reason != "" {
+			reason = in.Reason
+		}
+	}
+
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if hook == nil {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	if err := h.Runtime.Store.Webhook.Disable(c.Context(), rc.Project.ID, hook.ID, reason); err != nil {
+		return response.Internal(c, err)
+	}
+
+	hook, err = h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, hook.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, WebhookResponse{Webhook: hook})
+}
+
+// Test serves POST /api/v1/webhooks/:id/test: one signed POST of a
+// webhook.test event, now, on this request, with the outcome in the
+// answer and in the delivery log. No retry and no disabling - a
+// person is watching and will act on the answer themselves.
+func (h *Handler) Test(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	if h.Runtime.Dispatch == nil {
+		return response.Unavailable(c, "webhook delivery is not running on this node")
+	}
+
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if hook == nil {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	body, err := dispatch.Body(whmodel.EventWebhookTest, map[string]any{
+		"webhook_id": hook.ID,
+		"url":        hook.URL,
+		"message":    "This is a test delivery from Mailyard.",
+	})
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	del, err := h.Runtime.Dispatch.Deliver(c.Context(), hook, whmodel.EventWebhookTest, body)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, DeliveryResponse{Delivery: del})
+}
+
+// Redeliver serves POST /api/v1/webhooks/:id/deliveries/:deliveryId/redeliver:
+// the body one attempt posted, posted again now, as a new attempt in
+// the log. A row from before bodies were kept is refused rather than
+// rebuilt, because the record is what the receiver was sent.
+func (h *Handler) Redeliver(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	if h.Runtime.Dispatch == nil {
+		return response.Unavailable(c, "webhook delivery is not running on this node")
+	}
+
+	hook, err := h.Runtime.Store.Webhook.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if hook == nil {
+		return response.NotFound(c, "webhook not found")
+	}
+
+	prior, err := h.Runtime.Store.Webhook.GetDelivery(c.Context(), rc.Project.ID, hook.ID, c.Params("deliveryId"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if prior == nil {
+		return response.NotFound(c, "delivery not found")
+	}
+
+	if prior.Payload == "" {
+		return response.Conflict(c, "this delivery was recorded before bodies were kept, so there is nothing to send again")
+	}
+
+	del, err := h.Runtime.Dispatch.Deliver(c.Context(), hook, prior.Event, []byte(prior.Payload))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, DeliveryResponse{Delivery: del})
 }
 
 // newSecret mints a signing secret: 256 bits, hex.
@@ -463,8 +696,18 @@ func (h *Handler) Deliveries(c fiber.Ctx) error {
 		return response.NotFound(c, "webhook not found")
 	}
 
+	status := c.Query("status")
+	if status != "" && status != whmodel.DeliverySuccess && status != whmodel.DeliveryFailed {
+		return response.BadRequest(c, "status must be success or failed")
+	}
+
 	w := paging.WindowFrom(c)
-	dels, err := h.Runtime.Store.Webhook.ListDeliveries(c.Context(), rc.Project.ID, hook.ID, w.Fetch(), w.Cursor)
+	dels, err := h.Runtime.Store.Webhook.ListDeliveries(c.Context(), rc.Project.ID, hook.ID, store.DeliveryFilter{
+		Status: status,
+		Event:  paging.Search(c, "event"),
+		Limit:  w.Fetch(),
+		Cursor: w.Cursor,
+	})
 	if err != nil {
 		return response.Internal(c, err)
 	}

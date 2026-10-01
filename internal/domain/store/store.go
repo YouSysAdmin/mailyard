@@ -1007,10 +1007,23 @@ type WebhookStore interface {
 	// id existed. The only write to the column after Put.
 	RotateSecret(ctx context.Context, projID, id, secret string) (bool, error)
 	RecordDelivery(ctx context.Context, d *webhook.Delivery) error
-	ListDeliveries(ctx context.Context, projID, webhookID string, limit int, cur keyset.Cursor) ([]*webhook.Delivery, error)
+	ListDeliveries(ctx context.Context, projID, webhookID string, f DeliveryFilter) ([]*webhook.Delivery, error)
+
+	// GetDelivery is one attempt, scoped to its webhook as well as the
+	// project so a row cannot be read through another hook's path.
+	GetDelivery(ctx context.Context, projID, webhookID, id string) (*webhook.Delivery, error)
 
 	// Retention sweep, unscoped by project.
 	PurgeDeliveriesOlderThan(ctx context.Context, before time.Time) (int64, error)
+}
+
+// DeliveryFilter narrows a webhook's delivery log. Status is success
+// or failed, Event one event name. Zero values mean no constraint.
+type DeliveryFilter struct {
+	Status string
+	Event  string
+	Limit  int
+	Cursor keyset.Cursor
 }
 
 // AdminAPIKeyStore persists platform credentials.

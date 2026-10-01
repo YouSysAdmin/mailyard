@@ -126,15 +126,7 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 		return
 	}
 
-	// Through the wire policy in response - a webhook body is the
-	// product's JSON the same way an API response is, so an empty list
-	// in a payload is [] there too, and a bad byte out of received
-	// mail cannot make the delivery fail unsent.
-	body, err := response.Marshal(map[string]any{
-		"event":     event,
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"data":      payload,
-	})
+	body, err := Body(event, payload)
 	if err != nil {
 		d.log.Error("dispatch: marshal payload", "event", event, "err", err)
 
@@ -168,6 +160,55 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 			d.deliver(h, event, body)
 		})
 	}
+}
+
+// Body is the envelope every delivery carries: the event, the instant
+// it was built, and the payload under data.
+//
+// Through the wire policy in response - a webhook body is the
+// product's JSON the same way an API response is, so an empty list in
+// a payload is [] there too, and a bad byte out of received mail
+// cannot make the delivery fail unsent.
+func Body(event string, payload any) ([]byte, error) {
+	return response.Marshal(map[string]any{
+		"event":     event,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"data":      payload,
+	})
+}
+
+// Deliver posts body to h once, now, on the caller's context, files
+// the attempt and returns it. What the test and redeliver routes call:
+// no retry, no slot, no disabling, because a person is watching and
+// will act on the answer themselves. Deliberately not refused on a
+// disabled hook - testing one is how the owner learns it is fixed.
+func (d *Dispatcher) Deliver(ctx context.Context, h *whmodel.Webhook, event string, body []byte) (*whmodel.Delivery, error) {
+	status, err := d.post(ctx, h, event, body)
+	del := &whmodel.Delivery{
+		WebhookID:  h.ID,
+		ProjectID:  h.ProjectID,
+		Event:      event,
+		HTTPStatus: status,
+		Attempt:    1,
+		Payload:    string(body),
+	}
+	switch {
+	case err != nil:
+		del.Status = whmodel.DeliveryFailed
+		del.ErrorMessage = err.Error()
+	case status < 200 || status >= 300:
+		del.Status = whmodel.DeliveryFailed
+		del.ErrorMessage = fmt.Sprintf("endpoint returned status %d", status)
+	default:
+		del.Status = whmodel.DeliverySuccess
+	}
+
+	metrics.WebhookDeliveries.WithLabelValues(del.Status).Inc()
+	if rerr := d.sink.RecordDelivery(ctx, del); rerr != nil {
+		return nil, rerr
+	}
+
+	return del, nil
 }
 
 // finished releases the pending count one delivery held.
@@ -280,6 +321,7 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 			Event:      event,
 			HTTPStatus: status,
 			Attempt:    attempt,
+			Payload:    string(body),
 		}
 		if err == nil && status >= 200 && status < 300 {
 			del.Status = whmodel.DeliverySuccess

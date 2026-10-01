@@ -31,6 +31,66 @@ func APIDocs() []apidoc.Route {
 			},
 		},
 		{
+			Method:     "GET",
+			Path:       "/webhooks/:id",
+			Tag:        "webhooks",
+			Permission: "webhooks:read",
+			Summary:    "One webhook",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Responses:  []apidoc.Response{apidoc.OK("The webhook, without its secret.", WebhookResponse{}), apidoc.NotFound},
+		},
+		{
+			Method:     "PATCH",
+			Path:       "/webhooks/:id",
+			Tag:        "webhooks",
+			Permission: "webhooks:write",
+			Summary:    "Change a webhook",
+			Description: "Each of `url`, `events` and `filters` is changed only when sent. " +
+				"`filters: []` clears the list. The signing secret is untouched, so a " +
+				"receiver keeps verifying through the edit - rotate it separately if " +
+				"the endpoint changed hands.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Request:    updateInput{},
+			Responses: []apidoc.Response{
+				apidoc.OK("The webhook.", WebhookResponse{}),
+				apidoc.BadRequest,
+				apidoc.NotFound,
+			},
+		},
+		{
+			Method:     "POST",
+			Path:       "/webhooks/:id/disable",
+			Tag:        "webhooks",
+			Permission: "webhooks:write",
+			Summary:    "Take a webhook out of rotation",
+			Description: "Nothing is delivered to it until it is enabled again. The optional " +
+				"`reason` is recorded on the hook where the dispatcher's own reason would " +
+				"be. Idempotent on a webhook that is already disabled, which keeps its " +
+				"first reason.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Request:    disableInput{},
+			Responses: []apidoc.Response{
+				apidoc.OK("The webhook.", WebhookResponse{}),
+				apidoc.NotFound,
+			},
+		},
+		{
+			Method:     "POST",
+			Path:       "/webhooks/:id/test",
+			Tag:        "webhooks",
+			Permission: "webhooks:write",
+			Summary:    "Post a test event now",
+			Description: "One signed delivery of a `webhook.test` event, made during this " +
+				"request, with the outcome in the answer and in the delivery log. No " +
+				"retry and no disabling, whatever the receiver answers. Works on a " +
+				"disabled webhook, which is how its owner learns it is fixed.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Responses: []apidoc.Response{
+				apidoc.OK("The attempt.", DeliveryResponse{}),
+				apidoc.NotFound,
+			},
+		},
+		{
 			Method:     "POST",
 			Path:       "/webhooks/:id/rotate-secret",
 			Tag:        "webhooks",
@@ -70,20 +130,40 @@ func APIDocs() []apidoc.Route {
 			},
 		},
 		{
-			Method:      "GET",
-			Path:        "/webhooks/:id/deliveries",
-			Tag:         "webhooks",
-			Permission:  "webhooks:read",
-			Summary:     "Delivery log of one webhook",
-			Description: "Cursor paged. The log belongs to one webhook, so its id is part of the path.",
-			PathParams:  []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Method:     "GET",
+			Path:       "/webhooks/:id/deliveries",
+			Tag:        "webhooks",
+			Permission: "webhooks:read",
+			Summary:    "Delivery log of one webhook",
+			Description: "Cursor paged. The log belongs to one webhook, so its id is part of the path. " +
+				"Each row carries the body it posted, so a failed one can be read and sent again.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
 			Query: []apidoc.Param{
+				{Name: "status", Enum: []string{"success", "failed"}},
+				{Name: "event", Description: "One event name exactly."},
 				{Name: "limit", Type: "integer"},
 				{Name: "cursor"},
 			},
 			Responses: []apidoc.Response{
 				apidoc.OK("One page of attempts.", DeliveriesResponse{}),
 				apidoc.NotFound,
+			},
+		},
+		{
+			Method:     "POST",
+			Path:       "/webhooks/:id/deliveries/:deliveryId/redeliver",
+			Tag:        "webhooks",
+			Permission: "webhooks:write",
+			Summary:    "Send one delivery again",
+			Description: "Posts the body that attempt sent, again, now, as a new attempt in the " +
+				"log. One try, during this request. A delivery recorded before bodies were " +
+				"kept answers 409, because the record is what the receiver was sent and " +
+				"nothing else would be.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}, {Name: "deliveryId", Format: "uuid"}},
+			Responses: []apidoc.Response{
+				apidoc.OK("The new attempt.", DeliveryResponse{}),
+				apidoc.NotFound,
+				apidoc.Conflict,
 			},
 		},
 	}
