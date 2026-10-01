@@ -130,7 +130,7 @@ func TestNoPointerFieldSaysOmitempty(t *testing.T) {
 func TestEveryRuleInUseHasASentence(t *testing.T) {
 	// Structural tags: they steer the walk, they never fail.
 	structural := map[string]bool{
-		"omitempty": true, "omitzero": true, "dive": true, "required": true,
+		"omitempty": true, "omitzero": true, "dive": true, "keys": true, "endkeys": true, "required": true,
 	}
 
 	used := map[string]string{} // rule -> where it was seen

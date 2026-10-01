@@ -80,6 +80,7 @@ Leave the template ref out and each item carries its own content:
 | `language`                                                                 | Overrides the batch default                                                                                          |
 | `subject`, `html`, `text`                                                  | Raw mode                                                                                                             |
 | `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Per item, because an opt-out link identifies a recipient                                                             |
+| `tags`, `metadata`                                                         | Per item, the same as on a [single send](/docs/email-sending/single-email#optional-fields) - an order id belongs to one message |
 
 The opt-out fields are per item deliberately. A batch is where an application sends its bulk mail, and one link shared
 across a hundred items would unsubscribe whoever clicked it from nothing in particular.

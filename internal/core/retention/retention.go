@@ -228,6 +228,15 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		s.Log.Info("retention: pruned email volume counters", "rows", n)
 	}
 
+	// Idempotency keys outlive their retry window by nothing: a client
+	// retrying a send a day later is not retrying, and the key would
+	// otherwise answer with a message retention may already have taken.
+	if n, err := s.Store.Email.PruneKeysBefore(ctx, now.AddDate(0, 0, -1)); err != nil {
+		note("idempotency keys", err)
+	} else if n > 0 {
+		s.Log.Info("retention: pruned idempotency keys", "rows", n)
+	}
+
 	// Read notifications only. An unread alert is still trying to
 	// tell somebody something, so age alone is not a reason to drop
 	// it - the store enforces that, this just supplies the window.

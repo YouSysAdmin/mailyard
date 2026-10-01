@@ -635,6 +635,7 @@ type EmailFilter struct {
 	Sender       string
 	Recipient    string
 	Template     string
+	Tag          string
 	APIKeyID     string
 	SMTPServerID string
 	From         *time.Time
@@ -686,6 +687,17 @@ type EmailStore interface {
 	// COUNT over the emails table any more.
 	AcceptedSince(ctx context.Context, projID string, since time.Time) (int, error)
 	PruneVolumeBefore(ctx context.Context, before time.Time) (int64, error)
+
+	// The Idempotency-Key ledger. ReserveKey claims a key for the
+	// request about to send and reports whether it did: when it did
+	// not, emailID is the message an earlier request queued under the
+	// key, or empty while that request is still running. CompleteKey
+	// records the message, ReleaseKey gives the key back after a send
+	// that failed, and PruneKeysBefore is the day-old sweep.
+	ReserveKey(ctx context.Context, projID, key string) (emailID string, reserved bool, err error)
+	CompleteKey(ctx context.Context, projID, key, emailID string) error
+	ReleaseKey(ctx context.Context, projID, key string) error
+	PruneKeysBefore(ctx context.Context, before time.Time) (int64, error)
 	CountAllByStatus(ctx context.Context) (map[string]int, error)
 
 	ClaimDue(ctx context.Context, now time.Time, limit int) ([]*email.Email, error)

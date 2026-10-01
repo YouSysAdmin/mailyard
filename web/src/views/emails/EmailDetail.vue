@@ -266,6 +266,14 @@ async function retryEmail() {
                 <td class="meta-label">Template</td>
                 <td>{{ email.template_name || '-' }}</td>
               </tr>
+              <tr v-if="email.tags?.length">
+                <td class="meta-label">Tags</td>
+                <td>{{ email.tags.join(', ') }}</td>
+              </tr>
+              <tr v-for="(value, key) in email.metadata" :key="key">
+                <td class="meta-label">{{ key }}</td>
+                <td>{{ value }}</td>
+              </tr>
               <!-- The origin rides on the accept time rather than
                    taking a row of its own, and on THIS date because it
                    is the one always there: how a message was submitted

@@ -90,6 +90,12 @@ type Email struct {
 	Attachments  []Attachment      `json:"attachments,omitempty"`
 	Headers      map[string]string `json:"headers,omitempty"`
 
+	// Tags are the caller's labels, what the log is filtered by.
+	// Metadata is a flat string map the caller attaches and reads back,
+	// an order id or a tenant of theirs, carried and never interpreted.
+	Tags     []string          `json:"tags,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+
 	// RFC 2369 / 8058 List-Unsubscribe headers: stamped on campaign
 	// emails by the runner, minted for a send scoped to an opt-out
 	// list, or supplied by the caller for an application that runs its

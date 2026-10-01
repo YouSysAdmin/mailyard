@@ -181,6 +181,8 @@ type BatchItem struct {
 	Subject               string
 	HTML                  string
 	Text                  string
+	Tags                  []string
+	Metadata              map[string]string
 	ListUnsubscribeURL    string
 	ListUnsubscribeMailto string
 	ListUnsubscribePost   bool
@@ -206,6 +208,8 @@ func (s *Service) SendBatch(ctx context.Context, projID, createdBy, apiKeyID, fr
 		req := &SendRequest{
 			From:                  from,
 			ReplyTo:               replyTo,
+			Tags:                  item.Tags,
+			Metadata:              item.Metadata,
 			Subject:               item.Subject,
 			HTML:                  item.HTML,
 			Text:                  item.Text,

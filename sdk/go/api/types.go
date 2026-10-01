@@ -177,17 +177,19 @@ type BatchInput struct {
 
 // BatchItemInput is the request body.
 type BatchItemInput struct {
-	To                    []string       `json:"to"`
-	Cc                    []string       `json:"cc"`
-	Bcc                   []string       `json:"bcc"`
-	Language              string         `json:"language"`
-	Data                  map[string]any `json:"data"`
-	Subject               string         `json:"subject"`
-	HTML                  string         `json:"html"`
-	Text                  string         `json:"text"`
-	ListUnsubscribeURL    string         `json:"list_unsubscribe_url"`
-	ListUnsubscribeMailto string         `json:"list_unsubscribe_mailto"`
-	ListUnsubscribePost   bool           `json:"list_unsubscribe_post"`
+	To                    []string          `json:"to"`
+	Cc                    []string          `json:"cc"`
+	Bcc                   []string          `json:"bcc"`
+	Language              string            `json:"language"`
+	Data                  map[string]any    `json:"data"`
+	Subject               string            `json:"subject"`
+	HTML                  string            `json:"html"`
+	Text                  string            `json:"text"`
+	Tags                  []string          `json:"tags"`
+	Metadata              map[string]string `json:"metadata"`
+	ListUnsubscribeURL    string            `json:"list_unsubscribe_url"`
+	ListUnsubscribeMailto string            `json:"list_unsubscribe_mailto"`
+	ListUnsubscribePost   bool              `json:"list_unsubscribe_post"`
 }
 
 // BatchResponse is the response body.
@@ -570,6 +572,8 @@ type Email struct {
 	TextBody              string            `json:"text_body,omitempty"`
 	Attachments           []Attachment      `json:"attachments,omitempty"`
 	Headers               map[string]string `json:"headers,omitempty"`
+	Tags                  []string          `json:"tags,omitempty"`
+	Metadata              map[string]string `json:"metadata,omitempty"`
 	ListUnsubscribeURL    string            `json:"list_unsubscribe_url,omitempty"`
 	ListUnsubscribeMailto string            `json:"list_unsubscribe_mailto,omitempty"`
 	UnsubscribeListID     string            `json:"unsubscribe_list_id,omitempty"`
@@ -623,6 +627,8 @@ type EmailSendInput struct {
 	Attachments           []Attachment      `json:"attachments"`
 	SendAt                string            `json:"send_at"`
 	DryRun                bool              `json:"dry_run"`
+	Tags                  []string          `json:"tags"`
+	Metadata              map[string]string `json:"metadata"`
 	UnsubscribeListID     string            `json:"unsubscribe_list_id"`
 	ListUnsubscribeURL    string            `json:"list_unsubscribe_url"`
 	ListUnsubscribeMailto string            `json:"list_unsubscribe_mailto"`
@@ -1615,6 +1621,7 @@ type SendInput struct {
 type SendResponse struct {
 	Email      *Email   `json:"email"`
 	Suppressed []string `json:"suppressed_recipients"`
+	Replayed   bool     `json:"replayed,omitzero"`
 }
 
 // Sender is the wire body.
@@ -2231,6 +2238,8 @@ type TemplateSendInput struct {
 	Attachments           []Attachment      `json:"attachments"`
 	SendAt                string            `json:"send_at"`
 	DryRun                bool              `json:"dry_run"`
+	Tags                  []string          `json:"tags"`
+	Metadata              map[string]string `json:"metadata"`
 	DisableTracking       bool              `json:"disable_tracking"`
 	DisableSigning        bool              `json:"disable_signing"`
 	SMTPGroup             string            `json:"smtp_group"`

@@ -358,6 +358,9 @@ export interface Email {
   text_body?: string
   attachments?: EmailAttachment[]
   headers?: Record<string, string>
+  // The caller's own labels and key-value record, carried through.
+  tags?: string[]
+  metadata?: Record<string, string>
   list_unsubscribe_url?: string
   list_unsubscribe_mailto?: string
   list_unsubscribe_post?: boolean

@@ -100,7 +100,7 @@ func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, string
 	}
 
 	for name, value := range map[string]string{
-		"sender": f.Sender, "recipient": f.Recipient, "template": f.Template,
+		"sender": f.Sender, "recipient": f.Recipient, "template": f.Template, "tag": f.Tag,
 		"api_key_id": f.APIKeyID, "smtp_server_id": f.SMTPServerID,
 		"search": f.Search, "cursor": f.Cursor,
 	} {

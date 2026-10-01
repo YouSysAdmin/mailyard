@@ -49,6 +49,11 @@ type SendRequest struct {
 	Headers     map[string]string `json:"headers,omitempty"`
 	Attachments []Attachment      `json:"attachments,omitempty"`
 
+	// Tags label the message for ListEmails' Tag filter. Metadata is a
+	// flat string map read back on the record, never interpreted.
+	Tags     []string          `json:"tags,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+
 	// SendAt schedules the message. RFC 3339.
 	SendAt string `json:"send_at,omitempty"`
 
@@ -533,6 +538,7 @@ type EmailFilter struct {
 	Sender       string
 	Recipient    string
 	Template     string
+	Tag          string
 	APIKeyID     string
 	SMTPServerID string
 

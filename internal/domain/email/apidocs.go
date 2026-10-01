@@ -35,7 +35,12 @@ func APIDocs() []apidoc.Route {
 				"`{\"sandbox_email\": {...}, \"sandboxed\": true}` - because the " +
 				"message was captured rather than queued. OpenAPI carries one " +
 				"schema per status, so that shape is named here rather than " +
-				"listed above.",
+				"listed above. " +
+				"An `Idempotency-Key` header, up to 255 characters and scoped to the project, " +
+				"makes a retry safe: a second request carrying the same key answers 200 with " +
+				"the message the first one queued and `replayed: true`, a duplicate arriving " +
+				"while the first is still running answers 409, and the key is forgotten after " +
+				"a day. A request that fails releases its key.",
 			Request: sendInput{},
 			Responses: []apidoc.Response{
 				apidoc.Created("Queued.", SendResponse{}),
@@ -133,6 +138,7 @@ func APIDocs() []apidoc.Route {
 				{Name: "sender", Description: "One whole From address, without regard to case."},
 				{Name: "recipient", Description: "One whole recipient address, Cc and Bcc included, without regard to case."},
 				{Name: "template", Description: "The name of the template the message was rendered from."},
+				{Name: "tag", Description: "Only messages carrying this tag."},
 				{Name: "api_key_id", Format: "uuid", Description: "Only mail accepted through this API key."},
 				{Name: "smtp_server_id", Format: "uuid", Description: "Only mail delivered through this server."},
 				{Name: "from", Description: "Created at or after this date (2026-08-01) or RFC 3339 instant."},

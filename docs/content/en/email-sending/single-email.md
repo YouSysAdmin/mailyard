@@ -88,6 +88,8 @@ with no text alternative scores worse with spam filters than one that has it.
 | `cc`, `bcc` | The other two recipient lists - see [Who sees whom](#who-sees-whom) |
 | `reply_to` | Where a reply lands when it should not go back to `from`. Any parseable address, verified or not |
 | `headers` | Up to 20 custom headers, written over the [project's defaults](/docs/projects/settings) - see below |
+| `tags` | Up to 10 labels of 64 characters. The [log](/docs/email-sending/email-log) filters by `?tag=` |
+| `metadata` | Up to 20 string pairs - your order id, your tenant - read back on the record and never interpreted |
 | `attachments` | Base64 files — see [Attachments](/docs/email-sending/attachments) |
 | `send_at` | Hold until an RFC 3339 time — see [Scheduled Email](/docs/email-sending/scheduled-email) |
 | `dry_run` | Run every validation and persist nothing |
@@ -127,6 +129,30 @@ A message's headers are laid over two other sets, and the nearest one wins, comp
 So a project default of `X-Env: staging` is what goes out until a message says `x-env: prod`, and then only the
 message's spelling is written. Each layer may hold twenty headers of its own, and each is checked against the reserved
 set when it is saved.
+
+## Sending once
+
+A client that times out waiting for the 201 does not know whether the message was queued. Retrying blindly sends it
+twice. Send an `Idempotency-Key` header instead, any string of up to 255 characters you mint per message, and a
+retry carrying the same key is answered with the message the first request queued:
+
+```bash
+curl -X POST https://mail.example.com/api/v1/emails/send \
+  -H "Authorization: Bearer myk_..." \
+  -H "Idempotency-Key: order-10457-receipt" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+| Outcome | Status | Body |
+|---|---|---|
+| First request | `201` | The queued message |
+| A retry after the first completed | `200` | The same message, with `replayed: true` and an empty `suppressed_recipients` |
+| A duplicate while the first is still running | `409` | An error naming the key |
+| A retry after the first was refused | Whatever the corrected request earns | The key is released by a failure |
+
+The key is scoped to the project and forgotten after a day. It applies to `/emails/send` and `/emails/send-template`.
+A batch is its own unit and does not take one.
 
 ## What comes back
 

@@ -126,6 +126,7 @@ var crossProjectByDesign = map[string]string{
 	"internal/domain/audit/store.go PurgeOlderThan":             "retention sweep, installation-wide",
 	"internal/domain/email/store.go PurgeOlderThan":             "retention sweep",
 	"internal/domain/email/store.go PruneVolumeBefore":          "retention sweep, drops volume counters no window can read",
+	"internal/domain/email/store.go PruneKeysBefore":            "retention sweep, drops idempotency keys past their retry window",
 	"internal/domain/analytics/rollup.go RecomputeDaily":        "maintenance sweep, rebuilds the trend rollup for every project in one scan",
 	"internal/domain/email/store.go ClearBodiesOlderThan":       "retention sweep",
 	"internal/domain/email/store.go ClearAttachmentsOlderThan":  "retention sweep",

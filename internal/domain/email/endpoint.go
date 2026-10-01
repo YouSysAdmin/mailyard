@@ -110,9 +110,73 @@ func (h *Handler) Send(c fiber.Ctx) error {
 		})
 	}
 
-	e, blocked, err := svc.Send(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), req)
+	return h.sendOnce(c, rc, func() (*emailmodel.Email, []string, error) {
+		return svc.Send(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), req)
+	})
+}
+
+// maxIdempotencyKey bounds the header. A key is an id the caller
+// minted, and anything longer than this is a body in a header.
+const maxIdempotencyKey = 255
+
+// sendOnce runs send under the request's Idempotency-Key, when it
+// carries one.
+//
+// The key is reserved BEFORE the send and completed after, so a
+// duplicate that arrives while the first request is still running is
+// told to wait rather than handed nothing or given a second message.
+// A send that fails releases the key, because the retry that follows
+// a 4xx is a corrected request, not a duplicate. Scoped to the
+// project, the way every send resource is.
+func (h *Handler) sendOnce(c fiber.Ctx, rc *domain.RequestContext, send func() (*emailmodel.Email, []string, error)) error {
+	key := strings.TrimSpace(c.Get("Idempotency-Key"))
+	if len(key) > maxIdempotencyKey {
+		return response.BadRequest(c, "Idempotency-Key must be at most 255 characters")
+	}
+
+	if key == "" {
+		e, blocked, err := send()
+		if err != nil {
+			return sendFailure(c, err)
+		}
+
+		return response.Created(c, SendResponse{Email: e, Suppressed: emptyIfNil(blocked)})
+	}
+
+	keys := h.Runtime.Store.Email
+	existing, reserved, err := keys.ReserveKey(c.Context(), rc.Project.ID, key)
 	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !reserved {
+		if existing == "" {
+			return response.Conflict(c, "a request with this Idempotency-Key is still being processed")
+		}
+
+		e, err := keys.Get(c.Context(), rc.Project.ID, existing)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if e == nil {
+			return response.Gone(c, "the message this Idempotency-Key produced is no longer in the log")
+		}
+
+		return response.Success(c, SendResponse{Email: e, Suppressed: emptyIfNil(nil), Replayed: true})
+	}
+
+	e, blocked, err := send()
+	if err != nil {
+		if rerr := keys.ReleaseKey(c.Context(), rc.Project.ID, key); rerr != nil {
+			h.Runtime.Log.Warn("email: releasing an idempotency key", "error", rerr)
+		}
+
 		return sendFailure(c, err)
+	}
+
+	if cerr := keys.CompleteKey(c.Context(), rc.Project.ID, key, e.ID); cerr != nil {
+		h.Runtime.Log.Warn("email: completing an idempotency key", "error", cerr)
 	}
 
 	return response.Created(c, SendResponse{Email: e, Suppressed: emptyIfNil(blocked)})
@@ -153,6 +217,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 		Sender:       paging.Search(c, "sender"),
 		Recipient:    paging.Search(c, "recipient"),
 		Template:     paging.Search(c, "template"),
+		Tag:          paging.Search(c, "tag"),
 		APIKeyID:     strings.TrimSpace(c.Query("api_key_id")),
 		SMTPServerID: strings.TrimSpace(c.Query("smtp_server_id")),
 		Search:       paging.Search(c, "search"),
@@ -431,6 +496,8 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 		HTML:        in.HTML,
 		Text:        in.Text,
 		Headers:     in.Headers,
+		Tags:        in.Tags,
+		Metadata:    in.Metadata,
 		Attachments: in.Attachments,
 
 		UnsubscribeListID:     in.UnsubscribeListID,

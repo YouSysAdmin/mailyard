@@ -43,7 +43,8 @@ const emailColumns = `id, project_id, created_by, api_key_id, credential_id, smt
        list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
        status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
        created_at, scheduled_at, sent_at,
-       tracked, opened_at, clicked_at, open_count, click_count, delivered_via, signing`
+       tracked, opened_at, clicked_at, open_count, click_count, delivered_via, signing,
+       tags, metadata`
 
 const emailSelect = `
 SELECT ` + emailColumns + `
@@ -318,6 +319,14 @@ func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmode
 		args = append(args, f.Template)
 	}
 
+	// Containment rather than the jsonb ? operator, which the
+	// placeholder rewriter would turn into a parameter. @> is what the
+	// expression index serves.
+	if f.Tag != "" {
+		query += ` AND tags::jsonb @> ?::jsonb`
+		args = append(args, database.MustJSON([]string{f.Tag}))
+	}
+
 	if f.APIKeyID != "" {
 		query += ` AND api_key_id = ?`
 		args = append(args, f.APIKeyID)
@@ -378,8 +387,8 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
             subject, template_name, html_body, text_body, attachments_json, headers_json,
             list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
             status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
-            created_at, scheduled_at, sent_at, tracked, signing
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            created_at, scheduled_at, sent_at, tracked, signing, tags, metadata
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING project_id, created_at
         )
         INSERT INTO email_volume (project_id, minute, accepted)
@@ -396,10 +405,29 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
 		e.Status, e.ErrorMessage, e.Attempts, e.MaxAttempts,
 		database.NullTime(e.NextAttemptAt), database.NullTime(e.ClaimedAt),
 		e.CreatedAt, database.NullTime(e.ScheduledAt), database.NullTime(e.SentAt),
-		e.Tracked, e.Signing,
+		e.Tracked, e.Signing, database.MustJSON(emptyTags(e.Tags)), database.MustJSON(emptyMetadata(e.Metadata)),
 	)
 
 	return err
+}
+
+// emptyTags and emptyMetadata keep a nil slice or map from being
+// stored as the JSON null, which the column default and the tag
+// index both read as a shape they do not expect.
+func emptyTags(in []string) []string {
+	if in == nil {
+		return []string{}
+	}
+
+	return in
+}
+
+func emptyMetadata(in map[string]string) map[string]string {
+	if in == nil {
+		return map[string]string{}
+	}
+
+	return in
 }
 
 // Reset returns a failed row to the queue for a manual retry:
@@ -580,7 +608,7 @@ func (s *Store) RecoverStuck(ctx context.Context, olderThan time.Time) (int, err
 
 func scanEmail(r interface{ Scan(...any) error }) (*emailmodel.Email, error) {
 	var e emailmodel.Email
-	var recipients, attachments, headers string
+	var recipients, attachments, headers, tags, metadata string
 	var nextAt, claimedAt, scheduledAt, sentAt sql.NullTime
 	var openedAt, clickedAt sql.NullTime
 	if err := r.Scan(&e.ID, &e.ProjectID, &e.CreatedBy, database.Str(&e.APIKeyID),
@@ -592,13 +620,22 @@ func scanEmail(r interface{ Scan(...any) error }) (*emailmodel.Email, error) {
 		&e.Status, &e.ErrorMessage, &e.Attempts, &e.MaxAttempts,
 		&nextAt, &claimedAt, &e.CreatedAt, &scheduledAt, &sentAt,
 		&e.Tracked, &openedAt, &clickedAt, &e.OpenCount, &e.ClickCount,
-		&e.DeliveredVia, &e.Signing); err != nil {
+		&e.DeliveredVia, &e.Signing, &tags, &metadata); err != nil {
 		return nil, err
 	}
 
 	database.MustUnmarshalJSON(recipients, &e.Recipients)
 	database.MustUnmarshalJSON(attachments, &e.Attachments)
 	database.MustUnmarshalJSON(headers, &e.Headers)
+	database.MustUnmarshalJSON(tags, &e.Tags)
+	database.MustUnmarshalJSON(metadata, &e.Metadata)
+	if len(e.Tags) == 0 {
+		e.Tags = nil
+	}
+
+	if len(e.Metadata) == 0 {
+		e.Metadata = nil
+	}
 	if nextAt.Valid {
 		e.NextAttemptAt = new(nextAt.Time)
 	}
@@ -643,6 +680,64 @@ func (s *Store) AcceptedSince(ctx context.Context, projID string, since time.Tim
 		projID, since.UTC()).Scan(&n)
 
 	return n, err
+}
+
+// ReserveKey claims key for the request about to send. The insert
+// carries no email id yet, so a duplicate arriving while the first
+// request runs sees the row with none and is told to wait rather than
+// handed a message that does not exist yet.
+func (s *Store) ReserveKey(ctx context.Context, projID, key string) (string, bool, error) {
+	res, err := s.Exec(ctx, `
+        INSERT INTO email_idempotency (project_id, key, email_id, created_at)
+        VALUES (?, ?, NULL, ?)
+        ON CONFLICT (project_id, key) DO NOTHING`, projID, key, time.Now().UTC())
+	if err != nil {
+		return "", false, err
+	}
+
+	if n, err := res.RowsAffected(); err != nil {
+		return "", false, err
+	} else if n > 0 {
+		return "", true, nil
+	}
+
+	var emailID string
+	err = s.QueryRow(ctx, `SELECT email_id FROM email_idempotency WHERE project_id = ? AND key = ?`,
+		projID, key).Scan(database.Str(&emailID))
+	if errors.Is(err, sql.ErrNoRows) {
+		// Released between the insert and the read: the earlier
+		// request failed. The caller tries again from the top.
+		return "", false, nil
+	}
+
+	return emailID, false, err
+}
+
+// CompleteKey records the message a reserved key produced.
+func (s *Store) CompleteKey(ctx context.Context, projID, key, emailID string) error {
+	_, err := s.Exec(ctx, `UPDATE email_idempotency SET email_id = ? WHERE project_id = ? AND key = ?`,
+		emailID, projID, key)
+
+	return err
+}
+
+// ReleaseKey gives a key back after the send it was reserved for
+// failed, so the retry that follows is not told it is a duplicate.
+func (s *Store) ReleaseKey(ctx context.Context, projID, key string) error {
+	_, err := s.Exec(ctx, `DELETE FROM email_idempotency WHERE project_id = ? AND key = ? AND email_id IS NULL`,
+		projID, key)
+
+	return err
+}
+
+// PruneKeysBefore drops keys older than the retry window.
+func (s *Store) PruneKeysBefore(ctx context.Context, before time.Time) (int64, error) {
+	res, err := s.Exec(ctx, `DELETE FROM email_idempotency WHERE created_at < ?`, before.UTC())
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
 }
 
 // PruneVolumeBefore drops counter rows the windows can no longer read.

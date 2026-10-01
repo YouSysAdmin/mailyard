@@ -245,6 +245,8 @@ type SendRequest struct {
 	HTML                  string
 	Text                  string
 	Headers               map[string]string
+	Tags                  []string
+	Metadata              map[string]string
 	Attachments           []emailmodel.Attachment
 	SendAt                *time.Time
 	TemplateName          string
@@ -637,6 +639,8 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		TextBody:              req.Text,
 		Attachments:           req.Attachments,
 		Headers:               withDisplayRecipients(req),
+		Tags:                  req.Tags,
+		Metadata:              req.Metadata,
 		ListUnsubscribeURL:    req.ListUnsubscribeURL,
 		ListUnsubscribeMailto: req.ListUnsubscribeMailto,
 		UnsubscribeListID:     req.UnsubscribeListID,

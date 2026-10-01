@@ -45,6 +45,12 @@ func (f *fakeEmailStore) PruneVolumeBefore(context.Context, time.Time) (int64, e
 	return 0, nil
 }
 
+func (f *fakeEmailStore) PruneKeysBefore(context.Context, time.Time) (int64, error) {
+	*f.log = append(*f.log, "email:prune-keys")
+
+	return 0, nil
+}
+
 func (f *fakeEmailStore) StorageKeysOlderThan(context.Context, time.Time) ([]string, error) {
 	*f.log = append(*f.log, "email:keys")
 

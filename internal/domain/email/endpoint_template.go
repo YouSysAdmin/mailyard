@@ -8,6 +8,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
 )
 
 // SendTemplate renders a stored template and queues the result.
@@ -26,7 +27,9 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		ListUnsubscribePost:   in.ListUnsubscribePost,
 		Sandbox:               in.Sandbox,
 		SandboxRetentionDays:  in.SandboxRetentionDays,
-		DisableSigning:        in.DisableSigning}
+		DisableSigning:        in.DisableSigning,
+		Tags:                  in.Tags,
+		Metadata:              in.Metadata}
 	req, err := base.toRequest()
 	if err != nil {
 		return response.BadRequest(c, err.Error())
@@ -110,12 +113,9 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		})
 	}
 
-	e, blocked, err := svc.SendWithTemplate(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), ref, req)
-	if err != nil {
-		return sendFailure(c, err)
-	}
-
-	return response.Created(c, SendResponse{Email: e, Suppressed: emptyIfNil(blocked)})
+	return h.sendOnce(c, rc, func() (*emailmodel.Email, []string, error) {
+		return svc.SendWithTemplate(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc), ref, req)
+	})
 }
 
 // Batch queues up to 100 sends in one call and reports per-item

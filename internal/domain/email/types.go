@@ -46,6 +46,11 @@ type sendInput struct {
 	SendAt      string                  `json:"send_at"     validate:"omitempty"`
 	DryRun      bool                    `json:"dry_run"`
 
+	// Tags label the message for the log's ?tag= filter. Metadata is a
+	// flat string map read back on the record and never interpreted.
+	Tags     []string          `json:"tags"     validate:"omitempty,max=10,dive,min=1,max=64"`
+	Metadata map[string]string `json:"metadata" validate:"omitempty,max=20,dive,keys,min=1,max=64,endkeys,max=256"`
+
 	// UnsubscribeListID scopes to send to a transactional opt-out
 	// list, so {{ mailyard_unsubscribe_url }} renders a one-click link
 	// that blocks only that category of mail.
@@ -123,6 +128,8 @@ type templateSendInput struct {
 	Attachments     []emailmodel.Attachment `json:"attachments"   validate:"omitempty,max=10"`
 	SendAt          string                  `json:"send_at"       validate:"omitempty"`
 	DryRun          bool                    `json:"dry_run"`
+	Tags            []string                `json:"tags"          validate:"omitempty,max=10,dive,min=1,max=64"`
+	Metadata        map[string]string       `json:"metadata"      validate:"omitempty,max=20,dive,keys,min=1,max=64,endkeys,max=256"`
 	DisableTracking bool                    `json:"disable_tracking"`
 	DisableSigning  bool                    `json:"disable_signing"`
 
@@ -162,14 +169,16 @@ type batchInput struct {
 // batchItemInput is converted to BatchItem by a struct conversion, so
 // the two carry the same fields in the same order.
 type batchItemInput struct {
-	To       []string       `json:"to"       validate:"required,min=1,dive,max=320"`
-	Cc       []string       `json:"cc"       validate:"omitempty,dive,max=320"`
-	Bcc      []string       `json:"bcc"      validate:"omitempty,dive,max=320"`
-	Language string         `json:"language" validate:"omitempty,min=2,max=10"`
-	Data     map[string]any `json:"data"`
-	Subject  string         `json:"subject"  validate:"omitempty,max=1000"`
-	HTML     string         `json:"html"     validate:"omitempty,max=1048576"`
-	Text     string         `json:"text"     validate:"omitempty,max=1048576"`
+	To       []string          `json:"to"       validate:"required,min=1,dive,max=320"`
+	Cc       []string          `json:"cc"       validate:"omitempty,dive,max=320"`
+	Bcc      []string          `json:"bcc"      validate:"omitempty,dive,max=320"`
+	Language string            `json:"language" validate:"omitempty,min=2,max=10"`
+	Data     map[string]any    `json:"data"`
+	Subject  string            `json:"subject"  validate:"omitempty,max=1000"`
+	HTML     string            `json:"html"     validate:"omitempty,max=1048576"`
+	Text     string            `json:"text"     validate:"omitempty,max=1048576"`
+	Tags     []string          `json:"tags"     validate:"omitempty,max=10,dive,min=1,max=64"`
+	Metadata map[string]string `json:"metadata" validate:"omitempty,max=20,dive,keys,min=1,max=64,endkeys,max=256"`
 
 	// Per item, because an opt-out link identifies the recipient. A
 	// batch is where an application sends its bulk mail, and one link
@@ -223,6 +232,11 @@ type verifyInput struct {
 type SendResponse struct {
 	Email      *emailmodel.Email `json:"email"`
 	Suppressed []string          `json:"suppressed_recipients"`
+
+	// Replayed says this is the message an earlier request with the
+	// same Idempotency-Key queued, answered again rather than sent
+	// again. suppressed_recipients is empty on a replay.
+	Replayed bool `json:"replayed,omitzero"`
 }
 
 // DryRunResponse is what a send with dry_run set returns: the message

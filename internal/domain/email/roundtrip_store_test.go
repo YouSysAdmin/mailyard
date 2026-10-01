@@ -51,6 +51,8 @@ func TestEmailSurvivesARoundTrip(t *testing.T) {
 		HTMLBody:              "<p>html</p>",
 		TextBody:              "text",
 		Headers:               map[string]string{"X-Thing": "value"},
+		Tags:                  []string{"receipt", "shop"},
+		Metadata:              map[string]string{"order_id": "A-1001"},
 		ListUnsubscribeURL:    "https://example.com/u",
 		ListUnsubscribeMailto: "mailto:unsub@example.com",
 		ListUnsubscribePost:   true,
