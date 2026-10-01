@@ -18,10 +18,10 @@ GET /api/v1/inbound-emails?limit=50&status=received
 |---|---|
 | `status` | One of the three below |
 | `limit` | Default 50, maximum 200 |
-| `before` | Cursor: RFC 3339 `received_at` of the last row you saw |
-| `before_id` | The id of that row. Send it with `before` |
+| `cursor` | The `next_cursor` of the previous page |
 | `sender` | An address or part of one, matched against the From header without regard to case |
 | `recipient` | The same, against the envelope recipients |
+| `search` | Part of the subject, without regard to case |
 
 There are three statuses, and no others:
 
@@ -31,9 +31,9 @@ There are three statuses, and no others:
 | `rejected` | Refused at ingest — a suppressed sender, or a DMARC failure on a `p=reject` domain |
 | `failed` | The MIME tree could not be parsed. The raw bytes are still there |
 
-Paging is a **keyset cursor**, like the outbound log, and for the same reason: this list grows on its own. Send
-`before_id` alongside `before` or two messages sharing a `received_at` across a page boundary will appear on neither
-page. There is no total and no offset.
+Paging is a **keyset cursor**, like the outbound log, and for the same reason: this list grows on its own. Follow
+`next_cursor` until it comes back empty. The cursor encodes `received_at` and the id together, so two messages sharing
+a `received_at` across a page boundary are neither repeated nor skipped. There is no total and no offset.
 
 ```bash
 curl -G http://localhost:3000/api/v1/inbound-emails \

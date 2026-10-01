@@ -65,16 +65,17 @@ export interface InboundListParams {
   sender?: string
   recipient?: string
   limit?: number
-  // RFC 3339 keyset cursor over received_at, whose other half is
-  // before_id - the timestamp alone drops rows that share it with the
-  // last one on the page.
-  before?: string
-  before_id?: string
+  // The next_cursor of the previous page, which encodes received_at
+  // and id together so a tie across a page boundary is neither
+  // repeated nor skipped.
+  cursor?: string
 }
 
 export const inboundApi = {
   list: (params: InboundListParams = {}) =>
-    api.get<{ inbound_emails: InboundEmail[] }>('/inbound-emails/', { params }),
+    api.get<{ inbound_emails: InboundEmail[]; next_cursor: string }>('/inbound-emails/', {
+      params,
+    }),
   stats: () => api.get<{ counts: Record<string, number> }>('/inbound-emails/stats'),
   get: (id: string) => api.get<{ inbound_email: InboundEmail }>(`/inbound-emails/${id}`),
   remove: (id: string) => api.delete(`/inbound-emails/${id}`),

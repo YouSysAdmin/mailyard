@@ -195,7 +195,7 @@ func exportWindow(c fiber.Ctx) (time.Time, time.Time, error, bool) {
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
 		// A bare date needs no adjustment at this end: midnight IS the
 		// start of the day somebody meant.
-		t, _, err := parseBound(raw)
+		t, _, err := paging.Bound(raw)
 		if err != nil {
 			return from, to, response.BadRequest(c,
 				"from must be a date (2026-08-01) or an RFC 3339 timestamp"), false
@@ -205,7 +205,7 @@ func exportWindow(c fiber.Ctx) (time.Time, time.Time, error, bool) {
 	}
 
 	if raw := strings.TrimSpace(c.Query("to")); raw != "" {
-		t, dateOnly, err := parseBound(raw)
+		t, dateOnly, err := paging.Bound(raw)
 		if err != nil {
 			return from, to, response.BadRequest(c,
 				"to must be a date (2026-08-01) or an RFC 3339 timestamp"), false
@@ -223,21 +223,6 @@ func exportWindow(c fiber.Ctx) (time.Time, time.Time, error, bool) {
 	}
 
 	return from, to, nil, true
-}
-
-// parseBound reads one end of the window and says whether it was a bare
-// date, which is what decides where the day ends.
-func parseBound(raw string) (time.Time, bool, error) {
-	if t, err := time.Parse(time.RFC3339, raw); err == nil {
-		return t.UTC(), false, nil
-	}
-
-	t, err := time.Parse("2006-01-02", raw)
-	if err != nil {
-		return time.Time{}, false, err
-	}
-
-	return t.UTC(), true, nil
 }
 
 func orEmpty(in []*amodel.Event) []*amodel.Event {

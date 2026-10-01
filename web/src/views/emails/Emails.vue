@@ -30,9 +30,9 @@ const status = ref('')
 // is on screen rather than whatever is half-typed in the box.
 const search = ref('')
 const searchInput = ref('')
-// Server keyset paging: when a page comes back full there may be more
-// rows before the last created_at cursor.
-const hasMore = ref(false)
+// Server keyset paging: the cursor of the page after the one on
+// screen, empty when there is none.
+const nextCursor = ref('')
 const retryingId = ref<string | null>(null)
 // True once older pages have been pulled in, which is what stops an
 // automatic refresh from collapsing the list back to the newest page.
@@ -59,7 +59,7 @@ async function load(quiet = false) {
       limit: PAGE_SIZE,
     })
     emails.value = res.data.emails ?? []
-    hasMore.value = emails.value.length === PAGE_SIZE
+    nextCursor.value = res.data.next_cursor ?? ''
   } catch (e) {
     // A failed automatic refresh is not worth a toast every ten
     // seconds - the rows on screen are still the last good answer.
@@ -70,21 +70,18 @@ async function load(quiet = false) {
 }
 
 async function loadMore() {
-  const last = emails.value[emails.value.length - 1]
-  if (!last || loadingMore.value) return
+  if (!nextCursor.value || loadingMore.value) return
   loadingMore.value = true
   try {
     const res = await emailsApi.list({
       status: status.value || undefined,
       search: search.value || undefined,
       limit: PAGE_SIZE,
-      before: last.created_at,
-      before_id: last.id,
+      cursor: nextCursor.value,
     })
-    const batch = res.data.emails ?? []
-    emails.value = emails.value.concat(batch)
+    emails.value = emails.value.concat(res.data.emails ?? [])
     pagedBack.value = true
-    hasMore.value = batch.length === PAGE_SIZE
+    nextCursor.value = res.data.next_cursor ?? ''
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load more emails'))
   } finally {
@@ -265,7 +262,7 @@ function recipientsSummary(recipients: string[]): string {
               </tbody>
             </table>
           </div>
-          <div v-if="hasMore" class="load-more">
+          <div v-if="nextCursor" class="load-more">
             <button class="btn btn-secondary" :disabled="loadingMore" @click="loadMore">
               {{ loadingMore ? 'Loading...' : 'Load more' }}
             </button>

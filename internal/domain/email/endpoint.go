@@ -6,11 +6,14 @@ import (
 	"errors"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/keyset"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
@@ -145,35 +148,65 @@ func emptyIfNil(in []string) []string {
 // List serves GET /api/v1/emails.
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
+	w := paging.WindowFrom(c)
 	f := Filter{
-		Status: c.Query("status"),
-		Search: paging.Search(c, "search"),
-		Limit:  paging.From(c).Limit,
+		Sender:       paging.Search(c, "sender"),
+		Recipient:    paging.Search(c, "recipient"),
+		Template:     paging.Search(c, "template"),
+		APIKeyID:     strings.TrimSpace(c.Query("api_key_id")),
+		SMTPServerID: strings.TrimSpace(c.Query("smtp_server_id")),
+		Search:       paging.Search(c, "search"),
+		Limit:        w.Fetch(),
+		Cursor:       w.Cursor,
 	}
-	if before := c.Query("before"); before != "" {
-		t, err := time.Parse(time.RFC3339, before)
-		if err != nil {
-			return response.BadRequest(c, "before must be an RFC 3339 timestamp")
+	// A list, so one request answers "anything that did not go out".
+	// Each value is checked by name: an unknown status would match
+	// nothing and read as an empty log.
+	for status := range strings.SplitSeq(c.Query("status"), ",") {
+		status = strings.TrimSpace(status)
+		if status == "" {
+			continue
 		}
 
-		f.Before = &t
-		// The other half of the cursor. Optional, so `?before=` on its
-		// own keeps working - but without it two messages sharing a
-		// created_at across a page boundary are skipped entirely, and the
-		// caller never learns a row went missing.
-		f.BeforeID = c.Query("before_id")
+		if !emailmodel.ValidStatus(status) {
+			return response.BadRequest(c, "unknown status "+status)
+		}
+
+		f.Statuses = append(f.Statuses, status)
 	}
 
-	emails, err := h.Runtime.Store.Email.List(c.Context(), rc.Project.ID, f)
+	for name, id := range map[string]string{"api_key_id": f.APIKeyID, "smtp_server_id": f.SMTPServerID} {
+		if id != "" && !ids.Valid(id) {
+			return response.BadRequest(c, name+" must be a uuid")
+		}
+	}
+
+	var err error
+	if f.From, f.To, err = paging.TimeWindow(c); err != nil {
+		return response.BadRequest(c, "from and to "+err.Error())
+	}
+
+	if f.After, err = paging.Instant(c, "after"); err != nil {
+		return response.BadRequest(c, "after "+err.Error())
+	}
+
+	rows, err := h.Runtime.Store.Email.List(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if emails == nil {
-		emails = []*emailmodel.Email{}
+	page, more := keyset.Cut(rows, w.Limit)
+	if page == nil {
+		page = []*emailmodel.Email{}
 	}
 
-	return response.Success(c, ListResponse{Emails: emails})
+	next := ""
+	if more && len(page) > 0 {
+		last := page[len(page)-1]
+		next = keyset.Cursor{CreatedAt: last.CreatedAt, ID: last.ID}.Encode()
+	}
+
+	return response.Success(c, ListResponse{Emails: page, NextCursor: next})
 }
 
 // Stats returns per-status counts for the project.

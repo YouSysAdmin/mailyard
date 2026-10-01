@@ -28,6 +28,7 @@ const (
 var validStatuses = map[string]struct{}{
 	StatusPending: {}, StatusQueued: {}, StatusProcessing: {},
 	StatusSent: {}, StatusFailed: {}, StatusSuppressed: {}, StatusScheduled: {},
+	StatusCancelled: {},
 }
 
 // ValidStatus reports whether s names a real delivery state.

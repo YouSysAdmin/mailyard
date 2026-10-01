@@ -237,12 +237,26 @@ func (s *Store) GetAny(ctx context.Context, id string) (*emailmodel.Email, error
 	return e, err
 }
 
+// listLimit is the store's own clamp, one more than the API ceiling
+// because the handler asks for limit+1 to learn whether a next page
+// exists.
+func listLimit(n int) int {
+	if n < 1 || n > 201 {
+		return 51
+	}
+
+	return n
+}
+
 // List returns the project's emails, newest first.
 //
 // Search matches a RECIPIENT address or the SUBJECT, in two clauses
 // because the columns are asked different questions. recipients is a
 // JSON array and the needle is quoted (%"a@b.com"%) so a partial
-// address cannot match. subject is prose, so a plain substring.
+// address cannot match. subject is prose, so a plain substring. Both
+// without regard to case: an address is written however the caller
+// wrote it, and a log search that misses Bob@x.test for bob@x.test
+// reads as "that message was never sent".
 //
 // Not the body: the largest column on the largest table, and a
 // question nobody asks of a delivery log.
@@ -252,27 +266,70 @@ func (s *Store) GetAny(ctx context.Context, id string) (*emailmodel.Email, error
 func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmodel.Email, error) {
 	query := emailSelect + ` WHERE project_id = ?`
 	args := []any{projID}
-	if f.Status != "" {
-		query += ` AND status = ?`
-		args = append(args, f.Status)
+	if len(f.Statuses) > 0 {
+		query += ` AND status = ANY(?::text[])`
+		args = append(args, f.Statuses)
 	}
 
 	// The cursor is `(created_at, id)`, and the row-value comparison is
 	// what makes it one condition rather than two that can disagree.
 	// Without the id, a tie in created_at straddling a page boundary
 	// SKIPS every row sharing that timestamp - they show on neither page,
-	// so the log is missing a message that was sent. BeforeID may be
-	// absent, which keeps a caller passing only `?before=` working.
-	if f.Before != nil && f.BeforeID != "" {
+	// so the log is missing a message that was sent.
+	if !f.Cursor.IsZero() {
 		query += ` AND (created_at, id) < (?, ?)`
-		args = append(args, *f.Before, f.BeforeID)
-	} else if f.Before != nil {
+		args = append(args, f.Cursor.CreatedAt.UTC(), f.Cursor.ID)
+	}
+
+	// The window bounds created_at, which is also what the table is
+	// partitioned on, so each of these prunes partitions as well as
+	// rows.
+	if f.From != nil {
+		query += ` AND created_at >= ?`
+		args = append(args, f.From.UTC())
+	}
+
+	if f.To != nil {
 		query += ` AND created_at < ?`
-		args = append(args, *f.Before)
+		args = append(args, f.To.UTC())
+	}
+
+	if f.After != nil {
+		query += ` AND created_at > ?`
+		args = append(args, f.After.UTC())
+	}
+
+	// A whole address each. The sender is one column, lowered to match
+	// addressMatchClause. recipients is a JSON array, so the needle is
+	// quoted the way Search quotes it and matched without regard to
+	// case, which the trigram index serves either way.
+	if f.Sender != "" {
+		query += ` AND LOWER(sender) = ?`
+		args = append(args, strings.ToLower(strings.TrimSpace(f.Sender)))
+	}
+
+	if f.Recipient != "" {
+		query += ` AND recipients ILIKE ? ESCAPE '\'`
+		args = append(args, `%"`+database.EscapeLike(strings.TrimSpace(f.Recipient))+`"%`)
+	}
+
+	if f.Template != "" {
+		query += ` AND template_name = ?`
+		args = append(args, f.Template)
+	}
+
+	if f.APIKeyID != "" {
+		query += ` AND api_key_id = ?`
+		args = append(args, f.APIKeyID)
+	}
+
+	if f.SMTPServerID != "" {
+		query += ` AND smtp_server_id = ?`
+		args = append(args, f.SMTPServerID)
 	}
 
 	if term := strings.TrimSpace(f.Search); term != "" {
-		query += ` AND (recipients LIKE ? ESCAPE '\' OR subject ILIKE ? ESCAPE '\')`
+		query += ` AND (recipients ILIKE ? ESCAPE '\' OR subject ILIKE ? ESCAPE '\')`
 		escaped := database.EscapeLike(term)
 		args = append(args, `%"`+escaped+`"%`, "%"+escaped+"%")
 	}
@@ -281,12 +338,7 @@ func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmode
 	// query does not - and the tie it exists to break is decided by
 	// whatever the plan happens to return.
 	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
-	limit := f.Limit
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-
-	args = append(args, limit)
+	args = append(args, listLimit(f.Limit))
 
 	rows, err := s.ReadQuery(ctx, query, args...)
 	if err != nil {

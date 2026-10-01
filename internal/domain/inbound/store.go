@@ -76,22 +76,25 @@ func (s *Store) List(ctx context.Context, projID string, f store.InboundFilter) 
 		args = append(args, "%"+database.EscapeLike(f.Recipient)+"%")
 	}
 
+	if f.Search != "" {
+		sb.WriteString(` AND subject ILIKE ? ESCAPE '\'`)
+		args = append(args, "%"+database.EscapeLike(f.Search)+"%")
+	}
+
 	// `(received_at, id)`, one row-value comparison. received_at alone
 	// SKIPS every row tied with the last one on the page - see
-	// store.InboundFilter. BeforeID may be absent, which leaves the older
-	// `?before=` contract working as it did.
-	if f.Before != nil && f.BeforeID != "" {
+	// store.InboundFilter.
+	if !f.Cursor.IsZero() {
 		sb.WriteString(` AND (received_at, id) < (?, ?)`)
-		args = append(args, f.Before.UTC(), f.BeforeID)
-	} else if f.Before != nil {
-		sb.WriteString(` AND received_at < ?`)
-		args = append(args, f.Before.UTC())
+		args = append(args, f.Cursor.CreatedAt.UTC(), f.Cursor.ID)
 	}
 
 	sb.WriteString(` ORDER BY received_at DESC, id DESC LIMIT ?`)
+	// One more than the API ceiling, because the handler asks for
+	// limit+1 to learn whether a next page exists.
 	limit := f.Limit
-	if limit <= 0 || limit > 200 {
-		limit = 50
+	if limit <= 0 || limit > 201 {
+		limit = 51
 	}
 
 	args = append(args, limit)

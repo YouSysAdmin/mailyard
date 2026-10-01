@@ -60,7 +60,7 @@ func TestResponseKeysAreStable(t *testing.T) {
 		{
 			name: "empty list is an array",
 			body: ListResponse{Emails: []*emailmodel.Email{}},
-			want: `{"emails":[]}`,
+			want: `{"emails":[],"next_cursor":""}`,
 		},
 	}
 

@@ -24,6 +24,15 @@ func New() string {
 	return uuid.NewV7().String()
 }
 
+// Valid reports whether s is a uuid at all, which is what a filter
+// value has to be before it is compared against a uuid column: a
+// malformed one fails the statement rather than matching nothing.
+func Valid(s string) bool {
+	_, err := uuid.Parse(s)
+
+	return err == nil
+}
+
 // MintedAt returns the millisecond a v7 id was minted, and whether it
 // could be read at all.
 //

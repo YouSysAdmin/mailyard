@@ -125,14 +125,22 @@ func APIDocs() []apidoc.Route {
 			Tag:        "emails",
 			Permission: "emails:read",
 			Summary:    "List sent and queued emails",
+			Description: "Cursor paged, newest first: follow `next_cursor` until it comes back empty. " +
+				"Every filter is ANDed with the others.",
 			Query: []apidoc.Param{
-				{Name: "status", Enum: []string{"pending", "queued", "scheduled", "processing", "sent", "failed", "suppressed", "cancelled"}},
-				{Name: "before", Format: "date-time", Description: "Only rows created before this RFC 3339 instant."},
-				{Name: "before_id", Description: "The id of the last row on the previous page. " +
-					"Pass it with `before` - two messages can share a created_at, and without the id " +
-					"every row tied with the last one is skipped rather than returned on the next page."},
-				{Name: "search", Description: "Match a recipient address exactly, or a substring of the subject. The body is not searched."},
+				{Name: "status", Description: "One status, or several separated by commas. " +
+					"Values: pending, queued, scheduled, processing, sent, failed, suppressed, cancelled."},
+				{Name: "sender", Description: "One whole From address, without regard to case."},
+				{Name: "recipient", Description: "One whole recipient address, Cc and Bcc included, without regard to case."},
+				{Name: "template", Description: "The name of the template the message was rendered from."},
+				{Name: "api_key_id", Format: "uuid", Description: "Only mail accepted through this API key."},
+				{Name: "smtp_server_id", Format: "uuid", Description: "Only mail delivered through this server."},
+				{Name: "from", Description: "Created at or after this date (2026-08-01) or RFC 3339 instant."},
+				{Name: "to", Description: "Created before this instant. A bare date includes that whole day."},
+				{Name: "after", Description: "Created strictly after this instant, which is how a poller asks for what is new since the last row it saw."},
+				{Name: "search", Description: "Match a recipient address exactly, or a substring of the subject, without regard to case. The body is not searched."},
 				{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."},
+				{Name: "cursor", Description: "The next_cursor of the previous page."},
 			},
 			Responses: []apidoc.Response{
 				apidoc.OK("Newest first.", ListResponse{}),

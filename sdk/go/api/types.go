@@ -592,7 +592,8 @@ type Email struct {
 
 // EmailListResponse is the response body.
 type EmailListResponse struct {
-	Emails []*Email `json:"emails"`
+	Emails     []*Email `json:"emails"`
+	NextCursor string   `json:"next_cursor"`
 }
 
 // EmailPreviewResponse is the response body.
@@ -850,6 +851,7 @@ type InboundGetResponse struct {
 // InboundListResponse is the response body.
 type InboundListResponse struct {
 	InboundEmails []*InboundEmail `json:"inbound_emails"`
+	NextCursor    string          `json:"next_cursor"`
 }
 
 // InboundStatsResponse is the response body.

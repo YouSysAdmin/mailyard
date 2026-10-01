@@ -21,6 +21,10 @@ import (
 // ListResponse is a page of received mail.
 type ListResponse struct {
 	InboundEmails []*imodel.Email `json:"inbound_emails"`
+
+	// NextCursor is passed back as ?cursor= for the page after this
+	// one, and empty on the last page.
+	NextCursor string `json:"next_cursor"`
 }
 
 // StatsResponse counts received mail by status.

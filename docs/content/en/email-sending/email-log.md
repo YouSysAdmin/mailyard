@@ -34,22 +34,29 @@ curl "http://localhost:3000/api/v1/emails?limit=50&status=failed" \
 
 ## Parameters
 
-| Param       | Notes                                                                                        |
-|-------------|----------------------------------------------------------------------------------------------|
-| `status`    | One status. Not a list — see [Email Status](/docs/email-sending/email-status) for the values |
-| `search`    | A whole recipient address, or part of a subject                                              |
-| `limit`     | Default 50, maximum 200                                                                      |
-| `before`    | Cursor: RFC 3339 `created_at` of the last row you saw                                        |
-| `before_id` | The id of that same row. Send it with `before`                                               |
+| Param            | Notes                                                                                         |
+|------------------|-----------------------------------------------------------------------------------------------|
+| `status`         | One status or several separated by commas — see [Email Status](/docs/email-sending/email-status) |
+| `sender`         | One whole From address, without regard to case                                                |
+| `recipient`      | One whole recipient address, Cc and Bcc included, without regard to case                     |
+| `template`       | The name of the template the message was rendered from                                        |
+| `api_key_id`     | Only mail accepted through this API key                                                       |
+| `smtp_server_id` | Only mail delivered through this server                                                       |
+| `from`, `to`     | A `created_at` window. Each is a date (`2026-08-01`) or an RFC 3339 instant, `to` exclusive, and a bare date on `to` includes that whole day |
+| `after`          | Created strictly after this instant. A poller passes the `created_at` of the newest row it has |
+| `search`         | A whole recipient address, or part of a subject, without regard to case                       |
+| `limit`          | Default 50, maximum 200                                                                       |
+| `cursor`         | The `next_cursor` of the previous page                                                        |
 
-Rows come back newest first, ordered by `created_at` then `id`. That order is fixed — there is no sort parameter.
+Every filter is ANDed with the others. Rows come back newest first, ordered by `created_at` then `id`. That order is
+fixed — there is no sort parameter. The response carries `next_cursor`, empty on the last page.
 
 {{< callout type="info" title="What `search` actually matches" >}}
 Two things, joined by OR:
 
 - **A recipient, matched whole.** The pattern is the complete address, so `alice@example.com` finds the message and
-  `alice@` finds nothing. It is matched against the recipient **exactly as it was submitted**, so a send addressed to
-  `Alice <alice@example.com>` is not found by the bare address, and matching is case-sensitive.
+  `alice@` finds nothing. It is matched against the recipient **as it was submitted**, so a send addressed to
+  `Alice <alice@example.com>` is not found by the bare address. Case does not matter.
 - **A subject, matched as a substring**, case-insensitively. `invoice` finds "Your invoice for March".
 
 The **body is never searched.** It may be large, it may be redacted by a retention policy, and it may live in blob
@@ -58,26 +65,20 @@ storage rather than in the row — none of which makes for a predictable search.
 
 ## Paging is a cursor, not an offset
 
-The log grows with every message sent, so it pages by cursor. Take the `created_at` and `id` of the last row on the
-page and pass both:
+The log grows with every message sent, so it pages by cursor. Every page carries `next_cursor`, and the next request
+passes it back:
 
 ```bash
 curl -G http://localhost:3000/api/v1/emails \
   -H "Authorization: Bearer myk_..." \
-  --data-urlencode "before=2026-03-20T09:14:22.481Z" \
-  --data-urlencode "before_id=0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33"
+  --data-urlencode "cursor=MjAyNi0wMy0yMFQwOToxNDoyMi40ODFafDAxOThmNmExLTNjN2UtN2IyMS05ZjRkLTJhNWM4ZTBiMWQzMw"
 ```
 
-{{< callout type="warning" title="Send `before_id` as well as `before`" >}}
-`before` on its own still works, and it will silently lose rows. Two messages can share a `created_at` down to the
-microsecond, and if that tie straddles a page boundary the rows sharing the timestamp appear on **neither** page. You
-get a log with a message missing and no indication that it happened.
-
-With both, the comparison is on the pair `(created_at, id)`, which no two rows can tie on.
-{{< /callout >}}
+The cursor is opaque. Inside it is the `created_at` and the `id` of the last row together, which is what makes it
+safe: two messages can share a `created_at` down to the microsecond, and a cursor made of the timestamp alone would
+drop the rows tied with it across a page boundary. An empty `next_cursor` is the last page.
 
 There is no total, deliberately. Counting a table that grows per message costs more than the page it would decorate.
-Fetch a page, and if it comes back full there is probably another.
 
 ## One message
 

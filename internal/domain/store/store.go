@@ -618,18 +618,28 @@ type StylesheetStore interface {
 
 // EmailFilter narrows EmailStore.List. Zero values mean "no constraint".
 //
-// Before and BeforeID are one cursor, `(created_at, id)`. created_at
-// alone loses rows: two messages can share a timestamp, and when the tie
-// straddles a page boundary the next page asks for `created_at < value`
-// and skips every row sharing it - they appear on neither page.
+// Cursor is `(created_at, id)`, the same keyset every growing list
+// pages by. created_at alone loses rows: two messages can share a
+// timestamp, and when the tie straddles a page boundary the next page
+// asks for `created_at < value` and skips every row sharing it - they
+// appear on neither page.
 //
-// BeforeID may be empty, which keeps the older `?before=` contract
-// working rather than turning it into an error.
+// Sender and Recipient are one whole address each, without regard to
+// case. From and To bound created_at as a half-open window, After is
+// what a poller asks for: everything newer than the last row it saw.
 type EmailFilter struct {
-	Status   string
-	Before   *time.Time
-	BeforeID string
+	Statuses []string
+	Cursor   keyset.Cursor
 	Limit    int
+
+	Sender       string
+	Recipient    string
+	Template     string
+	APIKeyID     string
+	SMTPServerID string
+	From         *time.Time
+	To           *time.Time
+	After        *time.Time
 
 	// Search matches a RECIPIENT address or the SUBJECT, and nothing
 	// else. Not the body: the log is how somebody answers "did this
@@ -1093,20 +1103,20 @@ type SandboxInboxStore interface {
 
 // InboundFilter narrows inbound listings.
 //
-// Before and BeforeID are one cursor, `(received_at, id)` - see
-// EmailFilter for why the timestamp alone drops rows rather than
-// repeating them, which here means received mail that appears on no page
-// of the inbound log.
+// Cursor is `(received_at, id)` - see EmailFilter for why the
+// timestamp alone drops rows rather than repeating them, which here
+// means received mail that appears on no page of the inbound log.
 //
-// Sender and Recipient are search terms over the envelope, the same
-// reading as on SandboxFilter.
+// Sender, Recipient and Search are search terms, the first two over
+// the envelope and the third over the subject, the same reading as on
+// SandboxFilter.
 type InboundFilter struct {
 	Status    string
 	Sender    string
 	Recipient string
+	Search    string
 	Limit     int
-	Before    *time.Time
-	BeforeID  string
+	Cursor    keyset.Cursor
 }
 
 // LanguageStore persists the per-project language registry.

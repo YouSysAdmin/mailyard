@@ -104,17 +104,15 @@ export interface EmailListParams {
   // the body - see the store.
   search?: string
   limit?: number
-  /**
-   * Keyset cursor over created_at. Send before_id with it: two messages
-   * can share a created_at, and the timestamp alone SKIPS every row tied
-   * with the last one on the page - they appear on neither page.
-   */
-  before?: string
-  before_id?: string
+  // The next_cursor of the previous page. Opaque: the server encodes
+  // created_at and id together, so a tie across a page boundary is
+  // neither repeated nor skipped.
+  cursor?: string
 }
 
 export const emailsApi = {
-  list: (params: EmailListParams = {}) => api.get<{ emails: Email[] }>('/emails/', { params }),
+  list: (params: EmailListParams = {}) =>
+    api.get<{ emails: Email[]; next_cursor: string }>('/emails/', { params }),
   stats: () => api.get<{ counts: Record<string, number> }>('/emails/stats'),
   limits: () => api.get<{ limits: SendLimits }>('/emails/limits'),
   get: (id: string) =>

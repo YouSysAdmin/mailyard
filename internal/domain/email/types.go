@@ -261,6 +261,10 @@ type PreviewResponse struct {
 // ListResponse is a page of the email log.
 type ListResponse struct {
 	Emails []*emailmodel.Email `json:"emails"`
+
+	// NextCursor is passed back as ?cursor= for the page after this
+	// one, and empty on the last page.
+	NextCursor string `json:"next_cursor"`
 }
 
 // StatsResponse counts emails by delivery status.

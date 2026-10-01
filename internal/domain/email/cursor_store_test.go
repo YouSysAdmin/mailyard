@@ -3,10 +3,12 @@
 package email
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/keyset"
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/database/dbtest"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
@@ -72,8 +74,7 @@ func TestPagingTheLogDoesNotSkipMessagesThatShareATimestamp(t *testing.T) {
 		}
 
 		last := rows[len(rows)-1]
-		f.Before = new(last.CreatedAt)
-		f.BeforeID = last.ID
+		f.Cursor = keyset.Cursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
 
 	if len(seen) != len(want) {
@@ -88,10 +89,10 @@ func TestPagingTheLogDoesNotSkipMessagesThatShareATimestamp(t *testing.T) {
 	}
 }
 
-// The timestamp on its own still works, because the older `?before=`
-// contract has to keep answering something sensible - it just cannot
-// promise completeness across a tie, which is why the id half exists.
-func TestATimestampOnlyCursorStillPages(t *testing.T) {
+// Every filter narrows the same statement, and the address filters
+// match a whole address without regard to case: a log search that
+// misses Bob@x.test for bob@x.test reads as "never sent".
+func TestTheLogFiltersNarrowTogether(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
 	s := &Store{Base: database.NewBase(db)}
@@ -105,37 +106,54 @@ func TestATimestampOnlyCursorStillPages(t *testing.T) {
 	}
 
 	base := time.Now().UTC().Truncate(time.Microsecond)
-	for i := range 4 {
+	seed := func(sender, recipients, status, template string, at time.Time) string {
+		id := ids.New()
 		if _, err := db.ExecContext(ctx, `
-			INSERT INTO emails (id, project_id, sender, recipients, subject, status, created_at)
-			VALUES ($1, $2, 'from@x.test', '["to@y.test"]', 's', 'sent', $3)`,
-			ids.New(), projID, base.Add(-time.Duration(i)*time.Minute)); err != nil {
+			INSERT INTO emails (id, project_id, sender, recipients, subject, status, template_name, created_at)
+			VALUES ($1, $2, $3, $4, 'Receipt', $5, $6, $7)`,
+			id, projID, sender, recipients, status, template, at); err != nil {
 			t.Fatalf("seed email: %v", err)
 		}
+
+		return id
 	}
 
-	first, err := s.List(ctx, projID, store.EmailFilter{Limit: 2})
-	if err != nil {
-		t.Fatalf("first page: %v", err)
-	}
+	old := seed("Shop@Example.test", `["Bob@x.test"]`, "sent", "receipt", base.Add(-2*time.Hour))
+	failed := seed("shop@example.test", `["ann@x.test","bob@x.test"]`, "failed", "receipt", base.Add(-time.Hour))
+	other := seed("ops@example.test", `["carol@x.test"]`, "sent", "", base)
 
-	if len(first) != 2 {
-		t.Fatalf("first page has %d rows, want 2", len(first))
+	cases := []struct {
+		name string
+		f    store.EmailFilter
+		want []string
+	}{
+		{"sender, any case", store.EmailFilter{Sender: "SHOP@example.test"}, []string{failed, old}},
+		{"recipient, any case, whole address", store.EmailFilter{Recipient: "BOB@x.test"}, []string{failed, old}},
+		{"recipient, a prefix is not an address", store.EmailFilter{Recipient: "bob"}, nil},
+		{"two statuses", store.EmailFilter{Statuses: []string{"failed", "queued"}}, []string{failed}},
+		{"template", store.EmailFilter{Template: "receipt"}, []string{failed, old}},
+		{"window", store.EmailFilter{From: ptr(base.Add(-90 * time.Minute)), To: ptr(base)}, []string{failed}},
+		{"after", store.EmailFilter{After: ptr(base.Add(-time.Hour))}, []string{other}},
+		{"search ignores case", store.EmailFilter{Search: "ANN@X.TEST"}, []string{failed}},
+		{"combined", store.EmailFilter{Sender: "shop@example.test", Statuses: []string{"sent"}}, []string{old}},
 	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rows, err := s.List(ctx, projID, tc.f)
+			if err != nil {
+				t.Fatalf("list: %v", err)
+			}
 
-	cursor := first[1].CreatedAt
-	second, err := s.List(ctx, projID, store.EmailFilter{Limit: 2, Before: &cursor})
-	if err != nil {
-		t.Fatalf("second page: %v", err)
-	}
+			var got []string
+			for _, e := range rows {
+				got = append(got, e.ID)
+			}
 
-	if len(second) != 2 {
-		t.Errorf("second page has %d rows, want 2", len(second))
-	}
-
-	for _, e := range second {
-		if !e.CreatedAt.Before(cursor) {
-			t.Errorf("row %s is not older than the cursor", e.ID)
-		}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
+
+func ptr[T any](v T) *T { return &v }

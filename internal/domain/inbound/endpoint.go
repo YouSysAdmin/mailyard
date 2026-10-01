@@ -4,12 +4,12 @@ package inbound
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/keyset"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
@@ -27,35 +27,33 @@ type Handler struct {
 // List serves GET /api/v1/inbound-emails.
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
+	w := paging.WindowFrom(c)
 	f := store.InboundFilter{
 		Status:    c.Query("status"),
 		Sender:    paging.Search(c, "sender"),
 		Recipient: paging.Search(c, "recipient"),
-		Limit:     paging.From(c).Limit,
-	}
-	if before := c.Query("before"); before != "" {
-		t, err := time.Parse(time.RFC3339, before)
-		if err != nil {
-			return response.BadRequest(c, "before must be an RFC 3339 timestamp")
-		}
-
-		f.Before = &t
-		// The id half of the cursor - optional, for the reason on the
-		// email log: without it a tie in received_at across a page
-		// boundary drops the tied rows from both pages.
-		f.BeforeID = c.Query("before_id")
+		Search:    paging.Search(c, "search"),
+		Limit:     w.Fetch(),
+		Cursor:    w.Cursor,
 	}
 
-	emails, err := h.Runtime.Store.Inbound.List(c.Context(), rc.Project.ID, f)
+	rows, err := h.Runtime.Store.Inbound.List(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if emails == nil {
-		emails = []*imodel.Email{}
+	page, more := keyset.Cut(rows, w.Limit)
+	if page == nil {
+		page = []*imodel.Email{}
 	}
 
-	return response.Success(c, ListResponse{InboundEmails: emails})
+	next := ""
+	if more && len(page) > 0 {
+		last := page[len(page)-1]
+		next = keyset.Cursor{CreatedAt: last.ReceivedAt, ID: last.ID}.Encode()
+	}
+
+	return response.Success(c, ListResponse{InboundEmails: page, NextCursor: next})
 }
 
 // Stats serves GET /api/v1/inbound-emails/stats.

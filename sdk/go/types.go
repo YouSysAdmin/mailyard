@@ -524,11 +524,31 @@ type Analytics struct {
 
 // EmailFilter narrows a list of emails.
 type EmailFilter struct {
-	Status string
+	// Statuses narrows to any of these delivery states.
+	Statuses []string
 
-	// Before returns only rows created before this instant.
-	Before *time.Time
+	// Sender and Recipient are one whole address each, matched without
+	// regard to case. Template is the name the message was rendered
+	// from, APIKeyID and SMTPServerID the credential and the server.
+	Sender       string
+	Recipient    string
+	Template     string
+	APIKeyID     string
+	SMTPServerID string
+
+	// From and To bound created_at as a half-open window. After asks
+	// for rows created strictly after an instant, which is how a poller
+	// walks forward.
+	From  *time.Time
+	To    *time.Time
+	After *time.Time
+
+	// Search matches a whole recipient address or part of the subject.
+	Search string
 	Limit  int
+
+	// Cursor is the next cursor the previous page returned.
+	Cursor string
 }
 
 // SuppressionFilter narrows a list of suppressions. Search is

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -90,15 +91,28 @@ func (c *Client) Verify(ctx context.Context, email string, fresh bool) (*Verific
 	return &out.Verification, nil
 }
 
-// ListEmails returns a page of the email log, newest first.
-func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, error) {
+// ListEmails returns a page of the email log, newest first, and the
+// cursor of the page after it, empty on the last page.
+func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, string, error) {
 	q := url.Values{}
-	if f.Status != "" {
-		q.Set("status", f.Status)
+	if len(f.Statuses) > 0 {
+		q.Set("status", strings.Join(f.Statuses, ","))
 	}
 
-	if f.Before != nil {
-		q.Set("before", f.Before.UTC().Format(time.RFC3339))
+	for name, value := range map[string]string{
+		"sender": f.Sender, "recipient": f.Recipient, "template": f.Template,
+		"api_key_id": f.APIKeyID, "smtp_server_id": f.SMTPServerID,
+		"search": f.Search, "cursor": f.Cursor,
+	} {
+		if value != "" {
+			q.Set(name, value)
+		}
+	}
+
+	for name, at := range map[string]*time.Time{"from": f.From, "to": f.To, "after": f.After} {
+		if at != nil {
+			q.Set(name, at.UTC().Format(time.RFC3339Nano))
+		}
 	}
 
 	if f.Limit > 0 {
@@ -106,13 +120,14 @@ func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, error)
 	}
 
 	out, err := c.do[struct {
-		Emails []Email `json:"emails"`
+		Emails     []Email `json:"emails"`
+		NextCursor string  `json:"next_cursor"`
 	}](ctx, http.MethodGet, "/emails", q, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return out.Emails, nil
+	return out.Emails, out.NextCursor, nil
 }
 
 // EmailStats counts emails by delivery status.

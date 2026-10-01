@@ -10,19 +10,19 @@ import "github.com/yousysadmin/mailyard/internal/core/apidoc"
 func APIDocs() []apidoc.Route {
 	return []apidoc.Route{
 		{
-			Method:     "GET",
-			Path:       "/inbound-emails",
-			Tag:        "inbound",
-			Permission: "inbound:read",
-			Summary:    "List mail received by the MX listener",
+			Method:      "GET",
+			Path:        "/inbound-emails",
+			Tag:         "inbound",
+			Permission:  "inbound:read",
+			Summary:     "List mail received by the MX listener",
+			Description: "Cursor paged, newest first: follow `next_cursor` until it comes back empty.",
 			Query: []apidoc.Param{
-				{Name: "status"},
+				{Name: "status", Enum: []string{"received", "rejected", "failed"}},
 				{Name: "sender", Description: "Part of the sender (the From header), case-insensitive."},
 				{Name: "recipient", Description: "Part of any envelope recipient, Bcc included, case-insensitive."},
-				{Name: "before", Format: "date-time"},
-				{Name: "before_id", Description: "The id of the last row on the previous page. " +
-					"Pass it with `before`, or rows sharing a received_at with the last one are skipped."},
+				{Name: "search", Description: "Part of the subject, case-insensitive."},
 				{Name: "limit", Type: "integer"},
+				{Name: "cursor", Description: "The next_cursor of the previous page."},
 			},
 			Responses: []apidoc.Response{apidoc.OK("Newest first.", ListResponse{}), apidoc.BadRequest},
 		},

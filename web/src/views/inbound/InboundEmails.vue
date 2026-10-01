@@ -44,9 +44,9 @@ const status = ref('')
 const sender = ref('')
 const recipient = ref('')
 const counts = ref<Record<string, number>>({})
-// Server keyset paging over received_at: a full page means there may be
-// more rows before the last cursor.
-const hasMore = ref(false)
+// Server keyset paging: the cursor of the page after the one on
+// screen, empty when there is none.
+const nextCursor = ref('')
 // True once older pages have been pulled in, which is what keeps an
 // automatic refresh from collapsing the list back to the newest page.
 const pagedBack = ref(false)
@@ -103,7 +103,7 @@ async function load(quiet = false) {
   try {
     const res = await inboundApi.list({ ...filterParams(), limit: PAGE_SIZE })
     emails.value = res.data.inbound_emails ?? []
-    hasMore.value = emails.value.length === PAGE_SIZE
+    nextCursor.value = res.data.next_cursor ?? ''
   } catch (e) {
     // A failed automatic refresh leaves the last good rows on screen
     // rather than raising a toast every ten seconds.
@@ -123,21 +123,18 @@ async function loadStats() {
 }
 
 async function loadMore() {
-  const last = emails.value[emails.value.length - 1]
-  if (!last || loadingMore.value) return
+  if (!nextCursor.value || loadingMore.value) return
 
   loadingMore.value = true
   try {
     const res = await inboundApi.list({
       ...filterParams(),
       limit: PAGE_SIZE,
-      before: last.received_at,
-      before_id: last.id,
+      cursor: nextCursor.value,
     })
-    const batch = res.data.inbound_emails ?? []
-    emails.value = emails.value.concat(batch)
+    emails.value = emails.value.concat(res.data.inbound_emails ?? [])
     pagedBack.value = true
-    hasMore.value = batch.length === PAGE_SIZE
+    nextCursor.value = res.data.next_cursor ?? ''
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load more inbound emails'))
   } finally {
@@ -228,7 +225,7 @@ watch([status, sender, recipient], () => {
   // the auto-select watch would put the old filter's newest message
   // right back.
   emails.value = []
-  hasMore.value = false
+  nextCursor.value = ''
   if (selectedId.value) router.replace('/inbound-emails')
   load()
 })
@@ -304,7 +301,7 @@ onMounted(() => loadAll())
           </template>
         </MessageListRow>
 
-        <div v-if="hasMore" class="list-more">
+        <div v-if="nextCursor" class="list-more">
           <button class="btn btn-secondary btn-sm" :disabled="loadingMore" @click="loadMore">
             {{ loadingMore ? 'Loading...' : 'Load older' }}
           </button>

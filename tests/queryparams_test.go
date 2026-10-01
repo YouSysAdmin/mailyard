@@ -31,9 +31,9 @@ const modulePath = "github.com/yousysadmin/mailyard"
 //
 // What a handler reads is collected from its body and from the
 // helpers it calls in its own package: c.Query, fiber.Query,
-// paging.Search, and the paging readers - From stands for limit and
-// offset, WindowFrom for limit and cursor, From(c).Limit for the
-// limit alone.
+// paging.Search, paging.Instant, and the paging readers - From stands
+// for limit and offset, WindowFrom for limit and cursor, TimeWindow
+// for from and to, From(c).Limit for the limit alone.
 // Both directions fail: a parameter read but not listed, and a
 // parameter listed that nothing reads.
 func TestEveryQueryParameterIsDocumented(t *testing.T) {
@@ -388,6 +388,10 @@ func readsIn(t *testing.T, fset *token.FileSet, body *ast.BlockStmt, recvName, t
 				direct = append(direct, "limit", "cursor")
 			case x.Name == "paging" && fun.Sel.Name == "CursorFrom":
 				direct = append(direct, "cursor")
+			case x.Name == "paging" && fun.Sel.Name == "TimeWindow":
+				direct = append(direct, "from", "to")
+			case x.Name == "paging" && fun.Sel.Name == "Instant" && len(call.Args) >= 2:
+				direct = append(direct, literalArg(t, fset, call, 1))
 			case x.Name == "paging" && fun.Sel.Name == "Search" && len(call.Args) >= 2:
 				direct = append(direct, literalArg(t, fset, call, 1))
 			case fun.Sel.Name == "Query" && len(call.Args) >= 1:
