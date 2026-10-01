@@ -80,6 +80,10 @@ type previewInput struct {
 // ListResponse is the project's campaigns.
 type ListResponse struct {
 	Campaigns []*cmodel.Campaign `json:"campaigns"`
+
+	// Total counts what the filters match, whether or not a page was
+	// asked for.
+	Total int `json:"total"`
 }
 
 // CampaignResponse is one campaign.

@@ -13,9 +13,11 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
@@ -29,19 +31,41 @@ type Handler struct {
 	Runtime *env.Runtime
 }
 
+// flag reads a three-state filter: absent leaves the column alone.
+func flag(raw, name string) (*bool, error) {
+	switch raw {
+	case "":
+		return nil, nil
+	case "true":
+		return new(true), nil
+	case "false":
+		return new(false), nil
+	}
+
+	return nil, errors.New(name + " must be true or false")
+}
+
 // List returns every user, oldest first. Always an array ("users": []),
 // never null, so the SPA can .map() without a guard.
 func (h *Handler) List(c fiber.Ctx) error {
-	users, err := h.Runtime.Store.User.List(c.Context())
+	pg := paging.Optional(c)
+	f := store.UserFilter{Query: paging.Search(c, "q"), Limit: pg.Limit, Offset: pg.Offset}
+
+	var err error
+	if f.Admin, err = flag(c.Query("admin"), "admin"); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+
+	if f.Disabled, err = flag(c.Query("disabled"), "disabled"); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+
+	users, total, err := h.Runtime.Store.User.Find(c.Context(), f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if users == nil {
-		users = []*usermodel.User{}
-	}
-
-	return response.Success(c, ListResponse{Users: users})
+	return response.Success(c, ListResponse{Users: users, Total: total})
 }
 
 // Get returns a single user by id.

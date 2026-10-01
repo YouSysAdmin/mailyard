@@ -382,7 +382,7 @@ func readsIn(t *testing.T, fset *token.FileSet, body *ast.BlockStmt, recvName, t
 			switch {
 			case recvName != "" && x.Name == recvName:
 				calls = append(calls, typeName+"."+fun.Sel.Name)
-			case isPagingPage(fun):
+			case isPagingPage(fun), isPkgFunc(fun, "paging", "Optional"):
 				direct = append(direct, "limit", "offset")
 			case x.Name == "paging" && fun.Sel.Name == "WindowFrom":
 				direct = append(direct, "limit", "cursor")

@@ -14,6 +14,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/render"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -51,16 +52,14 @@ func putError(c fiber.Ctx, err error) error {
 // List serves GET /api/v1/templates.
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ts, err := h.Runtime.Store.Template.List(c.Context(), rc.Project.ID)
+	pg := paging.Optional(c)
+	ts, total, err := h.Runtime.Store.Template.Find(c.Context(), rc.Project.ID,
+		store.ListFilter{Query: paging.Search(c, "q"), Limit: pg.Limit, Offset: pg.Offset})
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if ts == nil {
-		ts = []*tmodel.Template{}
-	}
-
-	return response.Success(c, ListResponse{Templates: ts})
+	return response.Success(c, ListResponse{Templates: ts, Total: total})
 }
 
 // Get serves GET /api/v1/templates/:id.

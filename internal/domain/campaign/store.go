@@ -69,6 +69,55 @@ func (s *Store) GetAny(ctx context.Context, id string) (*cmodel.Campaign, error)
 	return c, err
 }
 
+// Find is List narrowed by f, with the count of what f matches so a
+// paged client knows how far the list goes.
+func (s *Store) Find(ctx context.Context, projID string, f store.ListFilter) ([]*cmodel.Campaign, int, error) {
+	var where strings.Builder
+	where.WriteString(` WHERE project_id = ?`)
+	args := []any{projID}
+	if f.Query != "" {
+		where.WriteString(` AND name ILIKE ? ESCAPE '\'`)
+		args = append(args, "%"+database.EscapeLike(f.Query)+"%")
+	}
+
+	if len(f.Statuses) > 0 {
+		where.WriteString(` AND status = ANY(?::text[])`)
+		args = append(args, f.Statuses)
+	}
+
+	var total int
+	if err := s.QueryRow(ctx, `SELECT COUNT(*) FROM campaigns`+where.String(), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	var sb strings.Builder
+	sb.WriteString(campaignSelect)
+	sb.WriteString(where.String())
+	sb.WriteString(` ORDER BY created_at DESC`)
+	if f.Limit > 0 {
+		sb.WriteString(` LIMIT ? OFFSET ?`)
+		args = append(args, f.Limit, f.Offset)
+	}
+
+	rows, err := s.Query(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*cmodel.Campaign{}
+	for rows.Next() {
+		c, err := scanCampaign(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		out = append(out, c)
+	}
+
+	return out, total, rows.Err()
+}
+
 // List returns every campaign in projID.
 func (s *Store) List(ctx context.Context, projID string) ([]*cmodel.Campaign, error) {
 	rows, err := s.Query(ctx, campaignSelect+` WHERE project_id = ? ORDER BY created_at DESC`, projID)

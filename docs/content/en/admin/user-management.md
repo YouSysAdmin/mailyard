@@ -51,8 +51,9 @@ an install that provisions everyone into a shared project does not collect an em
 GET /api/v1/admin/users
 ```
 
-Returns every account, oldest first, as `{"users": [...]}`. The list is not paged - it is bounded by how many people
-your installation has.
+Returns every account, oldest first, as `{"users": [...], "total": n}`. `q` narrows it to addresses containing the
+term, `admin=true|false` and `disabled=true|false` to one side of each flag, and `limit` with `offset` asks for a
+page of at most 200. Without `limit` the whole list comes back.
 
 ## Update a User
 

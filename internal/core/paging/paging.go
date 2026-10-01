@@ -72,6 +72,18 @@ func FromWith(c fiber.Ctx, def, ceiling int) Page {
 	return Page{Limit: limit, Offset: offset}
 }
 
+// Optional reads a page only when the caller asked for one, which is
+// how a list bounded by what a person made stays whole by default: a
+// console dropdown wants every template, and a client that wants a
+// window says so with limit. The zero Page means no window.
+func Optional(c fiber.Ctx) Page {
+	if c.Query("limit") == "" {
+		return Page{Offset: max(fiber.Query[int](c, "offset", 0), 0)}
+	}
+
+	return From(c)
+}
+
 // MaxSearchTerm bounds a free-text search term.
 //
 // 200 characters is longer than any address (320 is the RFC ceiling

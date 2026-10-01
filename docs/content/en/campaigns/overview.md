@@ -103,14 +103,16 @@ already running or finished".
 GET /api/v1/campaigns
 ```
 
-Every campaign in the project, newest first.
+Every campaign in the project, newest first, with `total`.
 
-{{< callout type="warning" title="This route takes no parameters" >}}
-No `limit`, no `offset`, no `status` filter — the whole list comes back in one response, and each entry is the campaign
-record alone. **Per-campaign statistics are not included**: those come from the single-campaign route below.
+| Param | Notes |
+|---|---|
+| `status` | One status or several separated by commas: `draft`, `scheduled`, `sending`, `paused`, `sent`, `cancelled` |
+| `q` | Part of the name, without regard to case |
+| `limit`, `offset` | A page, at most 200 rows. Without `limit` the whole list comes back, which is what the console wants |
 
-Campaigns are a list somebody made by hand, so it stays small in practice. Filter client-side.
-{{< /callout >}}
+Each entry is the campaign record alone. **Per-campaign statistics are not included**: those come from the
+single-campaign route below.
 
 ## Read one
 

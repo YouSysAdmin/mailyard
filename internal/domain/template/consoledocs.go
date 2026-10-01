@@ -19,8 +19,13 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/templates/",
 			Tag:         "template",
 			Summary:     "List",
-			Description: "Needs the `templates:read` permission.",
-			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
+			Description: "Needs the `templates:read` permission. By name, the whole list unless `limit` asks for a page.",
+			Query: []apidoc.Param{
+				{Name: "q", Description: "Part of the name, case-insensitive."},
+				{Name: "limit", Type: "integer", Description: "Page size, at most 200. Without it the whole list is answered."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
 			Method:      "POST",

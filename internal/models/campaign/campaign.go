@@ -19,6 +19,16 @@ const (
 	StatusCancelled = "cancelled"
 )
 
+// ValidStatus reports whether s names a campaign state.
+func ValidStatus(s string) bool {
+	switch s {
+	case StatusDraft, StatusScheduled, StatusSending, StatusPaused, StatusSent, StatusCancelled:
+		return true
+	}
+
+	return false
+}
+
 // Variant is one A/B test arm: an alternative subject and optionally
 // a different template, delivered to SplitPercentage of the audience.
 type Variant struct {

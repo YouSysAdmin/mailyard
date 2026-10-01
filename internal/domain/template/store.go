@@ -6,9 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/database"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	tmodel "github.com/yousysadmin/mailyard/internal/models/template"
 )
 
@@ -55,6 +57,49 @@ func (s *Store) GetByName(ctx context.Context, projID, name string) (*tmodel.Tem
 	}
 
 	return t, err
+}
+
+// Find is List narrowed by f, with the count of what f matches.
+func (s *Store) Find(ctx context.Context, projID string, f store.ListFilter) ([]*tmodel.Template, int, error) {
+	var where strings.Builder
+	where.WriteString(` WHERE project_id = ?`)
+	args := []any{projID}
+	if f.Query != "" {
+		where.WriteString(` AND name ILIKE ? ESCAPE '\'`)
+		args = append(args, "%"+database.EscapeLike(f.Query)+"%")
+	}
+
+	var total int
+	if err := s.QueryRow(ctx, `SELECT COUNT(*) FROM templates`+where.String(), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	var sb strings.Builder
+	sb.WriteString(templateSelect)
+	sb.WriteString(where.String())
+	sb.WriteString(` ORDER BY name ASC`)
+	if f.Limit > 0 {
+		sb.WriteString(` LIMIT ? OFFSET ?`)
+		args = append(args, f.Limit, f.Offset)
+	}
+
+	rows, err := s.Query(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*tmodel.Template{}
+	for rows.Next() {
+		t, err := scanTemplate(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		out = append(out, t)
+	}
+
+	return out, total, rows.Err()
 }
 
 // List returns every template in projID.

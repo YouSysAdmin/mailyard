@@ -19,8 +19,14 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/campaigns/",
 			Tag:         "campaign",
 			Summary:     "List",
-			Description: "Needs the `campaigns:read` permission.",
-			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
+			Description: "Needs the `campaigns:read` permission. Newest first, the whole list unless `limit` asks for a page.",
+			Query: []apidoc.Param{
+				{Name: "status", Description: "One status, or several separated by commas: draft, scheduled, sending, paused, sent, cancelled."},
+				{Name: "q", Description: "Part of the name, case-insensitive."},
+				{Name: "limit", Type: "integer", Description: "Page size, at most 200. Without it the whole list is answered."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
 			Method:      "POST",

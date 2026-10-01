@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/database"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
 )
 
@@ -294,6 +296,60 @@ func (s *Store) ClaimTOTPStep(ctx context.Context, userID string, step uint64) (
 	}
 
 	return n > 0, nil
+}
+
+// Find is List narrowed by f, with the count of what f matches.
+// Unscoped like List: accounts belong to the installation.
+func (s *Store) Find(ctx context.Context, f store.UserFilter) ([]*usermodel.User, int, error) {
+	var where strings.Builder
+	where.WriteString(` WHERE TRUE`)
+	var args []any
+	if f.Query != "" {
+		where.WriteString(` AND email ILIKE ? ESCAPE '\'`)
+		args = append(args, "%"+database.EscapeLike(f.Query)+"%")
+	}
+
+	if f.Admin != nil {
+		where.WriteString(` AND admin = ?`)
+		args = append(args, *f.Admin)
+	}
+
+	if f.Disabled != nil {
+		where.WriteString(` AND disabled = ?`)
+		args = append(args, *f.Disabled)
+	}
+
+	var total int
+	if err := s.QueryRow(ctx, `SELECT COUNT(*) FROM users`+where.String(), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	var sb strings.Builder
+	sb.WriteString(userSelect)
+	sb.WriteString(where.String())
+	sb.WriteString(` ORDER BY created_at ASC`)
+	if f.Limit > 0 {
+		sb.WriteString(` LIMIT ? OFFSET ?`)
+		args = append(args, f.Limit, f.Offset)
+	}
+
+	rows, err := s.Query(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*usermodel.User{}
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		out = append(out, u)
+	}
+
+	return out, total, rows.Err()
 }
 
 // List returns every account.

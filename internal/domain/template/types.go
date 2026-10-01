@@ -122,6 +122,10 @@ type transferLocalization struct {
 // ListResponse is every template in the project.
 type ListResponse struct {
 	Templates []*tmodel.Template `json:"templates"`
+
+	// Total counts what the filters match, whether or not a page was
+	// asked for.
+	Total int `json:"total"`
 }
 
 // GetResponse is one template together with its version history, so

@@ -97,7 +97,8 @@ are uneven by nature.
 GET /api/v1/templates
 ```
 
-Returns every template in the project. The list is not paged.
+Returns every template in the project by name, with `total`. `q` narrows it to names containing the term, and
+`limit` with `offset` asks for a page of at most 200. Without `limit` the whole list comes back.
 
 ## Read one
 

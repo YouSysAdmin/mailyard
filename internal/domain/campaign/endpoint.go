@@ -4,6 +4,7 @@ package campaign
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -119,16 +120,27 @@ func (h *Handler) validateCampaignRefs(c fiber.Ctx, projID string, in *upsertInp
 // List serves GET /api/v1/campaigns.
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	campaigns, err := h.Runtime.Store.Campaign.List(c.Context(), rc.Project.ID)
+	pg := paging.Optional(c)
+	f := store.ListFilter{Query: paging.Search(c, "q"), Limit: pg.Limit, Offset: pg.Offset}
+	for status := range strings.SplitSeq(c.Query("status"), ",") {
+		status = strings.TrimSpace(status)
+		if status == "" {
+			continue
+		}
+
+		if !cmodel.ValidStatus(status) {
+			return response.BadRequest(c, "unknown status "+status)
+		}
+
+		f.Statuses = append(f.Statuses, status)
+	}
+
+	campaigns, total, err := h.Runtime.Store.Campaign.Find(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if campaigns == nil {
-		campaigns = []*cmodel.Campaign{}
-	}
-
-	return response.Success(c, ListResponse{Campaigns: campaigns})
+	return response.Success(c, ListResponse{Campaigns: campaigns, Total: total})
 }
 
 // Get serves GET /api/v1/campaigns/:id.

@@ -58,6 +58,10 @@ type updateInput struct {
 // ListResponse is every account on the installation.
 type ListResponse struct {
 	Users []*usermodel.User `json:"users"`
+
+	// Total counts what the filters match, whether or not a page was
+	// asked for.
+	Total int `json:"total"`
 }
 
 // UserResponse is one account. Password hash and TOTP secret carry

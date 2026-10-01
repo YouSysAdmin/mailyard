@@ -8,12 +8,18 @@ import "github.com/yousysadmin/mailyard/internal/core/apidoc"
 func APIDocs() []apidoc.Route {
 	return []apidoc.Route{
 		{
-			Method:     "GET",
-			Path:       "/templates",
-			Tag:        "templates",
-			Permission: "templates:read",
-			Summary:    "List templates",
-			Responses:  []apidoc.Response{apidoc.OK("Every template in the project.", ListResponse{})},
+			Method:      "GET",
+			Path:        "/templates",
+			Tag:         "templates",
+			Permission:  "templates:read",
+			Summary:     "List templates",
+			Description: "By name. The whole list unless `limit` asks for a page, and `total` counts what `q` matches either way.",
+			Query: []apidoc.Param{
+				{Name: "q", Description: "Part of the name, case-insensitive."},
+				{Name: "limit", Type: "integer", Description: "Page size, at most 200. Without it the whole list is answered."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("Every template in the project, or one page of them.", ListResponse{})},
 		},
 		{
 			Method:      "GET",

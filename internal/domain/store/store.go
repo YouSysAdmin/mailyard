@@ -233,6 +233,26 @@ type AuditStore interface {
 	PurgeOlderThan(ctx context.Context, before time.Time) (int64, error)
 }
 
+// ListFilter narrows a list bounded by what a person made. Query is a
+// case-insensitive substring of the name, Statuses any of these, and a
+// Limit of zero means the whole list rather than a page.
+type ListFilter struct {
+	Query    string
+	Statuses []string
+	Limit    int
+	Offset   int
+}
+
+// UserFilter narrows the account list. Admin and Disabled are
+// three-state: nil leaves the column alone.
+type UserFilter struct {
+	Query    string
+	Admin    *bool
+	Disabled *bool
+	Limit    int
+	Offset   int
+}
+
 // AuditFilter narrows a paged trail. Type is one event type exactly,
 // Actor an account id or its address, From and To a half-open window
 // over created_at. Zero values mean no constraint.
@@ -352,6 +372,10 @@ type UserStore interface {
 	// administrator - see the store method.
 	DeleteKeepingAnAdmin(ctx context.Context, id string) error
 	List(ctx context.Context) ([]*user.User, error)
+
+	// Find is List narrowed and optionally windowed, with the count of
+	// what the filter matches, for the admin screen and the API.
+	Find(ctx context.Context, f UserFilter) ([]*user.User, int, error)
 	Count(ctx context.Context) (int, error)
 	TouchLastLogin(ctx context.Context, email string) error
 
@@ -598,6 +622,10 @@ type TemplateStore interface {
 	Get(ctx context.Context, projID, id string) (*template.Template, error)
 	GetByName(ctx context.Context, projID, name string) (*template.Template, error)
 	List(ctx context.Context, projID string) ([]*template.Template, error)
+
+	// Find is List narrowed and optionally windowed, with the count of
+	// what the filter matches.
+	Find(ctx context.Context, projID string, f ListFilter) ([]*template.Template, int, error)
 	Put(ctx context.Context, t *template.Template) error
 	Delete(ctx context.Context, projID, id string) error
 	SetActiveVersion(ctx context.Context, projID, id, versionID string) error
@@ -896,6 +924,10 @@ type CampaignStore interface {
 	Get(ctx context.Context, projID, id string) (*campaign.Campaign, error)
 	GetAny(ctx context.Context, id string) (*campaign.Campaign, error)
 	List(ctx context.Context, projID string) ([]*campaign.Campaign, error)
+
+	// Find is List narrowed and optionally windowed, with the count of
+	// what the filter matches.
+	Find(ctx context.Context, projID string, f ListFilter) ([]*campaign.Campaign, int, error)
 	Put(ctx context.Context, c *campaign.Campaign) error
 	Delete(ctx context.Context, projID, id string) error
 	TransitionStatus(ctx context.Context, projID, id, to string, from ...string) (bool, error)

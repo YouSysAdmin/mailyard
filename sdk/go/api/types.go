@@ -271,6 +271,7 @@ type CampaignDetailResponse struct {
 // CampaignListResponse is the response body.
 type CampaignListResponse struct {
 	Campaigns []*Campaign `json:"campaigns"`
+	Total     int64       `json:"total"`
 }
 
 // CampaignResponse is the response body.
@@ -2207,6 +2208,7 @@ type TemplateGetResponse struct {
 // TemplateListResponse is the response body.
 type TemplateListResponse struct {
 	Templates []*Template `json:"templates"`
+	Total     int64       `json:"total"`
 }
 
 // TemplatePreviewInput is the request body.
@@ -2424,6 +2426,7 @@ type User struct {
 // UserListResponse is the response body.
 type UserListResponse struct {
 	Users []*User `json:"users"`
+	Total int64   `json:"total"`
 }
 
 // UserResponse is the response body.
