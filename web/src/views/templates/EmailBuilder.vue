@@ -13,7 +13,7 @@
 // switching back is not offered.
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import grapesjs, { type Editor } from 'grapesjs'
+import grapesjs, { type Editor, type PropertySelect } from 'grapesjs'
 import newsletterPreset from 'grapesjs-preset-newsletter'
 import 'grapesjs/dist/css/grapes.min.css'
 import { templatesApi } from '../../api/templates'
@@ -56,8 +56,43 @@ const ready = computed(() => template.value !== null && localization.value !== n
 const devices = [
   { name: 'Desktop', width: '' },
   { name: 'Tablet', width: '768px', widthMedia: '992px' },
-  { name: 'Mobile', width: '375px', widthMedia: '480px' },
+  // The preset's toolbar switches by NAME, and these are the three
+  // names its commands ask for. Called Mobile, the third button did
+  // nothing at all.
+  { name: 'Mobile portrait', width: '375px', widthMedia: '480px' },
 ]
+
+/**
+ * The font menu.
+ *
+ * Mail clients fetch no fonts, so a name here is a promise that the
+ * recipient's machine has it. These ship with both Windows and macOS,
+ * each with the generic family it falls back to elsewhere. GrapesJS'
+ * own list is replaced rather than extended: it carried Comic Sans and
+ * Brush Script, which nobody puts in a transactional message, and
+ * lacked Palatino, which is the one serif both platforms ship besides
+ * Georgia and Times.
+ */
+const fonts = [
+  'Arial, Helvetica, sans-serif',
+  'Helvetica, Arial, sans-serif',
+  'Verdana, Geneva, sans-serif',
+  'Tahoma, Geneva, sans-serif',
+  'Trebuchet MS, Helvetica, sans-serif',
+  'Lucida Sans Unicode, Lucida Grande, sans-serif',
+  'Arial Black, Gadget, sans-serif',
+  'Impact, Charcoal, sans-serif',
+  'Georgia, serif',
+  'Times New Roman, Times, serif',
+  'Palatino Linotype, Book Antiqua, Palatino, serif',
+  'Courier New, Courier, monospace',
+].map((font) => ({ id: font, label: font.split(',')[0] }))
+
+/** Words for the typography toggles the preset draws as icons. */
+const radioLabels: Record<string, Record<string, string>> = {
+  'text-decoration': { none: 'None', underline: 'Underline', 'line-through': 'Strike' },
+  'font-style': { normal: 'Normal', italic: 'Italic' },
+}
 
 function startEditor(html: string) {
   if (!canvas.value) return
@@ -75,11 +110,49 @@ function startEditor(html: string) {
     // console's CSP refuses outright - the toolbar ships inline SVG
     // regardless, so the stylesheet is pure breakage.
     cssIcons: '',
+    // Phones home to grapesjs.com on load. The console's CSP refuses
+    // the connection anyway, so all it did was log two errors.
+    telemetry: false,
     plugins: [newsletterPreset],
     deviceManager: { devices },
   })
 
   if (html) editor.setComponents(html)
+
+  // Preview hides every panel and leaves one way back, a span GrapesJS
+  // creates on first use and styles below. It is given a tooltip here
+  // because the stylesheet cannot.
+  editor.on('command:run:preview', () => {
+    editor?.getEl()?.querySelector('.gjs-off-prv')?.setAttribute('title', 'Exit preview')
+  })
+
+  // On load, not right after init: the preset installs its sectors
+  // while the editor is still coming up, and a list written before
+  // that is written over.
+  editor.on('load', () => {
+    const sm = editor?.StyleManager
+    if (!sm) return
+
+    const fontProp = sm.getProperty('typography', 'font-family')
+    if (fontProp && 'setOptions' in fontProp) (fontProp as PropertySelect).setOptions(fonts)
+
+    // Two of the typography toggles are drawn by the preset as Font
+    // Awesome glyphs, which the console does not ship, so they rendered
+    // as blank bars with nothing to say which was which. Worded like
+    // the text-align row beside them.
+    for (const [property, labels] of Object.entries(radioLabels)) {
+      const prop = sm.getProperty('typography', property)
+      if (!prop || !('setOptions' in prop)) continue
+
+      const select = prop as PropertySelect
+      select.setOptions(
+        select.getOptions().map((o) => {
+          const id = select.getOptionId(o)
+          return { id, label: labels[id] ?? id }
+        }),
+      )
+    }
+  })
 
   // Fired on every model change, including the ones setComponents
   // above triggers, so the flag is armed only after the initial load
@@ -314,6 +387,47 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* The right-hand panel. GrapesJS sizes it as 15% of the canvas,
+     which is 180px on a laptop, and the style manager's label and
+     input then share a column too narrow for either. */
+  --gjs-left-width: clamp(260px, 20%, 320px);
+}
+
+/* The way out of preview. GrapesJS mounts a span carrying Font Awesome
+   classes for its icon, and the console ships no Font Awesome, so it
+   rendered as a bare 10px square at the top left - over the message
+   itself, since the top left is where the content sits. A real button
+   at the top right, where preview has just emptied the panel. */
+.builder-canvas :deep(.gjs-off-prv) {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background-color: var(--bg-primary);
+  box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+}
+
+.builder-canvas :deep(.gjs-off-prv:hover) {
+  background-color: var(--bg-tertiary);
+}
+
+/* A crossed eye, drawn on the console's 18px grid at stroke 1.5. The
+   glyph is a mask so it takes currentColor like the toolbar's. */
+.builder-canvas :deep(.gjs-off-prv)::before {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l14 14'/%3E%3Cpath d='M7.2 7.3a2.5 2.5 0 0 0 3.5 3.5'/%3E%3Cpath d='M4.3 4.7C2.7 5.8 1.5 7.4 1.5 9c0 0 2.5 4.5 7.5 4.5 1.3 0 2.4-.3 3.4-.8'/%3E%3Cpath d='M7.4 3.7c.5-.1 1-.2 1.6-.2 5 0 7.5 5.5 7.5 5.5-.4.8-1 1.7-1.8 2.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l14 14'/%3E%3Cpath d='M7.2 7.3a2.5 2.5 0 0 0 3.5 3.5'/%3E%3Cpath d='M4.3 4.7C2.7 5.8 1.5 7.4 1.5 9c0 0 2.5 4.5 7.5 4.5 1.3 0 2.4-.3 3.4-.8'/%3E%3Cpath d='M7.4 3.7c.5-.1 1-.2 1.6-.2 5 0 7.5 5.5 7.5 5.5-.4.8-1 1.7-1.8 2.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 /* GrapesJS paints its chrome from four theme classes. Mapping them to
