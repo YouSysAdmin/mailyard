@@ -297,7 +297,19 @@ is the intent.
 GET /api/v1/api-keys
 ```
 
-Needs `apikeys:read`. Only the prefix is returned - see the warning above.
+Needs `apikeys:read`. Only the prefix is returned - see the warning above. `GET /api/v1/api-keys/{id}` answers one
+key the same way.
+
+## Changing a Key
+
+```
+PATCH /api/v1/api-keys/{id}
+```
+
+Needs `apikeys:write`. `name`, `allowed_ips` and `expires_at`, each changed only when sent: `allowed_ips: []` lifts
+the restriction, `expires_at: "never"` clears the expiry. What the key may do is not editable - a key holding other
+permissions, or one that captures into the sandbox, is a new key minted with them, so the old one can be revoked on
+its own schedule.
 
 ## Revoking a Key
 

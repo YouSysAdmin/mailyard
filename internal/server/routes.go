@@ -656,6 +656,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	keys := v1.Group("/api-keys", permOn(perm.ResourceAPIKeys))
 	keys.Get("/", permRead, kh.List)
 	keys.Post("/", permWrite, kh.Create)
+	keys.Get("/:id", permRead, kh.Get)
+	keys.Patch("/:id", permWrite, kh.Update)
 	keys.Post("/:id/revoke", permWrite, kh.Revoke)
 	keys.Delete("/:id", permDelete, kh.Delete)
 
@@ -665,6 +667,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	sch := &smtpcredential.Handler{Runtime: rt}
 	creds.Get("/", permRead, sch.List)
 	creds.Post("/", permWrite, sch.Create)
+	creds.Get("/:id", permRead, sch.Get)
+	creds.Patch("/:id", permWrite, sch.Update)
 	creds.Post("/:id/revoke", permWrite, sch.Revoke)
 	creds.Delete("/:id", permDelete, sch.Delete)
 
@@ -816,6 +820,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	snd := v1.Group("/senders", permOn(perm.ResourceSenders))
 	snd.Get("/", permRead, snh.List)
 	snd.Post("/", permWrite, snh.Create)
+	snd.Get("/:id", permRead, snh.Get)
+	snd.Patch("/:id", permWrite, snh.Update)
 	snd.Delete("/:id", permDelete, snh.Delete)
 	// The key an address signs its mail with. A sender resource like
 	// the address itself, so the same tier governs both.
@@ -871,6 +877,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// sandbox this caller already reads.
 	sb.Get("/credentials", permRead, sbh.ListCredentials)
 	sb.Post("/credentials", permWrite, sbh.CreateCredential)
+	sb.Get("/credentials/:id", permRead, sbh.GetCredential)
+	sb.Patch("/credentials/:id", permWrite, sbh.UpdateCredential)
 	sb.Post("/credentials/:id/revoke", permWrite, sbh.RevokeCredential)
 	// Inboxes are saved sender filters over the capture list. Deleting
 	// one deletes no mail, so sandbox:delete gates it for symmetry with

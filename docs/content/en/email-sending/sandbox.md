@@ -255,6 +255,11 @@ The sandbox has a console API under `/api/v1/sandbox`, session-authenticated lik
 | `GET /api/v1/sandbox/:id/attachments/:idx` | One attachment                                |
 | `DELETE /api/v1/sandbox/:id`               | Delete one message                            |
 | `POST /api/v1/sandbox/clear`               | Empty the project's sandbox. A body of `senders` or `recipients` keeps it to captures from or to those addresses, `older_than` to what was received before that instant |
+| `GET /api/v1/sandbox/credentials`          | The project's sandbox credentials             |
+| `POST /api/v1/sandbox/credentials`         | Mint one: `name`. The password is returned once |
+| `GET /api/v1/sandbox/credentials/:id`      | One credential                                |
+| `PATCH /api/v1/sandbox/credentials/:id`    | Rename it                                     |
+| `POST /api/v1/sandbox/credentials/:id/revoke` | Retire it                                  |
 | `GET /api/v1/sandbox/inboxes`              | Every inbox in the project                    |
 | `POST /api/v1/sandbox/inboxes`             | Create an inbox: `name`, `description`, `addresses` |
 | `GET /api/v1/sandbox/inboxes/:id`          | One inbox                                     |

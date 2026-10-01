@@ -115,6 +115,49 @@ func (h *Handler) CreateCredential(c fiber.Ctx) error {
 	})
 }
 
+// GetCredential answers one sandbox credential, with the same refusal
+// to tell a live credential from a missing one that revoke makes.
+func (h *Handler) GetCredential(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cred == nil || !cred.Sandbox {
+		return response.NotFound(c, "sandbox credential not found")
+	}
+
+	return response.Success(c, CredentialResponse{SMTPCredential: cred})
+}
+
+// UpdateCredential renames one sandbox credential. Nothing else on it
+// is the caller's to change: the username and password are minted,
+// and the sandbox flag is what makes it reachable from here at all.
+func (h *Handler) UpdateCredential(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	in, resp, ok := validation.Bind[credentialUpdateInput](c)
+	if !ok {
+		return resp
+	}
+
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cred == nil || !cred.Sandbox {
+		return response.NotFound(c, "sandbox credential not found")
+	}
+
+	cred.Name = in.Name
+	if err := h.Runtime.Store.SMTPCredential.Put(c.Context(), cred); err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, CredentialResponse{SMTPCredential: cred})
+}
+
 // RevokeCredential retires one sandbox credential.
 //
 // The sandbox check is re-read from the row rather than trusted from

@@ -251,6 +251,14 @@ class API:
         "Delete"
         return self._t.request("DELETE", f"/api-keys/{_esc(id)}", body=None, query=query)
 
+    def get_api_key(self, id, **query: Any) -> Any:
+        "Get"
+        return self._t.request("GET", f"/api-keys/{_esc(id)}", body=None, query=query)
+
+    def update_api_key(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Update"
+        return self._t.request("PATCH", f"/api-keys/{_esc(id)}", body=body, query=query)
+
     def revoke_api_key(self, id, **query: Any) -> Any:
         "Revoke"
         return self._t.request("POST", f"/api-keys/{_esc(id)}/revoke", body=None, query=query)
@@ -643,6 +651,14 @@ class API:
         "Create credential"
         return self._t.request("POST", "/sandbox/credentials", body=body, query=query)
 
+    def get_sandbox_credential(self, id, **query: Any) -> Any:
+        "Get credential"
+        return self._t.request("GET", f"/sandbox/credentials/{_esc(id)}", body=None, query=query)
+
+    def update_sandbox_credential(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Rename credential"
+        return self._t.request("PATCH", f"/sandbox/credentials/{_esc(id)}", body=body, query=query)
+
     def credentials_revoke_sandbox(self, id, **query: Any) -> Any:
         "Revoke credential"
         return self._t.request("POST", f"/sandbox/credentials/{_esc(id)}/revoke", body=None, query=query)
@@ -683,6 +699,14 @@ class API:
         "Delete"
         return self._t.request("DELETE", f"/senders/{_esc(id)}", body=None, query=query)
 
+    def get_sender(self, id, **query: Any) -> Any:
+        "Get"
+        return self._t.request("GET", f"/senders/{_esc(id)}", body=None, query=query)
+
+    def update_sender(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Update"
+        return self._t.request("PATCH", f"/senders/{_esc(id)}", body=body, query=query)
+
     def delete_sender_signing(self, id, **query: Any) -> Any:
         "Remove the signing key"
         return self._t.request("DELETE", f"/senders/{_esc(id)}/signing", body=None, query=query)
@@ -710,6 +734,14 @@ class API:
     def delete_smtp_credential(self, id, **query: Any) -> Any:
         "Delete"
         return self._t.request("DELETE", f"/smtp-credentials/{_esc(id)}", body=None, query=query)
+
+    def get_smtp_credential(self, id, **query: Any) -> Any:
+        "Get"
+        return self._t.request("GET", f"/smtp-credentials/{_esc(id)}", body=None, query=query)
+
+    def update_smtp_credential(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Update"
+        return self._t.request("PATCH", f"/smtp-credentials/{_esc(id)}", body=body, query=query)
 
     def revoke_smtp_credential(self, id, **query: Any) -> Any:
         "Revoke"

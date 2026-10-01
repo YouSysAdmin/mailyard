@@ -181,6 +181,17 @@ GET /api/v1/smtp-credentials
 Returns the credentials of the current project under `smtp_credentials`, plus a `submission` object describing the
 listener (`enabled`, `host`, `port`, `starttls`) so a client can render connection settings. Passwords are never
 returned - only credential metadata (`id`, `name`, `username`, `allowed_ips`, `revoked`, `created_at`, `last_used_at`).
+`GET /api/v1/smtp-credentials/{id}` answers one credential the same way.
+
+### Changing a Credential
+
+```
+PATCH /api/v1/smtp-credentials/{id}
+```
+
+`name`, `allowed_ips` and `smtp_group`, each changed only when sent: `allowed_ips: []` lifts the restriction and
+`smtp_group: "none"` puts the credential back on the project's default group. The password is minted once and the
+sandbox flag is what the credential is, so neither is editable.
 
 ### Revoking a Credential
 

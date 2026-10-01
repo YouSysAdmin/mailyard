@@ -43,6 +43,17 @@ type createInput struct {
 // ListResponse is the project's submission credentials together with
 // the listener settings, so the screen can render connection details
 // without a second call to a config endpoint.
+// updateInput changes the name, the address list or the group, each
+// only when sent. The literal "none" for smtp_group puts the credential
+// back on the project's default group, since an empty string is "not
+// sent". The sandbox flag is not here: a credential that sends for
+// real is a different credential.
+type updateInput struct {
+	Name       string   `json:"name"        validate:"omitempty,min=1,max=100" normalize:"trim"`
+	AllowedIPs []string `json:"allowed_ips" validate:"omitempty,max=20,dive,ipcidr"`
+	SMTPGroup  string   `json:"smtp_group"  validate:"omitempty,max=100"       normalize:"normalize"`
+}
+
 type ListResponse struct {
 	SMTPCredentials []*scmodel.Credential `json:"smtp_credentials"`
 	Submission      ListenerInfo          `json:"submission"`

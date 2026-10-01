@@ -107,6 +107,13 @@ type ApikeyListResponse struct {
 	APIKeys []*Key `json:"api_keys"`
 }
 
+// ApikeyUpdateInput is the request body.
+type ApikeyUpdateInput struct {
+	Name       string   `json:"name"`
+	AllowedIPs []string `json:"allowed_ips"`
+	ExpiresAt  string   `json:"expires_at"`
+}
+
 // AssignInput is the request body.
 type AssignInput struct {
 	PlanID string `json:"plan_id"`
@@ -412,6 +419,11 @@ type CredentialListResponse struct {
 // CredentialResponse is the response body.
 type CredentialResponse struct {
 	SMTPCredential *Credential `json:"smtp_credential"`
+}
+
+// CredentialUpdateInput is the request body.
+type CredentialUpdateInput struct {
+	Name string `json:"name"`
 }
 
 // DataExportResponse is the response body.
@@ -1663,6 +1675,11 @@ type SenderResponse struct {
 	Sender *Sender `json:"sender"`
 }
 
+// SenderUpdateInput is the request body.
+type SenderUpdateInput struct {
+	Name *string `json:"name"`
+}
+
 // SendingLimits is the wire body.
 type SendingLimits struct {
 	MaxRecipients          int64 `json:"max_recipients"`
@@ -1881,6 +1898,13 @@ type SmtpcredentialCredentialResponse struct {
 type SmtpcredentialListResponse struct {
 	SMTPCredentials []*Credential `json:"smtp_credentials"`
 	Submission      ListenerInfo  `json:"submission"`
+}
+
+// SmtpcredentialUpdateInput is the request body.
+type SmtpcredentialUpdateInput struct {
+	Name       string   `json:"name"`
+	AllowedIPs []string `json:"allowed_ips"`
+	SMTPGroup  string   `json:"smtp_group"`
 }
 
 // SmtpserverCreateInput is the request body.

@@ -360,6 +360,50 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	return response.Created(c, SenderResponse{Sender: m})
 }
 
+// Get serves GET /api/v1/senders/:id.
+func (h *Handler) Get(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	m, err := h.Runtime.Store.Sender.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if m == nil {
+		return response.NotFound(c, "sender not found")
+	}
+
+	return response.Success(c, SenderResponse{Sender: m})
+}
+
+// Update serves PATCH /api/v1/senders/:id: the display name, which is
+// what a bare From gets on the server. An empty name clears it.
+func (h *Handler) Update(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	in, resp, ok := validation.Bind[updateInput](c)
+	if !ok {
+		return resp
+	}
+
+	m, err := h.Runtime.Store.Sender.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if m == nil {
+		return response.NotFound(c, "sender not found")
+	}
+
+	if in.Name != nil {
+		m.Name = strings.TrimSpace(*in.Name)
+	}
+
+	if err := h.Runtime.Store.Sender.Put(c.Context(), m); err != nil {
+		return response.Internal(c, err)
+	}
+
+	return h.answerSender(c, rc.Project.ID, m.ID, response.Success)
+}
+
 // Delete serves DELETE /api/v1/senders/:id.
 func (h *Handler) Delete(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)

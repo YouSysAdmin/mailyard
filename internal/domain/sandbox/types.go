@@ -23,6 +23,12 @@ type credentialInput struct {
 	Name string `json:"name" validate:"required,min=1,max=100" normalize:"trim"`
 }
 
+// credentialUpdateInput is the name, the one thing about a sandbox
+// credential that is not minted.
+type credentialUpdateInput struct {
+	Name string `json:"name" validate:"required,min=1,max=100" normalize:"trim"`
+}
+
 // Addresses arrive trimmed and lowercased - normalize:"normalize" on a
 // []string is applied to every element - which is the form the list
 // query compares lower(sender) against. The handler dedupes what is

@@ -36,8 +36,13 @@ what a send may put in the From header unless strict mode is on.
 
 ```
 GET    /api/v1/senders
+GET    /api/v1/senders/{id}
+PATCH  /api/v1/senders/{id}
 DELETE /api/v1/senders/{id}
 ```
+
+`PATCH` takes `name`, the display name a bare `from` is given on the server. An empty name clears it. The address
+itself cannot change: a different address is a different sender, registered against its own verified domain.
 
 Removing an address takes it out of the console selector, and - under strict mode - stops sends from it. It does nothing
 to mail already queued or delivered.

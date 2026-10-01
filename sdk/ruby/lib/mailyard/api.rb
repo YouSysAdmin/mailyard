@@ -306,6 +306,16 @@ module Mailyard
       @t.request("DELETE", "/api-keys/#{esc(id)}", body: nil, query: query)
     end
 
+    # Get
+    def get_api_key(id, **query)
+      @t.request("GET", "/api-keys/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Update
+    def update_api_key(id, body: nil, **query)
+      @t.request("PATCH", "/api-keys/#{esc(id)}", body: body, query: query)
+    end
+
     # Revoke
     def revoke_api_key(id, **query)
       @t.request("POST", "/api-keys/#{esc(id)}/revoke", body: nil, query: query)
@@ -796,6 +806,16 @@ module Mailyard
       @t.request("POST", "/sandbox/credentials", body: body, query: query)
     end
 
+    # Get credential
+    def get_sandbox_credential(id, **query)
+      @t.request("GET", "/sandbox/credentials/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Rename credential
+    def update_sandbox_credential(id, body: nil, **query)
+      @t.request("PATCH", "/sandbox/credentials/#{esc(id)}", body: body, query: query)
+    end
+
     # Revoke credential
     def credentials_revoke_sandbox(id, **query)
       @t.request("POST", "/sandbox/credentials/#{esc(id)}/revoke", body: nil, query: query)
@@ -846,6 +866,16 @@ module Mailyard
       @t.request("DELETE", "/senders/#{esc(id)}", body: nil, query: query)
     end
 
+    # Get
+    def get_sender(id, **query)
+      @t.request("GET", "/senders/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Update
+    def update_sender(id, body: nil, **query)
+      @t.request("PATCH", "/senders/#{esc(id)}", body: body, query: query)
+    end
+
     # Remove the signing key
     def delete_sender_signing(id, **query)
       @t.request("DELETE", "/senders/#{esc(id)}/signing", body: nil, query: query)
@@ -879,6 +909,16 @@ module Mailyard
     # Delete
     def delete_smtp_credential(id, **query)
       @t.request("DELETE", "/smtp-credentials/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Get
+    def get_smtp_credential(id, **query)
+      @t.request("GET", "/smtp-credentials/#{esc(id)}", body: nil, query: query)
+    end
+
+    # Update
+    def update_smtp_credential(id, body: nil, **query)
+      @t.request("PATCH", "/smtp-credentials/#{esc(id)}", body: body, query: query)
     end
 
     # Revoke

@@ -44,6 +44,17 @@ type createInput struct {
 
 // ListResponse is the project's keys. Only the prefix of each is
 // stored, so a list can never hand back a usable credential.
+// updateInput changes the name, the address list or the expiry, each
+// only when sent. ExpiresAt as an empty string is "not sent", the
+// literal "never" clears it, since a pointer and a string cannot both
+// mean absent. Permissions and the sandbox flag are not here: those
+// change what a key IS, which is a new key.
+type updateInput struct {
+	Name       string   `json:"name"        validate:"omitempty,min=1,max=100" normalize:"trim"`
+	AllowedIPs []string `json:"allowed_ips" validate:"omitempty,max=20,dive,ipcidr"`
+	ExpiresAt  string   `json:"expires_at"  validate:"omitempty,max=40"        normalize:"trim"`
+}
+
 type ListResponse struct {
 	APIKeys []*akmodel.Key `json:"api_keys"`
 }

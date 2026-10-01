@@ -401,6 +401,20 @@ func (c *Client) DeleteApiKey(ctx context.Context, id string, opts ...RequestOpt
 	return err
 }
 
+// GetApiKey Get.
+//
+// GET /api-keys/:id
+func (c *Client) GetApiKey(ctx context.Context, id string, opts ...RequestOption) (APIKeyResponse, error) {
+	return do[APIKeyResponse](ctx, c, "GET", fmt.Sprintf("/api-keys/%s", escape(id)), nil, opts)
+}
+
+// UpdateApiKey Update.
+//
+// PATCH /api-keys/:id
+func (c *Client) UpdateApiKey(ctx context.Context, id string, body ApikeyUpdateInput, opts ...RequestOption) (APIKeyResponse, error) {
+	return do[APIKeyResponse](ctx, c, "PATCH", fmt.Sprintf("/api-keys/%s", escape(id)), body, opts)
+}
+
 // RevokeApiKey Revoke.
 //
 // POST /api-keys/:id/revoke
@@ -1099,6 +1113,20 @@ func (c *Client) CreateSandboxCredential(ctx context.Context, body CredentialInp
 	return do[CredentialCreatedResponse](ctx, c, "POST", "/sandbox/credentials", body, opts)
 }
 
+// GetSandboxCredential Get credential.
+//
+// GET /sandbox/credentials/:id
+func (c *Client) GetSandboxCredential(ctx context.Context, id string, opts ...RequestOption) (CredentialResponse, error) {
+	return do[CredentialResponse](ctx, c, "GET", fmt.Sprintf("/sandbox/credentials/%s", escape(id)), nil, opts)
+}
+
+// UpdateSandboxCredential Rename credential.
+//
+// PATCH /sandbox/credentials/:id
+func (c *Client) UpdateSandboxCredential(ctx context.Context, id string, body CredentialUpdateInput, opts ...RequestOption) (CredentialResponse, error) {
+	return do[CredentialResponse](ctx, c, "PATCH", fmt.Sprintf("/sandbox/credentials/%s", escape(id)), body, opts)
+}
+
 // CredentialsRevokeSandbox Revoke credential.
 //
 // POST /sandbox/credentials/:id/revoke
@@ -1171,6 +1199,20 @@ func (c *Client) DeleteSender(ctx context.Context, id string, opts ...RequestOpt
 	return err
 }
 
+// GetSender Get.
+//
+// GET /senders/:id
+func (c *Client) GetSender(ctx context.Context, id string, opts ...RequestOption) (SenderResponse, error) {
+	return do[SenderResponse](ctx, c, "GET", fmt.Sprintf("/senders/%s", escape(id)), nil, opts)
+}
+
+// UpdateSender Update.
+//
+// PATCH /senders/:id
+func (c *Client) UpdateSender(ctx context.Context, id string, body SenderUpdateInput, opts ...RequestOption) (SenderResponse, error) {
+	return do[SenderResponse](ctx, c, "PATCH", fmt.Sprintf("/senders/%s", escape(id)), body, opts)
+}
+
 // DeleteSenderSigning Remove the signing key.
 //
 // DELETE /senders/:id/signing
@@ -1220,6 +1262,20 @@ func (c *Client) CreateSmtpCredential(ctx context.Context, body SmtpcredentialCr
 func (c *Client) DeleteSmtpCredential(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/smtp-credentials/%s", escape(id)), nil, opts)
 	return err
+}
+
+// GetSmtpCredential Get.
+//
+// GET /smtp-credentials/:id
+func (c *Client) GetSmtpCredential(ctx context.Context, id string, opts ...RequestOption) (SmtpcredentialCredentialResponse, error) {
+	return do[SmtpcredentialCredentialResponse](ctx, c, "GET", fmt.Sprintf("/smtp-credentials/%s", escape(id)), nil, opts)
+}
+
+// UpdateSmtpCredential Update.
+//
+// PATCH /smtp-credentials/:id
+func (c *Client) UpdateSmtpCredential(ctx context.Context, id string, body SmtpcredentialUpdateInput, opts ...RequestOption) (SmtpcredentialCredentialResponse, error) {
+	return do[SmtpcredentialCredentialResponse](ctx, c, "PATCH", fmt.Sprintf("/smtp-credentials/%s", escape(id)), body, opts)
 }
 
 // RevokeSmtpCredential Revoke.

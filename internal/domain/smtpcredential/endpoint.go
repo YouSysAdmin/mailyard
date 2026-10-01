@@ -138,6 +138,74 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	})
 }
 
+// Get serves GET /api/v1/smtp-credentials/:id. The username and never
+// the password, like the list.
+func (h *Handler) Get(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cred == nil {
+		return response.NotFound(c, "smtp credential not found")
+	}
+
+	return response.Success(c, CredentialResponse{SMTPCredential: cred})
+}
+
+// Update serves PATCH /api/v1/smtp-credentials/:id: the name, the
+// address list or the group. The password and the sandbox flag stay:
+// the first is minted once, the second is what the credential is.
+func (h *Handler) Update(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	in, resp, ok := validation.Bind[updateInput](c)
+	if !ok {
+		return resp
+	}
+
+	cred, err := h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cred == nil {
+		return response.NotFound(c, "smtp credential not found")
+	}
+
+	if in.Name != "" {
+		cred.Name = in.Name
+	}
+
+	// nil is "not sent", an empty list lifts the restriction.
+	if in.AllowedIPs != nil {
+		cred.AllowedIPs = in.AllowedIPs
+	}
+
+	switch in.SMTPGroup {
+	case "":
+	case "none":
+		cred.SMTPGroupID, cred.SMTPGroup, cred.SMTPGroupName = "", "", ""
+	default:
+		g, err := h.Runtime.Store.SMTPGroup.GetBySlug(c.Context(), rc.Project.ID, in.SMTPGroup)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if g == nil {
+			return response.BadRequest(c, "smtp server group "+in.SMTPGroup+" does not exist")
+		}
+
+		cred.SMTPGroupID, cred.SMTPGroup, cred.SMTPGroupName = g.ID, g.Slug, g.Name
+	}
+
+	if err := h.Runtime.Store.SMTPCredential.Put(c.Context(), cred); err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, CredentialResponse{SMTPCredential: cred})
+}
+
 // Revoke serves POST /api/v1/smtp-credentials/:id/revoke.
 func (h *Handler) Revoke(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)

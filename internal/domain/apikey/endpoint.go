@@ -144,6 +144,74 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	return response.Created(c, CreatedResponse{APIKey: k, Token: plaintext})
 }
 
+// Get serves GET /api/v1/api-keys/:id. The prefix and nothing of the
+// secret, like the list.
+func (h *Handler) Get(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	k, err := h.Runtime.Store.APIKey.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if k == nil {
+		return response.NotFound(c, "api key not found")
+	}
+
+	return response.Success(c, APIKeyResponse{APIKey: k})
+}
+
+// Update serves PATCH /api/v1/api-keys/:id: the name, the address
+// list or the expiry. What a key may do is not editable - a key
+// holding different permissions is a different key, minted with them.
+func (h *Handler) Update(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	in, resp, ok := validation.Bind[updateInput](c)
+	if !ok {
+		return resp
+	}
+
+	k, err := h.Runtime.Store.APIKey.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if k == nil {
+		return response.NotFound(c, "api key not found")
+	}
+
+	if in.Name != "" {
+		k.Name = in.Name
+	}
+
+	// nil is "not sent", an empty list lifts the restriction.
+	if in.AllowedIPs != nil {
+		k.AllowedIPs = in.AllowedIPs
+	}
+
+	switch in.ExpiresAt {
+	case "":
+	case "never":
+		k.ExpiresAt = nil
+	default:
+		t, err := time.Parse(time.RFC3339, in.ExpiresAt)
+		if err != nil {
+			return response.BadRequest(c, "expires_at must be an RFC 3339 timestamp, or never")
+		}
+
+		if t.Before(time.Now()) {
+			return response.BadRequest(c, "expires_at is in the past")
+		}
+
+		k.ExpiresAt = new(t.UTC())
+	}
+
+	if err := h.Runtime.Store.APIKey.Put(c.Context(), k); err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, APIKeyResponse{APIKey: k})
+}
+
 // Revoke serves POST /api/v1/api-keys/:id/revoke.
 func (h *Handler) Revoke(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)

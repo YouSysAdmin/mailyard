@@ -49,6 +49,13 @@ type signingFlagsInput struct {
 // ----------------------------------------------------------------------------
 
 // ListResponse is the project's approved From addresses.
+// updateInput is the display name. The address is the identity and
+// cannot change: a different address is a different sender, registered
+// against its own verified domain.
+type updateInput struct {
+	Name *string `json:"name" validate:"omitzero,max=100"`
+}
+
 type ListResponse struct {
 	Senders []*smodel.Sender `json:"senders"`
 }
