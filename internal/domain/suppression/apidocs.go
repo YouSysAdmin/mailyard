@@ -40,6 +40,22 @@ func APIDocs() []apidoc.Route {
 			},
 		},
 		{
+			Method:     "POST",
+			Path:       "/suppressions/import",
+			Tag:        "suppressions",
+			Permission: "suppressions:write",
+			Summary:    "Block a list of addresses",
+			Description: "Up to a thousand per call, each entry what a single block takes. " +
+				"One malformed address refuses the whole body before anything is written. " +
+				"An address already blocked takes the kind and reason sent, so a list " +
+				"brought over from another provider can be re-imported.",
+			Request: importInput{},
+			Responses: []apidoc.Response{
+				apidoc.OK("How many were written.", ImportResponse{}),
+				apidoc.BadRequest,
+			},
+		},
+		{
 			Method:     "DELETE",
 			Path:       "/suppressions",
 			Tag:        "suppressions",

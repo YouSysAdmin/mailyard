@@ -24,6 +24,14 @@ type createInput struct {
 	Reason string `json:"reason" validate:"omitempty,max=500"      normalize:"trim"`
 }
 
+// importInput is a block list brought in whole, from another
+// provider or a spreadsheet. Each entry is what a single create
+// takes, and one malformed address refuses the whole body up front
+// rather than leaving a list half applied.
+type importInput struct {
+	Suppressions []createInput `json:"suppressions" validate:"required,min=1,max=1000,dive"`
+}
+
 // ----------------------------------------------------------------------------
 // Responses
 // ----------------------------------------------------------------------------
@@ -41,4 +49,11 @@ type ListResponse struct {
 // CreateResponse is the row that now blocks the address.
 type CreateResponse struct {
 	Suppression *supmodel.Suppression `json:"suppression"`
+}
+
+// ImportResponse counts what the import wrote. An address already
+// blocked is written again, with the kind and reason sent, so the
+// count is the list's length.
+type ImportResponse struct {
+	Imported int `json:"imported"`
 }

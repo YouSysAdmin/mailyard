@@ -358,6 +358,36 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	return response.Created(c, CreateResponse{Suppression: sup})
 }
 
+// Import blocks every address in the body, up to a thousand per
+// call, each written the way Create writes one. The same upsert, so
+// an address already on the list takes the kind and reason sent
+// rather than failing the import.
+func (h *Handler) Import(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	in, resp, ok := validation.Bind[importInput](c)
+	if !ok {
+		return resp
+	}
+
+	for _, item := range in.Suppressions {
+		sup := &supmodel.Suppression{
+			ProjectID: rc.Project.ID,
+			Email:     item.Email,
+			Kind:      item.Kind,
+			Reason:    item.Reason,
+		}
+		if sup.Kind == "" {
+			sup.Kind = supmodel.KindManual
+		}
+
+		if err := h.Runtime.Store.Suppression.Upsert(c.Context(), sup); err != nil {
+			return response.Internal(c, err)
+		}
+	}
+
+	return response.Success(c, ImportResponse{Imported: len(in.Suppressions)})
+}
+
 // Delete unblocks an address. The email comes as a query param since
 // addresses do not belong in path segments.
 //

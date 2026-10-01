@@ -35,6 +35,24 @@ curl -X POST http://localhost:3000/api/v1/suppressions \
 
 Manually created suppressions are stored with `kind: "manual"`. Returns `409 Conflict` if already suppressed.
 
+## Importing a block list
+
+```
+POST /api/v1/suppressions/import
+```
+
+A list brought over whole, from another provider or a spreadsheet: `suppressions`, up to a thousand entries, each
+with the same `email`, `kind` and `reason` a single block takes. One malformed address refuses the whole body before
+anything is written, so a list is never half applied. An address already blocked takes the kind and reason sent
+rather than failing, which is what lets the same file be imported twice. The answer is `{"imported": n}`.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/suppressions/import \
+  -H "Authorization: Bearer myk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"suppressions": [{"email": "a@example.com", "kind": "bounce"}, {"email": "b@example.com"}]}'
+```
+
 ## List Suppressed Addresses
 
 ```

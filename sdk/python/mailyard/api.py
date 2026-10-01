@@ -915,6 +915,10 @@ class API:
         "Block an address Needs suppressions:write."
         return self._t.request("POST", "/suppressions", body=body, query=query)
 
+    def import_suppression(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Block a list of addresses Needs suppressions:write."
+        return self._t.request("POST", "/suppressions/import", body=body, query=query)
+
     def list_templates(self, **query: Any) -> Any:
         "List templates Needs templates:read."
         return self._t.request("GET", "/templates", body=None, query=query)

@@ -1586,6 +1586,13 @@ func (c *Client) CreateSuppression(ctx context.Context, body SuppressionCreateIn
 	return do[CreateResponse](ctx, c, "POST", "/suppressions", body, opts)
 }
 
+// ImportSuppression Block a list of addresses.
+//
+// POST /suppressions/import
+func (c *Client) ImportSuppression(ctx context.Context, body SuppressionImportInput, opts ...RequestOption) (SuppressionImportResponse, error) {
+	return do[SuppressionImportResponse](ctx, c, "POST", "/suppressions/import", body, opts)
+}
+
 // ListTemplates List templates.
 //
 // GET /templates

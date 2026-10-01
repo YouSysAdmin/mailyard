@@ -2153,6 +2153,16 @@ type SuppressionCreateInput struct {
 	Reason string `json:"reason"`
 }
 
+// SuppressionImportInput is the request body.
+type SuppressionImportInput struct {
+	Suppressions []SuppressionCreateInput `json:"suppressions"`
+}
+
+// SuppressionImportResponse is the response body.
+type SuppressionImportResponse struct {
+	Imported int64 `json:"imported"`
+}
+
 // SuppressionListResponse is the response body.
 type SuppressionListResponse struct {
 	Suppressions []*Suppression `json:"suppressions"`

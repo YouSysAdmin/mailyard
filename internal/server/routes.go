@@ -676,6 +676,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	sups := v1.Group("/suppressions", permOn(perm.ResourceSuppressions))
 	sups.Get("/", permRead, suph.List)
 	sups.Post("/", permWrite, suph.Create)
+	sups.Post("/import", permWrite, suph.Import)
 	sups.Delete("/", permDelete, suph.Delete)
 	bounces := v1.Group("/bounces", permOn(perm.ResourceBounces))
 	bounces.Get("/", permRead, bh.List)

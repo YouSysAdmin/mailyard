@@ -39,5 +39,14 @@ func ConsoleDocs() []apidoc.Route {
 			Request:     createInput{},
 			Responses:   []apidoc.Response{apidoc.Created("The result.", CreateResponse{})},
 		},
+		{
+			Method:      "POST",
+			Path:        "/suppressions/import",
+			Tag:         "suppression",
+			Summary:     "Import",
+			Description: "Needs the `suppressions:write` permission.",
+			Request:     importInput{},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", ImportResponse{})},
+		},
 	}
 }

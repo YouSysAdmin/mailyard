@@ -1136,6 +1136,11 @@ module Mailyard
       @t.request("POST", "/suppressions", body: body, query: query)
     end
 
+    # Block a list of addresses Needs suppressions:write.
+    def import_suppression(body: nil, **query)
+      @t.request("POST", "/suppressions/import", body: body, query: query)
+    end
+
     # List templates Needs templates:read.
     def list_templates(**query)
       @t.request("GET", "/templates", body: nil, query: query)
