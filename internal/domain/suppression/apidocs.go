@@ -18,6 +18,7 @@ func APIDocs() []apidoc.Route {
 			Query: []apidoc.Param{
 				{Name: "kind", Enum: []string{"bounce", "complaint", "manual", "list_unsubscribe"}},
 				{Name: "search", Description: "Prefix match on the address."},
+				{Name: "email", Description: "One whole address, without regard to case. Every row blocking it, across lists."},
 				{Name: "limit", Type: "integer"},
 				{Name: "cursor", Description: "Opaque cursor from the previous page."},
 			},

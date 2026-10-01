@@ -28,6 +28,7 @@ GET /api/v1/contacts?search=alice&limit=25&offset=0
 | Parameter | Default | Description                                                 |
 |-----------|---------|-------------------------------------------------------------|
 | `search`  | -       | Matches the address or the display name, case-insensitively |
+| `email`   | -       | One whole address. Answers that contact alone, in the same shape |
 | `limit`   | `20`    | Page size, capped at `200`                                  |
 | `offset`  | `0`     | Rows to skip                                                |
 

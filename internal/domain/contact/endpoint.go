@@ -36,6 +36,26 @@ func (h *Handler) List(c fiber.Ctx) error {
 	pg := paging.FromWith(c, defaultPageSize, maxPageSize)
 	limit, offset := pg.Limit, pg.Offset
 
+	// One whole address is a lookup through the unique index, answered
+	// in the list's shape so a client keeps one code path.
+	if email := paging.Search(c, "email"); email != "" {
+		contact, err := h.Runtime.Store.Contact.GetByEmail(c.Context(), rc.Project.ID, email)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		contacts := []*cmodel.Contact{}
+		if contact != nil {
+			contacts = append(contacts, contact)
+		}
+
+		if err := h.markSuppressed(c, rc.Project.ID, contacts); err != nil {
+			return response.Internal(c, err)
+		}
+
+		return response.Success(c, ListResponse{Contacts: contacts, Total: len(contacts), Limit: limit})
+	}
+
 	contacts, err := h.Runtime.Store.Contact.List(c.Context(), rc.Project.ID, search, limit, offset)
 	if err != nil {
 		return response.Internal(c, err)

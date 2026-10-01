@@ -720,8 +720,10 @@ type EmailStore interface {
 type SuppressionFilter struct {
 	Kind string
 
-	// Search matches the start of an address.
+	// Search matches the start of an address. Email matches one whole
+	// address, which is the question a machine asks: is this blocked.
 	Search string
+	Email  string
 	Limit  int
 	Cursor keyset.Cursor
 }
@@ -762,8 +764,10 @@ type BounceFilter struct {
 	// Type is hard, soft or complaint.
 	Type string
 
-	// Search matches the start of a recipient address.
+	// Search matches the start of a recipient address, Email one whole
+	// address.
 	Search string
+	Email  string
 	Limit  int
 	Cursor keyset.Cursor
 }

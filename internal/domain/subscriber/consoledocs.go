@@ -27,6 +27,7 @@ func ConsoleDocs() []apidoc.Route {
 					Enum:        []string{"subscribed", "unsubscribed", "bounced", "complained"},
 				},
 				{Name: "q", Description: "Part of the address or the name, case-insensitive."},
+				{Name: "email", Description: "One whole address, without regard to case. Answers that subscriber alone, and `q` is ignored."},
 				{Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."},
 				{Name: "offset", Type: "integer", Description: "Rows to skip."},
 			},

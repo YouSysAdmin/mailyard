@@ -77,6 +77,11 @@ func (s *Store) List(ctx context.Context, projID string, f store.SuppressionFilt
 		args = append(args, database.EscapeLike(strings.ToLower(strings.TrimSpace(f.Search)))+"%")
 	}
 
+	if f.Email != "" {
+		query += ` AND email = ?`
+		args = append(args, strings.ToLower(strings.TrimSpace(f.Email)))
+	}
+
 	// The keyset predicate. Row-value comparison rather than
 	// `created_at < ? OR (created_at = ? AND id < ?)`: it is the same
 	// condition, it matches the index order directly, and it cannot be
@@ -306,6 +311,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 	rows, err := h.Runtime.Store.Suppression.List(c.Context(), rc.Project.ID, store.SuppressionFilter{
 		Kind:   kind,
 		Search: paging.Search(c, "search"),
+		Email:  paging.Search(c, "email"),
 		Limit:  w.Fetch(),
 		Cursor: w.Cursor,
 	})

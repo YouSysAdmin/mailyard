@@ -38,6 +38,24 @@ func (h *Handler) List(c fiber.Ctx) error {
 		}
 	}
 
+	// One whole address is a lookup, not a search: it goes through the
+	// unique index and answers at most one row, in the list's shape so
+	// a client keeps one code path.
+	if email := paging.Search(c, "email"); email != "" {
+		sub, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, email)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		out := ListResponse{Subscribers: []*submodel.Subscriber{}}
+		if sub != nil && (status == "" || sub.Status == status) {
+			out.Subscribers = append(out.Subscribers, sub)
+			out.Total = 1
+		}
+
+		return response.Success(c, out)
+	}
+
 	pg := paging.From(c)
 	search := paging.Search(c, "q")
 	subs, err := h.Runtime.Store.Subscriber.List(c.Context(), rc.Project.ID,

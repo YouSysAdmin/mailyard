@@ -20,7 +20,8 @@ func APIDocs() []apidoc.Route {
 				"resolved from the suppression list on read, never stored, so it cannot " +
 				"drift from the list that governs sending.",
 			Query: []apidoc.Param{
-				{Name: "search"},
+				{Name: "search", Description: "Part of the address or the display name, without regard to case."},
+				{Name: "email", Description: "One whole address, without regard to case. Answers that contact alone, and `search` is ignored."},
 				{Name: "limit", Type: "integer"},
 				{Name: "offset", Type: "integer"},
 			},

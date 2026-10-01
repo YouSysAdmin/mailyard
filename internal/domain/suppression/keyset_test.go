@@ -184,6 +184,25 @@ func TestSearchTreatsWildcardsAsLiteralText(t *testing.T) {
 	}
 }
 
+// One whole address answers every row blocking it and nothing that
+// merely starts the same way, without regard to case.
+func TestEmailMatchesOneWholeAddress(t *testing.T) {
+	s := testStore(t)
+	proj := newProject(t, s)
+	now := time.Now().UTC()
+	add(t, s, proj, "ada@example.com", supmodel.KindBounce, now)
+	add(t, s, proj, "ada@example.com.au", supmodel.KindManual, now.Add(-time.Minute))
+
+	rows, err := s.List(t.Context(), proj, store.SuppressionFilter{Email: "Ada@Example.COM", Limit: 10})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if len(rows) != 1 || rows[0].Email != "ada@example.com" {
+		t.Fatalf("email lookup returned %+v", rows)
+	}
+}
+
 func TestKindFilterAndSearchCombine(t *testing.T) {
 	s := testStore(t)
 	proj := newProject(t, s)

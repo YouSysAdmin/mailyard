@@ -44,6 +44,7 @@ GET /api/v1/suppressions?search=ada@&kind=bounce&limit=50
 | Parameter | Meaning                                                                 |
 |-----------|-------------------------------------------------------------------------|
 | `search`  | Matches the **start** of an address                                     |
+| `email`   | One whole address. Every row blocking it, across lists, so an empty page means it is not blocked |
 | `kind`    | `bounce`, `complaint`, `manual` or `list_unsubscribe`                   |
 | `limit`   | Rows per page, default 50, capped at 200                                |
 | `cursor`  | Where to resume. Pass back the `next_cursor` from the previous response |

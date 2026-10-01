@@ -15,6 +15,7 @@ func APIDocs() []apidoc.Route {
 			Query: []apidoc.Param{
 				{Name: "type", Enum: []string{"hard", "soft", "complaint"}},
 				{Name: "search", Description: "Prefix match on the recipient."},
+				{Name: "email", Description: "One whole recipient address, without regard to case."},
 				{Name: "limit", Type: "integer"},
 				{Name: "cursor"},
 			},

@@ -91,6 +91,11 @@ func (s *Store) List(ctx context.Context, projID string, f store.BounceFilter) (
 		args = append(args, database.EscapeLike(strings.ToLower(strings.TrimSpace(f.Search)))+"%")
 	}
 
+	if f.Email != "" {
+		query += ` AND LOWER(recipient) = ?`
+		args = append(args, strings.ToLower(strings.TrimSpace(f.Email)))
+	}
+
 	if !f.Cursor.IsZero() {
 		query += ` AND (created_at, id) < (?, ?)`
 		args = append(args, f.Cursor.CreatedAt.UTC(), f.Cursor.ID)
@@ -146,6 +151,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 	rows, err := h.Runtime.Store.Bounce.List(c.Context(), rc.Project.ID, store.BounceFilter{
 		Type:   c.Query("type"),
 		Search: paging.Search(c, "search"),
+		Email:  paging.Search(c, "email"),
 		Limit:  w.Fetch(),
 		Cursor: w.Cursor,
 	})
