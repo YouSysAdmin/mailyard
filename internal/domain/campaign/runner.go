@@ -429,7 +429,8 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		Headers: c.Headers,
 		// The campaign's pool, already resolved to an id when the
 		// campaign was created. Empty means the project's default.
-		Route: email.Route{GroupID: c.SMTPGroupID},
+		Route:          email.Route{GroupID: c.SMTPGroupID},
+		DisableSigning: c.DisableSigning,
 	}
 	if err := r.EmailService.AttachTemplateFiles(ctx, c.ProjectID, templateID, req); err != nil {
 		return err

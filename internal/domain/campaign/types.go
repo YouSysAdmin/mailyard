@@ -49,6 +49,10 @@ type upsertInput struct {
 	// of Gmail and Yahoo, and offered anyway as a deliberate choice.
 	UnsubscribeDisabled bool `json:"unsubscribe_disabled"`
 
+	// DisableSigning sends the campaign without the sender address's
+	// signature, when the address carries a key.
+	DisableSigning bool `json:"disable_signing"`
+
 	// smtpGroupID is the resolved form of SMTPGroup, filled by
 	// validateCampaignRefs. Unexported so it cannot arrive from the
 	// request body - a caller naming a group id directly would skip

@@ -37,7 +37,7 @@ func NewStore(db *sql.DB) *Store {
 const campaignSelect = `
 SELECT id, project_id, created_by, name, subject, from_email, from_name, reply_to,
        template_id, language, template_data, headers_json, status, list_id, smtp_group_id, send_rate,
-       send_at_local_time, ab_test_enabled, ab_variants, unsubscribe_disabled,
+       send_at_local_time, ab_test_enabled, ab_variants, unsubscribe_disabled, disable_signing,
        scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at,
        COALESCE((SELECT u.email FROM users u WHERE u.id = NULLIF(campaigns.created_by, '')::uuid), ''),
        COALESCE((SELECT t.name FROM templates t WHERE t.id = campaigns.template_id), ''),
@@ -109,9 +109,9 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
         INSERT INTO campaigns (
             id, project_id, created_by, name, subject, from_email, from_name, reply_to,
             template_id, language, template_data, headers_json, status, list_id, smtp_group_id, send_rate,
-            send_at_local_time, ab_test_enabled, ab_variants, unsubscribe_disabled,
+            send_at_local_time, ab_test_enabled, ab_variants, unsubscribe_disabled, disable_signing,
             scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name               = excluded.name,
             subject            = excluded.subject,
@@ -129,12 +129,14 @@ func (s *Store) Put(ctx context.Context, c *cmodel.Campaign) error {
             ab_test_enabled    = excluded.ab_test_enabled,
             ab_variants        = excluded.ab_variants,
             unsubscribe_disabled = excluded.unsubscribe_disabled,
+            disable_signing    = excluded.disable_signing,
             updated_at         = excluded.updated_at
     `,
 		c.ID, c.ProjectID, c.CreatedBy, c.Name, c.Subject, c.FromEmail, c.FromName, c.ReplyTo,
 		c.TemplateID, c.Language, database.MustJSON(c.TemplateData), database.MustJSON(orEmptyHeaders(c.Headers)),
 		c.Status, c.ListID, database.NullStr(c.SMTPGroupID),
 		c.SendRate, c.SendAtLocalTime, c.ABTestEnabled, database.MustJSON(c.ABVariants), c.UnsubscribeDisabled,
+		c.DisableSigning,
 		database.NullTime(c.ScheduledAt), database.NullTime(c.StartedAt),
 		database.NullTime(c.CompletedAt), database.NullTime(c.NextBatchAt),
 		c.CreatedAt, database.NullTime(c.UpdatedAt),
@@ -595,7 +597,7 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	if err := r.Scan(&c.ID, &c.ProjectID, &c.CreatedBy, &c.Name, &c.Subject,
 		&c.FromEmail, &c.FromName, &c.ReplyTo, &c.TemplateID, &c.Language, &data, &headers, &c.Status,
 		&c.ListID, database.Str(&c.SMTPGroupID), &c.SendRate, &c.SendAtLocalTime, &c.ABTestEnabled, &variants,
-		&c.UnsubscribeDisabled, &scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt,
+		&c.UnsubscribeDisabled, &c.DisableSigning, &scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt,
 		&c.CreatedByEmail, &c.TemplateName, &c.ListName, &c.SMTPGroup, &c.SMTPGroupName); err != nil {
 		return nil, err
 	}

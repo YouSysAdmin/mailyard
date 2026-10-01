@@ -342,6 +342,10 @@ void start()
               <div class="summary-label">Unsubscribe Links</div>
               <div>{{ campaign.unsubscribe_disabled ? 'Off' : 'On' }}</div>
             </div>
+            <div>
+              <div class="summary-label">Signature</div>
+              <div>{{ campaign.disable_signing ? 'Off' : "The sender's key" }}</div>
+            </div>
           </div>
         </div>
       </div>

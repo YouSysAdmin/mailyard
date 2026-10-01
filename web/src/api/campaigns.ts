@@ -21,6 +21,9 @@ export interface CampaignPayload {
   ab_test_enabled?: boolean
   ab_variants?: CampaignVariant[]
   unsubscribe_disabled?: boolean
+  // Leaves the sender address's signature off the campaign, when the
+  // address carries a key. Same opt-out as a single send.
+  disable_signing?: boolean
 }
 
 export interface CampaignDetail {

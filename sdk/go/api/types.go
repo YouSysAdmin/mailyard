@@ -250,6 +250,7 @@ type Campaign struct {
 	ABTestEnabled       bool              `json:"ab_test_enabled"`
 	ABVariants          []Variant         `json:"ab_variants,omitempty"`
 	UnsubscribeDisabled bool              `json:"unsubscribe_disabled"`
+	DisableSigning      bool              `json:"disable_signing"`
 	ScheduledAt         *time.Time        `json:"scheduled_at,omitempty"`
 	StartedAt           *time.Time        `json:"started_at,omitempty"`
 	CompletedAt         *time.Time        `json:"completed_at,omitempty"`
@@ -293,6 +294,7 @@ type CampaignUpsertInput struct {
 	ABTestEnabled       bool              `json:"ab_test_enabled"`
 	ABVariants          []Variant         `json:"ab_variants"`
 	UnsubscribeDisabled bool              `json:"unsubscribe_disabled"`
+	DisableSigning      bool              `json:"disable_signing"`
 }
 
 // CatalogResponse is the response body.

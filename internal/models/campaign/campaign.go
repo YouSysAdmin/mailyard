@@ -92,6 +92,11 @@ type Campaign struct {
 	// and Yahoo rather than bounced.
 	UnsubscribeDisabled bool `json:"unsubscribe_disabled"`
 
+	// DisableSigning leaves the sender address's S/MIME or PGP
+	// signature off every message of the campaign. Only ever off, like
+	// the single send's flag of the same name.
+	DisableSigning bool `json:"disable_signing"`
+
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`

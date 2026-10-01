@@ -599,6 +599,7 @@ export interface Campaign {
   // No List-Unsubscribe headers and no unsubscribe link on this
   // campaign's mail. An option, never a default.
   unsubscribe_disabled: boolean
+  disable_signing: boolean
   scheduled_at?: string
   started_at?: string
   completed_at?: string

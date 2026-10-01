@@ -654,6 +654,7 @@ func (in *upsertInput) toModel(projID string) *cmodel.Campaign {
 		ABVariants:      in.ABVariants,
 
 		UnsubscribeDisabled: in.UnsubscribeDisabled,
+		DisableSigning:      in.DisableSigning,
 	}
 	if cam.ABVariants == nil {
 		cam.ABVariants = []cmodel.Variant{}

@@ -89,6 +89,24 @@ async function loadSenders() {
 }
 
 /** Fill the display name from the sender, never over one already typed. */
+// The registered sender the From address names, when it signs its
+// mail. The checkbox below the picker exists only then, and only to
+// decline, the same way the send page offers it.
+const signingSender = computed(() => {
+  const addr = draft.value.from_email.trim().toLowerCase()
+  const s = senders.value.find((x) => x.email === addr)
+
+  return s?.signing?.sign ? s : null
+})
+
+// The draft stores the opt-out, the checkbox shows the opt-in.
+const signThis = computed({
+  get: () => !draft.value.disable_signing,
+  set: (v: boolean) => {
+    draft.value.disable_signing = !v
+  },
+})
+
 function onSenderPicked(s: Sender | null) {
   if (s?.name && !draft.value.from_name.trim()) draft.value.from_name = s.name
 }
@@ -155,6 +173,18 @@ void loadSenders()
 
     <FormField label="From address" required :error="errors.from_email">
       <SenderSelect v-model="draft.from_email" :senders="senders" @sender="onSenderPicked" />
+    </FormField>
+
+    <FormField
+      v-if="signingSender"
+      hint="The address carries a signing key. Untick to send this campaign unsigned."
+    >
+      <label class="checkbox-label">
+        <input v-model="signThis" type="checkbox" />
+        <span>
+          Sign every message ({{ signingSender.signing?.kind === 'pgp' ? 'PGP' : 'S/MIME' }})
+        </span>
+      </label>
     </FormField>
 
     <FormField label="From name" :error="errors.from_name">

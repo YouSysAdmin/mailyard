@@ -33,6 +33,7 @@ export interface CampaignDraft {
   headers: HeaderRow[]
   ab_test_enabled: boolean
   unsubscribe_disabled: boolean
+  disable_signing: boolean
 }
 
 /** An empty draft, for the create dialog. */
@@ -53,6 +54,7 @@ export function blankDraft(): CampaignDraft {
     headers: [],
     ab_test_enabled: false,
     unsubscribe_disabled: false,
+    disable_signing: false,
   }
 }
 
@@ -74,6 +76,7 @@ export function fromCampaign(c: Campaign): CampaignDraft {
     headers: headersToRows(c.headers),
     ab_test_enabled: c.ab_test_enabled,
     unsubscribe_disabled: c.unsubscribe_disabled,
+    disable_signing: c.disable_signing ?? false,
   }
 }
 
@@ -102,6 +105,7 @@ export function toPayload(d: CampaignDraft, variants: CampaignVariant[]): Campai
     send_at_local_time: d.send_at_local_time,
     ab_test_enabled: d.ab_test_enabled,
     unsubscribe_disabled: d.unsubscribe_disabled,
+    disable_signing: d.disable_signing,
     // Sent only when the split is on. Sending an empty list with it off
     // would ask the server to store variants nothing will ever read.
     ab_variants: d.ab_test_enabled

@@ -46,7 +46,7 @@ With **Attach the public key** on, which is the default, every message carries a
 
 With a key stored and **Sign outgoing mail** on, every message from the address is signed: API sends, template sends, campaigns and mail submitted over the SMTP relay. The text parts are written quoted-printable inside the signed body, because a bare line ending in a space is something a relay may strip and the signature would then break.
 
-A caller may decline for one message with `disable_signing: true` on `POST /api/v1/emails/send` or `send-template`. There is no way to turn signing on from a request: whether an address signs is decided where its key is.
+A caller may decline for one message with `disable_signing: true` on `POST /api/v1/emails/send` or `send-template`, and a campaign carries the same flag, shown as a checkbox under its From address whenever that address holds a key. There is no way to turn signing on from a request: whether an address signs is decided where its key is.
 
 {{< callout type="warning" title="Mail submitted over SMTP is re-signed, not passed through" >}}
 A message submitted over the SMTP relay is parsed and rebuilt before delivery, which already breaks any signature the submitting client put on it. With a key on the sender address the server signs the rebuilt message itself. For a shared address that is the better arrangement anyway: one key, held here, rather than one on every workstation that sends as the address.
