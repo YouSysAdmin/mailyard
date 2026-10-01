@@ -146,16 +146,14 @@ func (t *sesTransport) Send(ctx context.Context, msg *smtpclient.Message) error 
 		Content:     &sestypes.EmailContent{Raw: &sestypes.RawMessage{Data: raw}},
 		Destination: &sestypes.Destination{ToAddresses: msg.To},
 	}
-	// The RETURN PATH, not the From header. SES uses the raw message's own
-	// From for what the recipient sees, and this for the envelope - which
-	// is what a receiver checks SPF against and where bounces go. Leaving
-	// it unset would put the From address on the envelope and undo
-	// returnPathFor, whose entire job is keeping the envelope on a domain
-	// that authorizes the sending IPs.
-	if msg.EnvelopeFrom != "" {
-		in.FromEmailAddress = aws.String(smtpclient.EnvelopeAddress(msg.EnvelopeFrom))
-	}
-
+	// No FromEmailAddress. It is the From HEADER, not the envelope: SES
+	// rewrites the raw message's From to whatever is passed here, so a
+	// return path in this field strips the display name and puts the
+	// bounce address in front of the recipient. The envelope is not ours
+	// to choose on this provider - SES always sends from its own MAIL
+	// FROM (or the identity's custom one), and bounces come back over the
+	// configuration set - so msg.EnvelopeFrom has nowhere to go and is
+	// deliberately not sent.
 	if t.confSet != "" {
 		in.ConfigurationSetName = aws.String(t.confSet)
 	}

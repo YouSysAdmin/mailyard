@@ -95,10 +95,10 @@ func TestSESRefusesToGuessARegion(t *testing.T) {
 //
 // The three things worth pinning are the ones a reader cannot check by
 // looking: that the body is the SIGNED bytes rather than the rendered
-// ones, that FromEmailAddress is the RETURN PATH rather than the From
-// header, and that the configuration set travels - without it an
+// ones, that the From header in the raw message is the ONLY From SES is
+// given, and that the configuration set travels - without it an
 // accepted message reports no bounces at all.
-func TestSESSendsTheSignedBytesAndTheReturnPath(t *testing.T) {
+func TestSESSendsTheSignedBytesAndLeavesTheFromAlone(t *testing.T) {
 	var got sesRequest
 	srv := fakeSES(t, &got, func(w http.ResponseWriter) {
 		_, _ = w.Write([]byte(`{"MessageId":"0100018f-abc"}`))
@@ -139,12 +139,18 @@ func TestSESSendsTheSignedBytesAndTheReturnPath(t *testing.T) {
 		t.Error("the raw body is not the rendered message")
 	}
 
-	// The envelope, bare, with no display name - it is an address in a
-	// protocol field, not a header.
-	if got.FromEmailAddress != "bounces@mail.example.com" {
-		t.Errorf("FromEmailAddress = %q, want the return path. The From header there "+
-			"would undo returnPathFor and fail SPF on whatever IP SES sent from",
-			got.FromEmailAddress)
+	// FromEmailAddress is the From HEADER on this provider, not the
+	// envelope: SES rewrites the raw message's From to whatever is
+	// passed. The return path went here once, and every message from a
+	// registered sender arrived as a bare bounce address with no display
+	// name. The raw From is the one SES must see.
+	if got.FromEmailAddress != "" {
+		t.Errorf("FromEmailAddress = %q, want it unset - SES replaces the From header "+
+			"with it, and the recipient sees that instead of the sender", got.FromEmailAddress)
+	}
+
+	if !strings.Contains(string(raw), "From: Alice <alice@example.com>\r\n") {
+		t.Error("the raw body does not carry the sender's From header with its display name")
 	}
 
 	if got.ConfigurationSetName != "mailyard-events" {
