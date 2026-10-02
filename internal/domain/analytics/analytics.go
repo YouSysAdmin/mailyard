@@ -82,7 +82,7 @@ func (s *Store) Summary(ctx context.Context, projID string) (*amodel.Summary, er
 	var err error
 
 	out.Emails, err = s.countBy(ctx,
-		`SELECT status, COUNT(*) FROM emails WHERE project_id = ? GROUP BY status`, projID)
+		`SELECT status, COUNT(*) FROM emails WHERE project_id = ? AND NOT system GROUP BY status`, projID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (s *Store) engagement(ctx context.Context, projID string) (amodel.Engagemen
         SELECT COUNT(*) FILTER (WHERE status = 'sent' AND tracked),
                COUNT(*) FILTER (WHERE opened_at IS NOT NULL),
                COUNT(*) FILTER (WHERE clicked_at IS NOT NULL)
-        FROM emails WHERE project_id = ?`, projID).
+        FROM emails WHERE project_id = ? AND NOT system`, projID).
 		Scan(&e.TrackedSent, &e.Opened, &e.Clicked)
 	if err != nil {
 		return e, err
@@ -259,6 +259,6 @@ func (s *Store) DailyCounts(ctx context.Context, projID string, from, to time.Ti
 func (s *Store) StatusBreakdown(ctx context.Context, projID string, from, to time.Time) (map[string]int, error) {
 	return s.countBy(ctx, `
         SELECT status, COUNT(*) FROM emails
-        WHERE project_id = ? AND created_at >= ? AND created_at < ?
+        WHERE project_id = ? AND NOT system AND created_at >= ? AND created_at < ?
         GROUP BY status`, projID, from, to)
 }

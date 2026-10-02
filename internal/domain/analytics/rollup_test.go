@@ -52,11 +52,20 @@ func TestTheRollupAgreesWithCountingTheRows(t *testing.T) {
 	plant("sent", 1, 3)
 	plant("queued", 2, 4)
 
+	// Platform mail through this project is not the project's, so the
+	// rollup leaves it out - and so does the count it is compared with.
+	if _, err := db.ExecContext(ctx, `
+        INSERT INTO emails (id, project_id, sender, recipients, subject, status, created_at, system)
+        VALUES ($1, $2, 'a@b.test', '["c@d.test"]', 's', 'sent', $3, true)`,
+		ids.New(), projID, now); err != nil {
+		t.Fatalf("plant system row: %v", err)
+	}
+
 	// live counts the rows directly.
 	live := func(status string) map[string]int {
 		q := `
             SELECT to_char((created_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD'), COUNT(*)
-            FROM emails WHERE project_id = $1`
+            FROM emails WHERE project_id = $1 AND NOT system`
 		args := []any{projID}
 		if status != "" {
 			q += ` AND status = $2`

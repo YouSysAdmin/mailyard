@@ -176,7 +176,6 @@ func rekeyAll(ctx context.Context, db *sql.DB, current, fresh *crypto.Service, r
 	defer func() { _ = tx.Rollback() }()
 
 	counts := map[string]int{}
-	i
 	for _, col := range sealedColumns {
 		n, err := rekeyColumn(ctx, tx, col, current, fresh)
 		if err != nil {

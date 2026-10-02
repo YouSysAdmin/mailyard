@@ -277,6 +277,13 @@ type SendRequest struct {
 	// Service.ResolveRoute, which turns a caller's group slug into an
 	// id and rejects one that does not exist.
 	Route Route
+
+	// System marks the platform's own mail leaving through this
+	// project: the project lends its servers, relay nodes and DKIM,
+	// and nothing else. No quota, no suppressions, no tracking, no
+	// default headers, no strict-senders check, no webhooks, and the
+	// row answers to no project-scoped reader. Set only by SendSystem.
+	System bool
 }
 
 // ResolveRoute turns the caller-facing selectors into a Route.
@@ -369,7 +376,12 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 	}
 
 	// Strict sender mode: the project requires every From address to
-	// be registered under /api/senders.
+	// be registered under /api/senders. Platform mail is not one of
+	// the project's callers, so the rule does not reach it.
+	if req.System {
+		return nil
+	}
+
 	w, err := s.Store.Project.Get(ctx, projID)
 	if err != nil {
 		return err
@@ -572,19 +584,26 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		return nil, nil, err
 	}
 
-	var observe quota.Observer
-	if s.Quota != nil {
-		observe = s.Quota(projID)
-	}
+	// A system message is not the project's to budget or to block:
+	// the quota is the plan's and the suppressions are the project's,
+	// and a password reset is neither.
+	allowed, blocked := req.To, []string(nil)
+	if !req.System {
+		var observe quota.Observer
+		if s.Quota != nil {
+			observe = s.Quota(projID)
+		}
 
-	if err := quota.CheckSend(ctx, s.Store, projID, observe); err != nil {
-		return nil, nil, err
-	}
+		if err := quota.CheckSend(ctx, s.Store, projID, observe); err != nil {
+			return nil, nil, err
+		}
 
-	allowed, blocked, err := s.Store.Suppression.FilterSuppressedForList(
-		ctx, projID, req.UnsubscribeListID, req.To)
-	if err != nil {
-		return nil, nil, err
+		var err error
+		allowed, blocked, err = s.Store.Suppression.FilterSuppressedForList(
+			ctx, projID, req.UnsubscribeListID, req.To)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// A scoped send gets its one-click link minted here, bound to the
@@ -618,8 +637,10 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	reg := s.registeredSender(ctx, projID, req.From)
 	from := withRegisteredName(reg, req.From)
 
-	if err := s.withProjectDefaults(ctx, projID, req); err != nil {
-		return nil, nil, err
+	if !req.System {
+		if err := s.withProjectDefaults(ctx, projID, req); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	now := time.Now().UTC()
@@ -647,6 +668,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		ListUnsubscribePost:   req.ListUnsubscribePost,
 		Tracked:               req.Tracked,
 		Signing:               signingFor(reg, req.DisableSigning),
+		System:                req.System,
 		Status:                emailmodel.StatusQueued,
 		MaxAttempts:           s.MaxAttempts,
 		NextAttemptAt:         &now,
@@ -663,7 +685,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	// message the recipient got, tracking and all. Campaign sends
 	// arrive here already processed by the runner and carry Tracked,
 	// so this leaves them alone.
-	if !e.Tracked {
+	if !e.Tracked && !e.System {
 		s.applyTracking(ctx, projID, e, req.Track)
 	}
 
@@ -705,8 +727,10 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 
 	metrics.EmailsAccepted.Inc()
 	s.Log.Info("email: accepted", "email_id", e.ID, "project_id", projID,
-		"status", e.Status, "recipients", len(e.Recipients), "suppressed", len(blocked))
-	s.Emit(ctx, whmodel.EventEmailQueued, e)
+		"status", e.Status, "recipients", len(e.Recipients), "suppressed", len(blocked), "system", e.System)
+	if !e.System {
+		s.Emit(ctx, whmodel.EventEmailQueued, e)
+	}
 
 	return e, blocked, nil
 }

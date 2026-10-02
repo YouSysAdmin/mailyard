@@ -17,7 +17,6 @@ export interface SharedSMTPPayload {
   allowed_emails?: string[]
   allowed_domains?: string[]
   security_mode?: string
-  platform_only?: boolean
   priority?: number
   status?: string
 }

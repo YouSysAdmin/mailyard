@@ -1,16 +1,20 @@
 <script setup lang="ts">
 // One platform setting: what it is, and the control for changing it.
 //
-// The control has five shapes and choosing between them is the whole
+// The control has six shapes and choosing between them is the whole
 // difficulty of this page - a switch, a number with a unit, a list edited
-// as lines, plain text, and the case with NO control at all. Its own
-// component, so the view's job stays staging edits.
+// as lines, a project picked by name, plain text, and the case with NO
+// control at all. Its own component, so the view's job stays staging
+// edits.
 import { computed } from 'vue'
 import type { PlatformSetting } from '../../../api/settings'
+import type { Project } from '../../../api/types'
 import { formatDate } from '../../../composables/formatDate'
-import { displayValue, isBool, isInt, isList } from './settingValue'
+import { displayValue, isBool, isInt, isList, isProjectRef } from './settingValue'
 
-const props = defineProps<{ setting: PlatformSetting }>()
+// projects is what a project ref picks from. The view loads the list
+// once, only when a setting on the page asks for it.
+const props = defineProps<{ setting: PlatformSetting; projects?: Project[] }>()
 
 /** The staged value, in the shape the control edits. */
 const staged = defineModel<string | number>({ required: true })
@@ -30,7 +34,7 @@ const wide = computed(() => {
   // pushed those two to opposite ends of the row.
   if (props.setting.managed_at) return false
 
-  return !isBool(props.setting) && !isInt(props.setting)
+  return !isBool(props.setting) && !isInt(props.setting) && !isProjectRef(props.setting)
 })
 
 const on = computed(() => staged.value === 'true')
@@ -90,6 +94,18 @@ function setBool(checked: boolean) {
         placeholder="one value per line"
         :aria-label="setting.key"
       ></textarea>
+
+      <!-- An id picked by name. The empty option is the registry
+           default, which the description explains. -->
+      <select
+        v-else-if="isProjectRef(setting)"
+        v-model="staged"
+        class="form-select setting-select"
+        :aria-label="setting.key"
+      >
+        <option value="">None</option>
+        <option v-for="p in projects ?? []" :key="p.id" :value="p.id">{{ p.name }}</option>
+      </select>
 
       <div v-else class="input-with-unit">
         <input
@@ -213,6 +229,11 @@ function setBool(checked: boolean) {
 .setting-default {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* Wide enough for a project name, narrow enough to stay in the column. */
+.setting-select {
+  width: 260px;
 }
 
 .input-with-unit {

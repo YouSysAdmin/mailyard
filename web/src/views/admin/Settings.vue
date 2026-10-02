@@ -11,19 +11,26 @@
 // nothing with any of it - not a value, not a request, not a save.
 import { computed, onMounted, ref } from 'vue'
 import { type PlatformSetting, settingsApi } from '../../api/settings'
+import { projectApi } from '../../api/projects'
+import type { Project } from '../../api/types'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import SettingRow from './settings/SettingRow.vue'
 import ScheduledJobs from './settings/ScheduledJobs.vue'
-import { encodeLines, isList, linesOf } from './settings/settingValue'
+import { encodeLines, isList, isProjectRef, linesOf } from './settings/settingValue'
 
 const notify = useNotificationStore()
 
 const settings = ref<PlatformSetting[]>([])
 const loading = ref(true)
 const saving = ref(false)
+
+// Every project, for the settings that pick one by name. Fetched only
+// when such a setting is on the page, and a platform admin gets the
+// whole list from the ordinary projects route.
+const projects = ref<Project[]>([])
 
 // Keyed by setting key, in the shape the CONTROL edits - a list is
 // staged as lines, not as the JSON array it is stored in.
@@ -59,6 +66,10 @@ async function load() {
   loading.value = true
   try {
     settings.value = (await settingsApi.list()).data.settings ?? []
+    if (settings.value.some(isProjectRef)) {
+      projects.value = (await projectApi.list()).data.projects ?? []
+    }
+
     stage()
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load platform settings'))
@@ -117,7 +128,13 @@ onMounted(load)
             0 means data is kept forever.
           </p>
 
-          <SettingRow v-for="s in settings" :key="s.key" v-model="edits[s.key]" :setting="s" />
+          <SettingRow
+            v-for="s in settings"
+            :key="s.key"
+            v-model="edits[s.key]"
+            :setting="s"
+            :projects="projects"
+          />
         </div>
       </div>
 

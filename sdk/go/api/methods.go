@@ -649,6 +649,28 @@ func (c *Client) DkimRotateDomain(ctx context.Context, id string, opts ...Reques
 	return do[DetailResponse](ctx, c, "POST", fmt.Sprintf("/domains/%s/dkim/rotate", escape(id)), nil, opts)
 }
 
+// ListDomainGrants List grants.
+//
+// GET /domains/:id/grants
+func (c *Client) ListDomainGrants(ctx context.Context, id string, opts ...RequestOption) (GrantsResponse, error) {
+	return do[GrantsResponse](ctx, c, "GET", fmt.Sprintf("/domains/%s/grants", escape(id)), nil, opts)
+}
+
+// CreateDomainGrant Share.
+//
+// POST /domains/:id/grants
+func (c *Client) CreateDomainGrant(ctx context.Context, id string, body GrantInput, opts ...RequestOption) (GrantsResponse, error) {
+	return do[GrantsResponse](ctx, c, "POST", fmt.Sprintf("/domains/%s/grants", escape(id)), body, opts)
+}
+
+// DeleteDomainGrant Unshare.
+//
+// DELETE /domains/:id/grants/:project_id
+func (c *Client) DeleteDomainGrant(ctx context.Context, id string, projectId string, opts ...RequestOption) error {
+	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/domains/%s/grants/%s", escape(id), escape(projectId)), nil, opts)
+	return err
+}
+
 // VerifyDomain Verify.
 //
 // POST /domains/:id/verify

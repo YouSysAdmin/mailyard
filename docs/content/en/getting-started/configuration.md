@@ -234,28 +234,27 @@ There is deliberately no SMTP probe, so `mailbox_verified` is always false. See
 
 ## Platform mail
 
-The platform's own outbound mail: project invitations, password resets and signup confirmations. Deliberately separate
-from the tenant send pipeline, so it never consumes a project's plan quota, appears in a project email log, or needs a
-tenant to have configured an SMTP server.
+The platform's own outbound mail: project invitations, password resets, signup confirmations and alerts. It is sent as
+a message of a project you name, through that project's servers and DKIM key, marked as system mail so it never
+consumes the project's plan quota, appears in its email log, or fires its webhooks.
 
-**There is nothing to configure here.** Platform mail leaves through the **shared SMTP pool**, and the address it sends
-from is a platform setting rather than config:
+**There is nothing to configure here.** Both the address and the project are platform settings rather than config:
 
-| Setting                   | Where                                | Description                                                               |
-|---------------------------|--------------------------------------|---------------------------------------------------------------------------|
-| `platform_mail_from`      | Admin → Settings                     | Envelope sender. Empty means platform mail is off                         |
-| `platform_mail_from_name` | Admin → Settings                     | Optional display name                                                     |
-| `platform_only`           | Admin → Shared SMTP Pool, per server | Reserves that server for platform mail, so no tenant is routed through it |
+| Setting                   | Where            | Description                                                                 |
+|---------------------------|------------------|-----------------------------------------------------------------------------|
+| `platform_mail_from`      | Admin → Settings | Sender address, on a domain the project has verified                        |
+| `platform_mail_from_name` | Admin → Settings | Optional display name                                                       |
+| `platform_mail_project`   | Admin → Settings | The project platform mail is sent as. Off until this and the address are set |
 
-The address is a setting and not a config key on purpose: everything else about the pool is edited in the console by the
-same administrator, and an address that needs a restart to correct is the one thing they cannot fix when it is wrong.
+They are settings and not config keys on purpose: the project beside them is edited in the console by the same
+administrator, and a value that needs a restart to correct is the one thing they cannot fix when it is wrong.
 
 `platform_mail_from` requires `MAILYARD_SERVER_PUBLIC_URL`, since every link it sends is absolute — and that requirement
 is checked at the moment somebody writes the address, which is where it is actionable.
 
-With no address set, invitations still work — the console returns a copyable link instead — but password reset is not
-offered at all. Status and a connection test live at `GET`/`POST /api/v1/admin/system-mail[/test]`. See
-[System Mail](/docs/admin/system-mail).
+Until both are set, invitations still work — the console returns a copyable link instead — but password reset is not
+offered at all. Status and a test live at `GET`/`POST /api/v1/admin/system-mail[/test]`. See
+[Platform Mail](/docs/admin/system-mail).
 
 ## Relay nodes
 
@@ -528,5 +527,5 @@ On first start against an empty database the bootstrap admin password is written
 automatically, so nothing else is needed.
 
 Platform mail — invitations, password resets, signup confirmations — is not in this list because it is not configured
-here. Set `platform_mail_from` in **Admin → Settings** and give the shared pool a server. See
-[Platform mail](#platform-mail).
+here. Create the project it is sent as, verify its domain, and set `platform_mail_from` and `platform_mail_project` in
+**Admin → Settings**. See [Platform mail](#platform-mail).

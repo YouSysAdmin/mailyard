@@ -3,8 +3,10 @@
 package setting
 
 import (
+	"context"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,11 +14,14 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/cron"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/settings"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/certificate"
+	"github.com/yousysadmin/mailyard/internal/domain/email"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
 
@@ -92,6 +97,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 			Unit:        d.Unit,
 			ManagedAt:   d.ManagedAt,
 			ManagedIn:   d.ManagedIn,
+			Ref:         d.Ref,
 		}
 
 		if row, ok := overridden[d.Key]; ok {
@@ -125,10 +131,6 @@ func (h *Handler) Update(c fiber.Ctx) error {
 
 	// Validate the whole batch before writing any of it - a partial
 	// apply would leave the operator guessing which half landed.
-	type change struct {
-		def   smodel.Definition
-		value string
-	}
 	changes := make([]change, 0, len(in.Settings))
 	for _, s := range in.Settings {
 		d, ok := smodel.Lookup(s.Key)
@@ -169,6 +171,35 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		changes = append(changes, change{def: d, value: normalized})
 	}
 
+	// The project platform mail leaves through is checked against the
+	// address it leaves from, and the two can arrive in one batch or
+	// one at a time - so the pair is judged on what will be in force
+	// after this write, staged values first and the stored ones behind.
+	if touched(changes, smodel.KeyPlatformMailProject) || touched(changes, smodel.KeyPlatformMailFrom) {
+		effective := func(key string) string {
+			for _, ch := range changes {
+				if ch.def.Key == key {
+					return ch.value
+				}
+			}
+
+			return h.Runtime.Settings.String(key)
+		}
+
+		if err := validatePlatformMailProject(c.Context(), h.Runtime.Store,
+			effective(smodel.KeyPlatformMailProject), effective(smodel.KeyPlatformMailFrom)); err != nil {
+			if re, ok := errors.AsType[*email.RequestError](err); ok {
+				return response.BadRequest(c, re.Error())
+			}
+
+			if errors.Is(err, errBadSetting) {
+				return response.BadRequest(c, err.Error())
+			}
+
+			return response.Internal(c, err)
+		}
+	}
+
 	rc := domain.GetRequestContext(c)
 	updatedBy := ""
 	if rc != nil && rc.User != nil {
@@ -205,6 +236,74 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	}
 
 	return h.List(c)
+}
+
+// change is one validated write in a batch.
+type change struct {
+	def   smodel.Definition
+	value string
+}
+
+// errBadSetting marks a refusal the operator can act on, as opposed
+// to a store failure.
+var errBadSetting = errors.New("bad setting")
+
+// validatePlatformMailProject refuses a platform_mail_project that
+// cannot carry platform mail: not a project id, not a project, or a
+// project that has not verified the domain of platform_mail_from and
+// so could neither send nor sign it. Empty turns platform mail off and
+// always passes.
+//
+// The id is parsed BEFORE the lookup. A uuid column refuses `banana`
+// with 22P02, which response.Internal turns into a 404 - the right
+// answer for a resource route and the wrong one for a settings write.
+func validatePlatformMailProject(ctx context.Context, st *store.Store, projID, from string) error {
+	if projID == "" {
+		return nil
+	}
+
+	if !ids.Valid(projID) {
+		return fmt.Errorf("%w: platform_mail_project must be a project id", errBadSetting)
+	}
+
+	p, err := st.Project.Get(ctx, projID)
+	if err != nil {
+		return err
+	}
+
+	if p == nil {
+		return fmt.Errorf("%w: platform_mail_project names a project that does not exist", errBadSetting)
+	}
+
+	if from == "" {
+		return nil
+	}
+
+	if err := email.RequireVerifiedSender(ctx, st, projID, from); err != nil {
+		return err
+	}
+
+	srv, err := email.ResolveServer(ctx, st, projID, from, email.Route{})
+	if err != nil {
+		return err
+	}
+
+	if srv == nil {
+		return fmt.Errorf("%w: project %s has no SMTP server that can carry platform mail from %s", errBadSetting, p.Name, from)
+	}
+
+	return nil
+}
+
+// touched reports whether key is in the batch.
+func touched(changes []change, key string) bool {
+	for _, ch := range changes {
+		if ch.def.Key == key {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Jobs reports the scheduled maintenance jobs.

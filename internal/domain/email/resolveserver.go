@@ -158,13 +158,6 @@ func resolveShared(ctx context.Context, st *store.Store, projID, sender string) 
 
 	var out []*ssmodel.Server
 	for _, srv := range pool {
-		// Reserved for the platform's own mail. A tenant must never be
-		// routed through it, which is the whole point of the flag -
-		// see systemmail.
-		if srv.PlatformOnly {
-			continue
-		}
-
 		if !srv.AllowsSender(sender) || !srv.AllowsDomain(sender) {
 			continue
 		}
@@ -226,11 +219,11 @@ func RequireVerifiedSender(ctx context.Context, st *store.Store, projID, sender 
 	return nil
 }
 
-// ownsVerifiedDomain reports whether the SENDING project has proved
-// ownership of the sender's domain.
+// ownsVerifiedDomain reports whether the SENDING project may send as
+// the sender's domain: it verified it, or the owner shared it.
 //
 // This is what strict mode buys. Domain names are globally unique
-// here, so without the project comparison any tenant could relay as
+// here, so without the project question any tenant could relay as
 // another tenant's domain through platform credentials - the same
 // hole signerFor closes for DKIM, and it matters more on a shared
 // server, where the platform's own reputation carries the message.
@@ -241,12 +234,12 @@ func ownsVerifiedDomain(ctx context.Context, st *store.Store, projID, sender str
 	}
 
 	// Covering, not exact: a verified apex owns its subdomains.
-	d, err := st.Domain.GetVerifiedCovering(ctx, host)
+	d, err := st.Domain.GetVerifiedCoveringFor(ctx, host, projID)
 	if err != nil {
 		return false, err
 	}
 
-	return d != nil && d.ProjectID == projID, nil
+	return d != nil, nil
 }
 
 // senderAddress is the envelope form of a From header, shared by the

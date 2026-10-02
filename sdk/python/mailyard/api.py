@@ -391,6 +391,18 @@ class API:
         "Rotate DKIM key"
         return self._t.request("POST", f"/domains/{_esc(id)}/dkim/rotate", body=None, query=query)
 
+    def list_domain_grants(self, id, **query: Any) -> Any:
+        "List grants"
+        return self._t.request("GET", f"/domains/{_esc(id)}/grants", body=None, query=query)
+
+    def create_domain_grant(self, id, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Share"
+        return self._t.request("POST", f"/domains/{_esc(id)}/grants", body=body, query=query)
+
+    def delete_domain_grant(self, id, project_id, **query: Any) -> Any:
+        "Unshare"
+        return self._t.request("DELETE", f"/domains/{_esc(id)}/grants/{_esc(project_id)}", body=None, query=query)
+
     def verify_domain(self, id, **query: Any) -> Any:
         "Verify"
         return self._t.request("POST", f"/domains/{_esc(id)}/verify", body=None, query=query)

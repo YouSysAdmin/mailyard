@@ -90,9 +90,10 @@ func (s *Store) GetVerifiedByName(ctx context.Context, name string) (*dmodel.Dom
 // sits on a subdomain with its own MX so the apex keeps receiving real
 // mail.
 //
-// Most specific wins, so a subdomain verified separately by another
-// project stays theirs - a parent must not absorb a child somebody
-// else proved.
+// Most specific wins. A verified domain holds its zone, so another
+// project can no longer claim a name inside it (ZoneTakenByAnother),
+// and two projects nested in one zone exist only where the rows
+// predate that rule - there the child keeps its own subtree.
 //
 // Matching is by whole LABELS, never by string suffix - see
 // dnsname.Covering, which a relay node uses for the same question.
@@ -105,6 +106,165 @@ func (s *Store) GetVerifiedCovering(ctx context.Context, name string) (*dmodel.D
 	}
 
 	return nil, nil
+}
+
+// GetVerifiedCoveringFor answers whether projID may SEND as name: the
+// covering verified row exactly as GetVerifiedCovering finds it, when
+// projID owns it or the owner shared it with projID, and nil otherwise.
+//
+// A grant covers the owner's whole zone. When the owner verified
+// auth.example.com beside example.com, a project the apex was shared
+// with may send from auth.example.com too: the grant is asked of every
+// row on the way up that belongs to the same owner. The most specific
+// row is what is returned, so its key signs.
+func (s *Store) GetVerifiedCoveringFor(ctx context.Context, name, projID string) (*dmodel.Domain, error) {
+	var chain []*dmodel.Domain
+	for _, candidate := range dnsname.Covering(name) {
+		d, err := s.GetVerifiedByName(ctx, candidate)
+		if err != nil {
+			return nil, err
+		}
+
+		if d != nil {
+			chain = append(chain, d)
+		}
+	}
+
+	if len(chain) == 0 {
+		return nil, nil
+	}
+
+	d := chain[0]
+	if d.ProjectID == projID {
+		return d, nil
+	}
+
+	owned := make([]string, 0, len(chain))
+	for _, row := range chain {
+		if row.ProjectID == d.ProjectID {
+			owned = append(owned, row.ID)
+		}
+	}
+
+	var granted bool
+	if err := s.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM domain_grants WHERE project_id = ? AND domain_id = ANY(?::uuid[]))`,
+		projID, owned).Scan(&granted); err != nil {
+		return nil, err
+	}
+
+	if !granted {
+		return nil, nil
+	}
+
+	return d, nil
+}
+
+// ZoneTakenByAnother reports whether another project verified name, a
+// domain above it or a domain below it. A verified domain holds its
+// whole zone: whoever controls example.com controls every name under
+// it, so nobody else may claim auth.example.com, and a project may not
+// verify example.com while another holds a name inside it. A subdomain
+// somebody else needs is verified by the owner and shared.
+func (s *Store) ZoneTakenByAnother(ctx context.Context, name, projID string) (bool, error) {
+	name = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
+	var taken bool
+	err := s.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1 FROM domains
+            WHERE verified = TRUE AND project_id <> ?
+              AND (domain = ANY(?::text[]) OR domain LIKE ?)
+        )`, projID, dnsname.Covering(name), "%."+database.EscapeLike(name)).Scan(&taken)
+
+	return taken, err
+}
+
+// zoneTaken is the refusal for a name inside, or above, a zone another
+// project verified. One wording for both directions.
+const zoneTaken = "another project verified a domain in this zone - ask its owner to verify the name and share it with this project"
+
+// Grant shares a domain with another project. A repeat is a no-op,
+// so the caller does not have to ask first.
+func (s *Store) Grant(ctx context.Context, g *dmodel.Grant) error {
+	if g.CreatedAt.IsZero() {
+		g.CreatedAt = time.Now().UTC()
+	}
+
+	_, err := s.Exec(ctx, `
+        INSERT INTO domain_grants (domain_id, project_id, granted_by, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (domain_id, project_id) DO NOTHING`,
+		g.DomainID, g.ProjectID, g.GrantedBy, g.CreatedAt)
+
+	return err
+}
+
+// Revoke takes a grant back and reports whether there was one.
+func (s *Store) Revoke(ctx context.Context, domainID, projID string) (bool, error) {
+	res, err := s.Exec(ctx, `DELETE FROM domain_grants WHERE domain_id = ? AND project_id = ?`, domainID, projID)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// ListGrants lists who one domain is shared with, scoped to its OWNER:
+// a domain id another project owns answers nothing.
+func (s *Store) ListGrants(ctx context.Context, ownerProjID, domainID string) ([]*dmodel.Grant, error) {
+	rows, err := s.Query(ctx, `
+        SELECT g.domain_id, g.project_id, p.name, p.slug, g.granted_by, g.created_at
+        FROM domain_grants g
+        JOIN domains d ON d.id = g.domain_id
+        JOIN projects p ON p.id = g.project_id
+        WHERE d.project_id = ? AND g.domain_id = ?
+        ORDER BY g.created_at ASC`, ownerProjID, domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*dmodel.Grant{}
+	for rows.Next() {
+		var g dmodel.Grant
+		if err := rows.Scan(&g.DomainID, &g.ProjectID, &g.ProjectName, &g.ProjectSlug, &g.GrantedBy, &g.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		out = append(out, &g)
+	}
+
+	return out, rows.Err()
+}
+
+// ListShared lists the verified domains other projects shared with
+// projID, with the owner's name and nothing of the records.
+func (s *Store) ListShared(ctx context.Context, projID string) ([]*dmodel.Shared, error) {
+	rows, err := s.Query(ctx, `
+        SELECT d.id, d.domain, p.name, g.created_at
+        FROM domain_grants g
+        JOIN domains d ON d.id = g.domain_id
+        JOIN projects p ON p.id = d.project_id
+        WHERE g.project_id = ? AND d.verified = TRUE
+        ORDER BY d.domain ASC`, projID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*dmodel.Shared{}
+	for rows.Next() {
+		var sh dmodel.Shared
+		if err := rows.Scan(&sh.ID, &sh.Domain, &sh.OwnerName, &sh.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		out = append(out, &sh)
+	}
+
+	return out, rows.Err()
 }
 
 // VerifiedNames lists every verified domain in the installation.
@@ -391,7 +551,12 @@ func (h *Handler) List(c fiber.Ctx) error {
 		out = []*dmodel.Domain{}
 	}
 
-	return response.Success(c, ListResponse{Domains: out})
+	shared, err := h.Runtime.Store.Domain.ListShared(c.Context(), rc.Project.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	return response.Success(c, ListResponse{Domains: out, Shared: shared})
 }
 
 // Get serves GET /api/v1/domains/:id.
@@ -436,6 +601,15 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return response.Conflict(c, "this domain is already claimed")
 	}
 
+	taken, err := h.Runtime.Store.Domain.ZoneTakenByAnother(c.Context(), in.Domain, rc.Project.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if taken {
+		return response.Conflict(c, zoneTaken)
+	}
+
 	token := make([]byte, 16)
 	if _, err := rand.Read(token); err != nil {
 		return response.Internal(c, err)
@@ -466,6 +640,20 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 
 	if d == nil {
 		return response.NotFound(c, "domain not found")
+	}
+
+	// Checked again on the way to verified, because the zone can be
+	// taken between the claim and this call. A domain that is already
+	// verified is only re-checking its records and is left alone.
+	if !d.Verified {
+		taken, err := h.Runtime.Store.Domain.ZoneTakenByAnother(c.Context(), d.Domain, rc.Project.ID)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if taken {
+			return response.Conflict(c, zoneTaken)
+		}
 	}
 
 	// Several lookups, so a longer budget than a single-record check.

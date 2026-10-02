@@ -22,6 +22,13 @@ type createInput struct {
 	Domain string `json:"domain" validate:"required,fqdn,max=253" normalize:"normalize"`
 }
 
+// grantInput names the project a domain is shared with, by its slug:
+// the owner cannot list other projects, and a slug is what a team
+// tells another.
+type grantInput struct {
+	ProjectSlug string `json:"project_slug" validate:"required,min=1,max=100" normalize:"normalize"`
+}
+
 // ----------------------------------------------------------------------------
 // Responses
 // ----------------------------------------------------------------------------
@@ -29,8 +36,18 @@ type createInput struct {
 // ListResponse is the project's claimed domains. The DKIM private
 // half is sealed at rest and carries json:"-", so it never reaches
 // here.
+//
+// Shared is the domains other projects shared with this one, apart
+// from Domains so that list keeps exactly the shape it always had.
+// Always an array, never null.
 type ListResponse struct {
 	Domains []*dmodel.Domain `json:"domains"`
+	Shared  []*dmodel.Shared `json:"shared"`
+}
+
+// GrantsResponse is who one domain is shared with, for its owner.
+type GrantsResponse struct {
+	Grants []*dmodel.Grant `json:"grants"`
 }
 
 // DetailResponse is one domain plus every DNS record the operator has

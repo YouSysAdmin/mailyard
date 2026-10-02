@@ -1067,14 +1067,22 @@ type APIKeyStore interface {
 // DomainStore persists inbound routing domains. Neither verified
 // lookup is project scoped - the domain row decides the project.
 //
-// GetVerifiedCovering is the one every ownership question should ask:
-// it accepts a subdomain of a verified domain, which is what the
-// bounce-address and sending checks mean by "do you own this name".
-// GetVerifiedByName is the exact-match primitive underneath it.
+// GetVerifiedCovering answers which project a name belongs to, which
+// is what inbound routing asks. GetVerifiedCoveringFor answers whether
+// one project may SEND as it - the owner or a project it was shared
+// with - and is what every sending check asks. Both accept a subdomain
+// of a verified domain. GetVerifiedByName is the exact-match primitive
+// underneath them.
 type DomainStore interface {
 	Get(ctx context.Context, projID, id string) (*domain.Domain, error)
 	GetVerifiedByName(ctx context.Context, name string) (*domain.Domain, error)
 	GetVerifiedCovering(ctx context.Context, name string) (*domain.Domain, error)
+	GetVerifiedCoveringFor(ctx context.Context, name, projID string) (*domain.Domain, error)
+
+	// ZoneTakenByAnother reports whether another project verified the
+	// name, a domain above it or one below it - a verified domain holds
+	// its whole zone, and claiming or verifying inside it is refused.
+	ZoneTakenByAnother(ctx context.Context, name, projID string) (bool, error)
 	GetByName(ctx context.Context, name string) (*domain.Domain, error)
 	List(ctx context.Context, projID string) ([]*domain.Domain, error)
 
@@ -1087,6 +1095,15 @@ type DomainStore interface {
 	SetVerified(ctx context.Context, projID, id string, verified bool, at time.Time) error
 	Delete(ctx context.Context, projID, id string) error
 	Count(ctx context.Context, projID string) (int, error)
+
+	// Grant shares a domain with projID, a repeat is a no-op. Revoke
+	// reports whether a grant went. ListGrants is the owner's view of
+	// one domain, ListShared the grantee's view of everything it was
+	// handed.
+	Grant(ctx context.Context, g *domain.Grant) error
+	Revoke(ctx context.Context, domainID, projID string) (bool, error)
+	ListGrants(ctx context.Context, ownerProjID, domainID string) ([]*domain.Grant, error)
+	ListShared(ctx context.Context, projID string) ([]*domain.Shared, error)
 }
 
 // InboundStore persists mail received by the MX listener.

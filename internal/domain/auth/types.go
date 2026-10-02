@@ -253,29 +253,28 @@ type PasskeyChallengeResponse struct {
 }
 
 // SystemMailStatusResponse describes the platform's own outbound mail.
-// Platform admin only, and it never echoes the password - HasAuth says
-// whether one is set and nothing more.
+// Platform admin only. It names a project and never a credential.
 type SystemMailStatusResponse struct {
 	SystemMail SystemMailStatus `json:"system_mail"`
 }
 
 // SystemMailStatus is the configuration as an admin may see it.
 type SystemMailStatus struct {
-	// Enabled is whether platform mail is configured: a from address
-	// is set. Whether the pool can deliver right now is Server below.
+	// Enabled is whether platform mail is configured: an address and a
+	// project are both set. Whether that project can deliver right now
+	// is Problem below.
 	Enabled  bool   `json:"enabled"`
 	From     string `json:"from"`
 	FromName string `json:"from_name"`
 
-	// Server names the shared pool row platform mail would leave
-	// through, empty when the pool holds none it can use. Reserved
-	// says that row is marked platform_only, so no tenant shares it.
-	Server   string `json:"server"`
-	Reserved bool   `json:"reserved"`
+	// Project is the name of the project platform mail is sent as,
+	// ProjectID its id. Both empty until platform_mail_project is set.
+	Project   string `json:"project,omitempty"`
+	ProjectID string `json:"project_id,omitempty"`
 
-	// Problem explains an empty Server in words, since "no server" has
-	// two causes an admin fixes differently - an empty pool, or a pool
-	// whose rows are all disabled.
+	// Problem says in words what stops platform mail: a setting not
+	// set, a project that is gone, a domain the project has not
+	// verified, no server to carry the address.
 	Problem string `json:"problem,omitempty"`
 }
 

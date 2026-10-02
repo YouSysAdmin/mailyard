@@ -86,7 +86,7 @@ func (s *Store) RecomputeDaily(ctx context.Context, days int) error {
 	// below it is history that this table is the only record of.
 	var oldest sql.NullTime
 	if err := tx.QueryRowContext(ctx, s.Q(`
-        SELECT MIN(created_at) FROM emails WHERE created_at >= ?`), since).Scan(&oldest); err != nil {
+        SELECT MIN(created_at) FROM emails WHERE created_at >= ? AND NOT system`), since).Scan(&oldest); err != nil {
 		return fmt.Errorf("find the oldest row in the window: %w", err)
 	}
 
@@ -123,7 +123,7 @@ func (s *Store) RecomputeDaily(ctx context.Context, days int) error {
         -- twice cannot mean two different things.
         SELECT project_id, (created_at AT TIME ZONE 'UTC')::date, status, COUNT(*)
         FROM emails
-        WHERE created_at >= ?
+        WHERE created_at >= ? AND NOT system
         GROUP BY project_id, (created_at AT TIME ZONE 'UTC')::date, status
         ON CONFLICT (project_id, day, status) DO UPDATE SET n = EXCLUDED.n`), since); err != nil {
 		return fmt.Errorf("recompute the window: %w", err)

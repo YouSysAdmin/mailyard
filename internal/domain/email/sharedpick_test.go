@@ -55,6 +55,9 @@ func (f *fakeSharedPool) ListEnabled(context.Context) ([]*ssmodel.Shared, error)
 type fakeDomains struct {
 	store.DomainStore
 	verified *dmodel.Domain
+
+	// sharedWith holds the projects the owner shared the domain with.
+	sharedWith map[string]bool
 }
 
 func (f *fakeDomains) GetVerifiedByName(_ context.Context, name string) (*dmodel.Domain, error) {
@@ -79,6 +82,17 @@ func (f *fakeDomains) GetVerifiedCovering(_ context.Context, name string) (*dmod
 	}
 
 	return nil, nil
+}
+
+// GetVerifiedCoveringFor is the covering row for the owner or a
+// project it was shared with, nothing for anybody else.
+func (f *fakeDomains) GetVerifiedCoveringFor(ctx context.Context, name, projID string) (*dmodel.Domain, error) {
+	d, _ := f.GetVerifiedCovering(ctx, name)
+	if d == nil || (d.ProjectID != projID && !f.sharedWith[projID]) {
+		return nil, nil
+	}
+
+	return d, nil
 }
 
 func sharedServer(name string, mutate func(*ssmodel.Shared)) *ssmodel.Shared {
@@ -465,51 +479,3 @@ func (f *fakeProjects) Get(context.Context, string) (*projmodel.Project, error) 
 type fakeBounces struct{ store.BounceStore }
 
 func (f *fakeBounces) Put(context.Context, *bmodel.Bounce) error { return nil }
-
-// A pool row reserved for platform mail is not a delivery candidate.
-//
-// The flag exists so an operator can point invitations and password
-// resets at credentials no tenant touches. If resolveShared still
-// picked it up, that separation would be a label rather than a rule -
-// and the failure is silent, since the mail goes out either way and
-// only the reputation it goes out on differs.
-func TestAReservedPoolServerCarriesNoTenantMail(t *testing.T) {
-	reserved := sharedServer("platform", func(s *ssmodel.Shared) { s.PlatformOnly = true })
-	open := sharedServer("tenants", nil)
-
-	// Alone in the pool, it is as if the pool were empty. pickServer
-	// answers (nil, nil) for that - no candidate is not an error here,
-	// the caller turns it into one.
-	p := processorWith(0, nil, []*ssmodel.Shared{reserved}, nil)
-	srv, err := p.pickServer(t.Context(), job())
-	if err != nil {
-		t.Fatalf("pickServer: %v", err)
-	}
-
-	if srv != nil {
-		t.Errorf("a project was routed through %q, a platform-only server", srv.Name)
-	}
-
-	// Beside an ordinary row, only the ordinary one is offered - and
-	// the reserved one is first, so this is not passing by ordering.
-	got, err := ResolveCandidates(t.Context(),
-		&store.Store{
-			SMTPServer: &fakeProjectServers{count: 0},
-			SMTPGroup:  &fakeGroups{},
-			SharedSMTP: &fakeSharedPool{servers: []*ssmodel.Shared{reserved, open}},
-			Domain:     &fakeDomains{},
-		},
-		"proj-a", "hi@example.com", Route{})
-	if err != nil {
-		t.Fatalf("ResolveCandidates: %v", err)
-	}
-
-	if len(got) != 1 || got[0].Name != "tenants" {
-		names := make([]string, len(got))
-		for i, s := range got {
-			names[i] = s.Name
-		}
-
-		t.Errorf("candidates = %v, want just [tenants]", names)
-	}
-}

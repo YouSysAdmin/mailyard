@@ -22,6 +22,10 @@ export interface PlatformSetting {
   // server so the console keeps no list of its own.
   managed_at?: string
   managed_in?: string
+  // The value is the id of another entity, and the page offers a
+  // picker of names instead of a text box - an id is never shown.
+  // `project` is the only kind so far (platform_mail_project).
+  ref?: 'project'
   updated_at?: string
   updated_by?: string
 }

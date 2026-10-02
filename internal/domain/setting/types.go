@@ -64,6 +64,10 @@ type SettingItem struct {
 	ManagedAt string `json:"managed_at,omitempty"`
 	ManagedIn string `json:"managed_in,omitempty"`
 
+	// Ref says the value is the id of another entity, "project" for
+	// now, so the console offers names rather than a text box.
+	Ref string `json:"ref,omitempty"`
+
 	// Absent until somebody writes the key, which is what tells a
 	// choice from an untouched default.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`

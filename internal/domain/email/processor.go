@@ -499,16 +499,18 @@ func (p *Processor) signerFor(ctx context.Context, e *emailmodel.Email) (*dkim.S
 		return nil, nil
 	}
 
-	d, err := p.Store.Domain.GetVerifiedCovering(ctx, host)
+	// Not claimed, claimed by a project that did not share it, or no
+	// key yet. The project question matters: domain names are globally
+	// unique here, so without it one tenant could sign as another
+	// tenant's verified domain simply by putting it in From. A project
+	// the owner shared it with signs with the OWNER's key, because the
+	// selector in DNS belongs to the domain.
+	d, err := p.Store.Domain.GetVerifiedCoveringFor(ctx, host, e.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Not claimed, claimed by a different project, or no key yet.
-	// The project check matters: domain names are globally unique
-	// here, so without it one tenant could sign as another tenant's
-	// verified domain simply by putting it in From.
-	if d == nil || d.ProjectID != e.ProjectID || !d.CanSign() {
+	if d == nil || !d.CanSign() {
 		return nil, nil
 	}
 

@@ -48,7 +48,6 @@ function fromServer(srv: SharedSMTPServer | null) {
     skip_dkim: srv?.skip_dkim ?? false,
     ses_topic_arn: srv?.ses_topic_arn ?? '',
     security_mode: srv?.security_mode ?? 'permissive',
-    platform_only: srv?.platform_only ?? false,
     priority: srv?.priority ?? 0,
     allowed_domains_text: (srv?.allowed_domains ?? []).join(', '),
   }
@@ -71,7 +70,6 @@ function payload(): SharedSMTPPayload {
       .map((d) => d.trim())
       .filter(Boolean),
     security_mode: f.security_mode,
-    platform_only: f.platform_only,
     priority: Number(f.priority),
   }
   if (f.password) out.password = f.password
@@ -223,15 +221,6 @@ async function save() {
       {{ provider?.label }} signs with its own key, so Mailyard's signature is always omitted for
       this provider - there is nothing to choose.
     </p>
-
-    <FormField
-      hint="Invitations, password resets and signup confirmations leave through this server and no project ever does. Platform mail picks a reserved server over any other - leave this off and one shared server carries both, which is fine on a small install."
-    >
-      <label class="checkbox-label">
-        <input v-model="form.platform_only" type="checkbox" />
-        Reserve for platform mail only
-      </label>
-    </FormField>
 
     <FormField
       label="SES topic ARN"

@@ -183,9 +183,6 @@ export interface SharedSMTPServer {
   // the sender's domain, which is what stops one project relaying as
   // another's through platform credentials.
   security_mode: 'permissive' | 'strict'
-  // Reserved for the platform's own mail - invitations, password
-  // resets, signup confirmations. No tenant is routed through it.
-  platform_only: boolean
   // node_id is set when this row is a self-enrolled relay node. Its
   // status is the node's approval, managed from the relay nodes page.
   node_id?: string

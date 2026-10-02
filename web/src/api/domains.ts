@@ -50,8 +50,28 @@ export interface DomainPayload {
   dns_records: DNSRecord[]
 }
 
+// DomainGrant is another project this project's domain is shared with.
+// The id is for the revoke call only, the console shows the name.
+export interface DomainGrant {
+  domain_id: string
+  project_id: string
+  project_name: string
+  project_slug: string
+  granted_by?: string
+  created_at: string
+}
+
+// SharedDomain is a domain another project shared with this one: this
+// project may send as it, only the owner manages it.
+export interface SharedDomain {
+  id: string
+  domain: string
+  owner_name: string
+  created_at: string
+}
+
 export const domainsApi = {
-  list: () => api.get<{ domains: InboundDomain[] }>('/domains/'),
+  list: () => api.get<{ domains: InboundDomain[]; shared: SharedDomain[] }>('/domains/'),
   // 409 when the name is already claimed by any project.
   create: (domain: string) => api.post<DomainPayload>('/domains/', { domain }),
   get: (id: string) => api.get<DomainPayload>(`/domains/${id}`),
@@ -63,4 +83,9 @@ export const domainsApi = {
   rotateDkim: (id: string) => api.post<DomainPayload>(`/domains/${id}/dkim/rotate`),
   cancelDkimRotation: (id: string) => api.delete<DomainPayload>(`/domains/${id}/dkim/rotate`),
   remove: (id: string) => api.delete(`/domains/${id}`),
+  grants: (id: string) => api.get<{ grants: DomainGrant[] }>(`/domains/${id}/grants`),
+  // The project is named by its slug. Sharing again is a no-op.
+  share: (id: string, projectSlug: string) =>
+    api.post<{ grants: DomainGrant[] }>(`/domains/${id}/grants`, { project_slug: projectSlug }),
+  unshare: (id: string, projectId: string) => api.delete(`/domains/${id}/grants/${projectId}`),
 }

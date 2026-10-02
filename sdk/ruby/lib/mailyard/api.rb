@@ -481,6 +481,21 @@ module Mailyard
       @t.request("POST", "/domains/#{esc(id)}/dkim/rotate", body: nil, query: query)
     end
 
+    # List grants
+    def list_domain_grants(id, **query)
+      @t.request("GET", "/domains/#{esc(id)}/grants", body: nil, query: query)
+    end
+
+    # Share
+    def create_domain_grant(id, body: nil, **query)
+      @t.request("POST", "/domains/#{esc(id)}/grants", body: body, query: query)
+    end
+
+    # Unshare
+    def delete_domain_grant(id, project_id, **query)
+      @t.request("DELETE", "/domains/#{esc(id)}/grants/#{esc(project_id)}", body: nil, query: query)
+    end
+
     # Verify
     def verify_domain(id, **query)
       @t.request("POST", "/domains/#{esc(id)}/verify", body: nil, query: query)

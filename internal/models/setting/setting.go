@@ -89,12 +89,17 @@ const (
 	// through a row in the shared pool, so this is all an operator
 	// sets here.
 	//
-	// Settings and not yaml, because the pool beside it is already
-	// edited in the console and a wrong from address must not need a
-	// restart to correct. Empty turns platform mail off: invitations
-	// return a copyable link and password reset is unavailable.
+	// Settings and not yaml, because the project beside them is
+	// already edited in the console and a wrong address must not need a
+	// restart to correct. Platform mail is off until BOTH the address
+	// and the project are set: invitations return a copyable link and
+	// password reset is unavailable.
 	KeyPlatformMailFrom     = "platform_mail_from"
 	KeyPlatformMailFromName = "platform_mail_from_name"
+
+	// KeyPlatformMailProject names the project platform mail is sent
+	// as - its servers, relay nodes and DKIM carry it as system mail.
+	KeyPlatformMailProject = "platform_mail_project"
 
 	// KeyNotificationRetentionDays bounds how long read notifications
 	// live. Unread ones are never purged by age - an alert nobody has
@@ -208,7 +213,15 @@ type Definition struct {
 	// links there instead of offering a second control.
 	ManagedAt string `json:"managed_at,omitempty"`
 	ManagedIn string `json:"managed_in,omitempty"`
+
+	// Ref says a string value is the id of another entity, so the
+	// console renders a picker of names instead of a text box.
+	// RefProject is the only kind.
+	Ref string `json:"ref,omitempty"`
 }
+
+// RefProject is the Ref of a setting holding a project id.
+const RefProject = "project"
 
 // The certificates page has the host list, the Order button and the
 // listener selectors, so it owns every setting they touch.
@@ -308,11 +321,15 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyPlatformMailFrom, Type: TypeString, Default: "",
-		Description: "Address the platform's own mail comes from - invitations, password resets, signup confirmations. It leaves through the shared SMTP pool. Empty turns platform mail off, and invitations then return a copyable link instead.",
+		Description: "Address the platform's own mail comes from - invitations, password resets, signup confirmations, alerts. It must be on a domain the platform mail project has verified. Empty turns platform mail off, and invitations then return a copyable link instead.",
 	},
 	{
 		Key: KeyPlatformMailFromName, Type: TypeString, Default: "",
 		Description: "Display name beside the platform mail address. Optional.",
+	},
+	{
+		Key: KeyPlatformMailProject, Type: TypeString, Default: "", Ref: RefProject,
+		Description: "The project platform mail is sent as. Its SMTP servers, SES, relay nodes and DKIM key carry invitations, password resets and alerts as system mail, which skips the project's quota, suppressions, tracking, default headers, webhooks, live feed and email log. The platform mail address must be on a domain this project has verified. Platform mail is off until both this and platform_mail_from are set.",
 	},
 	{
 		Key: KeySecurityAlertsEnabled, Type: TypeBool, Default: "true",

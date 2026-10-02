@@ -44,7 +44,7 @@ const emailColumns = `id, project_id, created_by, api_key_id, credential_id, smt
        status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
        created_at, scheduled_at, sent_at,
        tracked, opened_at, clicked_at, open_count, click_count, delivered_via, signing,
-       tags, metadata`
+       tags, metadata, system`
 
 const emailSelect = `
 SELECT ` + emailColumns + `
@@ -187,7 +187,7 @@ func pruneByID(id string) (from, to time.Time, ok bool) {
 func (s *Store) Get(ctx context.Context, projID, id string) (*emailmodel.Email, error) {
 	if from, to, ok := pruneByID(id); ok {
 		e, err := scanEmail(s.QueryRow(ctx,
-			emailSelect+` WHERE project_id = ? AND id = ? AND created_at >= ? AND created_at < ?`,
+			emailSelect+` WHERE project_id = ? AND id = ? AND NOT system AND created_at >= ? AND created_at < ?`,
 			projID, id, from, to))
 		if err == nil {
 			return e, nil
@@ -201,7 +201,7 @@ func (s *Store) Get(ctx context.Context, projID, id string) (*emailmodel.Email, 
 	// Either the id carries no timestamp, or the row is outside the
 	// window. Ask the whole table rather than answer "no such message"
 	// on the strength of an approximation.
-	row := s.QueryRow(ctx, emailSelect+` WHERE project_id = ? AND id = ?`, projID, id)
+	row := s.QueryRow(ctx, emailSelect+` WHERE project_id = ? AND id = ? AND NOT system`, projID, id)
 	e, err := scanEmail(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -265,7 +265,7 @@ func listLimit(n int) int {
 // The term goes through EscapeLike, or a bare % matches everything and
 // reads as a broken filter.
 func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmodel.Email, error) {
-	query := emailSelect + ` WHERE project_id = ?`
+	query := emailSelect + ` WHERE project_id = ? AND NOT system`
 	args := []any{projID}
 	if len(f.Statuses) > 0 {
 		query += ` AND status = ANY(?::text[])`
@@ -383,34 +383,55 @@ func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmode
 	return out, rows.Err()
 }
 
-// Put inserts the email row (no upsert - rows are created once by
-// the service, then mutated through the queue methods).
-//
-// It also counts the send into email_volume, IN THE SAME STATEMENT. Not a
-// second Exec: two statements without a transaction lose the count if the
-// process dies between them, and the count is what a plan limit reads. A
-// data-modifying CTE makes the pair atomic for free.
-func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
-	if e.CreatedAt.IsZero() {
-		e.CreatedAt = time.Now().UTC()
-	}
-
-	_, err := s.Exec(ctx, `
-        WITH mail AS (
-        INSERT INTO emails (
+// putColumns is the INSERT list shared by both inserts below. One
+// list, so a column added to the tenant insert cannot be left out of
+// the system one.
+const putColumns = `
             id, project_id, created_by, api_key_id, credential_id, smtp_server_id, smtp_group_id, sender, recipients,
             subject, template_name, html_body, text_body, attachments_json, headers_json,
             list_unsubscribe_url, list_unsubscribe_mailto, list_unsubscribe_post, unsubscribe_list_id,
             status, error_message, attempts, max_attempts, next_attempt_at, claimed_at,
-            created_at, scheduled_at, sent_at, tracked, signing, tags, metadata
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            created_at, scheduled_at, sent_at, tracked, signing, tags, metadata, system`
+
+const putValues = `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+// putSQL inserts the row and counts the send into email_volume, IN
+// THE SAME STATEMENT. Not a second Exec: two statements without a
+// transaction lose the count if the process dies between them, and
+// the count is what a plan limit reads. A data-modifying CTE makes
+// the pair atomic for free.
+const putSQL = `
+        WITH mail AS (
+        INSERT INTO emails (` + putColumns + `
+        ) VALUES ` + putValues + `
         RETURNING project_id, created_at
         )
         INSERT INTO email_volume (project_id, minute, accepted)
         SELECT project_id, date_trunc('minute', created_at), 1 FROM mail
         ON CONFLICT (project_id, minute) DO UPDATE
             SET accepted = email_volume.accepted + 1
-    `,
+    `
+
+// putSystemSQL inserts a platform row without the volume count: the
+// message is not the project's and must not spend its quota.
+const putSystemSQL = `
+        INSERT INTO emails (` + putColumns + `
+        ) VALUES ` + putValues
+
+// Put inserts the email row (no upsert - rows are created once by
+// the service, then mutated through the queue methods). A system row
+// is platform mail and is not counted in email_volume.
+func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
+	if e.CreatedAt.IsZero() {
+		e.CreatedAt = time.Now().UTC()
+	}
+
+	query := putSQL
+	if e.System {
+		query = putSystemSQL
+	}
+
+	_, err := s.Exec(ctx, query,
 		e.ID, e.ProjectID, e.CreatedBy, database.NullStr(e.APIKeyID),
 		database.NullStr(e.CredentialID), database.NullStr(e.SMTPServerID), database.NullStr(e.SMTPGroupID), e.Sender,
 		database.MustJSON(e.Recipients), e.Subject, e.TemplateName, e.HTMLBody, e.TextBody,
@@ -421,6 +442,7 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
 		database.NullTime(e.NextAttemptAt), database.NullTime(e.ClaimedAt),
 		e.CreatedAt, database.NullTime(e.ScheduledAt), database.NullTime(e.SentAt),
 		e.Tracked, e.Signing, database.MustJSON(emptyTags(e.Tags)), database.MustJSON(emptyMetadata(e.Metadata)),
+		e.System,
 	)
 
 	return err
@@ -485,7 +507,7 @@ func (s *Store) Cancel(ctx context.Context, projID, id string, createdAt time.Ti
 
 // CountByStatus powers the dashboard-style summary.
 func (s *Store) CountByStatus(ctx context.Context, projID string, from, to *time.Time) (map[string]int, error) {
-	query := `SELECT status, COUNT(*) FROM emails WHERE project_id = ?`
+	query := `SELECT status, COUNT(*) FROM emails WHERE project_id = ? AND NOT system`
 	args := []any{projID}
 	if from != nil {
 		query += ` AND created_at >= ?`
@@ -597,6 +619,10 @@ func (s *Store) RequeueHanded(ctx context.Context, id string, createdAt, handedA
 // Finalize writes the terminal state. See Requeue for why created_at
 // and claimedAt are in the predicate.
 //
+// A system row loses its body here, in the statement that settles its
+// status: platform mail carries reset and invitation links, and once
+// the message is sent or given up on nothing reads them back.
+//
 // delivered_via is written with COALESCE-style care: an empty value
 // leaves whatever is there rather than clearing it. A message that
 // succeeded and was then finalized again - a retry path, a recovery
@@ -606,6 +632,8 @@ func (s *Store) Finalize(ctx context.Context, id string, createdAt time.Time, cl
         UPDATE emails
         SET status = ?, error_message = ?, sent_at = ?,
             delivered_via = CASE WHEN ? = '' THEN delivered_via ELSE ? END,
+            html_body = CASE WHEN system THEN '' ELSE html_body END,
+            text_body = CASE WHEN system THEN '' ELSE text_body END,
             claimed_at = NULL, next_attempt_at = NULL
         WHERE id = ? AND created_at = ? AND status = ? AND claimed_at = ?
     `, status, errMsg, database.NullTime(sentAt), deliveredVia, deliveredVia, id, createdAt,
@@ -648,7 +676,7 @@ func scanEmail(r interface{ Scan(...any) error }) (*emailmodel.Email, error) {
 		&e.Status, &e.ErrorMessage, &e.Attempts, &e.MaxAttempts,
 		&nextAt, &claimedAt, &e.CreatedAt, &scheduledAt, &sentAt,
 		&e.Tracked, &openedAt, &clickedAt, &e.OpenCount, &e.ClickCount,
-		&e.DeliveredVia, &e.Signing, &tags, &metadata); err != nil {
+		&e.DeliveredVia, &e.Signing, &tags, &metadata, &e.System); err != nil {
 		return nil, err
 	}
 

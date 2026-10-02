@@ -568,6 +568,14 @@ type Domain struct {
 	CheckedAt         *time.Time `json:"checked_at,omitempty"`
 }
 
+// DomainShared is the wire body.
+type DomainShared struct {
+	ID        string    `json:"id"`
+	Domain    string    `json:"domain"`
+	OwnerName string    `json:"owner_name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // DomainsCreateInput is the request body.
 type DomainsCreateInput struct {
 	Domain string `json:"domain"`
@@ -575,7 +583,8 @@ type DomainsCreateInput struct {
 
 // DomainsListResponse is the response body.
 type DomainsListResponse struct {
-	Domains []*Domain `json:"domains"`
+	Domains []*Domain       `json:"domains"`
+	Shared  []*DomainShared `json:"shared"`
 }
 
 // Email is the wire body.
@@ -787,6 +796,26 @@ type GenerateInput struct {
 // GetResponse is the response body.
 type GetResponse struct {
 	Contact *Contact `json:"contact"`
+}
+
+// Grant is the wire body.
+type Grant struct {
+	DomainID    string    `json:"domain_id"`
+	ProjectID   string    `json:"project_id"`
+	ProjectName string    `json:"project_name"`
+	ProjectSlug string    `json:"project_slug"`
+	GrantedBy   string    `json:"granted_by,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// GrantInput is the request body.
+type GrantInput struct {
+	ProjectSlug string `json:"project_slug"`
+}
+
+// GrantsResponse is the response body.
+type GrantsResponse struct {
+	Grants []*Grant `json:"grants"`
 }
 
 // Group is the wire body.
@@ -1743,6 +1772,7 @@ type SettingItem struct {
 	Unit        string     `json:"unit,omitempty"`
 	ManagedAt   string     `json:"managed_at,omitempty"`
 	ManagedIn   string     `json:"managed_in,omitempty"`
+	Ref         string     `json:"ref,omitempty"`
 	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 	UpdatedBy   string     `json:"updated_by,omitempty"`
 }
@@ -1785,7 +1815,6 @@ type Shared struct {
 	Provider        string            `json:"provider,omitempty"`
 	ProviderConfig  map[string]string `json:"provider_config,omitempty"`
 	SecurityMode    string            `json:"security_mode"`
-	PlatformOnly    bool              `json:"platform_only"`
 }
 
 // SharedCreateInput is the request body.
@@ -1803,7 +1832,6 @@ type SharedCreateInput struct {
 	AllowedDomains []string          `json:"allowed_domains"`
 	SecurityMode   string            `json:"security_mode"`
 	Priority       int64             `json:"priority"`
-	PlatformOnly   bool              `json:"platform_only"`
 	ProviderConfig map[string]string `json:"provider_config"`
 }
 
@@ -1840,7 +1868,6 @@ type SharedUpdateInput struct {
 	SecurityMode   string             `json:"security_mode"`
 	Priority       *int64             `json:"priority"`
 	Status         string             `json:"status"`
-	PlatformOnly   *bool              `json:"platform_only"`
 	ProviderConfig *map[string]string `json:"provider_config"`
 }
 
@@ -2178,12 +2205,12 @@ type System struct {
 
 // SystemMailStatus is the wire body.
 type SystemMailStatus struct {
-	Enabled  bool   `json:"enabled"`
-	From     string `json:"from"`
-	FromName string `json:"from_name"`
-	Server   string `json:"server"`
-	Reserved bool   `json:"reserved"`
-	Problem  string `json:"problem,omitempty"`
+	Enabled   bool   `json:"enabled"`
+	From      string `json:"from"`
+	FromName  string `json:"from_name"`
+	Project   string `json:"project,omitempty"`
+	ProjectID string `json:"project_id,omitempty"`
+	Problem   string `json:"problem,omitempty"`
 }
 
 // SystemMailStatusResponse is the response body.
