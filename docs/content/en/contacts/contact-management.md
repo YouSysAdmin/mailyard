@@ -89,7 +89,8 @@ DELETE /api/v1/contacts?inactive_before=2025-01-01T00:00:00Z
 Removes every contact whose last activity - the later of its last send and last failure - is before the cut-off, and
 answers `{ "deleted": 1240, "inactive_before": "..." }`. The cut-off is required and may not be in the future: erasing
 every contact regardless of age is the [data erasure](/docs/data/data-deletion) endpoint's job, behind
-`data:delete` and `confirm_all`.
+`data:delete` and `confirm_all`. The cut-off is an RFC 3339 timestamp or a bare date, which means midnight UTC of that
+day.
 
 In the console: **Contacts - Delete** on a row, or **Clean up inactive** in the page header.
 

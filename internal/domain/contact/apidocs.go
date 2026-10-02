@@ -59,7 +59,7 @@ func APIDocs() []apidoc.Route {
 				"required and may not be in the future: erasing every contact is the " +
 				"data erasure endpoint's job, behind data:delete and confirm_all.",
 			Query: []apidoc.Param{
-				{Name: "inactive_before", Required: true, Format: "date-time"},
+				{Name: "inactive_before", Required: true, Description: "A date (2026-08-01), meaning its midnight UTC, or an RFC 3339 timestamp."},
 			},
 			Responses: []apidoc.Response{apidoc.OK("How many were removed.", DeleteInactiveResponse{}), apidoc.BadRequest},
 		},

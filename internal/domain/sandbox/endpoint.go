@@ -4,7 +4,6 @@ package sandbox
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -62,13 +61,8 @@ func (h *Handler) List(c fiber.Ctx) error {
 		return response.BadRequest(c, err.Error())
 	}
 
-	if raw := c.Query("since"); raw != "" {
-		t, err := time.Parse(time.RFC3339, raw)
-		if err != nil {
-			return response.BadRequest(c, "since must be an RFC 3339 timestamp")
-		}
-
-		f.Since = &t
+	if f.Since, err = paging.Instant(c, "since"); err != nil {
+		return response.BadRequest(c, "since "+err.Error())
 	}
 
 	if id := c.Query("inbox"); id != "" {
@@ -243,9 +237,9 @@ func (h *Handler) Clear(c fiber.Ctx) error {
 
 		sel.Senders, sel.Recipients = in.Senders, in.Recipients
 		if in.OlderThan != "" {
-			t, err := time.Parse(time.RFC3339, in.OlderThan)
+			t, _, err := paging.Bound(in.OlderThan)
 			if err != nil {
-				return response.BadRequest(c, "older_than must be an RFC 3339 timestamp")
+				return response.BadRequest(c, "older_than "+paging.ErrBound.Error())
 			}
 
 			sel.OlderThan = &t

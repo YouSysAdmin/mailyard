@@ -123,16 +123,16 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // for confirm_all.
 func (h *Handler) DeleteInactive(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	raw := c.Query("inactive_before")
-	if raw == "" {
-		return response.BadRequest(c, "inactive_before is required, an RFC 3339 timestamp")
-	}
-
-	before, err := time.Parse(time.RFC3339, raw)
+	at, err := paging.Instant(c, "inactive_before")
 	if err != nil {
-		return response.BadRequest(c, "inactive_before must be an RFC 3339 timestamp")
+		return response.BadRequest(c, "inactive_before "+err.Error())
 	}
 
+	if at == nil {
+		return response.BadRequest(c, "inactive_before is required, a date (2026-08-01) or an RFC 3339 timestamp")
+	}
+
+	before := *at
 	if before.After(time.Now()) {
 		return response.BadRequest(c, "inactive_before is in the future, which would delete every contact")
 	}
