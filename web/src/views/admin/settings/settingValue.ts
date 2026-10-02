@@ -27,6 +27,11 @@ export function isList(s: PlatformSetting): boolean {
   return s.type === 'list'
 }
 
+/** The id of a project, picked by name. */
+export function isProjectRef(s: PlatformSetting): boolean {
+  return s.ref === 'project'
+}
+
 /**
  * A stored JSON array as one value per line, which is what a textarea
  * shows.

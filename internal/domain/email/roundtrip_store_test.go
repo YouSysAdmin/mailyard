@@ -103,6 +103,7 @@ func TestEmailSurvivesARoundTrip(t *testing.T) {
 		{"unsubscribe_list_id", want.UnsubscribeListID, got.UnsubscribeListID},
 		{"tracked", want.Tracked, got.Tracked},
 		{"signing", want.Signing, got.Signing},
+		{"system", want.System, got.System},
 		{"status", want.Status, got.Status},
 		{"error_message", want.ErrorMessage, got.ErrorMessage},
 		{"attempts", want.Attempts, got.Attempts},

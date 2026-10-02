@@ -129,6 +129,12 @@ type Email struct {
 	// applies to what is still queued.
 	Signing string `json:"signing,omitempty"`
 
+	// System marks platform mail sent through this project's pipeline.
+	// The row belongs to the platform, not the project: no quota, no
+	// suppressions, no tracking, no webhooks, no contacts, and no
+	// project-scoped reader answers it, so it is never on the wire.
+	System bool `json:"-"`
+
 	Status        string     `json:"status"`
 	ErrorMessage  string     `json:"error_message,omitempty"`
 	Attempts      int        `json:"attempts"`

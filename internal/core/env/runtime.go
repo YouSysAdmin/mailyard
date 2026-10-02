@@ -82,9 +82,10 @@ type Runtime struct {
 	Blob blob.Store
 
 	// SystemMail sends the platform's own mail (invitations, password
-	// resets). Always set in serve.go, but Enabled() reports false
-	// unless the operator configured system_mail - every caller must
-	// keep working without it.
+	// resets) as a message of the project platform_mail_project names.
+	// Always set in serve.go, but Enabled() reports false until that
+	// and platform_mail_from are set - every caller must keep working
+	// without it.
 	SystemMail *systemmail.Sender
 
 	// Settings serves platform settings from memory. Always set in

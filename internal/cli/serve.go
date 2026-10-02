@@ -292,35 +292,35 @@ func runServe(cmd *cobra.Command, r role) error {
 		return fmt.Errorf("load settings: %w", err)
 	}
 
-	// Platform mail (invitations, password resets, signup
-	// confirmations). Always present, Enabled() false until an admin
-	// sets a from address - every call site degrades to copyable
-	// links.
-	//
-	// It leaves through the SHARED SMTP POOL rather than a second
-	// server in the config file. One place to configure platform
-	// credentials, and a pool row marked platform_only reserves itself
-	// for this traffic.
-	//
-	// The relay identity is resolved FIRST, because the pool row this
-	// picks can be a relay node, and a node is dialled with our client
-	// certificate and no AUTH - so the sender needs the same transport
-	// builder the delivery worker and the console's Test button use.
+	// The relay identity a worker presents to a relay node. The
+	// delivery processor takes it directly, the console's Test button
+	// reads it off the Runtime.
 	relayClient := relayClientSource(cfg, st)
 	if relayClient != nil {
 		rt.RelayNodeTLS = relayClient.WorkerTLS
 	}
 
-	rt.SystemMail = systemmail.New(st.SharedSMTP, func() systemmail.Address {
+	// Platform mail (invitations, password resets, signup
+	// confirmations, alerts). Always present, Enabled() false until an
+	// admin sets an address and a project - every call site degrades
+	// to copyable links.
+	//
+	// It is a message of the project platform_mail_project names and
+	// goes out through that project's servers, so there is nothing to
+	// configure twice and the mail is signed with the project's DKIM
+	// key. The queue it goes into is handed over below, once the
+	// worker exists.
+	rt.SystemMail = systemmail.New(func() systemmail.Address {
 		return systemmail.Address{
 			From:     rt.Settings.String(smodel.KeyPlatformMailFrom),
 			FromName: rt.Settings.String(smodel.KeyPlatformMailFromName),
+			Project:  rt.Settings.String(smodel.KeyPlatformMailProject),
 		}
-	}, log, rt.RelayNodeTLS)
+	}, log)
 	if rt.SystemMail.Enabled() {
-		log.Info("platform mail enabled", "from", rt.SystemMail.From())
+		log.Info("platform mail enabled", "from", rt.SystemMail.From(), "project_id", rt.SystemMail.Project())
 	} else {
-		log.Warn("platform mail disabled, invitations return copyable links and password reset is unavailable - set platform_mail_from")
+		log.Warn("platform mail disabled, invitations return copyable links and password reset is unavailable - set platform_mail_from and platform_mail_project")
 	}
 
 	// Alert mail, off the audit stream. One watcher, because both
@@ -414,6 +414,13 @@ func runServe(cmd *cobra.Command, r role) error {
 
 	worker.OnFinal = func(job *emailmodel.Email, status, errMsg string) {
 		metrics.EmailsFinalized.WithLabelValues(status).Inc()
+
+		// Platform mail through a project is not the project's: no
+		// campaign to mark, no contact to record, nothing for its live
+		// feed or its webhooks. Finalize already cleared the body.
+		if job.System {
+			return
+		}
 
 		// Sync the campaign message (no-op for transactional sends).
 		msgStatus := map[string]string{
@@ -518,6 +525,11 @@ func runServe(cmd *cobra.Command, r role) error {
 	runner := campaign.NewRunner(st, email.NewService(rt), log,
 		dispatcher.Emit, rt.Tracking, cfg.Campaign.BatchSize, cfg.Campaign.PollInterval)
 	rt.CampaignWake = runner.Wake
+
+	// Platform mail goes in through the same door as a tenant's, which
+	// is why this waits for the queue: a service built before rt.Queue
+	// cannot wake the worker.
+	rt.SystemMail.UseProject(email.NewService(rt))
 	if r.worker {
 		safego.Go(log, "campaign: runner loop", func() { runner.Start(workerCtx) })
 	}

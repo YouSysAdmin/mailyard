@@ -1743,6 +1743,7 @@ type SettingItem struct {
 	Unit        string     `json:"unit,omitempty"`
 	ManagedAt   string     `json:"managed_at,omitempty"`
 	ManagedIn   string     `json:"managed_in,omitempty"`
+	Ref         string     `json:"ref,omitempty"`
 	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 	UpdatedBy   string     `json:"updated_by,omitempty"`
 }
@@ -2178,12 +2179,12 @@ type System struct {
 
 // SystemMailStatus is the wire body.
 type SystemMailStatus struct {
-	Enabled  bool   `json:"enabled"`
-	From     string `json:"from"`
-	FromName string `json:"from_name"`
-	Server   string `json:"server"`
-	Reserved bool   `json:"reserved"`
-	Problem  string `json:"problem,omitempty"`
+	Enabled   bool   `json:"enabled"`
+	From      string `json:"from"`
+	FromName  string `json:"from_name"`
+	Project   string `json:"project,omitempty"`
+	ProjectID string `json:"project_id,omitempty"`
+	Problem   string `json:"problem,omitempty"`
 }
 
 // SystemMailStatusResponse is the response body.

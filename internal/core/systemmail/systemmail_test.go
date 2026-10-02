@@ -4,65 +4,61 @@ package systemmail
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"log/slog"
 	"strings"
 	"testing"
-
-	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
 )
 
 func discard() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
-// fakePool is the shared SMTP pool, reduced to what this package asks
-// of it.
-type fakePool struct {
-	servers []*ssmodel.Shared
+func at(from, name, project string) func() Address {
+	return func() Address { return Address{From: from, FromName: name, Project: project} }
+}
+
+// fakeProject stands in for email.Service, recording what it is handed.
+type fakeProject struct {
+	sent    []Message
+	projIDs []string
+	checked int
 	err     error
 }
 
-func (f *fakePool) ListEnabled(context.Context) ([]*ssmodel.Shared, error) {
-	return f.servers, f.err
+func (f *fakeProject) SendSystem(_ context.Context, projID string, m Message) error {
+	f.sent = append(f.sent, m)
+	f.projIDs = append(f.projIDs, projID)
+
+	return f.err
 }
 
-func at(from, name string) func() Address {
-	return func() Address { return Address{From: from, FromName: name} }
+func (f *fakeProject) CheckSystem(context.Context, string, string) error {
+	f.checked++
+
+	return f.err
 }
 
-func shared(name string, platformOnly bool) *ssmodel.Shared {
-	s := &ssmodel.Shared{PlatformOnly: platformOnly}
-	s.Name = name
-	s.Host = "smtp.example.com"
-	s.Port = 587
-
-	return s
-}
-
-// Enabled is about CONFIGURATION - a from address and somewhere to
-// ask. Whether the pool can deliver right now is Send's answer, since
-// a server can be disabled between the two.
-func TestEnabledNeedsAnAddressAndAPool(t *testing.T) {
-	pool := &fakePool{servers: []*ssmodel.Shared{shared("relay", false)}}
+// Enabled is about CONFIGURATION - an address and a project. Whether
+// the project can deliver right now is Send's answer, since a server
+// can be disabled between the two.
+func TestEnabledNeedsAnAddressAndAProject(t *testing.T) {
 	cases := map[string]struct {
-		pool Pool
-		from string
-		want bool
+		from, project string
+		want          bool
 	}{
-		"address and pool": {pool, "a@example.com", true},
-		"no address":       {pool, "", false},
-		"no pool":          {nil, "a@example.com", false},
-		"neither":          {nil, "", false},
+		"address and project": {"a@example.com", "proj-1", true},
+		"no address":          {"", "proj-1", false},
+		"no project":          {"a@example.com", "", false},
+		"neither":             {"", "", false},
 	}
 	for name, tc := range cases {
-		s := New(tc.pool, at(tc.from, ""), discard(), nil)
+		s := New(at(tc.from, "", tc.project), discard())
 		if s.Enabled() != tc.want {
 			t.Errorf("%s: Enabled() = %v, want %v", name, s.Enabled(), tc.want)
 		}
 	}
 
 	// Unconfigured Send must not error, so callers can fire and forget.
-	s := New(nil, at("", ""), discard(), nil)
+	s := New(at("", "", ""), discard())
 	if err := s.Send(t.Context(), []string{"a@example.com"}, "s", "h", "t"); err != nil {
 		t.Errorf("unconfigured Send returned %v, want nil", err)
 	}
@@ -70,48 +66,65 @@ func TestEnabledNeedsAnAddressAndAPool(t *testing.T) {
 	s.SendAsync([]string{"a@example.com"}, "s", "h", "t")
 }
 
-// A reserved row wins wherever it sits in the pool, and an install
-// with none still gets platform mail off the first enabled server -
-// marking one platform_only is how an operator SEPARATES the traffic,
-// not how they turn it on.
-func TestServerPrefersAReservedRow(t *testing.T) {
-	cases := map[string]struct {
-		servers []*ssmodel.Shared
-		want    string
-		wantErr error
-	}{
-		"reserved last": {
-			[]*ssmodel.Shared{shared("tenants", false), shared("platform", true)}, "platform", nil,
-		},
-		"reserved first": {
-			[]*ssmodel.Shared{shared("platform", true), shared("tenants", false)}, "platform", nil,
-		},
-		"none reserved": {
-			[]*ssmodel.Shared{shared("first", false), shared("second", false)}, "first", nil,
-		},
-		"empty pool": {nil, "", ErrNoServer},
-	}
-	for name, tc := range cases {
-		s := New(&fakePool{servers: tc.servers}, at("a@example.com", ""), discard(), nil)
-		srv, err := s.Server(t.Context())
-		if !errors.Is(err, tc.wantErr) {
-			t.Errorf("%s: err = %v, want %v", name, err, tc.wantErr)
-			continue
-		}
+// The message is queued as the named project's, with the headers
+// platform mail always carries, and the check goes the same way.
+func TestTheProjectIsHandedTheMessage(t *testing.T) {
+	fp := &fakeProject{}
+	s := New(at("a@example.com", "Mailyard", "proj-1"), discard())
+	s.UseProject(fp)
 
-		if tc.wantErr == nil && srv.Name != tc.want {
-			t.Errorf("%s: picked %q, want %q", name, srv.Name, tc.want)
-		}
+	if err := s.Send(t.Context(), []string{"b@example.com"}, "hello", "<p>h</p>", "h"); err != nil {
+		t.Fatalf("Send = %v", err)
+	}
+
+	if len(fp.sent) != 1 || fp.projIDs[0] != "proj-1" {
+		t.Fatalf("the project was handed %d messages for %v, want 1 for proj-1", len(fp.sent), fp.projIDs)
+	}
+
+	m := fp.sent[0]
+	if m.From != `"Mailyard" <a@example.com>` || m.Subject != "hello" || len(m.To) != 1 ||
+		m.Headers["Auto-Submitted"] != "auto-generated" {
+		t.Errorf("message = %+v", m)
+	}
+
+	if err := s.Check(t.Context()); err != nil || fp.checked != 1 {
+		t.Errorf("Check = %v, checked %d times, want nil and 1", err, fp.checked)
+	}
+
+	// A refusal from the project comes back with the project named.
+	fp.err = errors.New("domain not verified")
+	err := s.Send(t.Context(), []string{"b@example.com"}, "hello", "<p>h</p>", "h")
+	if err == nil || !strings.Contains(err.Error(), "proj-1") || !errors.Is(err, fp.err) {
+		t.Errorf("Send with a refusing project = %v", err)
 	}
 }
 
-// An empty pool is not silence. The caller decides what to tell the
-// user, and "no server" has a different fix from "the server said no".
-func TestSendReportsAnEmptyPool(t *testing.T) {
-	s := New(&fakePool{}, at("a@example.com", ""), discard(), nil)
+// Configured but not wired: refused with the setting in the message,
+// never silently dropped.
+func TestANamedProjectWithoutAQueueIsRefused(t *testing.T) {
+	s := New(at("a@example.com", "", "proj-1"), discard())
 	err := s.Send(t.Context(), []string{"b@example.com"}, "s", "h", "t")
-	if !errors.Is(err, ErrNoServer) {
-		t.Errorf("Send with an empty pool returned %v, want ErrNoServer", err)
+	if err == nil || !strings.Contains(err.Error(), "platform_mail_project") {
+		t.Fatalf("Send with no queue = %v, want a refusal naming the setting", err)
+	}
+
+	if err := s.Check(t.Context()); err == nil || !strings.Contains(err.Error(), "platform_mail_project") {
+		t.Fatalf("Check with no queue = %v, want a refusal naming the setting", err)
+	}
+}
+
+// Check names the setting that is missing, so the admin status page
+// says what to do rather than "not configured".
+func TestCheckNamesTheMissingSetting(t *testing.T) {
+	for setting, addr := range map[string]func() Address{
+		"platform_mail_from":    at("", "", "proj-1"),
+		"platform_mail_project": at("a@example.com", "", ""),
+	} {
+		s := New(addr, discard())
+		s.UseProject(&fakeProject{})
+		if err := s.Check(t.Context()); err == nil || !strings.Contains(err.Error(), setting) {
+			t.Errorf("Check = %v, want a refusal naming %s", err, setting)
+		}
 	}
 }
 
@@ -121,9 +134,11 @@ func TestNilSenderIsSafe(t *testing.T) {
 		t.Error("nil sender must report disabled")
 	}
 
-	if s.From() != "" {
-		t.Error("nil sender must report an empty From")
+	if s.From() != "" || s.Project() != "" {
+		t.Error("nil sender must report an empty From and Project")
 	}
+
+	s.UseProject(&fakeProject{})
 }
 
 // The name is QUOTED now, because this goes through
@@ -135,12 +150,12 @@ func TestNilSenderIsSafe(t *testing.T) {
 // quotes the name with a comma in it, where the hand-composed form
 // produced two addresses.
 func TestHeaderFromUsesDisplayName(t *testing.T) {
-	with := New(nil, at("ops@example.com", "Mailyard Ops"), discard(), nil)
+	with := New(at("ops@example.com", "Mailyard Ops", ""), discard())
 	if got := with.headerFrom(); got != `"Mailyard Ops" <ops@example.com>` {
 		t.Errorf("headerFrom() = %q", got)
 	}
 
-	without := New(nil, at("ops@example.com", ""), discard(), nil)
+	without := New(at("ops@example.com", "", ""), discard())
 	if got := without.headerFrom(); got != "ops@example.com" {
 		t.Errorf("headerFrom() = %q", got)
 	}
@@ -188,60 +203,23 @@ func TestInvitationFallsBackWhenInviterUnknown(t *testing.T) {
 	}
 }
 
-// A pool row that is a relay node is dialled with OUR transport or not
-// at all. Spec(nil) asked the system roots about a certificate our own
-// CA signed, so every invitation and password reset through a
-// node-backed pool failed with an x509 error - and SendAsync is fire
-// and forget, so the only symptom was a log line and mail that never
-// came.
-func TestANodeRowNeedsTheRelayTransport(t *testing.T) {
-	node := shared("node1", false)
-	node.NodeID = "rn-1"
-	node.Host = "mx1.example.net"
-
-	// Without the builder: a refusal that names the problem, before
-	// any connection is paid for.
-	s := New(&fakePool{servers: []*ssmodel.Shared{node}}, at("a@example.com", ""), discard(), nil)
-	tlsCfg, err := s.dialTLS(t.Context(), node)
-	if err == nil || tlsCfg != nil {
-		t.Fatalf("dialTLS = (%v, %v), want a refusal naming the missing identity", tlsCfg, err)
-	}
-
-	// With it: the node's host is what the certificate is checked
-	// against, exactly as the delivery worker dials it.
-	s = New(&fakePool{servers: []*ssmodel.Shared{node}}, at("a@example.com", ""), discard(),
-		func(_ context.Context, host string) (*tls.Config, error) {
-			return &tls.Config{ServerName: host, MinVersion: tls.VersionTLS13}, nil
-		})
-	tlsCfg, err = s.dialTLS(t.Context(), node)
-	if err != nil || tlsCfg == nil || tlsCfg.ServerName != "mx1.example.net" {
-		t.Fatalf("dialTLS = (%+v, %v), want the builder's config for the node's host", tlsCfg, err)
-	}
-
-	// And an ordinary server keeps its nil, which is what leaves the
-	// existing dial untouched.
-	plain := shared("plain", false)
-	tlsCfg, err = s.dialTLS(t.Context(), plain)
-	if err != nil || tlsCfg != nil {
-		t.Fatalf("dialTLS on an ordinary server = (%v, %v), want (nil, nil)", tlsCfg, err)
-	}
-}
-
 // A stored from that is not an address fails HERE with the setting
-// named, never as a 501 from the far end: EnvelopeAddress hands back
-// what it cannot parse, and inside MAIL FROM:<...> the pool server's
-// protocol error would be the only symptom. The write path refuses
+// named, before the project is asked anything. The write path refuses
 // such a value, but a row that predates the check still has to fail
 // legibly.
-func TestABrokenFromFailsBeforeDialling(t *testing.T) {
+func TestABrokenFromFailsBeforeQueueing(t *testing.T) {
 	// A name without angle brackets - what typing "Name address" into
-	// one field produces - is the shape that does not parse, so it is
-	// the shape EnvelopeAddress hands through raw.
-	s := New(&fakePool{servers: []*ssmodel.Shared{shared("relay", false)}},
-		at("Mailyard no-reply@example.com", ""), discard(), nil)
+	// one field produces - is the shape that does not parse.
+	fp := &fakeProject{}
+	s := New(at("Mailyard no-reply@example.com", "", "proj-1"), discard())
+	s.UseProject(fp)
 
 	err := s.Send(t.Context(), []string{"a@example.com"}, "s", "h", "t")
 	if err == nil || !strings.Contains(err.Error(), "platform_mail_from") {
 		t.Fatalf("Send = %v, want a refusal naming platform_mail_from", err)
+	}
+
+	if len(fp.sent) != 0 {
+		t.Fatal("the project was handed a message with a broken From")
 	}
 }
