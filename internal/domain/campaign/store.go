@@ -579,6 +579,11 @@ func (s *Store) ListMessages(ctx context.Context, projID, campaignID string, f s
 		args = append(args, f.Status)
 	}
 
+	if f.Email != "" {
+		q.WriteString(` AND LOWER(s.email) = ?`)
+		args = append(args, strings.ToLower(f.Email))
+	}
+
 	if !f.Cursor.IsZero() {
 		q.WriteString(` AND (m.created_at, m.id) > (?, ?)`)
 		args = append(args, f.Cursor.CreatedAt.UTC(), f.Cursor.ID)

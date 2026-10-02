@@ -592,7 +592,7 @@ func (h *Handler) Messages(c fiber.Ctx) error {
 
 	w := paging.WindowFrom(c)
 	rows, err := h.Runtime.Store.Campaign.ListMessages(c.Context(), rc.Project.ID, cam.ID,
-		store.CampaignMessageFilter{Status: status, Limit: w.Fetch(), Cursor: w.Cursor})
+		store.CampaignMessageFilter{Status: status, Email: paging.Search(c, "email"), Limit: w.Fetch(), Cursor: w.Cursor})
 	if err != nil {
 		return response.Internal(c, err)
 	}

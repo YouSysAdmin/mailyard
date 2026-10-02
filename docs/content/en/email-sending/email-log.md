@@ -37,8 +37,9 @@ curl "http://localhost:3000/api/v1/emails?limit=50&status=failed" \
 | Param            | Notes                                                                                                                                        |
 |------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
 | `status`         | One status or several separated by commas — see [Email Status](/docs/email-sending/email-status)                                             |
-| `sender`         | One whole From address, without regard to case                                                                                               |
-| `recipient`      | One whole recipient address, Cc and Bcc included, without regard to case                                                                     |
+| `sender`         | Part of the From mailbox, without regard to case                                                                                             |
+| `recipient`      | Part of any recipient, Cc and Bcc included                                                                                                   |
+| `match`          | `contains` (the default) or `exact`. Exact makes `sender` and `recipient` one whole address each, found bare or inside `Name <address>`       |
 | `template`       | The name of the template the message was rendered from                                                                                       |
 | `tag`            | Only messages carrying this tag                                                                                                              |
 | `api_key_id`     | Only mail accepted through this API key                                                                                                      |

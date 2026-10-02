@@ -18,8 +18,9 @@ func APIDocs() []apidoc.Route {
 			Description: "Cursor paged, newest first: follow `next_cursor` until it comes back empty.",
 			Query: []apidoc.Param{
 				{Name: "status", Enum: []string{"received", "rejected", "failed"}},
-				{Name: "sender", Description: "Part of the sender (the From header), case-insensitive."},
-				{Name: "recipient", Description: "Part of any envelope recipient, Bcc included, case-insensitive."},
+				{Name: "sender", Description: "The sender (the From header), or part of it - see match."},
+				{Name: "recipient", Description: "Any envelope recipient, Bcc included, or part of one - see match."},
+				{Name: "match", Enum: []string{"contains", "exact"}, Description: "How sender and recipient are matched: contains, the default, is part of the stored value, exact is one whole address, found bare or inside a mailbox with a display name. Both without regard to case."},
 				{Name: "search", Description: "Part of the subject, case-insensitive."},
 				{Name: "limit", Type: "integer"},
 				{Name: "cursor", Description: "The next_cursor of the previous page."},

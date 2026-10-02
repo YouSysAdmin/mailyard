@@ -22,6 +22,7 @@ func ConsoleDocs() []apidoc.Route {
 			Description: "Platform admin. Oldest first, the whole list unless `limit` asks for a page.",
 			Query: []apidoc.Param{
 				{Name: "q", Description: "Part of the address, case-insensitive."},
+				{Name: "email", Description: "One whole address, without regard to case. Answers that account alone, and `q` is ignored."},
 				{Name: "admin", Type: "boolean", Description: "Only administrators, or only everyone else."},
 				{Name: "disabled", Type: "boolean", Description: "Only disabled accounts, or only enabled ones."},
 				{Name: "limit", Type: "integer", Description: "Page size, at most 200. Without it the whole list is answered."},

@@ -41,6 +41,11 @@ func TestTheInboundLogSearchesTheSender(t *testing.T) {
 		{"both, one misses", store.InboundFilter{Sender: "cron", Recipient: "qa@"}, 0},
 		{"with status", store.InboundFilter{Status: imodel.StatusRejected, Sender: "app"}, 0},
 		{"wildcard is literal", store.InboundFilter{Sender: "%"}, 0},
+		{"exact sender inside a mailbox", store.InboundFilter{Sender: "app@example.test", Exact: true}, 1},
+		{"exact sender refuses a prefix", store.InboundFilter{Sender: "app@", Exact: true}, 0},
+		{"exact sender refuses a superstring", store.InboundFilter{Sender: "notapp@example.test", Exact: true}, 0},
+		{"exact recipient", store.InboundFilter{Recipient: "QA@acme.test", Exact: true}, 1},
+		{"exact recipient refuses a prefix", store.InboundFilter{Recipient: "qa@", Exact: true}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -66,12 +66,27 @@ func (s *Store) List(ctx context.Context, projID string, f store.InboundFilter) 
 	// Address searches, a case-insensitive substring each. recipients
 	// is a JSON array in a TEXT column, so a substring of its text is a
 	// substring of one of the addresses.
-	if f.Sender != "" {
+	//
+	// Exact is one whole address. The sender is the From header, which
+	// may carry a display name, so the address is accepted bare or in
+	// angle brackets - the brackets are what keep bob@x.test from
+	// matching notbob@x.test. The recipients are the envelope, bare, so
+	// the array is unpacked and each element compared whole.
+	switch {
+	case f.Exact && f.Sender != "":
+		sb.WriteString(` AND (LOWER(sender) = ? OR LOWER(sender) LIKE ? ESCAPE '\')`)
+		addr := strings.ToLower(f.Sender)
+		args = append(args, addr, "%<"+database.EscapeLike(addr)+">%")
+	case f.Sender != "":
 		sb.WriteString(` AND sender ILIKE ? ESCAPE '\'`)
 		args = append(args, "%"+database.EscapeLike(f.Sender)+"%")
 	}
 
-	if f.Recipient != "" {
+	switch {
+	case f.Exact && f.Recipient != "":
+		sb.WriteString(` AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(recipients::jsonb) r WHERE lower(r) = ?)`)
+		args = append(args, strings.ToLower(f.Recipient))
+	case f.Recipient != "":
 		sb.WriteString(` AND recipients ILIKE ? ESCAPE '\'`)
 		args = append(args, "%"+database.EscapeLike(f.Recipient)+"%")
 	}

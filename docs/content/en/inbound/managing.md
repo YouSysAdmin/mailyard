@@ -19,8 +19,9 @@ GET /api/v1/inbound-emails?limit=50&status=received
 | `status`    | One of the three below                                                            |
 | `limit`     | Default 50, maximum 200                                                           |
 | `cursor`    | The `next_cursor` of the previous page                                            |
-| `sender`    | An address or part of one, matched against the From header without regard to case |
-| `recipient` | The same, against the envelope recipients                                         |
+| `sender`    | Part of the From header, without regard to case                                   |
+| `recipient` | Part of any envelope recipient                                                    |
+| `match`     | `contains` (the default) or `exact`. Exact makes `sender` and `recipient` one whole address each, the sender found bare or inside `Name <address>` |
 | `search`    | Part of the subject, without regard to case                                       |
 
 There are three statuses, and no others:

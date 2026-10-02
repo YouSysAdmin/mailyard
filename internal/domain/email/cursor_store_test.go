@@ -118,24 +118,27 @@ func TestTheLogFiltersNarrowTogether(t *testing.T) {
 		return id
 	}
 
-	old := seed("Shop@Example.test", `["Bob@x.test"]`, "sent", "receipt", base.Add(-2*time.Hour))
+	old := seed(`"Shop" <Shop@Example.test>`, `["Bob Smith <Bob@x.test>"]`, "sent", "receipt", base.Add(-2*time.Hour))
 	failed := seed("shop@example.test", `["ann@x.test","bob@x.test"]`, "failed", "receipt", base.Add(-time.Hour))
-	other := seed("ops@example.test", `["carol@x.test"]`, "sent", "", base)
+	other := seed("ops@example.test", `["carol@x.test","notbob@x.test"]`, "sent", "", base)
 
 	cases := []struct {
 		name string
 		f    store.EmailFilter
 		want []string
 	}{
-		{"sender, any case", store.EmailFilter{Sender: "SHOP@example.test"}, []string{failed, old}},
-		{"recipient, any case, whole address", store.EmailFilter{Recipient: "BOB@x.test"}, []string{failed, old}},
-		{"recipient, a prefix is not an address", store.EmailFilter{Recipient: "bob"}, nil},
+		{"sender substring, any case", store.EmailFilter{Sender: "SHOP"}, []string{failed, old}},
+		{"exact sender, bare and inside a mailbox", store.EmailFilter{Sender: "SHOP@example.test", Exact: true}, []string{failed, old}},
+		{"exact sender refuses a prefix", store.EmailFilter{Sender: "shop@", Exact: true}, nil},
+		{"recipient substring", store.EmailFilter{Recipient: "bob"}, []string{other, failed, old}},
+		{"exact recipient, bare and inside a mailbox", store.EmailFilter{Recipient: "BOB@x.test", Exact: true}, []string{failed, old}},
+		{"exact recipient refuses a superstring", store.EmailFilter{Recipient: "ob@x.test", Exact: true}, nil},
 		{"two statuses", store.EmailFilter{Statuses: []string{"failed", "queued"}}, []string{failed}},
 		{"template", store.EmailFilter{Template: "receipt"}, []string{failed, old}},
 		{"window", store.EmailFilter{From: ptr(base.Add(-90 * time.Minute)), To: ptr(base)}, []string{failed}},
 		{"after", store.EmailFilter{After: ptr(base.Add(-time.Hour))}, []string{other}},
 		{"search ignores case", store.EmailFilter{Search: "ANN@X.TEST"}, []string{failed}},
-		{"combined", store.EmailFilter{Sender: "shop@example.test", Statuses: []string{"sent"}}, []string{old}},
+		{"combined", store.EmailFilter{Sender: "shop@example.test", Exact: true, Statuses: []string{"sent"}}, []string{old}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

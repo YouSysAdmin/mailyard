@@ -667,8 +667,10 @@ type StylesheetStore interface {
 // asks for `created_at < value` and skips every row sharing it - they
 // appear on neither page.
 //
-// Sender and Recipient are one whole address each, without regard to
-// case. From and To bound created_at as a half-open window, After is
+// Sender and Recipient are address terms, matched without regard to
+// case: a substring of the stored mailbox by default, or with Exact one
+// whole address, found bare or inside a mailbox carrying a display
+// name. From and To bound created_at as a half-open window, After is
 // what a poller asks for: everything newer than the last row it saw.
 type EmailFilter struct {
 	Statuses []string
@@ -677,6 +679,7 @@ type EmailFilter struct {
 
 	Sender       string
 	Recipient    string
+	Exact        bool
 	Template     string
 	Tag          string
 	APIKeyID     string
@@ -817,7 +820,11 @@ type SuppressionStore interface {
 
 // CampaignMessageFilter pages a campaign's messages in fan-out order.
 // Keyset, because the table gains a row per recipient.
+// CampaignMessageFilter narrows a campaign's per-recipient rows. Email
+// is one whole subscriber address, without regard to case.
 type CampaignMessageFilter struct {
+	Email string
+
 	// Status is one of the campaign message statuses, empty for all.
 	Status string
 	Limit  int
@@ -1143,12 +1150,14 @@ type SandboxStore interface {
 //
 // Sender, Recipient and Subject are search terms, matched as a
 // case-insensitive substring and ANDed with each other and with the
-// inbox. Since keeps only captures received after that instant, which
+// inbox. Exact turns the two address terms into one whole address
+// each. Since keeps only captures received after that instant, which
 // is how a test run asks for its own mail. Empty means no condition.
 type SandboxFilter struct {
 	Addresses []string
 	Sender    string
 	Recipient string
+	Exact     bool
 	Subject   string
 	Since     *time.Time
 	Limit     int
@@ -1184,12 +1193,15 @@ type SandboxInboxStore interface {
 // means received mail that appears on no page of the inbound log.
 //
 // Sender, Recipient and Search are search terms, the first two over
-// the envelope and the third over the subject, the same reading as on
-// SandboxFilter.
+// the From header and the envelope recipients and the third over the
+// subject, the same reading as on SandboxFilter. Exact turns the two
+// address terms into one whole address each, the sender found bare or
+// inside a mailbox carrying a display name.
 type InboundFilter struct {
 	Status    string
 	Sender    string
 	Recipient string
+	Exact     bool
 	Search    string
 	Limit     int
 	Cursor    keyset.Cursor

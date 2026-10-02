@@ -13,6 +13,7 @@
 package paging
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -70,6 +71,22 @@ func FromWith(c fiber.Ctx, def, ceiling int) Page {
 	offset := max(fiber.Query[int](c, "offset", 0), 0)
 
 	return Page{Limit: limit, Offset: offset}
+}
+
+// Exact reads the ?match= modifier of an address filter: contains, the
+// default, is a substring of the stored text, which is what a person
+// typing into a From or To box means. exact is one whole address, the
+// machine's question. Anything else is refused by name rather than
+// silently read as one of the two.
+func Exact(c fiber.Ctx) (bool, error) {
+	switch c.Query("match") {
+	case "", "contains":
+		return false, nil
+	case "exact":
+		return true, nil
+	}
+
+	return false, errors.New("match must be contains or exact")
 }
 
 // Optional reads a page only when the caller asked for one, which is

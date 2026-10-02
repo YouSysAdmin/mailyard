@@ -56,6 +56,12 @@ func (h *Handler) List(c fiber.Ctx) error {
 		Limit:     p.Limit,
 		Offset:    p.Offset,
 	}
+
+	var err error
+	if f.Exact, err = paging.Exact(c); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+
 	if raw := c.Query("since"); raw != "" {
 		t, err := time.Parse(time.RFC3339, raw)
 		if err != nil {

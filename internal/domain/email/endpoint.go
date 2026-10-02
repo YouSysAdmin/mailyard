@@ -224,6 +224,12 @@ func (h *Handler) List(c fiber.Ctx) error {
 		Limit:        w.Fetch(),
 		Cursor:       w.Cursor,
 	}
+
+	var err error
+	if f.Exact, err = paging.Exact(c); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+
 	// A list, so one request answers "anything that did not go out".
 	// Each value is checked by name: an unknown status would match
 	// nothing and read as an empty log.
@@ -246,7 +252,6 @@ func (h *Handler) List(c fiber.Ctx) error {
 		}
 	}
 
-	var err error
 	if f.From, f.To, err = paging.TimeWindow(c); err != nil {
 		return response.BadRequest(c, "from and to "+err.Error())
 	}

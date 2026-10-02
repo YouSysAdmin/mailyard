@@ -388,6 +388,8 @@ func readsIn(t *testing.T, fset *token.FileSet, body *ast.BlockStmt, recvName, t
 				direct = append(direct, "limit", "cursor")
 			case x.Name == "paging" && fun.Sel.Name == "CursorFrom":
 				direct = append(direct, "cursor")
+			case x.Name == "paging" && fun.Sel.Name == "Exact":
+				direct = append(direct, "match")
 			case x.Name == "paging" && fun.Sel.Name == "TimeWindow":
 				direct = append(direct, "from", "to")
 			case x.Name == "paging" && fun.Sel.Name == "Instant" && len(call.Args) >= 2:

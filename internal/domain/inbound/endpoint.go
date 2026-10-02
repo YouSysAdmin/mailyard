@@ -37,6 +37,11 @@ func (h *Handler) List(c fiber.Ctx) error {
 		Cursor:    w.Cursor,
 	}
 
+	var err error
+	if f.Exact, err = paging.Exact(c); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+
 	rows, err := h.Runtime.Store.Inbound.List(c.Context(), rc.Project.ID, f)
 	if err != nil {
 		return response.Internal(c, err)

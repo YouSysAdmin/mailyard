@@ -112,6 +112,15 @@ const (
 // way senderIn lowers the sender.
 const recipientIn = ` AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(e.recipients::jsonb) r WHERE lower(r) = ANY(?::text[]))`
 
+// senderIs and recipientIs are the exact forms of the two searches:
+// one whole envelope address, lowered on both sides. The envelope
+// carries bare addresses, so equality is the whole test here, where
+// the inbound and email logs also have to look inside a mailbox.
+const (
+	senderIs    = ` AND lower(e.sender) = ?`
+	recipientIs = ` AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(e.recipients::jsonb) r WHERE lower(r) = ?)`
+)
+
 // narrow appends f's conditions to sb and their values to args, for
 // List and Count alike.
 func narrow(sb *strings.Builder, args []any, f store.SandboxFilter) []any {
@@ -120,12 +129,20 @@ func narrow(sb *strings.Builder, args []any, f store.SandboxFilter) []any {
 		args = append(args, f.Addresses)
 	}
 
-	if f.Sender != "" {
+	switch {
+	case f.Exact && f.Sender != "":
+		sb.WriteString(senderIs)
+		args = append(args, strings.ToLower(f.Sender))
+	case f.Sender != "":
 		sb.WriteString(senderLike)
 		args = append(args, "%"+database.EscapeLike(f.Sender)+"%")
 	}
 
-	if f.Recipient != "" {
+	switch {
+	case f.Exact && f.Recipient != "":
+		sb.WriteString(recipientIs)
+		args = append(args, strings.ToLower(f.Recipient))
+	case f.Recipient != "":
 		sb.WriteString(recipientLike)
 		args = append(args, "%"+database.EscapeLike(f.Recipient)+"%")
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -48,6 +49,22 @@ func flag(raw, name string) (*bool, error) {
 // List returns every user, oldest first. Always an array ("users": []),
 // never null, so the SPA can .map() without a guard.
 func (h *Handler) List(c fiber.Ctx) error {
+	// One whole address is a lookup through the login key, answered in
+	// the list's shape so a client keeps one code path.
+	if email := paging.Search(c, "email"); email != "" {
+		u, err := h.Runtime.Store.User.Get(c.Context(), strings.ToLower(email))
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		out := ListResponse{Users: []*usermodel.User{}}
+		if u != nil {
+			out.Users, out.Total = append(out.Users, u), 1
+		}
+
+		return response.Success(c, out)
+	}
+
 	pg := paging.Optional(c)
 	f := store.UserFilter{Query: paging.Search(c, "q"), Limit: pg.Limit, Offset: pg.Offset}
 

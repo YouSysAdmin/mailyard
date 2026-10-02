@@ -102,6 +102,7 @@ func ConsoleDocs() []apidoc.Route {
 			PathParams:  []apidoc.Param{{Name: "id"}},
 			Query: []apidoc.Param{
 				{Name: "status", Enum: []string{"pending", "queued", "sent", "failed", "skipped"}},
+				{Name: "email", Description: "One whole subscriber address, without regard to case: that subscriber's row in this campaign."},
 				{Name: "limit", Type: "integer"},
 				{Name: "cursor", Description: "The next_cursor of the previous page."},
 			},

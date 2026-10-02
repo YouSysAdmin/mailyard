@@ -300,18 +300,33 @@ func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmode
 		args = append(args, f.After.UTC())
 	}
 
-	// A whole address each. The sender is one column, lowered to match
-	// addressMatchClause. recipients is a JSON array, so the needle is
-	// quoted the way Search quotes it and matched without regard to
-	// case, which the trigram index serves either way.
-	if f.Sender != "" {
-		query += ` AND LOWER(sender) = ?`
-		args = append(args, strings.ToLower(strings.TrimSpace(f.Sender)))
+	// The address filters. A substring of the stored text by default,
+	// which the trigram indexes serve. Exact is one whole address, and
+	// these columns hold MAILBOXES rather than bare addresses -
+	// withRegisteredName stores `"Acme" <no-reply@acme.com>`, and a
+	// recipient is whatever the caller wrote - so the address is
+	// accepted bare or in angle brackets, the shapes addressMatchClause
+	// settled on. The brackets keep bob@x.test from matching
+	// notbob@x.test. The recipient array is unpacked so each element is
+	// judged whole rather than the JSON text searched.
+	switch {
+	case f.Exact && f.Sender != "":
+		query += ` AND (LOWER(sender) = ? OR LOWER(sender) LIKE ? ESCAPE '\')`
+		addr := strings.ToLower(strings.TrimSpace(f.Sender))
+		args = append(args, addr, "%<"+database.EscapeLike(addr)+">%")
+	case f.Sender != "":
+		query += ` AND sender ILIKE ? ESCAPE '\'`
+		args = append(args, "%"+database.EscapeLike(strings.TrimSpace(f.Sender))+"%")
 	}
 
-	if f.Recipient != "" {
+	switch {
+	case f.Exact && f.Recipient != "":
+		query += ` AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(recipients::jsonb) r WHERE lower(r) = ? OR lower(r) LIKE ? ESCAPE '\')`
+		addr := strings.ToLower(strings.TrimSpace(f.Recipient))
+		args = append(args, addr, "%<"+database.EscapeLike(addr)+">%")
+	case f.Recipient != "":
 		query += ` AND recipients ILIKE ? ESCAPE '\'`
-		args = append(args, `%"`+database.EscapeLike(strings.TrimSpace(f.Recipient))+`"%`)
+		args = append(args, "%"+database.EscapeLike(strings.TrimSpace(f.Recipient))+"%")
 	}
 
 	if f.Template != "" {

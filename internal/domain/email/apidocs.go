@@ -135,8 +135,9 @@ func APIDocs() []apidoc.Route {
 			Query: []apidoc.Param{
 				{Name: "status", Description: "One status, or several separated by commas. " +
 					"Values: pending, queued, scheduled, processing, sent, failed, suppressed, cancelled."},
-				{Name: "sender", Description: "One whole From address, without regard to case."},
-				{Name: "recipient", Description: "One whole recipient address, Cc and Bcc included, without regard to case."},
+				{Name: "sender", Description: "The From mailbox, or part of it - see match."},
+				{Name: "recipient", Description: "Any recipient, Cc and Bcc included, or part of one - see match."},
+				{Name: "match", Enum: []string{"contains", "exact"}, Description: "How sender and recipient are matched: contains, the default, is part of the stored value, exact is one whole address, found bare or inside a mailbox with a display name. Both without regard to case."},
 				{Name: "template", Description: "The name of the template the message was rendered from."},
 				{Name: "tag", Description: "Only messages carrying this tag."},
 				{Name: "api_key_id", Format: "uuid", Description: "Only mail accepted through this API key."},

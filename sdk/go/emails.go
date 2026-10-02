@@ -119,6 +119,10 @@ func (c *Client) ListEmails(ctx context.Context, f EmailFilter) ([]Email, string
 		q.Set("limit", strconv.Itoa(f.Limit))
 	}
 
+	if f.Exact {
+		q.Set("match", "exact")
+	}
+
 	out, err := c.do[struct {
 		Emails     []Email `json:"emails"`
 		NextCursor string  `json:"next_cursor"`

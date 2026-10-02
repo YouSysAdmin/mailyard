@@ -532,11 +532,14 @@ type EmailFilter struct {
 	// Statuses narrows to any of these delivery states.
 	Statuses []string
 
-	// Sender and Recipient are one whole address each, matched without
-	// regard to case. Template is the name the message was rendered
-	// from, APIKeyID and SMTPServerID the credential and the server.
+	// Sender and Recipient are matched without regard to case: part of
+	// the stored mailbox, or with Exact one whole address found bare or
+	// inside a mailbox with a display name. Template is the name the
+	// message was rendered from, APIKeyID and SMTPServerID the
+	// credential and the server.
 	Sender       string
 	Recipient    string
+	Exact        bool
 	Template     string
 	Tag          string
 	APIKeyID     string
