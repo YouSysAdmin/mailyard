@@ -7,12 +7,17 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/yousysadmin/mailyard/internal/cli"
 	"github.com/yousysadmin/mailyard/pkg"
 )
 
 func main() {
+	// Every time the process renders, in responses and logs, is UTC
+	// whatever the host zone is.
+	time.Local = time.UTC
+
 	err := cli.NewRoot().Execute()
 	if err == nil {
 		return

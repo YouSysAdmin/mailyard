@@ -216,7 +216,7 @@ func TestDropSpentRemovesWholeSpentPartitions(t *testing.T) {
 	proj := newProject(t, db)
 
 	old := dayStart(time.Now().UTC()).AddDate(0, 0, -21)
-	if _, err := m.ensureDay(t.Context(), old, old.AddDate(0, 0, 7)); err != nil {
+	if _, err := m.ensureDay(t.Context(), partitionName(old), old, old.AddDate(0, 0, 7)); err != nil {
 		t.Fatalf("create old partition: %v", err)
 	}
 
@@ -251,7 +251,7 @@ func TestDropSpentKeepsAPartitionHoldingScheduledMail(t *testing.T) {
 	proj := newProject(t, db)
 
 	old := dayStart(time.Now().UTC()).AddDate(0, 0, -21)
-	if _, err := m.ensureDay(t.Context(), old, old.AddDate(0, 0, 7)); err != nil {
+	if _, err := m.ensureDay(t.Context(), partitionName(old), old, old.AddDate(0, 0, 7)); err != nil {
 		t.Fatalf("create old partition: %v", err)
 	}
 
@@ -428,5 +428,85 @@ func TestNoTwoPartitionsOverlap(t *testing.T) {
 					a.name, a.lower, a.upper, b.name, b.lower, b.upper)
 			}
 		}
+	}
+}
+
+// A database whose session zone is not UTC laid its bounds at local
+// midnight, through the migration and through older binaries. Days
+// created now are UTC days and have to meet those exactly.
+func TestUTCDaysMeetPartitionsLaidDownInAnotherZone(t *testing.T) {
+	db := dbtest.Open(t)
+	if _, err := db.ExecContext(t.Context(), `SET TimeZone = 'Asia/Tokyo'`); err != nil {
+		t.Fatalf("set zone: %v", err)
+	}
+
+	dbtest.Migrate(t, db)
+	m := &Maintainer{DB: db, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+
+	parts, err := m.rangePartitions(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var last time.Time
+	for _, p := range parts {
+		if p.upper.After(last) {
+			last = p.upper
+		}
+	}
+
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Three days after the migration's own, the way the previous code
+	// wrote them, bare dates read in the session zone.
+	local := last.In(tokyo)
+	first := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	for i := range 3 {
+		from := first.AddDate(0, 0, i)
+		//sqlconst:allow the name comes from partitionName and the bounds from a time
+		if _, err := db.ExecContext(t.Context(), `CREATE TABLE `+partitionName(from)+
+			` PARTITION OF emails FOR VALUES FROM ('`+from.Format(time.DateOnly)+
+			`') TO ('`+from.AddDate(0, 0, 1).Format(time.DateOnly)+`')`); err != nil {
+			t.Fatalf("lay down %s: %v", partitionName(from), err)
+		}
+	}
+
+	if _, err := m.EnsureAhead(t.Context()); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+
+	start := dayStart(time.Now().UTC())
+	proj := newProject(t, db)
+	for at := start; at.Before(start.AddDate(0, 0, daysAhead+1)); at = at.Add(time.Hour) {
+		insertEmail(t, db, proj, "sent", at)
+	}
+
+	var stranded int
+	if err := db.QueryRowContext(t.Context(),
+		`SELECT count(*) FROM emails_default`).Scan(&stranded); err != nil {
+		t.Fatalf("count default: %v", err)
+	}
+
+	if stranded != 0 {
+		t.Errorf("%d hour(s) fell into the default partition", stranded)
+	}
+}
+
+func TestFitBetweenClosesTheGapAndAvoidsTheOverlap(t *testing.T) {
+	day := time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC)
+	before := rangePartition{lower: day.Add(-27 * time.Hour), upper: day.Add(-3 * time.Hour)}
+	after := rangePartition{lower: day.Add(21 * time.Hour), upper: day.Add(45 * time.Hour)}
+
+	lower, upper := fitBetween([]rangePartition{before, after}, day, day.AddDate(0, 0, 1))
+	if !lower.Equal(before.upper) || !upper.Equal(after.lower) {
+		t.Errorf("got [%s,%s), want [%s,%s)", lower, upper, before.upper, after.lower)
+	}
+
+	lower, upper = fitBetween(nil, day, day.AddDate(0, 0, 1))
+	if !lower.Equal(day) || !upper.Equal(day.AddDate(0, 0, 1)) {
+		t.Errorf("with no neighbours got [%s,%s), want the plain day", lower, upper)
 	}
 }

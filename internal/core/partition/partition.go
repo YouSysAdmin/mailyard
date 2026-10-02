@@ -152,7 +152,8 @@ func (m *Maintainer) EnsureAhead(ctx context.Context) (created int, err error) {
 			continue
 		}
 
-		made, cerr := m.ensureDay(ctx, from, to)
+		lower, upper := fitBetween(covered, from, to)
+		made, cerr := m.ensureDay(ctx, partitionName(from), lower, upper)
 		if cerr != nil {
 			return created, cerr
 		}
@@ -160,7 +161,7 @@ func (m *Maintainer) EnsureAhead(ctx context.Context) (created int, err error) {
 		if made {
 			created++
 			m.Log.Info("partition created", "table", partitionName(from),
-				"from", from.Format(time.DateOnly), "to", to.Format(time.DateOnly))
+				"from", lower.Format(time.RFC3339), "to", upper.Format(time.RFC3339))
 		}
 	}
 
@@ -213,8 +214,7 @@ func (m *Maintainer) EnsureAhead(ctx context.Context) (created int, err error) {
 	return created, nil
 }
 
-func (m *Maintainer) ensureDay(ctx context.Context, from, to time.Time) (bool, error) {
-	name := partitionName(from)
+func (m *Maintainer) ensureDay(ctx context.Context, name string, from, to time.Time) (bool, error) {
 	var exists bool
 	// to_regclass, again through the search_path, for the same reason
 	// as rangePartitions: relname alone is not unique across schemas.
@@ -236,9 +236,12 @@ func (m *Maintainer) ensureDay(ctx context.Context, from, to time.Time) (bool, e
 		return false, err
 	}
 
+	// The bounds carry their offset, so the session TimeZone cannot move
+	// where a day starts.
+	const bound = "2006-01-02 15:04:05-07"
 	stmt := fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM ('%s') TO ('%s')`,
-		name, Table, from.Format(time.DateOnly), to.Format(time.DateOnly))
+		name, Table, from.UTC().Format(bound), to.UTC().Format(bound))
 	//sqlconst:allow the table name is derived from a time, and validated by mustBeSafeName
 	if _, err := m.DB.ExecContext(ctx, stmt); err != nil {
 		return false, fmt.Errorf("create partition %s: %w", name, err)
@@ -488,6 +491,25 @@ func coveredBy(existing []rangePartition, day time.Time) bool {
 	}
 
 	return false
+}
+
+// fitBetween stretches or trims a day so it meets its neighbours
+// exactly. A partition laid down with bounds in another zone ends a few
+// hours off midnight UTC, and a plain day beside it would leave a gap
+// that only the default partition catches, or overlap it and be refused.
+func fitBetween(existing []rangePartition, from, to time.Time) (time.Time, time.Time) {
+	lower, upper := from, to
+	for _, p := range existing {
+		if p.upper.Before(from) && p.upper.After(from.AddDate(0, 0, -1)) && p.upper.Before(lower) {
+			lower = p.upper
+		}
+
+		if p.lower.After(from) && p.lower.Before(upper) {
+			upper = p.lower
+		}
+	}
+
+	return lower, upper
 }
 
 // partitionName names a DAILY partition, and the prefix says which kind
