@@ -55,6 +55,9 @@ func (f *fakeSharedPool) ListEnabled(context.Context) ([]*ssmodel.Shared, error)
 type fakeDomains struct {
 	store.DomainStore
 	verified *dmodel.Domain
+
+	// sharedWith holds the projects the owner shared the domain with.
+	sharedWith map[string]bool
 }
 
 func (f *fakeDomains) GetVerifiedByName(_ context.Context, name string) (*dmodel.Domain, error) {
@@ -79,6 +82,17 @@ func (f *fakeDomains) GetVerifiedCovering(_ context.Context, name string) (*dmod
 	}
 
 	return nil, nil
+}
+
+// GetVerifiedCoveringFor is the covering row for the owner or a
+// project it was shared with, nothing for anybody else.
+func (f *fakeDomains) GetVerifiedCoveringFor(ctx context.Context, name, projID string) (*dmodel.Domain, error) {
+	d, _ := f.GetVerifiedCovering(ctx, name)
+	if d == nil || (d.ProjectID != projID && !f.sharedWith[projID]) {
+		return nil, nil
+	}
+
+	return d, nil
 }
 
 func sharedServer(name string, mutate func(*ssmodel.Shared)) *ssmodel.Shared {

@@ -34,9 +34,14 @@ func testKeyPEM(t *testing.T) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 }
 
-func signerProcessor(d *dmodel.Domain) *Processor {
+func signerProcessor(d *dmodel.Domain, sharedWith ...string) *Processor {
+	shared := map[string]bool{}
+	for _, p := range sharedWith {
+		shared[p] = true
+	}
+
 	return &Processor{
-		Store: &store.Store{Domain: &fakeDomains{verified: d}},
+		Store: &store.Store{Domain: &fakeDomains{verified: d, sharedWith: shared}},
 		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 }
@@ -90,5 +95,27 @@ func TestASubdomainOfAnotherProjectsDomainIsNotSigned(t *testing.T) {
 
 	if signer != nil {
 		t.Error("one project signed as a subdomain of another project's domain")
+	}
+}
+
+// A project the owner shared the domain with signs with the OWNER's
+// key and d=, because the selector published in DNS belongs to the
+// domain and there is only one.
+func TestASharedDomainIsSignedWithTheOwnersKey(t *testing.T) {
+	d := &dmodel.Domain{
+		ProjectID: "6a5f0b90-6a56-47f4-8926-7cc56968798b", Domain: "managebac.com", Verified: true,
+		DKIMSelector: "mailyard", DKIMPrivateKey: testKeyPEM(t),
+	}
+	p := signerProcessor(d, "e66e7a4d-9e6c-4884-869a-cf9ffcf22181")
+
+	signer, err := p.signerFor(t.Context(), &emailmodel.Email{
+		ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181", Sender: "auth@managebac.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if signer == nil || signer.Domain() != "managebac.com" {
+		t.Fatalf("signer = %v, want the owner's key with d=managebac.com", signer)
 	}
 }

@@ -11,16 +11,22 @@ import (
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
 )
 
-func senderStore(d *dmodel.Domain) *store.Store {
-	return &store.Store{Domain: &fakeDomains{verified: d}}
+func senderStore(d *dmodel.Domain, sharedWith ...string) *store.Store {
+	shared := map[string]bool{}
+	for _, p := range sharedWith {
+		shared[p] = true
+	}
+
+	return &store.Store{Domain: &fakeDomains{verified: d, sharedWith: shared}}
 }
 
 func TestRequireVerifiedSender(t *testing.T) {
 	cases := []struct {
-		name    string
-		domain  *dmodel.Domain
-		sender  string
-		wantErr bool
+		name       string
+		domain     *dmodel.Domain
+		sharedWith []string
+		sender     string
+		wantErr    bool
 	}{
 		{
 			name:   "a domain this project verified",
@@ -73,10 +79,25 @@ func TestRequireVerifiedSender(t *testing.T) {
 			sender:  "nonsense",
 			wantErr: true,
 		},
+		{
+			// The owner shared it: the domain is still proj-b's, and
+			// proj-a may send as it and anything under it.
+			name:       "another project verified it and shared it with this one",
+			domain:     &dmodel.Domain{ProjectID: "proj-b", Domain: "example.com", Verified: true},
+			sharedWith: []string{"proj-a"},
+			sender:     "hi@auth.example.com",
+		},
+		{
+			name:       "shared with a different project",
+			domain:     &dmodel.Domain{ProjectID: "proj-b", Domain: "example.com", Verified: true},
+			sharedWith: []string{"proj-c"},
+			sender:     "hi@example.com",
+			wantErr:    true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := RequireVerifiedSender(t.Context(), senderStore(tc.domain), "proj-a", tc.sender)
+			err := RequireVerifiedSender(t.Context(), senderStore(tc.domain, tc.sharedWith...), "proj-a", tc.sender)
 			if tc.wantErr && err == nil {
 				t.Fatalf("sender %q was accepted, want a refusal", tc.sender)
 			}

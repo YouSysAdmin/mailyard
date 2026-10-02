@@ -233,14 +233,51 @@ That refuses a message at SMTP time only when the From domain published
 thing a receiver can do and forwarded mail fails SPF as a matter of routine. Turn it on after looking at what your real
 traffic scores.
 
+## Sharing a Domain With Another Project
+
+A domain belongs to one project: the one that verified it publishes its records, holds its DKIM key and receives its
+inbound mail. When two projects send from the same domain - an application and a companion one built by another team,
+say - the owner shares it instead of the other project verifying it a second time.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/domains/{id}/grants \
+  -H "X-Mailyard-Project-Id: <owner project>" \
+  -H "Content-Type: application/json" \
+  -d '{ "project_slug": "auth-app" }'
+```
+
+In the console it is the **Share** action on a verified domain. The other project is named by its slug.
+
+The project it is shared with may:
+
+- send as the domain and its subdomains, through **its own** SMTP servers, SES or relay nodes,
+- have that mail signed with the owner's DKIM key, so there is still one record to publish,
+- register its own sender addresses on the domain and use it for its bounce address.
+
+It may not change the domain's records, rotate its key, verify or delete it, and it does not receive its inbound mail.
+It sees the domain under **Shared with this project**, read-only, with the owner's name.
+
+Sharing a domain shares its whole zone, including subdomains the owner verified separately. Sharing again is a no-op.
+
+A verified domain holds its zone for its project: no other project can add or verify a name under it, or a name above
+one it holds. If another project needs a subdomain, the owner verifies it and shares it - or shares the apex.
+
+```
+GET    /api/v1/domains/{id}/grants
+DELETE /api/v1/domains/{id}/grants/{project_id}
+```
+
+Stopping the share refuses the other project's mail from that domain from then on. Deleting the domain ends every share.
+
 ## List Domains
 
 ```
 GET /api/v1/domains
 ```
 
-Returns the project's domains with their verification state. Use
-`GET /api/v1/domains/:id` for a single domain plus its `dns_records`.
+Returns the project's domains with their verification state, and under `shared` the domains other projects shared with
+it. Use `GET /api/v1/domains/:id` for a single domain plus its `dns_records` - a shared domain is not answered there,
+because its records belong to its owner.
 
 ## Delete a Domain
 

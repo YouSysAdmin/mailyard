@@ -82,6 +82,27 @@ func (d *Domain) CanSign() bool {
 	return d.Verified && d.DKIMPrivateKey != "" && d.DKIMSelector != ""
 }
 
+// Grant is a verified domain its owner shared with another project:
+// that project may send as the domain, signed with the owner's key.
+// ProjectName and ProjectSlug name the grantee, read with the grant.
+type Grant struct {
+	DomainID    string    `json:"domain_id"`
+	ProjectID   string    `json:"project_id"`
+	ProjectName string    `json:"project_name"`
+	ProjectSlug string    `json:"project_slug"`
+	GrantedBy   string    `json:"granted_by,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// Shared is a domain another project shared with this one, as the
+// grantee sees it: the name and who owns it, nothing of its records.
+type Shared struct {
+	ID        string    `json:"id"`
+	Domain    string    `json:"domain"`
+	OwnerName string    `json:"owner_name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // Rotating reports whether a DKIM key rotation is pending.
 func (d *Domain) Rotating() bool {
 	return d.DKIMNextPublicKey != "" && d.DKIMNextSelector != ""

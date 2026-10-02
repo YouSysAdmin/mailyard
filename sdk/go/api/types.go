@@ -568,6 +568,14 @@ type Domain struct {
 	CheckedAt         *time.Time `json:"checked_at,omitempty"`
 }
 
+// DomainShared is the wire body.
+type DomainShared struct {
+	ID        string    `json:"id"`
+	Domain    string    `json:"domain"`
+	OwnerName string    `json:"owner_name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // DomainsCreateInput is the request body.
 type DomainsCreateInput struct {
 	Domain string `json:"domain"`
@@ -575,7 +583,8 @@ type DomainsCreateInput struct {
 
 // DomainsListResponse is the response body.
 type DomainsListResponse struct {
-	Domains []*Domain `json:"domains"`
+	Domains []*Domain       `json:"domains"`
+	Shared  []*DomainShared `json:"shared"`
 }
 
 // Email is the wire body.
@@ -787,6 +796,26 @@ type GenerateInput struct {
 // GetResponse is the response body.
 type GetResponse struct {
 	Contact *Contact `json:"contact"`
+}
+
+// Grant is the wire body.
+type Grant struct {
+	DomainID    string    `json:"domain_id"`
+	ProjectID   string    `json:"project_id"`
+	ProjectName string    `json:"project_name"`
+	ProjectSlug string    `json:"project_slug"`
+	GrantedBy   string    `json:"granted_by,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// GrantInput is the request body.
+type GrantInput struct {
+	ProjectSlug string `json:"project_slug"`
+}
+
+// GrantsResponse is the response body.
+type GrantsResponse struct {
+	Grants []*Grant `json:"grants"`
 }
 
 // Group is the wire body.

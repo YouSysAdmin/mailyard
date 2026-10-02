@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { type DNSRecord, domainsApi, type InboundDomain } from '../../api/domains'
+import {
+  type DNSRecord,
+  domainsApi,
+  type InboundDomain,
+  type SharedDomain,
+} from '../../api/domains'
 import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
@@ -13,6 +18,7 @@ import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
 import SendersCard from './SendersCard.vue'
+import DomainShareModal from './DomainShareModal.vue'
 import { useFieldErrors } from '../../composables/fieldErrors'
 
 const notify = useNotificationStore()
@@ -21,6 +27,13 @@ const { confirm } = useConfirm()
 
 const loading = ref(true)
 const domains = ref<InboundDomain[]>([])
+
+// Domains other projects shared with this one. Read-only here: this
+// project may send as them, their owner manages them.
+const shared = ref<SharedDomain[]>([])
+
+// The domain whose share dialog is open.
+const sharing = ref<InboundDomain | null>(null)
 
 // Add-domain modal state. After a successful create the same modal
 // switches to showing the DNS record the operator must publish.
@@ -53,6 +66,7 @@ async function load() {
   try {
     const res = await domainsApi.list()
     domains.value = res.data.domains ?? []
+    shared.value = res.data.shared ?? []
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to load domains'))
   } finally {
@@ -281,6 +295,13 @@ async function deleteDomain(d: InboundDomain) {
                       {{ verifyingId === d.id ? 'Checking...' : 'Verify' }}
                     </button>
                     <button
+                      v-if="projStore.can('domains:write') && d.verified"
+                      class="btn btn-secondary btn-sm"
+                      @click="sharing = d"
+                    >
+                      Share
+                    </button>
+                    <button
                       v-if="projStore.can('domains:delete')"
                       class="btn btn-danger btn-sm"
                       :disabled="deletingId === d.id"
@@ -296,6 +317,40 @@ async function deleteDomain(d: InboundDomain) {
         </div>
       </template>
     </div>
+
+    <div v-if="!loading && shared.length" class="card">
+      <div class="card-header">
+        <h2>Shared with this project</h2>
+      </div>
+      <div class="card-body">
+        <p class="dns-intro">
+          This project may send as these domains through its own SMTP servers. Their DNS records,
+          DKIM key and inbound mail are managed by the project that owns them.
+        </p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Owned by</th>
+                <th>Shared</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in shared" :key="s.id">
+                <td>
+                  <code>{{ s.domain }}</code>
+                </td>
+                <td>{{ s.owner_name }}</td>
+                <td>{{ formatDate(s.created_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <DomainShareModal v-if="sharing" :domain="sharing" @close="sharing = null" />
 
     <!-- Its own resource, its own routes, its own permissions - it
          lives here only because you register an address for a domain

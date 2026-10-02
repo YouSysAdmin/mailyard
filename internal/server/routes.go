@@ -844,6 +844,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	doms.Post("/:id/verify", permWrite, dh.Verify)
 	doms.Post("/:id/dkim/rotate", permWrite, dh.RotateDKIM)
 	doms.Delete("/:id/dkim/rotate", permWrite, dh.CancelDKIMRotation)
+	doms.Get("/:id/grants", permRead, dh.Grants)
+	doms.Post("/:id/grants", permWrite, dh.Share)
+	doms.Delete("/:id/grants/:project_id", permWrite, dh.Unshare)
 	doms.Delete("/:id", permDelete, dh.Delete)
 
 	// Inbound emails - mail received by the MX listener.

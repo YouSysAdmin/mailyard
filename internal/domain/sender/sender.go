@@ -327,12 +327,12 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	}
 
 	_, domainName, _ := strings.CutLast(in.Email, "@")
-	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), domainName)
+	d, err := h.Runtime.Store.Domain.GetVerifiedCoveringFor(c.Context(), domainName, rc.Project.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if d == nil || d.ProjectID != rc.Project.ID {
+	if d == nil {
 		return response.BadRequest(c,
 			"domain "+domainName+" is not verified by this project, verify it under Domains first")
 	}

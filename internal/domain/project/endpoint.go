@@ -873,22 +873,22 @@ func (h *Handler) DeclineInvitation(c fiber.Ctx) error {
 	return response.Success(c, DeclinedResponse{Declined: true})
 }
 
-// ownsVerifiedDomain reports whether addr's domain is verified to
-// project projID. Covering, so a subdomain of a verified domain
-// counts - which is the point, since a bounce domain wants its own MX
-// and SPF and so is never the apex.
+// ownsVerifiedDomain reports whether project projID may send as
+// addr's domain - it verified it, or the owner shared it. Covering, so
+// a subdomain of a verified domain counts - which is the point, since
+// a bounce domain wants its own MX and SPF and so is never the apex.
 func (h *Handler) ownsVerifiedDomain(c fiber.Ctx, projID, addr string) (bool, error) {
 	_, host, ok := strings.CutLast(addr, "@")
 	if !ok {
 		return false, nil
 	}
 
-	d, err := h.Runtime.Store.Domain.GetVerifiedCovering(c.Context(), host)
+	d, err := h.Runtime.Store.Domain.GetVerifiedCoveringFor(c.Context(), host, projID)
 	if err != nil {
 		return false, err
 	}
 
-	return d != nil && d.ProjectID == projID, nil
+	return d != nil, nil
 }
 
 // access is what one caller may do in one project: whether they

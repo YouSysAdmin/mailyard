@@ -43,6 +43,12 @@ func (f *fakeDomains) GetVerifiedCovering(_ context.Context, name string) (*dmod
 
 	return nil, nil
 }
+func (f *fakeDomains) GetVerifiedCoveringFor(context.Context, string, string) (*dmodel.Domain, error) {
+	return nil, nil
+}
+func (f *fakeDomains) ZoneTakenByAnother(context.Context, string, string) (bool, error) {
+	return false, nil
+}
 func (f *fakeDomains) GetByName(context.Context, string) (*dmodel.Domain, error) { return nil, nil }
 func (f *fakeDomains) List(context.Context, string) ([]*dmodel.Domain, error)    { return nil, nil }
 func (f *fakeDomains) VerifiedNames(context.Context) ([]string, error) {
@@ -65,6 +71,16 @@ func (f *fakeDomains) SetVerified(context.Context, string, string, bool, time.Ti
 }
 func (f *fakeDomains) Delete(context.Context, string, string) error { return nil }
 func (f *fakeDomains) Count(context.Context, string) (int, error)   { return 0, nil }
+func (f *fakeDomains) Grant(context.Context, *dmodel.Grant) error   { return nil }
+func (f *fakeDomains) Revoke(context.Context, string, string) (bool, error) {
+	return false, nil
+}
+func (f *fakeDomains) ListGrants(context.Context, string, string) ([]*dmodel.Grant, error) {
+	return nil, nil
+}
+func (f *fakeDomains) ListShared(context.Context, string) ([]*dmodel.Shared, error) {
+	return nil, nil
+}
 
 // fakeInbound stores rows in memory.
 type fakeInbound struct{ rows []*imodel.Email }

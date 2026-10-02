@@ -34,6 +34,15 @@ type oneDomain struct {
 	d *dmodel.Domain
 }
 
+func (f oneDomain) GetVerifiedCoveringFor(ctx context.Context, name, projID string) (*dmodel.Domain, error) {
+	d, _ := f.GetVerifiedCovering(ctx, name)
+	if d == nil || d.ProjectID != projID {
+		return nil, nil
+	}
+
+	return d, nil
+}
+
 func (f oneDomain) GetVerifiedCovering(_ context.Context, name string) (*dmodel.Domain, error) {
 	if f.d != nil && (name == f.d.Domain || strings.HasSuffix(name, "."+f.d.Domain)) {
 		return f.d, nil

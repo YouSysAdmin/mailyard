@@ -18,7 +18,7 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "GET",
 			Path:        "/domains/",
 			Summary:     "List",
-			Description: "Needs the `domains:read` permission.",
+			Description: "Needs the `domains:read` permission. `shared` lists the domains other projects shared with this one: this project may send as them, and only their owner manages them.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
@@ -69,6 +69,31 @@ func ConsoleDocs() []apidoc.Route {
 			Description: "Needs the `domains:write` permission. Discards a pending key, the current one is untouched.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", DetailResponse{})},
+		},
+		{
+			Method:      "GET",
+			Path:        "/domains/:id/grants",
+			Summary:     "List grants",
+			Description: "Needs the `domains:read` permission. The projects this domain is shared with. Owner only.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Responses:   []apidoc.Response{apidoc.OK("The result.", GrantsResponse{})},
+		},
+		{
+			Method:      "POST",
+			Path:        "/domains/:id/grants",
+			Summary:     "Share",
+			Description: "Needs the `domains:write` permission. Lets the project named by its slug send as this verified domain and its subdomains, through its own servers, signed with this domain's DKIM key. Inbound mail, DNS records and the key stay with the owner. Sharing again is a no-op.",
+			PathParams:  []apidoc.Param{{Name: "id"}},
+			Request:     grantInput{},
+			Responses:   []apidoc.Response{apidoc.OK("Every project the domain is now shared with.", GrantsResponse{})},
+		},
+		{
+			Method:      "DELETE",
+			Path:        "/domains/:id/grants/:project_id",
+			Summary:     "Unshare",
+			Description: "Needs the `domains:write` permission. The project can no longer send as this domain.",
+			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "project_id"}},
+			Responses:   []apidoc.Response{apidoc.NoContent},
 		},
 	}
 }
