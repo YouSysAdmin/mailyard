@@ -38,7 +38,7 @@ const sharedSelect = `
 SELECT s.id, s.created_by, s.name, s.host, s.port, s.username, s.password,
        s.encryption, s.skip_dkim, s.allowed_emails, s.allowed_domains,
        s.security_mode, s.priority, s.status, s.validation_error,
-       s.validated_at, s.created_at, s.ses_topic_arn, s.platform_only,
+       s.validated_at, s.created_at, s.ses_topic_arn,
        s.provider, s.provider_config, rn.id, rn.last_seen_at
 FROM shared_smtp_servers s` + relaynode.FreshJoin + `s.id`
 
@@ -138,8 +138,8 @@ func (s *SharedStore) Put(ctx context.Context, srv *ssmodel.Shared) error {
             id, created_by, name, host, port, username, password, encryption,
             skip_dkim, allowed_emails, allowed_domains, security_mode, priority,
             status, validation_error, validated_at, created_at, ses_topic_arn,
-            platform_only, provider, provider_config
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            provider, provider_config
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name             = excluded.name,
             host             = excluded.host,
@@ -156,7 +156,6 @@ func (s *SharedStore) Put(ctx context.Context, srv *ssmodel.Shared) error {
             validation_error = excluded.validation_error,
             validated_at     = excluded.validated_at,
             ses_topic_arn    = excluded.ses_topic_arn,
-            platform_only    = excluded.platform_only,
             provider         = excluded.provider,
             provider_config  = excluded.provider_config
     `,
@@ -164,7 +163,7 @@ func (s *SharedStore) Put(ctx context.Context, srv *ssmodel.Shared) error {
 		srv.Encryption, srv.SkipDKIM, database.MustJSON(srv.AllowedEmails),
 		database.MustJSON(srv.AllowedDomains), srv.SecurityMode, srv.Priority,
 		srv.Status, srv.ValidationError, database.NullTime(srv.ValidatedAt), srv.CreatedAt,
-		srv.SESTopicARN, srv.PlatformOnly,
+		srv.SESTopicARN,
 		srv.Provider, database.MustJSON(srv.ProviderConfig),
 	)
 
@@ -205,7 +204,7 @@ func (s *SharedStore) scanShared(r interface{ Scan(...any) error }) (*ssmodel.Sh
 		&srv.Username, &srv.Password, &srv.Encryption, &srv.SkipDKIM,
 		&allowedEmails, &allowedDomains, &srv.SecurityMode, &srv.Priority,
 		&srv.Status, &srv.ValidationError, &validatedAt, &srv.CreatedAt,
-		&srv.SESTopicARN, &srv.PlatformOnly, &srv.Provider, &providerConfig,
+		&srv.SESTopicARN, &srv.Provider, &providerConfig,
 		database.Str(&srv.NodeID), &lastSeenAt); err != nil {
 		return nil, err
 	}

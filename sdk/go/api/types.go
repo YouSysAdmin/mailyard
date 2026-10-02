@@ -1786,7 +1786,6 @@ type Shared struct {
 	Provider        string            `json:"provider,omitempty"`
 	ProviderConfig  map[string]string `json:"provider_config,omitempty"`
 	SecurityMode    string            `json:"security_mode"`
-	PlatformOnly    bool              `json:"platform_only"`
 }
 
 // SharedCreateInput is the request body.
@@ -1804,7 +1803,6 @@ type SharedCreateInput struct {
 	AllowedDomains []string          `json:"allowed_domains"`
 	SecurityMode   string            `json:"security_mode"`
 	Priority       int64             `json:"priority"`
-	PlatformOnly   bool              `json:"platform_only"`
 	ProviderConfig map[string]string `json:"provider_config"`
 }
 
@@ -1841,7 +1839,6 @@ type SharedUpdateInput struct {
 	SecurityMode   string             `json:"security_mode"`
 	Priority       *int64             `json:"priority"`
 	Status         string             `json:"status"`
-	PlatformOnly   *bool              `json:"platform_only"`
 	ProviderConfig *map[string]string `json:"provider_config"`
 }
 

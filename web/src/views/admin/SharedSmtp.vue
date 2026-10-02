@@ -143,7 +143,6 @@ onMounted(load)
             <tr v-for="srv in servers" :key="srv.id">
               <td>
                 {{ srv.name }}
-                <span v-if="srv.platform_only" class="badge badge-info">platform</span>
                 <!-- A node's row is managed from the relay nodes page: its
                      status there is approval, and removing the row alone
                      leaves the node enrolled with nothing behind it. -->

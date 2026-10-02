@@ -90,7 +90,6 @@ func (h *SharedHandler) Create(c fiber.Ctx) error {
 		Priority:       in.Priority,
 		Status:         ssmodel.StatusEnabled,
 		SecurityMode:   in.SecurityMode,
-		PlatformOnly:   in.PlatformOnly,
 	}
 	normalizeShared(srv)
 	if err := h.Runtime.Store.SharedSMTP.Put(c.Context(), srv); err != nil {
@@ -174,10 +173,6 @@ func (h *SharedHandler) Update(c fiber.Ctx) error {
 
 	if in.Status != "" {
 		srv.Status = in.Status
-	}
-
-	if in.PlatformOnly != nil {
-		srv.PlatformOnly = *in.PlatformOnly
 	}
 
 	// Dial settings changed under an invalid verdict: clear it rather

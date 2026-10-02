@@ -258,17 +258,6 @@ type Shared struct {
 
 	// SecurityMode is permissive or strict. See SecurityStrict.
 	SecurityMode string `json:"security_mode"`
-
-	// PlatformOnly reserves this row for the platform's own mail -
-	// invitations, password resets, signup confirmations - and keeps
-	// tenant sends off it. resolveShared skips it and systemmail
-	// prefers it.
-	//
-	// The default is false, which is right for a small install: one
-	// shared server carries both, and there is nothing to configure.
-	// Set it where platform mail has to leave from a different address
-	// or reputation than the tenants relaying through the pool.
-	PlatformOnly bool `json:"platform_only"`
 }
 
 // AllowsDomain reports whether sender's domain may relay through this

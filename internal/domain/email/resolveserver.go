@@ -158,13 +158,6 @@ func resolveShared(ctx context.Context, st *store.Store, projID, sender string) 
 
 	var out []*ssmodel.Server
 	for _, srv := range pool {
-		// Reserved for the platform's own mail. A tenant must never be
-		// routed through it, which is the whole point of the flag -
-		// see systemmail.
-		if srv.PlatformOnly {
-			continue
-		}
-
 		if !srv.AllowsSender(sender) || !srv.AllowsDomain(sender) {
 			continue
 		}

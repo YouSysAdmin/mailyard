@@ -137,9 +137,6 @@ type sharedCreateInput struct {
 	SecurityMode   string   `json:"security_mode"   validate:"omitempty,oneof=permissive strict"`
 	Priority       int      `json:"priority"        validate:"omitempty,min=0,max=10000"`
 
-	// PlatformOnly reserves this server for the platform's own mail
-	// and keeps every tenant off it.
-	PlatformOnly   bool              `json:"platform_only"`
 	ProviderConfig map[string]string `json:"provider_config" validate:"omitempty,max=20"`
 }
 
@@ -157,7 +154,6 @@ type sharedUpdateInput struct {
 	SecurityMode   string    `json:"security_mode"   validate:"omitempty,oneof=permissive strict"`
 	Priority       *int      `json:"priority"        validate:"omitzero,min=0,max=10000"`
 	Status         string    `json:"status"          validate:"omitempty,oneof=enabled disabled"`
-	PlatformOnly   *bool     `json:"platform_only"`
 
 	// ProviderConfig is patchable, Provider is not - see updateInput.
 	ProviderConfig *map[string]string `json:"provider_config" validate:"omitzero,max=20"`
