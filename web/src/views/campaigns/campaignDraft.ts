@@ -6,7 +6,12 @@
 // only place a draft becomes a request.
 import type { CampaignPayload } from '../../api/campaigns'
 import type { Campaign, CampaignVariant } from '../../api/types'
-import { type HeaderRow, headerRowsProblem, headersToRows, rowsToHeaders } from '../../composables/headerRows'
+import {
+  type HeaderRow,
+  headerRowsProblem,
+  headersToRows,
+  rowsToHeaders,
+} from '../../composables/headerRows'
 
 /** What the form holds. Strings throughout - it is bound to inputs. */
 export interface CampaignDraft {

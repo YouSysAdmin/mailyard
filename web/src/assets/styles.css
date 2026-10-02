@@ -235,7 +235,8 @@
   /* Loaded in main.ts from @fontsource-variable. A family named here
      must be loaded somewhere, or the stack silently falls through to
      the system font. */
-  --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-sans:
+    'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* The -50 tints are DERIVED, not listed per theme. The light block
@@ -290,8 +291,9 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background var(--transition-slow),
-  color var(--transition-slow);
+  transition:
+    background var(--transition-slow),
+    color var(--transition-slow);
 }
 
 /* --accent-fg, not --primary-500: the ramp value does not reach
@@ -337,10 +339,11 @@ a:not([class]):hover {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--transition),
-  background-color var(--transition),
-  border-color var(--transition),
-  box-shadow var(--transition);
+  transition:
+    color var(--transition),
+    background-color var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
   line-height: 1;
   white-space: nowrap;
   font-family: inherit;
@@ -456,8 +459,9 @@ a:not([class]):hover {
   font-family: inherit;
   color: var(--text-primary);
   background: var(--bg-input);
-  transition: border-color var(--transition),
-  box-shadow var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
   outline: none;
 }
 
@@ -636,8 +640,9 @@ option::checkmark {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: background var(--transition-slow),
-  border-color var(--transition-slow);
+  transition:
+    background var(--transition-slow),
+    border-color var(--transition-slow);
 }
 
 .card-header {
@@ -863,8 +868,9 @@ tbody tr:hover td {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   padding: 16px;
-  transition: background var(--transition-slow),
-  border-color var(--transition-slow);
+  transition:
+    background var(--transition-slow),
+    border-color var(--transition-slow);
 }
 
 .stat-card .stat-header {
@@ -1383,8 +1389,9 @@ input[type='checkbox'] {
   display: inline-grid;
   place-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease,
-  border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 input[type='checkbox']:hover:not(:disabled) {
@@ -1471,9 +1478,10 @@ input[type='checkbox']:checked::before {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-tertiary);
-  transition: color var(--transition),
-  background-color var(--transition),
-  border-color var(--transition);
+  transition:
+    color var(--transition),
+    background-color var(--transition),
+    border-color var(--transition);
   font-family: inherit;
 }
 
