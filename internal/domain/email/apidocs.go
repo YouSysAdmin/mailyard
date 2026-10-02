@@ -19,7 +19,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/emails/send",
-			Tag:        "emails",
 			Permission: "emails:write",
 			Summary:    "Queue one email",
 			Description: "Delivery is asynchronous: the call returns as soon as the " +
@@ -52,7 +51,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/emails/send-template",
-			Tag:        "emails",
 			Permission: "emails:write",
 			Summary:    "Render a stored template and queue the result",
 			Description: "Name the template by `template_id` or `template_name`. " +
@@ -72,7 +70,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/emails/batch",
-			Tag:        "emails",
 			Permission: "emails:write",
 			Summary:    "Queue up to 100 emails in one call",
 			Description: "With a template reference every item renders it against its own " +
@@ -92,7 +89,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/preview",
-			Tag:         "emails",
 			Permission:  "emails:read",
 			Summary:     "Render a template without sending",
 			Description: "Read-only despite being a POST: the body carries the data to render against.",
@@ -105,7 +101,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/emails/verify",
-			Tag:        "emails",
 			Permission: "emails:read",
 			Summary:    "Judge whether an address is worth sending to",
 			Description: "Syntax, disposable-domain, role-account and MX checks, with this " +
@@ -127,7 +122,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/emails",
-			Tag:        "emails",
 			Permission: "emails:read",
 			Summary:    "List sent and queued emails",
 			Description: "Cursor paged, newest first: follow `next_cursor` until it comes back empty. " +
@@ -157,7 +151,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/emails/stats",
-			Tag:        "emails",
 			Permission: "emails:read",
 			Summary:    "Count emails by delivery status",
 			Query:      []apidoc.Param{{Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
@@ -166,7 +159,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/limits",
-			Tag:         "emails",
 			Permission:  "emails:read",
 			Summary:     "What a send may carry on this installation",
 			Description: "For validating client-side before paying for a round trip.",
@@ -175,7 +167,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/emails/:id",
-			Tag:        "emails",
 			Permission: "emails:read",
 			Summary:    "One email with its full delivery record",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
@@ -187,7 +178,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/:id/tracked-links",
-			Tag:         "emails",
 			Permission:  "emails:read",
 			Summary:     "Original destinations behind the click redirects",
 			Description: "Keyed by link hash. Empty when the message was not tracked.",
@@ -200,7 +190,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/:id/status",
-			Tag:         "emails",
 			Permission:  "emails:read",
 			Summary:     "Delivery status only",
 			Description: "The polling endpoint: cheaper than the full record, which carries the bodies.",
@@ -213,7 +202,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/:id/retry",
-			Tag:         "emails",
 			Permission:  "emails:write",
 			Summary:     "Requeue a failed email",
 			Description: "Only a message in a terminal failed state can be retried.",
@@ -227,7 +215,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/:id/cancel",
-			Tag:         "emails",
 			Permission:  "emails:write",
 			Summary:     "Cancel a message that has not gone out",
 			Description: "A scheduled message, or a queued one no worker has claimed yet, becomes `cancelled` and is never sent. Anything a worker holds or has finished is refused, naming its state.",

@@ -12,7 +12,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/unsubscribe-lists",
-			Tag:         "subscribers",
 			Permission:  "suppressions:read",
 			Summary:     "List transactional opt-out scopes",
 			Description: "Pass a list's id as `unsubscribe_list_id` on a send and Mailyard mints the one-click link and filters against that list.",
@@ -21,7 +20,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/unsubscribe-lists/:id",
-			Tag:        "subscribers",
 			Permission: "suppressions:read",
 			Summary:    "One opt-out scope",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},

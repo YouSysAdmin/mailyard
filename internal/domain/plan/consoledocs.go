@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/plans/",
-			Tag:         "plan",
 			Summary:     "List",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/plans/",
-			Tag:         "plan",
 			Summary:     "Create",
 			Description: "Platform admin.",
 			Request:     upsertInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/plans/:id",
-			Tag:         "plan",
 			Summary:     "Delete",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/plans/:id",
-			Tag:         "plan",
 			Summary:     "Update",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -53,7 +49,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/projects/:id/plan",
-			Tag:         "plan",
 			Summary:     "Assign",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -63,7 +58,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/usage",
-			Tag:         "plan",
 			Summary:     "Usage",
 			Description: "Needs the `analytics:read` permission.",
 

@@ -8,7 +8,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/suppressions",
-			Tag:        "suppressions",
 			Permission: "suppressions:read",
 			Summary:    "List blocked addresses",
 			Description: "Cursor paged: follow `next_cursor` until it comes back empty. " +
@@ -30,7 +29,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/suppressions",
-			Tag:        "suppressions",
 			Permission: "suppressions:write",
 			Summary:    "Block an address",
 			Request:    createInput{},
@@ -42,7 +40,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/suppressions/import",
-			Tag:        "suppressions",
 			Permission: "suppressions:write",
 			Summary:    "Block a list of addresses",
 			Description: "Up to a thousand per call, each entry what a single block takes. " +
@@ -58,7 +55,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "DELETE",
 			Path:       "/suppressions",
-			Tag:        "suppressions",
 			Permission: "suppressions:delete",
 			Summary:    "Unblock an address",
 			Description: "The address rides in the query rather than the path: an email address in a path segment is a needless encoding problem. " +

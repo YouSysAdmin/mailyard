@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/contacts/",
-			Tag:         "contact",
 			Summary:     "List",
 			Description: "Needs the `contacts:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/contacts/:id",
-			Tag:         "contact",
 			Summary:     "Get",
 			Description: "Needs the `contacts:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

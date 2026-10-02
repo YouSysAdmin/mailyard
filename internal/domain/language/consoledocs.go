@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/languages/",
-			Tag:         "language",
 			Summary:     "List",
 			Description: "Needs the `templates:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/languages/",
-			Tag:         "language",
 			Summary:     "Create",
 			Description: "Needs the `templates:write` permission.",
 			Request:     upsertInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/languages/:id",
-			Tag:         "language",
 			Summary:     "Delete",
 			Description: "Needs the `templates:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PUT",
 			Path:        "/languages/:id",
-			Tag:         "language",
 			Summary:     "Update",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

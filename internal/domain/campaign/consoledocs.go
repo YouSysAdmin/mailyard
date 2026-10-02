@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/campaigns/",
-			Tag:         "campaign",
 			Summary:     "List",
 			Description: "Needs the `campaigns:read` permission. Newest first, the whole list unless `limit` asks for a page.",
 			Query: []apidoc.Param{
@@ -31,7 +30,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/campaigns/",
-			Tag:         "campaign",
 			Summary:     "Create",
 			Description: "Needs the `campaigns:write` permission.",
 			Request:     upsertInput{},
@@ -40,7 +38,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/campaigns/:id",
-			Tag:         "campaign",
 			Summary:     "Delete",
 			Description: "Needs the `campaigns:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -49,7 +46,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/campaigns/:id",
-			Tag:         "campaign",
 			Summary:     "Get",
 			Description: "Needs the `campaigns:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -58,7 +54,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/campaigns/:id",
-			Tag:         "campaign",
 			Summary:     "Update",
 			Description: "Needs the `campaigns:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -68,7 +63,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/campaigns/:id/analytics",
-			Tag:         "campaign",
 			Summary:     "Analytics",
 			Description: "Needs the `campaigns:read` permission. `from` and `to` bound the daily series, the link tallies are over the campaign's life.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -78,7 +72,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/campaigns/:id/cancel",
-			Tag:         "campaign",
 			Summary:     "Cancel",
 			Description: "Needs the `campaigns:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -87,7 +80,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/campaigns/:id/duplicate",
-			Tag:         "campaign",
 			Summary:     "Duplicate",
 			Description: "Needs the `campaigns:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -96,7 +88,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/campaigns/:id/messages",
-			Tag:         "campaign",
 			Summary:     "Messages",
 			Description: "Needs the `campaigns:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -111,7 +102,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/campaigns/:id/pause",
-			Tag:         "campaign",
 			Summary:     "Pause",
 			Description: "Needs the `campaigns:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -120,7 +110,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/campaigns/:id/preview",
-			Tag:     "campaign",
 			Summary: "Preview",
 			Description: "Renders the campaign for one subscriber, exactly as a send would - " +
 				"variant overrides, the subscriber's language and custom fields included - " +
@@ -135,7 +124,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/campaigns/:id/resume",
-			Tag:         "campaign",
 			Summary:     "Resume",
 			Description: "Needs the `campaigns:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -144,7 +132,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/campaigns/:id/send",
-			Tag:         "campaign",
 			Summary:     "Send",
 			Description: "Needs the `campaigns:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

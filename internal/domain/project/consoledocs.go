@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/invitations/:token/accept",
-			Tag:         "project",
 			Summary:     "Accept invitation",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "token"}},
@@ -26,7 +25,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/invitations/:token/decline",
-			Tag:         "project",
 			Summary:     "Decline invitation",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "token"}},
@@ -35,7 +33,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/permissions",
-			Tag:         "project",
 			Summary:     "Catalog",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", CatalogResponse{})},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/projects/",
-			Tag:         "project",
 			Summary:     "List",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -51,7 +47,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/projects/",
-			Tag:         "project",
 			Summary:     "Create",
 			Description: "Platform administrators, plus any signed-in account when the user_project_creation platform setting is on. It is off by default, so on a fresh installation this answers 403 to everybody else. GET /projects reports the same answer as can_create.",
 			Request:     createInput{},
@@ -60,7 +55,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/projects/:id",
-			Tag:         "project",
 			Summary:     "Delete",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -69,7 +63,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/projects/:id",
-			Tag:         "project",
 			Summary:     "Get",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -78,7 +71,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/projects/:id",
-			Tag:         "project",
 			Summary:     "Update",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -88,7 +80,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/projects/:id/roles",
-			Tag:         "project",
 			Summary:     "List roles",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -97,7 +88,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/projects/:id/roles",
-			Tag:         "project",
 			Summary:     "Create role",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -107,7 +97,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/projects/:id/roles/:roleId",
-			Tag:         "project",
 			Summary:     "Delete role",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "roleId"}},
@@ -116,7 +105,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/projects/:id/roles/:roleId",
-			Tag:         "project",
 			Summary:     "Update role",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "roleId"}},
@@ -126,7 +114,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PUT",
 			Path:        "/projects/:id/default-role",
-			Tag:         "project",
 			Summary:     "Set the default role",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -136,7 +123,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/projects/:id/invitations",
-			Tag:         "project",
 			Summary:     "List invitations",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -145,7 +131,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/projects/:id/invitations",
-			Tag:         "project",
 			Summary:     "Create invitation",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -155,7 +140,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/projects/:id/invitations/:invId",
-			Tag:         "project",
 			Summary:     "Delete invitation",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "invId"}},
@@ -164,7 +148,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/projects/:id/members",
-			Tag:         "project",
 			Summary:     "List members",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -173,7 +156,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/projects/:id/members",
-			Tag:         "project",
 			Summary:     "Add member",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -183,7 +165,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/projects/:id/members/:userId",
-			Tag:         "project",
 			Summary:     "Remove member",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "userId"}},
@@ -192,7 +173,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/projects/:id/members/:userId",
-			Tag:         "project",
 			Summary:     "Update member",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "userId"}},

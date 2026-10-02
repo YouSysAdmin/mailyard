@@ -11,7 +11,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/dashboard/stats",
-			Tag:         "insight",
 			Permission:  "analytics:read",
 			Summary:     "Aggregate counts for a dashboard",
 			Description: "Emails by status, inbound by status, configured resources, and the failure rate over finalized mail only.",
@@ -20,7 +19,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/analytics",
-			Tag:        "insight",
 			Permission: "analytics:read",
 			Summary:    "Daily delivery trend and status breakdown",
 			Description: "The window defaults to the trailing 30 days and may not exceed 366. " +

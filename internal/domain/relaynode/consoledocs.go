@@ -23,7 +23,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/my/relay-nodes/",
-			Tag:         "relaynode",
 			Summary:     "List mine",
 			Description: "Needs the `smtp:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The calling project's nodes.", listOutput{})},
@@ -31,7 +30,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/my/relay-nodes/:id",
-			Tag:         "relaynode",
 			Summary:     "Delete mine",
 			Description: "Needs the `smtp:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -40,7 +38,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/my/relay-nodes/:id/approve",
-			Tag:         "relaynode",
 			Summary:     "Approve mine",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -49,7 +46,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/my/relay-nodes/:id/suspend",
-			Tag:         "relaynode",
 			Summary:     "Suspend mine",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -58,7 +54,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/relay-nodes/",
-			Tag:         "relaynode",
 			Summary:     "List",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("Every enrolled node.", listOutput{})},
@@ -66,7 +61,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "DELETE",
 			Path:    "/relay-nodes/authority",
-			Tag:     "relaynode",
 			Summary: "Destroy the relay authority",
 			Description: "Platform admin. The emergency lever: the private authority that " +
 				"signs every node certificate is destroyed, and every node identity goes " +
@@ -86,7 +80,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/relay-nodes/:id",
-			Tag:         "relaynode",
 			Summary:     "Delete",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -95,7 +88,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/:id/approve",
-			Tag:         "relaynode",
 			Summary:     "Approve",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -104,7 +96,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/:id/suspend",
-			Tag:         "relaynode",
 			Summary:     "Suspend",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -113,7 +104,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/heartbeat",
-			Tag:         "relaynode",
 			Summary:     "Heartbeat",
 			Description: "Authenticated by the node id and control token from enrolment.",
 			Request:     heartbeatInput{},
@@ -122,7 +112,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/relay-nodes/inbound",
-			Tag:     "relaynode",
 			Summary: "Forward a message a node's own MX received",
 			Description: "Authenticated by the node id and control token from enrolment. " +
 				"Platform nodes only. The status field says what happened to the mail " +
@@ -133,7 +122,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/register",
-			Tag:         "relaynode",
 			Summary:     "Register",
 			Description: "Public. Authenticated by the shared enrolment token or a project API key holding relay:write.",
 			Request:     registerInput{},
@@ -142,7 +130,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/renew",
-			Tag:         "relaynode",
 			Summary:     "Renew",
 			Description: "Authenticated by the node id and control token from enrolment.",
 			Request:     renewInput{},
@@ -151,7 +138,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/claim",
-			Tag:         "relaynode",
 			Summary:     "Claim",
 			Description: "Authenticated by the node id and control token from enrolment. A pull node fetching the messages assigned to it - parks until one is or the wait runs out.",
 			Request:     claimInput{},
@@ -160,7 +146,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/relay-nodes/report",
-			Tag:         "relaynode",
 			Summary:     "Report",
 			Description: "Authenticated by the node id and control token from enrolment.",
 			Request:     reportInput{},

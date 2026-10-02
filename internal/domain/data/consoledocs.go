@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/data/export",
-			Tag:         "data",
 			Summary:     "Export data",
 			Description: "Needs the `data:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ExportResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/data/delete-contacts",
-			Tag:         "data",
 			Summary:     "Delete contacts",
 			Description: "Needs the `data:delete` permission.",
 			Request:     deleteContactsInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/data/delete-email-logs",
-			Tag:         "data",
 			Summary:     "Delete email logs",
 			Description: "Needs the `data:delete` permission.",
 			Request:     deleteLogsInput{},

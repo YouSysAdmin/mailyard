@@ -8,7 +8,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/bounces",
-			Tag:         "bounces",
 			Permission:  "bounces:read",
 			Summary:     "List bounce reports",
 			Description: "Cursor paged, newest first. See the suppression list for why there is no total.",
@@ -24,7 +23,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "DELETE",
 			Path:       "/bounces",
-			Tag:        "bounces",
 			Permission: "bounces:delete",
 			Summary:    "Delete the bounce reports for an address",
 			Description: "Removes every report recorded for one recipient, which is what a " +
@@ -44,7 +42,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks/bounce",
-			Tag:        "bounces",
 			Permission: "bounces:write",
 			Summary:    "Ingest a bounce report",
 			Description: "For a feedback loop you run yourself. The report is filed against " +

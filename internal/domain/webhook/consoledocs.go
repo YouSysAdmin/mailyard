@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/webhooks/",
-			Tag:         "webhook",
 			Summary:     "List",
 			Description: "Needs the `webhooks:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/webhooks/",
-			Tag:         "webhook",
 			Summary:     "Create",
 			Description: "Needs the `webhooks:write` permission.",
 			Request:     createInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/webhooks/:id",
-			Tag:         "webhook",
 			Summary:     "Get",
 			Description: "Needs the `webhooks:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/webhooks/:id",
-			Tag:         "webhook",
 			Summary:     "Update",
 			Description: "Needs the `webhooks:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -53,7 +49,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/webhooks/:id",
-			Tag:         "webhook",
 			Summary:     "Delete",
 			Description: "Needs the `webhooks:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -62,7 +57,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/webhooks/:id/disable",
-			Tag:         "webhook",
 			Summary:     "Disable",
 			Description: "Needs the `webhooks:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -72,7 +66,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/webhooks/:id/test",
-			Tag:         "webhook",
 			Summary:     "Test",
 			Description: "Needs the `webhooks:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -81,7 +74,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/webhooks/:id/deliveries",
-			Tag:         "webhook",
 			Summary:     "Deliveries",
 			Description: "Needs the `webhooks:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -96,7 +88,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/webhooks/:id/deliveries/:deliveryId/redeliver",
-			Tag:         "webhook",
 			Summary:     "Redeliver",
 			Description: "Needs the `webhooks:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "deliveryId"}},

@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/",
-			Tag:         "template",
 			Summary:     "List",
 			Description: "Needs the `templates:read` permission. By name, the whole list unless `limit` asks for a page.",
 			Query: []apidoc.Param{
@@ -30,7 +29,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/",
-			Tag:         "template",
 			Summary:     "Create",
 			Description: "Needs the `templates:write` permission.",
 			Request:     createInput{},
@@ -39,7 +37,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/templates/:id",
-			Tag:         "template",
 			Summary:     "Delete",
 			Description: "Needs the `templates:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -48,7 +45,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id",
-			Tag:         "template",
 			Summary:     "Get",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -57,7 +53,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/templates/:id",
-			Tag:         "template",
 			Summary:     "Update",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -67,7 +62,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/:id/activate/:versionId",
-			Tag:         "template",
 			Summary:     "Activate",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "versionId"}},
@@ -76,7 +70,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id/attachments",
-			Tag:         "template",
 			Summary:     "List attachments",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -85,7 +78,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/:id/attachments",
-			Tag:         "template",
 			Summary:     "Upload attachment",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -95,7 +87,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/templates/:id/attachments/:attId",
-			Tag:         "template",
 			Summary:     "Delete attachment",
 			Description: "Needs the `templates:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "attId"}},
@@ -104,7 +95,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id/attachments/:attId/download",
-			Tag:         "template",
 			Summary:     "Download attachment",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "attId"}},
@@ -113,7 +103,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id/export",
-			Tag:         "template",
 			Summary:     "Export",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -122,7 +111,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/templates/:id/localizations/:localizationId",
-			Tag:         "template",
 			Summary:     "Delete localization",
 			Description: "Needs the `templates:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "localizationId"}},
@@ -131,7 +119,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id/versions",
-			Tag:         "template",
 			Summary:     "List versions",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -140,7 +127,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/:id/versions",
-			Tag:         "template",
 			Summary:     "Create version",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -150,7 +136,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/templates/:id/versions/:versionId",
-			Tag:         "template",
 			Summary:     "Delete version",
 			Description: "Needs the `templates:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "versionId"}},
@@ -159,7 +144,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/templates/:id/versions/:versionId",
-			Tag:         "template",
 			Summary:     "Update version",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "versionId"}},
@@ -169,7 +153,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id/versions/:versionId/localizations",
-			Tag:         "template",
 			Summary:     "List localizations",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "versionId"}},
@@ -178,7 +161,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PUT",
 			Path:        "/templates/:id/versions/:versionId/localizations",
-			Tag:         "template",
 			Summary:     "Put localization",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "versionId"}},
@@ -188,7 +170,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/:id/versions/:versionId/preview",
-			Tag:         "template",
 			Summary:     "Preview version",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "versionId"}},
@@ -198,7 +179,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/import",
-			Tag:         "template",
 			Summary:     "Import",
 			Description: "Needs the `templates:write` permission.",
 			Request:     transferDoc{},
@@ -207,7 +187,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/preview",
-			Tag:         "template",
 			Summary:     "Preview",
 			Description: "Needs the `templates:read` permission.",
 			Request:     previewInput{},

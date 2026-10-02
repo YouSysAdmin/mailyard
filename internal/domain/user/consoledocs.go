@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/users/",
-			Tag:         "user",
 			Summary:     "List",
 			Description: "Platform admin. Oldest first, the whole list unless `limit` asks for a page.",
 			Query: []apidoc.Param{
@@ -33,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/users/",
-			Tag:         "user",
 			Summary:     "Create",
 			Description: "Platform admin.",
 			Request:     createInput{},
@@ -42,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/users/:id",
-			Tag:         "user",
 			Summary:     "Delete",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -51,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/users/:id",
-			Tag:         "user",
 			Summary:     "Get",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -60,7 +56,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/users/:id",
-			Tag:         "user",
 			Summary:     "Update",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -70,7 +65,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/users/:id/2fa",
-			Tag:         "user",
 			Summary:     "Reset t o t p",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -79,7 +73,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/users/:id/passkeys",
-			Tag:         "user",
 			Summary:     "Reset passkeys",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -88,7 +81,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/users/:id/projects",
-			Tag:         "user",
 			Summary:     "Projects",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -97,7 +89,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/users/:id/revoke-sessions",
-			Tag:         "user",
 			Summary:     "Revoke sessions",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

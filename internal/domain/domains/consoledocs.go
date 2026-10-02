@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/domains/",
-			Tag:         "domains",
 			Summary:     "List",
 			Description: "Needs the `domains:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/domains/",
-			Tag:         "domains",
 			Summary:     "Create",
 			Description: "Needs the `domains:write` permission.",
 			Request:     createInput{},
@@ -35,7 +33,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/domains/:id",
-			Tag:         "domains",
 			Summary:     "Delete",
 			Description: "Needs the `domains:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -44,7 +41,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/domains/:id",
-			Tag:         "domains",
 			Summary:     "Get",
 			Description: "Needs the `domains:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -53,7 +49,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/domains/:id/verify",
-			Tag:         "domains",
 			Summary:     "Verify",
 			Description: "Needs the `domains:write` permission. Re-checks every DNS record, and completes a pending DKIM rotation once the new record is published.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -62,7 +57,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/domains/:id/dkim/rotate",
-			Tag:         "domains",
 			Summary:     "Rotate DKIM key",
 			Description: "Needs the `domains:write` permission. Mints the next signing key under the other selector. Signing stays on the current key until verify sees the new record published.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -71,7 +65,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/domains/:id/dkim/rotate",
-			Tag:         "domains",
 			Summary:     "Cancel DKIM rotation",
 			Description: "Needs the `domains:write` permission. Discards a pending key, the current one is untouched.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

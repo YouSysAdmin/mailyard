@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscriber-lists/",
-			Tag:         "subscriberlist",
 			Summary:     "List",
 			Description: "Needs the `subscribers:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscriber-lists/",
-			Tag:         "subscriberlist",
 			Summary:     "Create",
 			Description: "Needs the `subscribers:write` permission.",
 			Request:     upsertInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/subscriber-lists/:id",
-			Tag:         "subscriberlist",
 			Summary:     "Delete",
 			Description: "Needs the `subscribers:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscriber-lists/:id",
-			Tag:         "subscriberlist",
 			Summary:     "Get",
 			Description: "Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/subscriber-lists/:id",
-			Tag:         "subscriberlist",
 			Summary:     "Update",
 			Description: "Needs the `subscribers:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -62,7 +57,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscriber-lists/:id/members",
-			Tag:         "subscriberlist",
 			Summary:     "List members",
 			Description: "Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -72,7 +66,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscriber-lists/:id/members",
-			Tag:         "subscriberlist",
 			Summary:     "Add member",
 			Description: "Needs the `subscribers:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -82,7 +75,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/subscriber-lists/:id/members/:subscriberId",
-			Tag:         "subscriberlist",
 			Summary:     "Remove member",
 			Description: "Needs the `subscribers:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "subscriberId"}},
@@ -91,7 +83,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscriber-lists/:id/opt-outs",
-			Tag:         "subscriberlist",
 			Summary:     "Opt-outs",
 			Description: "Everyone who opted out of the list, newest first, member or not - a dynamic list has opt-outs and no members. Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -101,7 +92,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscriber-lists/:id/resubscribe",
-			Tag:         "subscriberlist",
 			Summary:     "Resubscribe by email",
 			Description: "Needs the `subscribers:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -111,7 +101,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscriber-lists/:id/unsubscribe",
-			Tag:         "subscriberlist",
 			Summary:     "Unsubscribe by email",
 			Description: "Needs the `subscribers:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -121,7 +110,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscriber-lists/preview-segment",
-			Tag:         "subscriberlist",
 			Summary:     "Preview segment",
 			Description: "Needs the `subscribers:read` permission.",
 			Request:     previewInput{},

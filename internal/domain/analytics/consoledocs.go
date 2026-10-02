@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/analytics",
-			Tag:         "analytics",
 			Summary:     "Analytics",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", TrendResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/dashboard/stats",
-			Tag:         "analytics",
 			Summary:     "Dashboard stats",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatsResponse{})},

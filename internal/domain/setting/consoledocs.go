@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/jobs",
-			Tag:         "setting",
 			Summary:     "Jobs",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", JobsResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/jobs/:name/run",
-			Tag:         "setting",
 			Summary:     "Run job",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "name"}},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/settings",
-			Tag:         "setting",
 			Summary:     "List",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -42,7 +39,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PUT",
 			Path:        "/settings",
-			Tag:         "setting",
 			Summary:     "Update",
 			Description: "Platform admin.",
 			Request:     updateInput{},

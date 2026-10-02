@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/shared-smtp-servers/",
-			Tag:         "smtpserver",
 			Summary:     "List",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", SharedListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/shared-smtp-servers/",
-			Tag:         "smtpserver",
 			Summary:     "Create",
 			Description: "Platform admin.",
 			Request:     sharedCreateInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/shared-smtp-servers/:id",
-			Tag:         "smtpserver",
 			Summary:     "Delete",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/shared-smtp-servers/:id",
-			Tag:         "smtpserver",
 			Summary:     "Get",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/shared-smtp-servers/:id",
-			Tag:         "smtpserver",
 			Summary:     "Update",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -62,7 +57,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/shared-smtp-servers/:id/test",
-			Tag:         "smtpserver",
 			Summary:     "Test",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -71,7 +65,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/smtp-server-groups/",
-			Tag:         "smtpserver",
 			Summary:     "List",
 			Description: "Needs the `smtp:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", GroupListResponse{})},
@@ -79,7 +72,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/smtp-server-groups/",
-			Tag:         "smtpserver",
 			Summary:     "Create",
 			Description: "Needs the `smtp:write` permission.",
 			Request:     groupCreateInput{},
@@ -88,7 +80,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/smtp-server-groups/:id",
-			Tag:         "smtpserver",
 			Summary:     "Delete",
 			Description: "Needs the `smtp:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -97,7 +88,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/smtp-server-groups/:id",
-			Tag:         "smtpserver",
 			Summary:     "Get",
 			Description: "Needs the `smtp:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -106,7 +96,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/smtp-server-groups/:id",
-			Tag:         "smtpserver",
 			Summary:     "Update",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -116,7 +105,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/smtp-servers/",
-			Tag:         "smtpserver",
 			Summary:     "List",
 			Description: "Needs the `smtp:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -124,7 +112,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/smtp-servers/",
-			Tag:         "smtpserver",
 			Summary:     "Create",
 			Description: "Needs the `smtp:write` permission.",
 			Request:     createInput{},
@@ -133,7 +120,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/smtp-servers/:id",
-			Tag:         "smtpserver",
 			Summary:     "Delete",
 			Description: "Needs the `smtp:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -142,7 +128,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/smtp-servers/:id",
-			Tag:         "smtpserver",
 			Summary:     "Get",
 			Description: "Needs the `smtp:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -151,7 +136,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/smtp-servers/:id",
-			Tag:         "smtpserver",
 			Summary:     "Update",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -161,7 +145,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/smtp-servers/:id/disable",
-			Tag:         "smtpserver",
 			Summary:     "Disable",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -170,7 +153,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/smtp-servers/:id/enable",
-			Tag:         "smtpserver",
 			Summary:     "Enable",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -179,7 +161,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/smtp-servers/:id/test",
-			Tag:         "smtpserver",
 			Summary:     "Test",
 			Description: "Needs the `smtp:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

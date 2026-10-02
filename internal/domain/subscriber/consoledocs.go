@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscribers/",
-			Tag:         "subscriber",
 			Summary:     "List",
 			Description: "Needs the `subscribers:read` permission.",
 			Query: []apidoc.Param{
@@ -36,7 +35,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscribers/",
-			Tag:         "subscriber",
 			Summary:     "Create",
 			Description: "Needs the `subscribers:write` permission.",
 			Request:     upsertInput{},
@@ -45,7 +43,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/subscribers/:id",
-			Tag:         "subscriber",
 			Summary:     "Delete",
 			Description: "Needs the `subscribers:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -54,7 +51,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscribers/:id",
-			Tag:         "subscriber",
 			Summary:     "Get",
 			Description: "Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -63,7 +59,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/subscribers/:id",
-			Tag:         "subscriber",
 			Summary:     "Update",
 			Description: "Needs the `subscribers:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -73,7 +68,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/subscribers/:id/lists",
-			Tag:         "subscriber",
 			Summary:     "Lists",
 			Description: "The static lists the subscriber is on. Needs the `subscribers:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -82,7 +76,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/subscribers/import",
-			Tag:         "subscriber",
 			Summary:     "Import",
 			Description: "Needs the `subscribers:write` permission.",
 			Request:     importInput{},
@@ -91,7 +84,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/subscribers/import/csv",
-			Tag:     "subscriber",
 			Summary: "Import CSV",
 			Description: "Upserts subscribers from a CSV posted as the raw request body - " +
 				"there is no multipart form and no column-mapping parameter. The header " +

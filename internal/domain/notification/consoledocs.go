@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/notifications/",
-			Tag:         "notification",
 			Summary:     "List",
 			Description: "Needs the `notifications:read` permission.",
 			Query: []apidoc.Param{
@@ -30,7 +29,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/notifications/:id",
-			Tag:         "notification",
 			Summary:     "Delete",
 			Description: "Needs the `notifications:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -39,7 +37,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/notifications/:id/read",
-			Tag:         "notification",
 			Summary:     "Mark read",
 			Description: "Needs the `notifications:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -48,7 +45,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/notifications/read-all",
-			Tag:         "notification",
 			Summary:     "Mark all read",
 			Description: "Needs the `notifications:write` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", MarkedResponse{})},
@@ -56,7 +52,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/notifications/unread",
-			Tag:         "notification",
 			Summary:     "Unread",
 			Description: "Needs the `notifications:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", UnreadResponse{})},

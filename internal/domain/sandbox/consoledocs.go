@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/",
-			Tag:         "sandbox",
 			Summary:     "List",
 			Description: "Needs the `sandbox:read` permission.",
 			Query: []apidoc.Param{
@@ -40,7 +39,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/sandbox/:id",
-			Tag:         "sandbox",
 			Summary:     "Delete",
 			Description: "Needs the `sandbox:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -49,7 +47,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/:id",
-			Tag:         "sandbox",
 			Summary:     "Get",
 			Description: "Needs the `sandbox:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -58,7 +55,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/:id/attachments/:idx",
-			Tag:         "sandbox",
 			Summary:     "Attachment",
 			Description: "Needs the `sandbox:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "idx"}},
@@ -67,7 +63,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/:id/eml",
-			Tag:         "sandbox",
 			Summary:     "EML",
 			Description: "Needs the `sandbox:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -76,7 +71,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/:id/raw",
-			Tag:         "sandbox",
 			Summary:     "Raw",
 			Description: "Needs the `sandbox:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -85,7 +79,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/sandbox/clear",
-			Tag:         "sandbox",
 			Summary:     "Clear",
 			Description: "Needs the `sandbox:delete` permission. Without a body, or with nothing set, every capture in the project is removed. `senders` keeps it to captures whose envelope sender is one of those addresses - an inbox's `addresses` list, for instance - and `recipients` to captures addressed to any of those. `older_than` removes only what was received before that date (2026-08-01) or RFC 3339 instant. Set together, a capture must satisfy all of them.",
 			Request:     clearInput{},
@@ -94,7 +87,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/credentials",
-			Tag:         "sandbox",
 			Summary:     "List credentials",
 			Description: "Needs the `sandbox:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", CredentialListResponse{})},
@@ -102,7 +94,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/sandbox/credentials",
-			Tag:         "sandbox",
 			Summary:     "Create credential",
 			Description: "Needs the `sandbox:write` permission.",
 			Request:     credentialInput{},
@@ -111,7 +102,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/sandbox/credentials/:id/revoke",
-			Tag:         "sandbox",
 			Summary:     "Revoke credential",
 			Description: "Needs the `sandbox:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -120,7 +110,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/credentials/:id",
-			Tag:         "sandbox",
 			Summary:     "Get credential",
 			Description: "Needs the `sandbox:read` permission. A live credential answers 404 here, the same as a missing one.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -129,7 +118,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/sandbox/credentials/:id",
-			Tag:         "sandbox",
 			Summary:     "Rename credential",
 			Description: "Needs the `sandbox:write` permission. The name is the one thing about a sandbox credential that is not minted.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -139,7 +127,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/inboxes",
-			Tag:         "sandbox",
 			Summary:     "List inboxes",
 			Description: "Needs the `sandbox:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", InboxListResponse{})},
@@ -147,7 +134,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/sandbox/inboxes",
-			Tag:         "sandbox",
 			Summary:     "Create inbox",
 			Description: "Needs the `sandbox:write` permission.",
 			Request:     inboxCreateInput{},
@@ -156,7 +142,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/sandbox/inboxes/:id",
-			Tag:         "sandbox",
 			Summary:     "Delete inbox",
 			Description: "Needs the `sandbox:delete` permission. No captured mail is removed.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -165,7 +150,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/inboxes/:id",
-			Tag:         "sandbox",
 			Summary:     "Get inbox",
 			Description: "Needs the `sandbox:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -174,7 +158,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/sandbox/inboxes/:id",
-			Tag:         "sandbox",
 			Summary:     "Update inbox",
 			Description: "Needs the `sandbox:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -184,7 +167,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/sandbox/info",
-			Tag:         "sandbox",
 			Summary:     "Info",
 			Description: "Needs the `sandbox:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", SettingsResponse{})},

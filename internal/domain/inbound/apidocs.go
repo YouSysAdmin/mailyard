@@ -12,7 +12,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails",
-			Tag:         "inbound",
 			Permission:  "inbound:read",
 			Summary:     "List mail received by the MX listener",
 			Description: "Cursor paged, newest first: follow `next_cursor` until it comes back empty.",
@@ -30,7 +29,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/inbound-emails/stats",
-			Tag:        "inbound",
 			Permission: "inbound:read",
 			Summary:    "Count received mail by status",
 			Query:      []apidoc.Param{{Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
@@ -39,7 +37,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails/:id",
-			Tag:         "inbound",
 			Permission:  "inbound:read",
 			Summary:     "One received message",
 			Description: "`auth` carries the SPF, DKIM and DMARC verdicts stamped at ingest. `aligned` is the field worth acting on - a valid signature from some other domain is not authentication.",

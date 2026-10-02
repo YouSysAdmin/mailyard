@@ -73,7 +73,7 @@ that one unless you specifically need what is above.`
 //
 // Assembled from each domain's generated ConsoleDocs, which is what
 // TestEveryConsoleRouteIsDocumented compares against routes.go.
-func ConsoleRoutes() []apidoc.Route { return consoleDocs() }
+func ConsoleRoutes() []apidoc.Route { return tagged(consoleDocs()) }
 
 // allConsoleDocs is every generated entry, still carrying the path
 // relative to its mount. surfaces.go decides where each one lives.

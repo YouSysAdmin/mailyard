@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/smtp-credentials/",
-			Tag:         "smtpcredential",
 			Summary:     "List",
 			Description: "Needs the `apikeys:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/smtp-credentials/",
-			Tag:     "smtpcredential",
 			Summary: "Create",
 			Description: "Needs the `apikeys:write` permission, and `emails:write` as well " +
 				"unless `sandbox` is true - a credential that sends real mail cannot be " +
@@ -36,7 +34,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/smtp-credentials/:id",
-			Tag:         "smtpcredential",
 			Summary:     "Get",
 			Description: "Needs the `apikeys:read` permission. The username and never the password, like the list.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -45,7 +42,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/smtp-credentials/:id",
-			Tag:         "smtpcredential",
 			Summary:     "Update",
 			Description: "Needs the `apikeys:write` permission. `name`, `allowed_ips` and `smtp_group`, each only when sent - `allowed_ips: []` lifts the restriction and `smtp_group: \"none\"` puts the credential back on the default group. The password and the sandbox flag are not editable.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -55,7 +51,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/smtp-credentials/:id",
-			Tag:         "smtpcredential",
 			Summary:     "Delete",
 			Description: "Needs the `apikeys:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -64,7 +59,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/smtp-credentials/:id/revoke",
-			Tag:         "smtpcredential",
 			Summary:     "Revoke",
 			Description: "Needs the `apikeys:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

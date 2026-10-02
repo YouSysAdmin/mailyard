@@ -10,7 +10,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/webhooks",
-			Tag:        "webhooks",
 			Permission: "webhooks:read",
 			Summary:    "List outgoing webhooks",
 			Responses:  []apidoc.Response{apidoc.OK("Every webhook in the project.", ListResponse{})},
@@ -18,7 +17,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Create an outgoing webhook",
 			Description: "The response carries the signing secret, which appears there and " +
@@ -33,7 +31,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/webhooks/:id",
-			Tag:        "webhooks",
 			Permission: "webhooks:read",
 			Summary:    "One webhook",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
@@ -42,7 +39,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "PATCH",
 			Path:       "/webhooks/:id",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Change a webhook",
 			Description: "Each of `url`, `events` and `filters` is changed only when sent. " +
@@ -60,7 +56,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks/:id/disable",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Take a webhook out of rotation",
 			Description: "Nothing is delivered to it until it is enabled again. The optional " +
@@ -77,7 +72,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks/:id/test",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Post a test event now",
 			Description: "One signed delivery of a `webhook.test` event, made during this " +
@@ -93,7 +87,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks/:id/rotate-secret",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Rotate a webhook's signing secret",
 			Description: "Mints a fresh secret and returns it once, the way creating the webhook did. " +
@@ -108,7 +101,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "DELETE",
 			Path:       "/webhooks/:id",
-			Tag:        "webhooks",
 			Permission: "webhooks:delete",
 			Summary:    "Delete a webhook",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
@@ -117,7 +109,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks/:id/enable",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Re-enable a disabled webhook",
 			Description: "A webhook whose deliveries fail on every attempt is disabled and the " +
@@ -132,7 +123,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/webhooks/:id/deliveries",
-			Tag:        "webhooks",
 			Permission: "webhooks:read",
 			Summary:    "Delivery log of one webhook",
 			Description: "Cursor paged. The log belongs to one webhook, so its id is part of the path. " +
@@ -152,7 +142,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "POST",
 			Path:       "/webhooks/:id/deliveries/:deliveryId/redeliver",
-			Tag:        "webhooks",
 			Permission: "webhooks:write",
 			Summary:    "Send one delivery again",
 			Description: "Posts the body that attempt sent, again, now, as a new attempt in the " +

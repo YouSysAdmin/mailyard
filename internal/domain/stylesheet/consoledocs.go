@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/stylesheets/",
-			Tag:         "stylesheet",
 			Summary:     "List",
 			Description: "Needs the `templates:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/stylesheets/",
-			Tag:         "stylesheet",
 			Summary:     "Create",
 			Description: "Needs the `templates:write` permission.",
 			Request:     upsertInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/stylesheets/:id",
-			Tag:         "stylesheet",
 			Summary:     "Delete",
 			Description: "Needs the `templates:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/stylesheets/:id",
-			Tag:         "stylesheet",
 			Summary:     "Get",
 			Description: "Needs the `templates:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PUT",
 			Path:        "/stylesheets/:id",
-			Tag:         "stylesheet",
 			Summary:     "Update",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

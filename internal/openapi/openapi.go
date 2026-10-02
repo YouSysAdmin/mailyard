@@ -80,7 +80,7 @@ the outcome.`
 // domain missing from it fails the build rather than shipping an
 // undocumented surface.
 func Routes() []apidoc.Route {
-	return mergeDocs(handWrittenDocs(), productDocs())
+	return tagged(mergeDocs(handWrittenDocs(), productDocs()))
 }
 
 func handWrittenDocs() []apidoc.Route {

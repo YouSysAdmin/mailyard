@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/2fa/disable",
-			Tag:         "auth",
 			Summary:     "T o t p disable",
 			Description: "Any signed-in member.",
 			Request:     totpCodeInput{},
@@ -26,7 +25,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/2fa/enable",
-			Tag:         "auth",
 			Summary:     "Turn two-factor auth on",
 			Description: "Any signed-in member. The response carries the recovery codes, shown here and never again.",
 			Request:     totpCodeInput{},
@@ -35,7 +33,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/2fa/recovery-codes",
-			Tag:         "auth",
 			Summary:     "Count the unspent recovery codes",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", RecoveryCodesStatusResponse{})},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/2fa/recovery-codes",
-			Tag:         "auth",
 			Summary:     "Generate a fresh set of recovery codes",
 			Description: "Any signed-in member, proving the password. Voids the previous set. Shown once.",
 			Request:     passkeyReauthInput{},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/2fa/setup",
-			Tag:         "auth",
 			Summary:     "T o t p setup",
 			Description: "Any signed-in member, proving the password.",
 			Request:     totpSetupInput{},
@@ -61,7 +56,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/info",
-			Tag:         "auth",
 			Summary:     "Info",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", AuthDisabledResponse{}), apidoc.OK("The result.", AuthInfoResponse{})},
@@ -69,7 +63,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/login",
-			Tag:         "auth",
 			Summary:     "Login",
 			Description: "Any signed-in member.",
 			Request:     loginInput{},
@@ -78,7 +71,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/logout",
-			Tag:         "auth",
 			Summary:     "Logout",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.NoContent},
@@ -86,7 +78,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/me",
-			Tag:         "auth",
 			Summary:     "Me",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", AuthDisabledResponse{}), apidoc.OK("The result.", UserResponse{})},
@@ -94,7 +85,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/oauth/:slug/callback",
-			Tag:         "auth",
 			Summary:     "O auth callback",
 			Description: "The provider's redirect back, carrying either a code or an error.",
 			PathParams:  []apidoc.Param{{Name: "slug"}},
@@ -109,7 +99,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/oauth/:slug/start",
-			Tag:         "auth",
 			Summary:     "O auth start",
 			Description: "Begins the sign-in with this provider.",
 			PathParams:  []apidoc.Param{{Name: "slug"}},
@@ -121,7 +110,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/passkey/login/begin",
-			Tag:         "auth",
 			Summary:     "Passkey login begin",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("WebAuthn assertion options, passed to the browser unchanged.", PasskeyChallengeResponse{})},
@@ -129,7 +117,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/passkey/login/finish",
-			Tag:         "auth",
 			Summary:     "Passkey login finish",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", UserResponse{})},
@@ -137,7 +124,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/passkeys",
-			Tag:         "auth",
 			Summary:     "Passkey list",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", PasskeyListResponse{})},
@@ -145,7 +131,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/auth/passkeys/:id",
-			Tag:         "auth",
 			Summary:     "Passkey rename",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -155,7 +140,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/passkeys/:id/delete",
-			Tag:         "auth",
 			Summary:     "Passkey delete",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -165,7 +149,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/passkeys/register/begin",
-			Tag:         "auth",
 			Summary:     "Passkey register begin",
 			Description: "Any signed-in member.",
 			Request:     passkeyReauthInput{},
@@ -174,7 +157,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/passkeys/register/finish",
-			Tag:         "auth",
 			Summary:     "Passkey register finish",
 			Description: "Any signed-in member.",
 			Query: []apidoc.Param{
@@ -185,7 +167,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/password",
-			Tag:         "auth",
 			Summary:     "Change your own password",
 			Description: "Any signed-in member with a local account.",
 			Request:     changePasswordInput{},
@@ -194,7 +175,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/password-reset/confirm",
-			Tag:         "auth",
 			Summary:     "Password reset confirm",
 			Description: "Any signed-in member.",
 			Request:     resetConfirmInput{},
@@ -203,7 +183,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/password-reset/request",
-			Tag:         "auth",
 			Summary:     "Password reset request",
 			Description: "Any signed-in member.",
 			Request:     resetRequestInput{},
@@ -212,7 +191,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/register",
-			Tag:         "auth",
 			Summary:     "Register",
 			Description: "Any signed-in member.",
 			Request:     registerInput{},
@@ -221,7 +199,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/auth/sessions",
-			Tag:         "auth",
 			Summary:     "List sessions",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", SessionListResponse{})},
@@ -229,7 +206,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/auth/sessions/:id",
-			Tag:         "auth",
 			Summary:     "Revoke session",
 			Description: "Any signed-in member.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -238,7 +214,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/sessions/revoke-others",
-			Tag:         "auth",
 			Summary:     "Revoke other sessions",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", RevokedResponse{})},
@@ -246,7 +221,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/verify-email",
-			Tag:         "auth",
 			Summary:     "Verify email confirm",
 			Description: "Any signed-in member.",
 			Request:     verifyConfirmInput{},
@@ -255,7 +229,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/auth/verify-email/resend",
-			Tag:         "auth",
 			Summary:     "Verify email resend",
 			Description: "Any signed-in member.",
 			Request:     verifyResendInput{},
@@ -264,7 +237,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/system-mail",
-			Tag:         "auth",
 			Summary:     "System mail status",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", SystemMailStatusResponse{})},
@@ -272,7 +244,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/system-mail/test",
-			Tag:         "auth",
 			Summary:     "System mail test",
 			Description: "Platform admin.",
 			Request:     systemMailTestInput{},

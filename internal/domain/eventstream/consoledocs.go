@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/events/stats",
-			Tag:         "eventstream",
 			Summary:     "Stats",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatsResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/events/stream",
-			Tag:         "eventstream",
 			Summary:     "Stream",
 			Description: "Any signed-in member.",
 			Responses:   []apidoc.Response{apidoc.EventStream("An open stream of project events.")},

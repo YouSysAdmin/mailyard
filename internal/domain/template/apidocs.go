@@ -10,7 +10,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates",
-			Tag:         "templates",
 			Permission:  "templates:read",
 			Summary:     "List templates",
 			Description: "By name. The whole list unless `limit` asks for a page, and `total` counts what `q` matches either way.",
@@ -24,7 +23,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/templates/:id",
-			Tag:         "templates",
 			Permission:  "templates:read",
 			Summary:     "One template with its version history",
 			Description: "The versions come along so a caller can pick one without a second call.",

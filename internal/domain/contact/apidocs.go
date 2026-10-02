@@ -12,7 +12,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/contacts",
-			Tag:        "insight",
 			Permission: "contacts:read",
 			Summary:    "Addresses this project has delivered to",
 			Description: "Offset paged with a total, unlike the message logs: this list is " +
@@ -30,7 +29,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/contacts/:id",
-			Tag:        "insight",
 			Permission: "contacts:read",
 			Summary:    "One contact",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
@@ -39,7 +37,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "DELETE",
 			Path:       "/contacts/:id",
-			Tag:        "insight",
 			Permission: "contacts:delete",
 			Summary:    "Delete one contact",
 			Description: "Removes the record and its tallies. The next delivery to the address " +
@@ -51,7 +48,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "DELETE",
 			Path:       "/contacts",
-			Tag:        "insight",
 			Permission: "contacts:delete",
 			Summary:    "Delete contacts idle since a date",
 			Description: "Removes every contact whose last activity - the later of its last " +

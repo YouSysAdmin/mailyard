@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/",
-			Tag:         "email",
 			Summary:     "List",
 			Description: "Needs the `emails:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/:id",
-			Tag:         "email",
 			Summary:     "Get",
 			Description: "Needs the `emails:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/:id/eml",
-			Tag:         "email",
 			Summary:     "EML",
 			Description: "Needs the `emails:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/:id/attachments/:idx",
-			Tag:         "email",
 			Summary:     "Attachment",
 			Description: "Needs the `emails:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "idx"}},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/:id/retry",
-			Tag:         "email",
 			Summary:     "Retry",
 			Description: "Needs the `emails:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -61,7 +56,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/:id/cancel",
-			Tag:         "email",
 			Summary:     "Cancel",
 			Description: "Needs the `emails:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -70,7 +64,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/:id/status",
-			Tag:         "email",
 			Summary:     "Status",
 			Description: "Needs the `emails:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -79,7 +72,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/batch",
-			Tag:         "email",
 			Summary:     "Batch",
 			Description: "Needs the `emails:write` permission.",
 			Request:     batchInput{},
@@ -88,7 +80,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/limits",
-			Tag:         "email",
 			Summary:     "Limits",
 			Description: "Needs the `emails:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", LimitsResponse{})},
@@ -96,7 +87,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/preview",
-			Tag:         "email",
 			Summary:     "Render preview",
 			Description: "Needs the `emails:read` permission.",
 			Request:     renderPreviewInput{},
@@ -105,7 +95,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/send",
-			Tag:         "email",
 			Summary:     "Send",
 			Description: "Needs the `emails:write` permission.",
 			Request:     sendInput{},
@@ -114,7 +103,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/send-template",
-			Tag:         "email",
 			Summary:     "Send template",
 			Description: "Needs the `emails:write` permission.",
 			Request:     templateSendInput{},
@@ -123,7 +111,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/emails/stats",
-			Tag:         "email",
 			Summary:     "Stats",
 			Description: "Needs the `emails:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatsResponse{})},
@@ -131,7 +118,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/emails/verify",
-			Tag:         "email",
 			Summary:     "Verify",
 			Description: "Needs the `emails:read` permission.",
 			Request:     verifyInput{},
@@ -140,7 +126,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/templates/:id/send-test",
-			Tag:         "email",
 			Summary:     "Send test",
 			Description: "Needs the `templates:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

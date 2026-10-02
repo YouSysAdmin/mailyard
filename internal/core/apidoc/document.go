@@ -23,7 +23,10 @@ type Route struct {
 	// compared to routes.go verbatim.
 	Path string
 
-	Tag         string
+	// Tag is the heading the route is filed under. Set by the caller
+	// assembling a document, from the path, never beside a handler.
+	Tag string
+
 	Summary     string
 	Description string
 

@@ -315,3 +315,71 @@ func TestDocumentedPathParametersUseTheRouterForm(t *testing.T) {
 			len(findings), strings.Join(findings, "\n  "))
 	}
 }
+
+// TestOnePathOneTag keeps a resource under one heading in the document.
+//
+// A tag is what a reader of the rendered document browses by, and it
+// is derived from the path in internal/openapi. Routes sharing a first
+// path segment share a tag, under /admin the second segment decides,
+// and every tag is spelled the way the paths are.
+func TestOnePathOneTag(t *testing.T) {
+	// elsewhere is a route filed under another resource on purpose.
+	elsewhere := map[string]string{
+		"POST /webhooks/bounce": "bounces",
+	}
+
+	routes := append(openapi.Routes(), openapi.ConsoleRoutes()...)
+	tags := map[string]map[string][]string{}
+	for _, r := range routes {
+		key := r.Method + " " + apidoc.NormalizePath(r.Path)
+		if r.Tag == "" {
+			t.Errorf("%s has no tag", key)
+
+			continue
+		}
+
+		if strings.Trim(r.Tag, "abcdefghijklmnopqrstuvwxyz-/") != "" {
+			t.Errorf("%s is tagged %q, which is not spelled like a path", key, r.Tag)
+		}
+
+		if want, ok := elsewhere[key]; ok {
+			if r.Tag != want {
+				t.Errorf("%s is tagged %q, want %q", key, r.Tag, want)
+			}
+
+			continue
+		}
+
+		path := strings.TrimPrefix(strings.TrimPrefix(r.Path, env.ConsolePath), "/api/")
+		segs := strings.Split(strings.Trim(path, "/"), "/")
+		family := segs[0]
+		if family == "admin" && len(segs) > 1 {
+			family += "/" + segs[1]
+		}
+
+		if tags[family] == nil {
+			tags[family] = map[string][]string{}
+		}
+
+		tags[family][r.Tag] = append(tags[family][r.Tag], key)
+	}
+
+	for family, byTag := range tags {
+		if len(byTag) < 2 {
+			continue
+		}
+
+		var parts []string
+		for tag, routes := range byTag {
+			slices.Sort(routes)
+			if len(routes) > 3 {
+				parts = append(parts, fmt.Sprintf("%q (%d routes)", tag, len(routes)))
+			} else {
+				parts = append(parts, fmt.Sprintf("%q %v", tag, routes))
+			}
+		}
+
+		slices.Sort(parts)
+		t.Errorf("/%s is split across tags: %s", family, strings.Join(parts, ", "))
+	}
+}

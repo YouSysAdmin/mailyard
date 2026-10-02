@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails/",
-			Tag:         "inbound",
 			Summary:     "List",
 			Description: "Needs the `inbound:read` permission.",
 			Query: []apidoc.Param{
@@ -30,7 +29,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/inbound-emails/:id",
-			Tag:         "inbound",
 			Summary:     "Delete",
 			Description: "Needs the `inbound:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -39,7 +37,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails/:id",
-			Tag:         "inbound",
 			Summary:     "Get",
 			Description: "Needs the `inbound:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -48,7 +45,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails/:id/attachments/:idx",
-			Tag:         "inbound",
 			Summary:     "Attachment",
 			Description: "Needs the `inbound:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}, {Name: "idx"}},
@@ -57,7 +53,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails/:id/eml",
-			Tag:         "inbound",
 			Summary:     "EML",
 			Description: "Needs the `inbound:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -66,7 +61,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/inbound-emails/:id/retry",
-			Tag:         "inbound",
 			Summary:     "Retry",
 			Description: "Needs the `inbound:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -75,7 +69,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/inbound-emails/stats",
-			Tag:         "inbound",
 			Summary:     "Stats",
 			Description: "Needs the `inbound:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatsResponse{})},

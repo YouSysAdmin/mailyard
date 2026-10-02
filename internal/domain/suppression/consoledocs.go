@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/suppressions/",
-			Tag:         "suppression",
 			Summary:     "Delete",
 			Description: "Needs the `suppressions:delete` permission.",
 			Responses:   []apidoc.Response{apidoc.NoContent},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/suppressions/",
-			Tag:         "suppression",
 			Summary:     "List",
 			Description: "Needs the `suppressions:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -33,7 +31,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/suppressions/",
-			Tag:         "suppression",
 			Summary:     "Create",
 			Description: "Needs the `suppressions:write` permission.",
 			Request:     createInput{},
@@ -42,7 +39,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/suppressions/import",
-			Tag:         "suppression",
 			Summary:     "Import",
 			Description: "Needs the `suppressions:write` permission.",
 			Request:     importInput{},

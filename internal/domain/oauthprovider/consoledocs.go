@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/oauth-providers/",
-			Tag:         "oauthprovider",
 			Summary:     "List",
 			Description: "Platform admin.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/oauth-providers/",
-			Tag:         "oauthprovider",
 			Summary:     "Create",
 			Description: "Platform admin.",
 			Request:     upsertInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/oauth-providers/:id",
-			Tag:         "oauthprovider",
 			Summary:     "Delete",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/oauth-providers/:id",
-			Tag:         "oauthprovider",
 			Summary:     "Get",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/oauth-providers/:id",
-			Tag:         "oauthprovider",
 			Summary:     "Update",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -62,7 +57,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/oauth-providers/:id/test",
-			Tag:         "oauthprovider",
 			Summary:     "Test",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

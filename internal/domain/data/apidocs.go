@@ -11,7 +11,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "GET",
 			Path:       "/data/export",
-			Tag:        "meta",
 			Permission: "data:read",
 			Summary:    "Export every record of the key's project",
 			Description: "On its own `data` resource rather than under any other read " +

@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/unsubscribe-lists/",
-			Tag:         "unsubscribelist",
 			Summary:     "List",
 			Description: "Needs the `suppressions:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/unsubscribe-lists/",
-			Tag:         "unsubscribelist",
 			Summary:     "Create",
 			Description: "Needs the `suppressions:write` permission.",
 			Request:     createInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/unsubscribe-lists/:id",
-			Tag:         "unsubscribelist",
 			Summary:     "Delete",
 			Description: "Needs the `suppressions:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/unsubscribe-lists/:id",
-			Tag:         "unsubscribelist",
 			Summary:     "Get",
 			Description: "Needs the `suppressions:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -52,7 +48,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/unsubscribe-lists/:id",
-			Tag:         "unsubscribelist",
 			Summary:     "Update",
 			Description: "Needs the `suppressions:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

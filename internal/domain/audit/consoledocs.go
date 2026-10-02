@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/audit-log",
-			Tag:         "audit",
 			Summary:     "Project log",
 			Description: "Needs the `audit:read` permission.",
 			Query:       []apidoc.Param{{Name: "type", Description: "One event type exactly, such as apikey.created."}, {Name: "actor", Description: "An account id or its address."}, {Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}, {Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."}, {Name: "offset", Type: "integer", Description: "Rows to skip."}},
@@ -26,7 +25,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "GET",
 			Path:    "/audit-log/export",
-			Tag:     "audit",
 			Summary: "Export the project log",
 			Description: "Needs the `audit:read` permission. " +
 				"`from` and `to` are optional and take a date (2026-08-01) or an " +
@@ -39,7 +37,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/audit-log/:id",
-			Tag:         "audit",
 			Summary:     "Project event",
 			Description: "Needs the `audit:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -48,7 +45,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/security-log",
-			Tag:         "audit",
 			Summary:     "Security log",
 			Description: "Any signed-in member, for their own account.",
 			Query:       []apidoc.Param{{Name: "all", Type: "boolean", Description: "Every account's events rather than the caller's own. Honored only for a platform admin."}, {Name: "type", Description: "One event type exactly, such as apikey.created."}, {Name: "actor", Description: "An account id or its address. Read only with all=true."}, {Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}, {Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."}, {Name: "offset", Type: "integer", Description: "Rows to skip."}},
@@ -57,7 +53,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:  "GET",
 			Path:    "/security-log/export",
-			Tag:     "audit",
 			Summary: "Export the security log",
 			Description: "Any signed-in member, for their own account - `all=true` is " +
 				"honored only for a platform admin. Same optional `from` and `to` as " +

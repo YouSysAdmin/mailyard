@@ -17,7 +17,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/api-keys/",
-			Tag:         "apikey",
 			Summary:     "List",
 			Description: "Needs the `apikeys:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
@@ -25,7 +24,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/api-keys/",
-			Tag:         "apikey",
 			Summary:     "Create",
 			Description: "Needs the `apikeys:write` permission.",
 			Request:     createInput{},
@@ -34,7 +32,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "GET",
 			Path:        "/api-keys/:id",
-			Tag:         "apikey",
 			Summary:     "Get",
 			Description: "Needs the `apikeys:read` permission. The prefix and nothing of the secret, like the list.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -43,7 +40,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "PATCH",
 			Path:        "/api-keys/:id",
-			Tag:         "apikey",
 			Summary:     "Update",
 			Description: "Needs the `apikeys:write` permission. `name`, `allowed_ips` and `expires_at`, each only when sent - `allowed_ips: []` lifts the restriction and `expires_at: \"never\"` clears the expiry. Permissions and the sandbox flag are not editable: a key that may do something else is a new key.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -53,7 +49,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "DELETE",
 			Path:        "/api-keys/:id",
-			Tag:         "apikey",
 			Summary:     "Delete",
 			Description: "Needs the `apikeys:delete` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
@@ -62,7 +57,6 @@ func ConsoleDocs() []apidoc.Route {
 		{
 			Method:      "POST",
 			Path:        "/api-keys/:id/revoke",
-			Tag:         "apikey",
 			Summary:     "Revoke",
 			Description: "Needs the `apikeys:write` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},

@@ -164,3 +164,61 @@ func mergeDocs(handWritten, generated []apidoc.Route) []apidoc.Route {
 
 	return out
 }
+
+// tagOf files a route under the resource its path names, which is the
+// heading a reader browses the document by. Decided here and nowhere
+// else, so a handler living in another domain's package cannot carry
+// that package's name into the document. Under /admin the second
+// segment decides, and a path not under /api/v1 is read past its
+// mount.
+func tagOf(path string) string {
+	for _, prefix := range []string{env.ConsolePath + "/api/", "/api/"} {
+		if rest, ok := strings.CutPrefix(path, prefix); ok {
+			path = rest
+
+			break
+		}
+	}
+
+	segs := strings.Split(strings.Trim(path, "/"), "/")
+	family := segs[0]
+	if family == "admin" && len(segs) > 1 {
+		family += "/" + segs[1]
+	}
+
+	if family == "my" && len(segs) > 1 {
+		family = segs[1]
+	}
+
+	if tag, ok := filedWith["/"+strings.Trim(path, "/")]; ok {
+		return tag
+	}
+
+	if tag, ok := filedWith[family]; ok {
+		return tag
+	}
+
+	return family
+}
+
+// filedWith is a path family, or one exact path, that belongs under
+// another resource's heading.
+var filedWith = map[string]string{
+	"invitations":        "projects",
+	"permissions":        "projects",
+	"usage":              "projects",
+	"smtp-server-groups": "smtp-servers",
+	"dashboard":          "analytics",
+
+	// Inbound bounce feedback, not the management of webhooks.
+	"/webhooks/bounce": "bounces",
+}
+
+// tagged sets every route's tag from its path.
+func tagged(routes []apidoc.Route) []apidoc.Route {
+	for i := range routes {
+		routes[i].Tag = tagOf(routes[i].Path)
+	}
+
+	return routes
+}

@@ -12,7 +12,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "GET",
 			Path:    "/admin/certificates",
-			Tag:     "admin",
 			Summary: "List managed certificates and listener assignments",
 			Description: "What an administrator uploaded or generated, with what each " +
 				"certificate says about itself - subject, names, expiry, SHA-256 " +
@@ -27,7 +26,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "GET",
 			Path:    "/admin/certificates/system",
-			Tag:     "admin",
 			Summary: "List the certificates the installation holds for itself",
 			Description: "The ACME cache, the self-signed pair and the relay authority. " +
 				"Read-only: these are maintained by the code that needs them, and " +
@@ -37,7 +35,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/admin/certificates",
-			Tag:     "admin",
 			Summary: "Upload a certificate and its private key",
 			Description: "The certificate may carry a chain, leaf first. The key is checked " +
 				"against it before anything is stored - a mismatch brings the listener " +
@@ -52,7 +49,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/admin/certificates/generate",
-			Tag:     "admin",
 			Summary: "Generate a certificate for a listener",
 			Description: "For an internal listener or a test instance. Hosts go in the SAN " +
 				"list and at least one is required - a certificate with no SAN matches no " +
@@ -74,7 +70,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/admin/certificates/generate-ca",
-			Tag:     "admin",
 			Summary: "Generate a certificate authority",
 			Description: "An authority signs the certificates your listeners serve, so a " +
 				"client trusts ONE certificate instead of one per listener. Install the " +
@@ -99,7 +94,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "GET",
 			Path:    "/admin/certificates/:name/pem",
-			Tag:     "admin",
 			Summary: "Read a certificate's public half",
 			Description: "The certificate, PEM encoded, with no private key - this is how " +
 				"an authority gets into the trust stores that have to trust it.\n\n" +
@@ -114,7 +108,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "GET",
 			Path:    "/admin/certificates/acme",
-			Tag:     "admin",
 			Summary: "What ACME is configured to do, and what it holds",
 			Description: "Whether ACME is on, the account contact, the directory, and each " +
 				"configured host with the certificate cached for it - absent until the " +
@@ -133,7 +126,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/admin/certificates/acme/order",
-			Tag:     "admin",
 			Summary: "Obtain a certificate for one configured host",
 			Description: "Synchronous: it is an ACME round trip including a challenge, and " +
 				"answering before it finishes would mean not being able to say whether " +
@@ -152,7 +144,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:  "POST",
 			Path:    "/admin/certificates/acme/renew",
-			Tag:     "admin",
 			Summary: "Discard what is cached for a host and order again",
 			Description: "Distinct from order, which is satisfied by whatever is already " +
 				"cached. There is no renew-now in the ACME client: the renewal timer " +
@@ -170,7 +161,6 @@ func APIDocs() []apidoc.Route {
 		{
 			Method:     "DELETE",
 			Path:       "/admin/certificates/:name",
-			Tag:        "admin",
 			Summary:    "Delete a managed certificate",
 			PathParams: []apidoc.Param{{Name: "name"}},
 			Description: "Refused while a listener is SERVING it. Allowing it would drop that " +
