@@ -160,6 +160,7 @@ func digest(rows []*certmodel.Certificate) (subject, html, text string) {
 	var t, h strings.Builder
 	t.WriteString("These certificates are expiring:\n\n")
 	h.WriteString("<p>These certificates are expiring:</p><ul>")
+
 	for _, r := range rows {
 		days := int(time.Until(*r.NotAfter).Hours() / 24)
 		name := r.Name
@@ -167,14 +168,14 @@ func digest(rows []*certmodel.Certificate) (subject, html, text string) {
 			name = "(the only one in this scope)"
 		}
 
-		line := fmt.Sprintf("%s / %s - %s (%d days)",
-			r.Scope, name, r.NotAfter.Format(time.DateOnly), days)
+		line := fmt.Sprintf("%s / %s - %s (%d days)", r.Scope, name, r.NotAfter.Format(time.DateOnly), days)
 		fmt.Fprintf(&t, "  %s\n", line)
 		fmt.Fprintf(&h, "<li>%s</li>", htmlEscape(line))
 	}
 
 	t.WriteString("\nA listener whose certificate has expired still starts. " +
 		"Only the handshake fails, so nothing else will report this.\n")
+
 	h.WriteString("</ul><p>A listener whose certificate has expired still starts. " +
 		"Only the handshake fails, so nothing else will report this.</p>")
 

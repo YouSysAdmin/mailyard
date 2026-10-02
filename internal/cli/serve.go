@@ -411,6 +411,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		ClaimTimeout:   cfg.Worker.ClaimTimeout,
 		AttemptTimeout: cfg.Worker.AttemptTimeout,
 	}, log)
+
 	worker.OnFinal = func(job *emailmodel.Email, status, errMsg string) {
 		metrics.EmailsFinalized.WithLabelValues(status).Inc()
 
@@ -466,6 +467,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		job.ErrorMessage = errMsg
 		dispatcher.Emit(context.Background(), job.ProjectID, event, job.Sender, email.EventPayload(job))
 	}
+
 	rt.Queue = worker
 	// WithCancelCause so the long-lived loops can report WHY they
 	// stopped. Three paths cancel this and they mean different things -
@@ -473,6 +475,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// ctx.Err() is context.Canceled for all three.
 	workerCtx, stopWorker := context.WithCancelCause(context.Background())
 	defer stopWorker(nil)
+
 	// The worker is CONSTRUCTED on every role, and only STARTED on a
 	// worker one. An api node still hands rt.Queue to the email
 	// service, whose Wake broadcasts - so accepting a send on an api
@@ -669,6 +672,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			},
 			Log: log,
 		}
+
 		rt.Cron.Register(cron.Job{
 			Name: "certificate-expiry",
 
@@ -688,6 +692,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			Recipients: st.AlertRecipients.ProjectAlert,
 			Log:        log,
 		}
+
 		rt.Cron.Register(cron.Job{
 			Name:     "signing-key-expiry",
 			Schedule: cron.EveryInterval(6 * time.Hour),
@@ -723,6 +728,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			Store: st, Settings: rt.Settings, Blob: rt.Blob, Log: log,
 			Partitions: parts,
 		}
+
 		rt.Cron.Register(cron.Job{
 			Name:     "retention-cleanup",
 			Schedule: cron.DailyAt(3, 0),
@@ -768,6 +774,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		bounceAlerter := &notify.BounceAlerter{
 			Store: st, Settings: rt.Settings, Raiser: rt.Notify, Log: log,
 		}
+
 		rt.Cron.Register(cron.Job{
 			Name:     "bounce-alert",
 			Schedule: cron.EveryInterval(15 * time.Minute),
@@ -806,6 +813,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		}
 
 		log.Info(kind+" listening", "addr", bound, "starttls", secure, "proxy_protocol", proxy.Enabled)
+
 		safego.Go(log, kind+": accept loop", func() {
 			if serr := srv.Serve(ln); serr != nil && !errors.Is(serr, smtp.ErrServerClosed) {
 				log.Error(kind+" stopped", "err", serr)
@@ -822,6 +830,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// rather than the worker one: they accept messages and queue
 	// them, exactly like POST /api/v1/emails/send does.
 	var submissionSrv *smtp.Server
+
 	if r.api && cfg.Submission.Enabled {
 		backend := &submission.Backend{
 			Credentials:    st.SMTPCredential,
@@ -833,6 +842,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			MaxMessageSize: cfg.Submission.MaxMessageSize,
 			Limiter:        iplimit.New(cfg.Submission.RatePerMinute, time.Minute),
 		}
+
 		submissionTLS, terr := tlsBuilder.Build(certificate.ListenerSubmission, cfg.Submission.TLS.Enabled)
 		if terr != nil {
 			return fmt.Errorf("submission tls: %w", terr)
@@ -848,6 +858,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// Inbound MX listener: receives mail for verified domains and
 	// stores it per project, emitting inbound.received webhooks.
 	var inboundSrv *smtp.Server
+
 	if r.api && cfg.Inbound.Enabled {
 		// The same pipeline the relay-node forwarding endpoint builds.
 		// One constructor, because the two transports differ in how
@@ -858,6 +869,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			MaxMessageSize: cfg.Inbound.MaxMessageSize,
 			Limiter:        iplimit.New(cfg.Inbound.RatePerMinute, time.Minute),
 		}
+
 		inboundTLS, terr := tlsBuilder.Build(certificate.ListenerInbound, cfg.Inbound.TLS.Enabled)
 		if terr != nil {
 			return fmt.Errorf("inbound tls: %w", terr)
@@ -877,6 +889,7 @@ func runServe(cmd *cobra.Command, r role) error {
 
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
+
 		if serr := srv.Shutdown(ctx); serr != nil {
 			_ = srv.Close()
 		}
@@ -934,6 +947,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
+
 	select {
 	case s := <-sigCh:
 		log.Info("shutdown requested", "signal", s.String())
@@ -951,6 +965,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		// drain.
 		stopWorker(fmt.Errorf("signal %s", s))
 		rt.Events.Close()
+
 		shutdownErr := srv.Shutdown(shutdownTimeout)
 		stopSMTPListeners(10 * time.Second)
 		runner.Stop(10 * time.Second)
@@ -966,6 +981,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		}
 
 		return shutdownErr
+
 	case err := <-errCh:
 		stopWorker(fmt.Errorf("listener failed: %w", err))
 		rt.Events.Close()
@@ -1076,6 +1092,7 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 // per message, the same order of writes a campaign already does.
 func trackContacts(ctx context.Context, st *store.Store, log *slog.Logger, job *emailmodel.Email, sent bool) {
 	now := time.Now().UTC()
+
 	for _, raw := range job.Recipients {
 		addr, name := splitRecipient(raw)
 		if addr == "" {

@@ -194,6 +194,7 @@ func (p *Provider) userInfoClaims(ctx context.Context, tok *oauth2.Token) (*Clai
 	c.Subject, _ = raw["sub"].(string)
 	c.Email, _ = raw["email"].(string)
 	c.Name, _ = raw["name"].(string)
+
 	// email_verified arrives as a bool from most IdPs and as the
 	// string "true" from a few.
 	switch v := raw["email_verified"].(type) {

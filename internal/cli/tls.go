@@ -37,6 +37,7 @@ func newTLSCmd() *cobra.Command {
 			"Use this to recover from an assignment that made the console\n" +
 			"unreachable - the console is otherwise the only place these are set.",
 	}
+
 	cmd.AddCommand(newTLSStatusCmd(), newTLSAssignCmd(), newTLSUnassignCmd())
 
 	return cmd
@@ -176,6 +177,7 @@ func newTLSAssignCmd() *cobra.Command {
 			return nil
 		},
 	}
+
 	cmd.Flags().StringVar(&listener, "listener", "", "server, submission or inbound")
 	cmd.Flags().StringVar(&name, "certificate", "", "name of a stored managed certificate")
 
@@ -219,6 +221,7 @@ func newTLSUnassignCmd() *cobra.Command {
 			return nil
 		},
 	}
+
 	cmd.Flags().StringVar(&listener, "listener", "", "server, submission or inbound")
 
 	return cmd
@@ -235,8 +238,7 @@ func newTLSUnassignCmd() *cobra.Command {
 // In an emergency, an operator who watches a console stay broken for four
 // minutes past a deadline they were given has no way to tell a slow fix
 // from a failed one, which is worse than being told to restart.
-const convergenceNote = "a running node picks this up within 5 minutes (its settings refresh), " +
-	"or restart it to apply immediately\n"
+const convergenceNote = "a running node picks this up within 5 minutes (its settings refresh), or restart it to apply immediately\n"
 
 // openForTLS loads the config and opens the database read-write.
 //
@@ -245,6 +247,7 @@ const convergenceNote = "a running node picks this up within 5 minutes (its sett
 // become a schema change. Same call shape as set-password.
 func openForTLS(cmd *cobra.Command) (*env.Config, *store.Store, func(), error) {
 	configPath, _ := cmd.Flags().GetString("config")
+
 	cfg, err := env.Load(configPath)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("load config: %w", err)
@@ -254,8 +257,7 @@ func openForTLS(cmd *cobra.Command) (*env.Config, *store.Store, func(), error) {
 		return nil, nil, nil, fmt.Errorf("config invalid: %w", err)
 	}
 
-	db, st, err := openDatabase(&cfg.Database,
-		crypto.New(cfg.Database.Crypto.EncryptionKey), false)
+	db, st, err := openDatabase(&cfg.Database, crypto.New(cfg.Database.Crypto.EncryptionKey), false)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("open db: %w", err)
 	}
@@ -277,6 +279,7 @@ func assignments(ctx context.Context, st *store.Store) (map[string]string, error
 	}
 
 	out := map[string]string{}
+
 	for _, l := range []string{
 		certificate.ListenerServer,
 		certificate.ListenerSubmission,

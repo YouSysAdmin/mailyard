@@ -24,6 +24,7 @@ type Deliverer struct {
 	HELO     string
 	SMTPPort int
 	Network  string
+
 	// MaxLifetime bounds how long a message may keep failing.
 	MaxLifetime time.Duration
 
@@ -262,6 +263,7 @@ func (d *Deliverer) attempt(ctx context.Context, m *Message) {
 		if len(res.Accepted) == 0 {
 			msg = "relay node: refused by the destination"
 		}
+
 		d.Log.Info(msg,
 			"id", m.ID, "domain", m.Domain, "host", res.Host, "tls", res.TLS,
 			"accepted", len(res.Accepted), "refused", len(res.Rejected))
@@ -296,6 +298,7 @@ func (d *Deliverer) defer_(m *Message, reason string) {
 	if err := d.Spool.Update(m); err != nil {
 		d.Log.Error("relay node: could not update a queued message", "id", m.ID, "err", err)
 	}
+
 	d.Log.Warn("relay node: deferred",
 		"id", m.ID, "domain", m.Domain, "attempt", m.Attempts,
 		"next", m.NextAttempt.Format(time.RFC3339), "reason", reason)
@@ -313,8 +316,10 @@ func (d *Deliverer) giveUp(ctx context.Context, m *Message, reason string) {
 			Permanent: permanent, Reason: reason,
 		})
 	}
+
 	d.Log.Warn("relay node: gave up",
 		"id", m.ID, "domain", m.Domain, "attempts", m.Attempts, "reason", reason)
+
 	if err := d.Spool.Remove(m.ID); err != nil {
 		d.Log.Error("relay node: could not remove an abandoned message", "id", m.ID, "err", err)
 	}
@@ -343,6 +348,7 @@ func backoff(attempt int) time.Duration {
 	attempt = max(attempt, 1)
 	const base = time.Minute
 	const ceiling = 4 * time.Hour
+
 	d := time.Duration(math.Pow(3, float64(attempt-1))) * base
 	if d > ceiling || d <= 0 {
 		return ceiling
@@ -359,6 +365,7 @@ func (d *Deliverer) SweepExpired(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	for _, m := range all {
 		if d.expired(m) {
 			d.giveUp(ctx, m, fmt.Sprintf("gave up after %s", d.MaxLifetime))

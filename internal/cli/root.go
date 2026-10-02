@@ -43,6 +43,7 @@ func NewRoot() *cobra.Command {
 		&cobra.Group{ID: groupRecover, Title: "Recover an installation:"},
 		&cobra.Group{ID: groupInspect, Title: "Inspect this build:"},
 	)
+
 	add(root, groupNode, newServeCmd())
 	add(root, groupNode, nodeCommands()...)
 	add(root, groupRecover, newSetPasswordCmd(), newRekeyCmd(), newTLSCmd())

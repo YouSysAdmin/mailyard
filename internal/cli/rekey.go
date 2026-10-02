@@ -54,6 +54,7 @@ func newRekeyCmd() *cobra.Command {
 			}
 
 			current := crypto.New(cfg.Database.Crypto.EncryptionKey)
+
 			db, _, err := openDatabase(&cfg.Database, current, false)
 			if err != nil {
 				return fmt.Errorf("open database: %w", err)
@@ -175,6 +176,7 @@ func rekeyAll(ctx context.Context, db *sql.DB, current, fresh *crypto.Service, r
 	defer func() { _ = tx.Rollback() }()
 
 	counts := map[string]int{}
+	i
 	for _, col := range sealedColumns {
 		n, err := rekeyColumn(ctx, tx, col, current, fresh)
 		if err != nil {
@@ -226,6 +228,7 @@ func rekeyColumn(ctx context.Context, tx *sql.Tx, col sealedColumn, current, fre
 	}
 
 	var pending []row
+
 	for rows.Next() {
 		r := row{keys: make([]any, col.keys)}
 		dest := make([]any, 0, col.keys+1)

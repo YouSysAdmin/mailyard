@@ -37,6 +37,7 @@ const (
 type CA struct {
 	cert *x509.Certificate
 	key  *ecdsa.PrivateKey
+
 	// certPEM is kept so callers can hand the bundle to a node
 	// without re-encoding it.
 	certPEM string
@@ -49,14 +50,17 @@ func Generate(commonName string, now time.Time) (certPEM, keyPEM string, err err
 	if err != nil {
 		return "", "", fmt.Errorf("generate ca key: %w", err)
 	}
+
 	key, ok := signer.(*ecdsa.PrivateKey)
 	if !ok {
 		return "", "", fmt.Errorf("generate ca key: got %T, want ecdsa", signer)
 	}
+
 	serial, err := certgen.Serial()
 	if err != nil {
 		return "", "", err
 	}
+
 	tmpl := &x509.Certificate{
 		SerialNumber:          serial,
 		Subject:               pkix.Name{CommonName: commonName, Organization: []string{"Mailyard"}},
@@ -71,6 +75,7 @@ func Generate(commonName string, now time.Time) (certPEM, keyPEM string, err err
 		MaxPathLen:     0,
 		MaxPathLenZero: true,
 	}
+
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {
 		return "", "", fmt.Errorf("create ca certificate: %w", err)
@@ -89,14 +94,17 @@ func Load(certPEM, keyPEM string) (*CA, error) {
 	if !cert.IsCA {
 		return nil, errors.New("stored relay ca certificate is not a ca")
 	}
+
 	block, _ := pem.Decode([]byte(keyPEM))
 	if block == nil {
 		return nil, errors.New("relay ca key is not pem")
 	}
+
 	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("parse relay ca key: %w", err)
 	}
+
 	key, ok := parsed.(*ecdsa.PrivateKey)
 	if !ok {
 		return nil, fmt.Errorf("relay ca key is %T, want an ecdsa key", parsed)
@@ -119,6 +127,7 @@ const (
 	// RoleNode is a relay node: it terminates TLS, so it needs server
 	// auth and its SANs are the names workers will dial.
 	RoleNode Role = "node"
+
 	// RoleClient is a delivery worker: it only ever connects out.
 	RoleClient Role = "client"
 )
@@ -141,6 +150,7 @@ func (c *CA) SignRequest(csrPEM string, role Role, cn string, hosts []string, no
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
 		return "", errors.New("not a pem certificate request")
 	}
+
 	csr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
 		return "", fmt.Errorf("parse certificate request: %w", err)
@@ -157,6 +167,7 @@ func (c *CA) SignRequest(csrPEM string, role Role, cn string, hosts []string, no
 	if err != nil {
 		return "", err
 	}
+
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject:      pkix.Name{CommonName: cn, Organization: []string{"Mailyard"}},
@@ -170,6 +181,7 @@ func (c *CA) SignRequest(csrPEM string, role Role, cn string, hosts []string, no
 		BasicConstraintsValid: true,
 		IsCA:                  false,
 	}
+
 	switch role {
 	case RoleNode:
 		tmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
@@ -202,12 +214,13 @@ func (c *CA) IssuePair(role Role, cn string, hosts []string, now time.Time) (cer
 	if err != nil {
 		return "", "", fmt.Errorf("create certificate request: %w", err)
 	}
-	csrPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER}))
 
+	csrPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER}))
 	certPEM, err = c.SignRequest(csrPEM, role, cn, hosts, now)
 	if err != nil {
 		return "", "", err
 	}
+
 	keyPEM, err = certgen.EncodeKey(key)
 	if err != nil {
 		return "", "", err

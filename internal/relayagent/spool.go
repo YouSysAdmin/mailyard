@@ -50,6 +50,7 @@ var (
 // nowhere near one.
 type Received struct {
 	ID string `json:"id"`
+
 	// What the SMTP session knew. ClientIP and HELO cannot be
 	// recovered from the bytes and SPF is computed from them, so they
 	// are recorded here at the moment they are known and travel as
@@ -69,6 +70,7 @@ type Received struct {
 // Message is one accepted message awaiting delivery.
 type Message struct {
 	ID string `json:"id"`
+
 	// EmailID is smtpclient.HeaderEmailID lifted out of the message.
 	// It is how a delivery outcome finds its way back to the row that
 	// caused it, and it is read once here rather than reparsed on
@@ -225,6 +227,7 @@ func (s *Spool) Due(now time.Time, limit int) ([]*Message, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// ForEach walks in key order, which is uuid order and therefore
 	// arbitrary. Sort by when the message was accepted so a backlog
 	// drains oldest first instead of at random.
@@ -287,6 +290,7 @@ func (s *Spool) All() ([]*Message, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	sortByAccepted(out)
 
 	return out, nil
@@ -310,6 +314,7 @@ func (s *Spool) PutReceived(m *Received, body []byte) error {
 	if err := os.WriteFile(path, body, 0o600); err != nil {
 		return fmt.Errorf("write received message: %w", err)
 	}
+
 	m.Size = int64(len(body))
 	if err := s.saveReceived(m); err != nil {
 		_ = os.Remove(path)
@@ -418,6 +423,7 @@ func (s *Spool) Outcomes(limit int) (keys []string, blobs [][]byte, err error) {
 			if limit > 0 && len(keys) >= limit {
 				return nil
 			}
+
 			keys = append(keys, string(k))
 			blobs = append(blobs, bytes.Clone(v))
 
@@ -517,6 +523,7 @@ func (s *Spool) sweepDir(bucket []byte, dir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	removed := 0
 	for _, e := range entries {
 		name := e.Name()

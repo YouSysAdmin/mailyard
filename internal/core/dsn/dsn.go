@@ -137,6 +137,7 @@ func parseParts(body io.Reader, boundary, wantType string, parse func([]byte) *R
 
 		ct, _, _ := mime.ParseMediaType(part.Header.Get("Content-Type"))
 		ct = strings.ToLower(ct)
+
 		// Reports are small by construction, but an adversarial or
 		// broken sender can put anything in a part, so cap the read.
 		content, err := io.ReadAll(io.LimitReader(part, 1<<20))

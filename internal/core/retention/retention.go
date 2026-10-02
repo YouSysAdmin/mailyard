@@ -132,6 +132,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		// attachment window was longer or disabled.
 		keys, err := s.Store.Email.StorageKeysOlderThan(ctx, cutoff)
 		note("email purge keys", err)
+
 		// The removal is inside this guard, and that is the whole
 		// point of reading the keys first. If the key query failed we
 		// do not know which blobs these rows own, so deleting the rows
@@ -171,6 +172,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		cutoff := now.AddDate(0, 0, -inboundDays)
 		keys, err := s.Store.Inbound.StorageKeysOlderThan(ctx, cutoff)
 		note("inbound keys", err)
+
 		// Inside the guard, for the reason spelled out on the email
 		// purge above: rows removed without their keys leave blobs
 		// nothing can ever name again.

@@ -1,3 +1,5 @@
+// Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+
 // Command mailyard is the single binary this project ships: the API
 // and console, the SMTP submission and inbound listeners, the delivery
 // queue and the scheduled jobs. Which of those a process runs is
@@ -14,8 +16,7 @@ import (
 )
 
 func main() {
-	// Every time the process renders, in responses and logs, is UTC
-	// whatever the host zone is.
+	// Sets the UTC time zone and ignores server time settings.
 	time.Local = time.UTC
 
 	err := cli.NewRoot().Execute()

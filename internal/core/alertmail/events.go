@@ -113,6 +113,7 @@ var alerts = map[string]Alert{
 	"project.member.deleted": {TierProject,
 		"Somebody was removed from your project",
 		"Their access ended immediately."},
+
 	// Ownership comes through here too: it is a field on the membership,
 	// not a route of its own, and an owner holds everything a role can
 	// grant plus deleting the project. There is no project.owner event.
@@ -144,6 +145,7 @@ var alerts = map[string]Alert{
 	"admin.settings": {TierPlatform,
 		"Platform settings were changed",
 		"These apply to the whole installation. The audit trail records which keys."},
+
 	// RouteType collapses a DELETE or PATCH on any /admin/<thing>/<id>
 	// to these two, so the type alone does not say what was touched -
 	// the mail carries the method and path for that reason.

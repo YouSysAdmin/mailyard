@@ -20,6 +20,7 @@ type RelayNodeConfig struct {
 	// connects OUT to it - nothing reaches into a node except the
 	// delivery workers, over mutual TLS.
 	ControlURL string `mapstructure:"control_url"`
+
 	// EnrollToken is the shared secret from relay_nodes.auto_register_token.
 	// Needed for the first run only: after enrolment the node holds a
 	// certificate and its own control token, and this can be removed.
@@ -36,6 +37,7 @@ type RelayNodeConfig struct {
 	// egress through a proxy. The control channel is plain HTTPS and
 	// honours HTTPS_PROXY, so pull mode needs no inbound port at all.
 	Mode string `mapstructure:"mode"`
+
 	// Hostname is what this node calls itself: the certificate name
 	// workers dial AND the HELO it announces to the internet.
 	//
@@ -77,15 +79,19 @@ type RelayNodeConfig struct {
 	// MaxLifetime is how long a message may keep failing before it is
 	// given up on. Three days is the ordinary MTA convention.
 	MaxLifetime time.Duration `mapstructure:"max_lifetime"`
+
 	// HeartbeatInterval is how often the node reports in. Well under
 	// the platform's stale window, which the node is told at
 	// enrolment.
 	HeartbeatInterval time.Duration `mapstructure:"heartbeat_interval"`
+
 	// DeliveryConcurrency caps simultaneous outbound sessions.
 	DeliveryConcurrency int `mapstructure:"delivery_concurrency"`
+
 	// SMTPPort is the destination port for delivery. 25 in production
 	// and configurable only so a test can point it somewhere else.
 	SMTPPort int `mapstructure:"smtp_port"`
+
 	// IPv6 allows delivery over IPv6.
 	//
 	// Off by default: a box with a AAAA record will prefer v6, where
@@ -107,22 +113,27 @@ type RelayNodeConfig struct {
 // Off by default - an open port 25 is a decision.
 type RelayNodeInboundConfig struct {
 	Enabled bool `mapstructure:"enabled"`
+
 	// Addr is where the internet connects. An MX record carries no
 	// port, so remote senders always try 25 - bind :2526 and map it
 	// when the process cannot take a privileged port.
 	Addr string `mapstructure:"addr"`
+
 	// MaxMessageSize caps one received message. Above the platform's
 	// inbound.max_message_size the node accepts mail the platform then
 	// refuses, paying the bandwidth twice and bouncing nothing.
 	MaxMessageSize int64 `mapstructure:"max_message_size"`
+
 	// RatePerMinute is the per-IP session budget. This is the one
 	// listener on a node whose rate is set by strangers.
 	RatePerMinute int `mapstructure:"rate_per_minute"`
+
 	// ProxyProtocol reads the real client address from a balancer in
 	// front of this port. The node ASSERTS client_ip to the platform
 	// and SPF is computed from it, so without this a node behind a
 	// balancer reports our own hop as the sender for every message.
 	ProxyProtocol ProxyProtocolConfig `mapstructure:"proxy_protocol"`
+
 	// TLS offers STARTTLS. Empty means a self-signed pair generated
 	// on this node and kept in the spool.
 	//

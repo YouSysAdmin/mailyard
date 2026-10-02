@@ -1,3 +1,5 @@
+// Mailyard, Copyright (c) 2021-2026 YouSysAdmin
+
 // Package pkg owns build-time identity (binary name + version string).
 // Version is a var so the build can override it via:
 //

@@ -82,6 +82,7 @@ type Agent struct {
 	// accept is the recipient domain list this node answers RCPT from,
 	// refreshed on the heartbeat and cached in the spool.
 	accept *acceptList
+
 	// forwardWake nudges the forward loop. Buffered by one and written
 	// non-blockingly, so an SMTP session never waits on it.
 	forwardWake chan struct{}
@@ -104,6 +105,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Agent, error) {
 		accept:      &acceptList{},
 		forwardWake: make(chan struct{}, 1),
 	}
+
 	// Restore the accept list before anything can bind port 25. A node
 	// restarting while the control plane is unreachable then keeps
 	// answering RCPT the way it did, instead of refusing everything
@@ -125,6 +127,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Agent, error) {
 	if cfg.IPv6 {
 		network = "tcp"
 	}
+
 	a.Deliverer = &Deliverer{
 		Spool:        spool,
 		Lookup:       mx.New(mx.Config{}),
@@ -221,6 +224,7 @@ func (a *Agent) enrol(ctx context.Context) error {
 			return fmt.Errorf("store node identity: %w", serr)
 		}
 	}
+
 	a.nodeID, a.token, a.peerCN = res.NodeID, res.Token, res.ClientName
 
 	a.log.Info("relay node: enrolled", "node_id", res.NodeID, "status", res.Status)
@@ -249,10 +253,12 @@ func (a *Agent) renewIfDue(ctx context.Context, certPEM string) error {
 	if err != nil {
 		return err
 	}
+
 	res, err := a.ctrl.Renew(ctx, a.nodeID, a.token, csrPEM)
 	if err != nil {
 		return err
 	}
+
 	for k, v := range map[string]string{
 		metaCert: res.Certificate, metaKey: keyPEM,
 		metaCA: res.CA, metaPeerCN: res.ClientName,
@@ -261,6 +267,7 @@ func (a *Agent) renewIfDue(ctx context.Context, certPEM string) error {
 			return serr
 		}
 	}
+
 	a.peerCN = res.ClientName
 	a.log.Info("relay node: certificate renewed", "expires", crt.NotAfter.Format(time.RFC3339))
 
@@ -281,6 +288,7 @@ func (a *Agent) buildTLS() error {
 	if err != nil {
 		return err
 	}
+
 	a.tlsCfg = &tls.Config{
 		Certificates: []tls.Certificate{pair},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
@@ -317,6 +325,7 @@ func (a *Agent) recordOutcome(_ context.Context, o Outcome) {
 
 		return
 	}
+
 	// Keyed by message and recipient, so the same terminal result
 	// recorded twice is one row rather than two reports of one bounce.
 	key := o.EmailID + "|" + o.Recipient
@@ -349,6 +358,7 @@ func (a *Agent) flushOutcomes(ctx context.Context) {
 	if len(keys) == 0 {
 		return
 	}
+
 	outcomes := make([]ReportOutcome, 0, len(blobs))
 	for _, b := range blobs {
 		var o ReportOutcome
@@ -371,6 +381,7 @@ func (a *Agent) flushOutcomes(ctx context.Context) {
 
 			return
 		}
+
 		a.log.Warn("relay node: could not report outcomes, will retry",
 			"count", len(outcomes), "err", err)
 
@@ -431,6 +442,7 @@ func (a *Agent) Start(ctx context.Context) {
 	if a.cfg.Pulls() {
 		safego.Go(a.log, "relay node: claim loop", func() { a.pullLoop(ctx) })
 	}
+
 	// Started whether or not this node runs an MX. A node that had one
 	// and no longer does still holds mail it accepted, and the loop is
 	// what drains it.
@@ -512,6 +524,7 @@ func (a *Agent) refreshAccept(res *Heartbeat) {
 	if res.AcceptETag == "" || res.AcceptETag == a.accept.etagOf() {
 		return
 	}
+
 	a.accept.replace(res.AcceptDomains, res.AcceptETag)
 	if err := a.accept.store(a.spool, res.AcceptDomains, res.AcceptETag); err != nil {
 		// Not fatal: the list is live in memory either way. It only
@@ -519,6 +532,7 @@ func (a *Agent) refreshAccept(res *Heartbeat) {
 		// one, or with none.
 		a.log.Warn("relay node: could not cache the recipient domain list", "err", err)
 	}
+
 	a.log.Info("relay node: recipient domain list updated", "domains", len(res.AcceptDomains))
 }
 
@@ -566,6 +580,7 @@ func (a *Agent) checkOutboundSMTP(ctx context.Context) {
 	if a.cfg.SMTPPort != 25 {
 		return
 	}
+
 	// gmail-smtp-in.l.google.com is about as reliably reachable as
 	// port 25 gets. A refusal is informative, a timeout is the block.
 	probe, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -580,6 +595,7 @@ func (a *Agent) checkOutboundSMTP(ctx context.Context) {
 		return
 	}
 	_ = conn.Close()
+
 	a.log.Info("relay node: outbound port 25 is open")
 }
 
@@ -618,6 +634,7 @@ func (a *Agent) checkReverseDNS(ctx context.Context) {
 
 		return
 	}
+
 	want := strings.TrimSuffix(strings.ToLower(a.cfg.Hostname), ".")
 	for _, n := range names {
 		if strings.TrimSuffix(strings.ToLower(n), ".") == want {
@@ -626,6 +643,7 @@ func (a *Agent) checkReverseDNS(ctx context.Context) {
 			return
 		}
 	}
+
 	a.log.Warn("relay node: the PTR record does not match relay_node.hostname. Receivers compare the two and reject on a mismatch",
 		"address", addr, "ptr", strings.Join(names, ","), "expected", a.cfg.Hostname)
 }
@@ -635,11 +653,13 @@ func (a *Agent) checkReverseDNS(ctx context.Context) {
 // route and a source address, which is what a receiver will see.
 func publicAddress(ctx context.Context) (string, error) {
 	var d net.Dialer
+
 	conn, err := d.DialContext(ctx, "udp4", "8.8.8.8:53")
 	if err != nil {
 		return "", err
 	}
 	defer func() { _ = conn.Close() }()
+
 	host, _, err := net.SplitHostPort(conn.LocalAddr().String())
 
 	return host, err
@@ -650,7 +670,9 @@ func portOf(addr string) int {
 	if err != nil {
 		return 2587
 	}
+
 	var n int
+
 	if _, err := fmt.Sscanf(port, "%d", &n); err != nil || n == 0 {
 		return 2587
 	}

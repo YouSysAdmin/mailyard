@@ -195,6 +195,7 @@ func (n *Notifier) deliver(ctx context.Context, a Alert, e *amodel.Event) {
 
 	subject, html, text := Message(a.Heading, a.Note, actor, action, n.trailLink(a.Tier))
 	n.Mail.SendAsync(to, subject, html, text)
+
 	n.Log.Info("alertmail: sent", "type", e.Type, "recipients", len(to))
 }
 

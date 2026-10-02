@@ -235,6 +235,7 @@ func InlineCSS(html, css string) string {
 	styled := withStyleBlock(html, css)
 
 	opts := premailer.NewOptions()
+
 	// The classes stay. premailer would strip them once their rules are
 	// inlined, and they are what the tracking stripper and anyone
 	// reading the source have to go on.

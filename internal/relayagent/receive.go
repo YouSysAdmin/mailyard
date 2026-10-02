@@ -44,6 +44,7 @@ type acceptList struct {
 	mu    sync.RWMutex
 	names map[string]bool
 	etag  string
+
 	// known is false until a list has actually been received. It is
 	// NOT the same as an empty list, and the difference decides
 	// whether an unrecognized recipient gets a 451 or a 550.
@@ -139,6 +140,7 @@ func (a *acceptList) replace(names []string, etag string) {
 	for _, n := range names {
 		set[strings.ToLower(strings.TrimSuffix(strings.TrimSpace(n), "."))] = true
 	}
+
 	a.mu.Lock()
 	a.names, a.etag, a.known = set, etag, true
 	a.mu.Unlock()
@@ -153,10 +155,12 @@ func (a *acceptList) load(s *Spool) {
 	if blob == "" || etag == "" {
 		return
 	}
+
 	var names []string
 	if err := json.Unmarshal([]byte(blob), &names); err != nil {
 		return
 	}
+
 	a.replace(names, etag)
 }
 
@@ -211,6 +215,7 @@ func (b *ReceiveBackend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 	if c != nil && c.Conn() != nil {
 		remote = c.Conn().RemoteAddr().String()
 	}
+
 	ip := remote
 	if host, _, err := net.SplitHostPort(remote); err == nil {
 		ip = host
@@ -221,6 +226,7 @@ func (b *ReceiveBackend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 
 		return nil, &smtp.SMTPError{Code: 421, EnhancedCode: smtp.EnhancedCode{4, 7, 0}, Message: "rate limit exceeded"}
 	}
+
 	helo := ""
 	if c != nil {
 		helo = c.Hostname()
@@ -314,6 +320,7 @@ func (s *receiveSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 	if len(s.to) >= maxSessionRecipients {
 		return &smtp.SMTPError{Code: 452, EnhancedCode: smtp.EnhancedCode{4, 5, 3}, Message: "too many recipients"}
 	}
+
 	s.to = append(s.to, addr)
 
 	return nil
@@ -337,6 +344,7 @@ func (s *receiveSession) Data(r io.Reader) (err error) {
 				Message: "temporary failure processing message"}
 		}
 	}()
+
 	if len(s.to) == 0 {
 		return &smtp.SMTPError{Code: 554, EnhancedCode: smtp.EnhancedCode{5, 5, 1}, Message: "no valid recipients"}
 	}
@@ -366,13 +374,16 @@ func (s *receiveSession) Data(r io.Reader) (err error) {
 		ReceivedAt:   time.Now().UTC(),
 		NextAttempt:  time.Now().UTC(),
 	}
+
 	if perr := s.backend.Spool.PutReceived(m, raw); perr != nil {
 		s.backend.Log.Error("relay node: could not spool received mail", "err", perr)
 
 		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "could not queue message"}
 	}
+
 	s.backend.Log.Info("relay node: received",
 		"id", m.ID, "from", s.from, "recipients", len(s.to), "bytes", len(raw), "client_ip", s.ip)
+
 	if s.backend.Wake != nil {
 		s.backend.Wake()
 	}
@@ -443,6 +454,7 @@ func (a *Agent) forwardReceived(ctx context.Context) {
 
 		return
 	}
+
 	for _, m := range due {
 		if ctx.Err() != nil {
 			return
@@ -458,6 +470,7 @@ func (a *Agent) forwardOne(ctx context.Context, m *Received) {
 		// Dropping the entry stops the node retrying a message it
 		// cannot read for the rest of its life.
 		a.log.Error("relay node: received message body is missing, dropping it", "id", m.ID, "err", err)
+
 		if rerr := a.spool.RemoveReceived(m.ID); rerr != nil {
 			a.log.Error("relay node: could not drop a bodyless entry", "id", m.ID, "err", rerr)
 		}
@@ -472,6 +485,7 @@ func (a *Agent) forwardOne(ctx context.Context, m *Received) {
 		HELO:         m.HELO,
 		Raw:          body,
 	})
+
 	switch err {
 	case nil:
 		// accepted, duplicate or refused - all three are the platform
@@ -494,6 +508,7 @@ func (a *Agent) forwardOne(ctx context.Context, m *Received) {
 			// message a stranger's MTA was told we had accepted.
 			a.log.Error("relay node: forwarded mail refused permanently, dropping it",
 				"id", m.ID, "recipients", len(m.Recipients), "err", err)
+
 			if rerr := a.spool.RemoveReceived(m.ID); rerr != nil {
 				a.log.Error("relay node: could not drop refused mail", "id", m.ID, "err", rerr)
 			}
@@ -530,6 +545,7 @@ func (a *Agent) retryForward(m *Received, cause error) {
 	if uerr := a.spool.UpdateReceived(m); uerr != nil {
 		a.log.Error("relay node: could not reschedule a forward", "id", m.ID, "err", uerr)
 	}
+
 	a.log.Warn("relay node: could not forward received mail, will retry",
 		"id", m.ID, "attempts", m.Attempts, "next", m.NextAttempt.Format(time.RFC3339), "err", cause)
 }

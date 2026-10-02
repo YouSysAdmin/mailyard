@@ -99,6 +99,7 @@ func (a *Agent) selfSignedMX() (tls.Certificate, error) {
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("relay node inbound tls: %w", err)
 	}
+
 	for k, v := range map[string]string{metaMXCert: newCert, metaMXKey: newKey} {
 		if serr := a.spool.SetMeta(k, v); serr != nil {
 			// Not fatal. The pair in hand is perfectly good for this

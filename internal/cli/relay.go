@@ -72,7 +72,9 @@ func runRelay(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("init logger: %w", err)
 	}
+
 	slog.SetDefault(log)
+
 	log.Info("mailyard starting", "role", "relay", "config", cfg.Source,
 		"hostname", cfg.RelayNode.Hostname, "spool", cfg.RelayNode.SpoolDir)
 
@@ -116,6 +118,7 @@ func runRelay(cmd *cobra.Command, _ []string) error {
 	} else {
 		addr, tlsCfg, backend := agent.Listener()
 		srv = relayagent.NewServer(backend, addr, cfg.RelayNode.Hostname, tlsCfg)
+
 		// At debug, the whole SMTP conversation lands in the log. It is
 		// the only view of a PROTOCOL refusal - the library answers a
 		// malformed command itself and calls no hook - so without it a bad
@@ -132,6 +135,7 @@ func runRelay(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("relay node listener on %s: %w", addr, err)
 		}
+
 		// Implicit TLS is the listener itself being a TLS listener, not a
 		// STARTTLS upgrade inside the session. go-smtp has no ServeTLS, so
 		// the wrapping happens here - and doing it here rather than
@@ -164,6 +168,7 @@ func runRelay(cmd *cobra.Command, _ []string) error {
 
 	shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+
 	// The MX first. It is the one taking mail from strangers, and
 	// every session it accepts after this point is one more message
 	// the forward loop will not get to drain.
@@ -197,7 +202,9 @@ func startReceiveListener(cfg *env.Config, agent *relayagent.Agent, log *slog.Lo
 	if err != nil {
 		return nil, fmt.Errorf("relay node inbound tls: %w", err)
 	}
+
 	backend := agent.ReceiveListener(in.MaxMessageSize, in.RatePerMinute)
+
 	srv := relayagent.NewReceiveServer(backend, in.Addr, cfg.RelayNode.Hostname, tlsCfg)
 	if strings.EqualFold(cfg.Logging.Level, "debug") {
 		srv.Debug = relayagent.ProtocolTrace(log, "inbound")
@@ -207,7 +214,9 @@ func startReceiveListener(cfg *env.Config, agent *relayagent.Agent, log *slog.Lo
 	if err != nil {
 		return nil, fmt.Errorf("relay node inbound listener on %s: %w", in.Addr, err)
 	}
+
 	bound := ln.Addr().String()
+
 	// The PROXY wrap goes OUTSIDE, because the header is the first
 	// thing on the wire - before EHLO and before the STARTTLS upgrade.
 	//
@@ -223,6 +232,7 @@ func startReceiveListener(cfg *env.Config, agent *relayagent.Agent, log *slog.Lo
 			return nil, fmt.Errorf("relay node inbound proxy protocol: %w", err)
 		}
 	}
+
 	// STARTTLS, not implicit TLS: this is an MX, and a sender on the
 	// internet opens a cleartext session and upgrades. The other
 	// listener in this process is the opposite, because its only
@@ -230,6 +240,7 @@ func startReceiveListener(cfg *env.Config, agent *relayagent.Agent, log *slog.Lo
 	log.Info("relay node inbound listening", "addr", bound,
 		"hostname", cfg.RelayNode.Hostname, "starttls", tlsCfg != nil,
 		"proxy_protocol", in.ProxyProtocol.Enabled)
+
 	safego.Go(log, "relay node: inbound accept loop", func() {
 		if serr := srv.Serve(ln); serr != nil && !errors.Is(serr, smtp.ErrServerClosed) {
 			log.Error("relay node inbound listener stopped", "err", serr)

@@ -176,6 +176,7 @@ func (w *Worker) Stop(timeout time.Duration) {
 		w.wg.Wait()
 		close(done)
 	}()
+
 	select {
 	case <-done:
 		w.log.Info("queue: worker stopped")
@@ -187,6 +188,7 @@ func (w *Worker) Stop(timeout time.Duration) {
 	// Grace period spent: cut the attempts and let the outcomes land.
 	w.log.Warn("queue: in-flight deliveries did not finish, aborting them")
 	w.abort()
+
 	select {
 	case <-done:
 		w.log.Info("queue: worker stopped after aborting in-flight deliveries")

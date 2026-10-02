@@ -77,6 +77,7 @@ func (b *Backend) checkPeer(state tls.ConnectionState) error {
 		// of guessing here is admitting another node.
 		return errors.New("node has no expected peer name configured")
 	}
+
 	leaf := state.PeerCertificates[0]
 	if leaf.Subject.CommonName == b.PeerName {
 		return nil
@@ -138,6 +139,7 @@ func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 
 		return &smtp.SMTPError{Code: 501, Message: "recipient is not a valid address"}
 	}
+
 	s.to = append(s.to, addr)
 
 	return nil
@@ -152,10 +154,12 @@ func (s *session) Data(r io.Reader) error {
 
 		return &smtp.SMTPError{Code: 503, Message: "no recipients"}
 	}
+
 	limit := s.backend.MaxMessageSize
 	if limit <= 0 {
 		limit = 50 << 20
 	}
+
 	body, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
 		return &smtp.SMTPError{Code: 451, Message: "could not read message"}
@@ -183,6 +187,7 @@ func (s *session) Data(r io.Reader) error {
 		d := strings.ToLower(host)
 		byDomain[d] = append(byDomain[d], rcpt)
 	}
+
 	if len(byDomain) == 0 {
 		s.backend.Log.Warn("relay node: refused a message", "remote", s.remote, "reason", "no usable recipients")
 
@@ -202,6 +207,7 @@ func (s *session) Data(r io.Reader) error {
 			AcceptedAt:   now,
 			NextAttempt:  now,
 		}
+
 		if err := s.backend.Spool.Put(m, body); err != nil {
 			s.backend.Log.Error("relay node: could not spool a message", "err", err)
 
@@ -289,6 +295,7 @@ func NewServer(b *Backend, addr, hostname string, tlsCfg *tls.Config) *smtp.Serv
 	srv.MaxMessageBytes = b.MaxMessageSize
 	srv.AllowInsecureAuth = false
 	srv.TLSConfig = tlsCfg
+
 	// Into OUR log, not the library stderr default: a failed
 	// handshake on this listener is a worker with the wrong
 	// certificate, which is exactly the thing somebody will be

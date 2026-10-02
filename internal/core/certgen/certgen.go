@@ -59,6 +59,7 @@ type Subject struct {
 
 func (s Subject) pkix() pkix.Name {
 	n := pkix.Name{CommonName: s.CommonName}
+
 	// Each is a slice in pkix.Name, and an empty string appended would
 	// encode as a present-but-empty attribute rather than an absent
 	// one. Some verifiers reject that, and it is a lie either way.

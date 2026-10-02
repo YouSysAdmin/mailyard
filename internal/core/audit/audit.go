@@ -218,6 +218,7 @@ func (r *Recorder) Security(c fiber.Ctx, e *amodel.Event) {
 
 	Stamp(e, c)
 	e.Category = amodel.CategorySecurity
+
 	// Security events are about an account, not a tenant.
 	e.ProjectID = ""
 	r.Record(e)
@@ -278,6 +279,7 @@ func Stamp(e *amodel.Event, c fiber.Ctx) {
 	}
 
 	e.ClientIP = clientip.From(c)
+
 	// Capped, because it is a request header: something has to bound what
 	// a caller can write into a column, and no real agent string is
 	// anywhere near this long. Through safetext rather than a byte cut:
@@ -288,6 +290,7 @@ func Stamp(e *amodel.Event, c fiber.Ctx) {
 	// it was given when there is nothing to clamp - which is every
 	// ordinary user agent, so the common case is the unsafe one.
 	const maxUserAgent = 400
+
 	e.UserAgent = safetext.Clamp(strings.Clone(c.Get(fiber.HeaderUserAgent)), maxUserAgent)
 
 	// Cloned here rather than at the caller, so no producer of events

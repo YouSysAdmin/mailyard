@@ -49,6 +49,7 @@ type registerReq struct {
 	Port     int    `json:"port"`
 	Name     string `json:"name,omitempty"`
 	Version  string `json:"version,omitempty"`
+
 	// ServerGroup is the slug of the project group to join. Sent only
 	// at enrolment - a node's group is changed in the console
 	// afterward, like any other server.
@@ -79,15 +80,18 @@ type heartbeatReq struct {
 	NodeID  string `json:"node_id"`
 	Token   string `json:"token"`
 	Version string `json:"version,omitempty"`
+
 	// AcceptETag is the fingerprint of the recipient domain list this
 	// node holds. Sending it keeps the list off the wire on the beats
 	// where nothing changed, which is nearly all of them.
 	AcceptETag string `json:"inbound_domains_etag,omitempty"`
+
 	// The receiving half, so the console can see an MX that is taking
 	// mail and failing to hand it over. A queue that only grows is the
 	// whole diagnosis.
 	InboundEnabled bool `json:"inbound_enabled"`
 	InboundQueued  int  `json:"inbound_queued"`
+
 	// Mode, on every beat, so a node switched to pull is assigned to
 	// from the next message.
 	Mode string `json:"mode,omitempty"`
@@ -97,6 +101,7 @@ type heartbeatReq struct {
 type Heartbeat struct {
 	Status            string `json:"status"`
 	StaleAfterSeconds int    `json:"stale_after_seconds"`
+
 	// AcceptETag and AcceptDomains carry the recipient domain list.
 	//
 	// The ETAG is what decides whether to replace the cache, NOT
@@ -137,14 +142,17 @@ func NewKeyAndCSR(host string) (csrPEM, keyPEM string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("generate node key: %w", err)
 	}
+
 	tmpl := &x509.CertificateRequest{
 		Subject:  pkix.Name{CommonName: host},
 		DNSNames: []string{host},
 	}
+
 	der, err := x509.CreateCertificateRequest(rand.Reader, tmpl, key)
 	if err != nil {
 		return "", "", fmt.Errorf("create certificate request: %w", err)
 	}
+
 	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		return "", "", fmt.Errorf("marshal node key: %w", err)
@@ -169,11 +177,13 @@ func (c *Control) postWith(ctx context.Context, client *http.Client, path string
 	if err != nil {
 		return err
 	}
+
 	url := strings.TrimSuffix(c.BaseURL, "/") + path
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {

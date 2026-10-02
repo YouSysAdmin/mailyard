@@ -33,6 +33,7 @@ func Covering(name string) []string {
 
 	labels := strings.Split(name, ".")
 	out := make([]string, 0, len(labels))
+
 	for i := 0; i+2 <= len(labels); i++ {
 		out = append(out, strings.Join(labels[i:], "."))
 	}

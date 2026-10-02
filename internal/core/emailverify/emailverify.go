@@ -358,6 +358,7 @@ func isNullMX(mx []*net.MX) bool {
 func (v *Verifier) storeMX(domain string, ok bool, now time.Time) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+
 	v.mxAnswer[domain] = cachedMX{ok: ok, at: now}
 	if len(v.mxAnswer) > maxCacheEntries {
 		v.evictLocked(now)

@@ -794,6 +794,7 @@ func Load(path string) (*Config, error) {
 	bindEnvKeys(v, reflect.TypeFor[Config](), "")
 
 	v.SetDefault("server.addr", ":3000")
+
 	// Far above what any single node of this shape serves, far below
 	// fasthttp's 262144 - the point is that the worst case is a number
 	// rather than whatever the kernel allows.
@@ -852,6 +853,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("relay_node.inbound.addr", ":25")
 	v.SetDefault("relay_node.inbound.max_message_size", 26214400)
 	v.SetDefault("relay_node.inbound.rate_per_minute", 120)
+
 	// Off, and off is the only safe default: a PROXY header is an
 	// unauthenticated claim about who is calling, so a listener that
 	// reads one without a trusted list hands a stranger a forged source
@@ -879,6 +881,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("campaign.batch_size", 100)
 	v.SetDefault("campaign.poll_interval", "5s")
 	v.SetDefault("submission.enabled", false)
+
 	// 587 is the submission port (RFC 6409) and 25 is where an MX is
 	// expected. Both are privileged, so an unprivileged process needs
 	// CAP_NET_BIND_SERVICE or a port mapping - but both listeners are
@@ -890,12 +893,14 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("submission.hostname", "mailyard")
 	v.SetDefault("submission.max_message_size", 25*1024*1024)
 	v.SetDefault("submission.rate_per_minute", 60)
+
 	// STARTTLS on for the two mail listeners and off for HTTP. See
 	// TLSConfig.Enabled for why those are different answers rather than
 	// an oversight.
 	v.SetDefault("server.tls.enabled", false)
 	v.SetDefault("submission.tls.enabled", true)
 	v.SetDefault("inbound.tls.enabled", true)
+
 	// Empty, not ":80". tls-alpn-01 needs no port at all, so binding one
 	// by default would take a privileged port from every installation
 	// for a challenge type most of them never use.
@@ -905,6 +910,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("inbound.hostname", "mailyard")
 	v.SetDefault("inbound.max_message_size", 25*1024*1024)
 	v.SetDefault("inbound.rate_per_minute", 120)
+
 	// Off, and off is the only safe default: a PROXY header is an
 	// unauthenticated claim about who is calling, so a listener that
 	// reads one without a trusted list hands a stranger a forged source
@@ -926,6 +932,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("metrics.enabled", false)
 	v.SetDefault("metrics.addr", "127.0.0.1:9090")
 	v.SetDefault("cors.enabled", false)
+
 	// The methods and headers the API actually uses, so a working
 	// config is just cors.enabled plus cors.allowed_origins.
 	v.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})

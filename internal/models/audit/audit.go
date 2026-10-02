@@ -37,8 +37,7 @@ const (
 
 	// TypeTOTPReset is an ADMIN removing another user's second factor,
 	// as opposed to TypeTOTPDisabled where the owner proves possession
-	// with a code. Kept distinct because the trail must show which one
-	// happened.
+	// with a code. Kept distinct because the trail must show which one happened.
 	TypeTOTPReset       = "auth.2fa.reset"
 	TypePasswordResetOK = "auth.password_reset.completed"
 
