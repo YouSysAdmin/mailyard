@@ -13,6 +13,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"io"
+	"net"
 	"net/http"
 	"reflect"
 	"slices"
@@ -766,5 +767,48 @@ func TestTheChallengeListenerIsBoundWithACMEOff(t *testing.T) {
 
 	if res.StatusCode != http.StatusOK || string(body) != "tok.keyauth" {
 		t.Fatalf("with ACME on the challenge path answered %d %q, want the token from the store", res.StatusCode, body)
+	}
+}
+
+// A TLS 1.2 client offering only CBC suites is refused, one offering
+// an AEAD suite is served.
+func TestListenersServeNoCBCSuite(t *testing.T) {
+	store := &recordingStore{rows: map[string]string{}}
+	b := &Builder{Store: store, Host: "mx.example.com", ACME: staticACME(ACME{})}
+	t.Cleanup(func() { _ = b.Shutdown(context.Background()) })
+
+	srvCfg, err := b.Build("inbound", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handshake := func(suite uint16) error {
+		c, s := net.Pipe()
+		defer func() { _ = c.Close() }()
+		defer func() { _ = s.Close() }()
+
+		go func() { _ = tls.Server(s, srvCfg).Handshake() }()
+
+		return tls.Client(c, &tls.Config{
+			ServerName:         "mx.example.com",
+			InsecureSkipVerify: true, //nolint:gosec // only the suite is under test
+			MaxVersion:         tls.VersionTLS12,
+			CipherSuites:       []uint16{suite},
+		}).Handshake()
+	}
+
+	for _, suite := range []uint16{
+		tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+		tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+		tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+		tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+	} {
+		if err := handshake(suite); err == nil {
+			t.Errorf("%s was negotiated", tls.CipherSuiteName(suite))
+		}
+	}
+
+	if err := handshake(tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256); err != nil {
+		t.Errorf("GCM handshake: %v", err)
 	}
 }

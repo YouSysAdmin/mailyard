@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
+	"github.com/yousysadmin/mailyard/internal/core/tlsbuild"
 )
 
 // Meta keys for the MX listener's own pair. In the spool, not on the
@@ -44,7 +45,7 @@ func (a *Agent) ReceiveTLS(certFile, keyFile string) (*tls.Config, error) {
 			return nil, fmt.Errorf("relay node inbound tls: %w", err)
 		}
 
-		return &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}, nil
+		return mxTLS(pair), nil
 	}
 
 	pair, err := a.selfSignedMX()
@@ -58,7 +59,15 @@ func (a *Agent) ReceiveTLS(certFile, keyFile string) (*tls.Config, error) {
 	// that demands 1.3 does not get a downgrade - it gets the message
 	// delivered in the clear instead, which is the opposite of the
 	// intent.
-	return &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}, nil
+	return mxTLS(pair), nil
+}
+
+func mxTLS(pair tls.Certificate) *tls.Config {
+	return &tls.Config{
+		Certificates: []tls.Certificate{pair},
+		MinVersion:   tls.VersionTLS12,
+		CipherSuites: tlsbuild.ServerCipherSuites(),
+	}
 }
 
 func (a *Agent) selfSignedMX() (tls.Certificate, error) {
