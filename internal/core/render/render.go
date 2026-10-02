@@ -70,6 +70,7 @@ type Output struct {
 // claiming to have one.
 func (r *Renderer) Render(input *Input, data map[string]any) (*Output, error) {
 	onMissing := r.missingKey()
+	data = wholeNumbers(data)
 
 	subject, err := plainTemplate(input.Subject, data, onMissing)
 	if err != nil {

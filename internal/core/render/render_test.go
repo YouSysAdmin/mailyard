@@ -1,6 +1,7 @@
 package render
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -9,21 +10,93 @@ import (
 
 func TestNormalize(t *testing.T) {
 	cases := map[string]string{
-		"{{ name }}":                    "{{ .name }}",
-		"{{name}}":                      "{{ .name }}",
-		"{{ .name }}":                   "{{ .name }}",
-		"{{ $var }}":                    "{{ $var }}",
-		"{{ range features }}":          "{{ range .features }}",
-		"{{ if active }}":               "{{ if .active }}",
-		"{{ end }}":                     "{{ end }}",
-		"{{ else }}":                    "{{ else }}",
-		"{{- name -}}":                  "{{- .name -}}",
-		"Hi {{ name }}, {{ order_id }}": "Hi {{ .name }}, {{ .order_id }}",
+		"{{ name }}":                                               "{{ .name }}",
+		"{{name}}":                                                 "{{.name}}",
+		"{{ .name }}":                                              "{{ .name }}",
+		"{{ $var := 1 }}{{ $var }}":                                "{{ $var := 1 }}{{ $var }}",
+		"{{ range features }}{{ . }}{{ end }}":                     "{{ range .features }}{{ . }}{{ end }}",
+		"{{ if active }}y{{ else }}n{{ end }}":                     "{{ if .active }}y{{ else }}n{{ end }}",
+		"{{- name -}}":                                             "{{- .name -}}",
+		"Hi {{ name }}, {{ order_id }}":                            "Hi {{ .name }}, {{ .order_id }}",
+		"{{ range $i, $x := items }}{{ $x }}{{ end }}":             "{{ range $i, $x := .items }}{{ $x }}{{ end }}",
+		"{{ range items }}{{ break }}{{ end }}":                    "{{ range .items }}{{ break }}{{ end }}",
+		"{{ range items }}{{ continue }}{{ end }}":                 "{{ range .items }}{{ continue }}{{ end }}",
+		"{{ slice name 0 2 }}":                                     "{{ slice .name 0 2 }}",
+		"{{ if and flag (gt (len items) 1) }}{{ end }}":            "{{ if and .flag (gt (len .items) 1) }}{{ end }}",
+		"{{ $n := name }}":                                         "{{ $n := .name }}",
+		"{{ user.first }}":                                         "{{ .user.first }}",
+		"{{ name | printf \"%q\" }}":                               "{{ .name | printf \"%q\" }}",
+		"{{ define \"x\" }}{{ a }}{{ end }}{{ template \"x\" b }}": "{{ define \"x\" }}{{ .a }}{{ end }}{{ template \"x\" .b }}",
+		"{{/* name */}}{{ name }}":                                 "{{/* name */}}{{ .name }}",
+		"{{ else }}":                                               "{{ else }}",
 	}
 	for in, want := range cases {
 		if got := Normalize(in); got != want {
 			t.Errorf("Normalize(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Data arrives as JSON, so every number in it is a float64.
+func TestRenderTakesJSONData(t *testing.T) {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(`{"count":3,"price":9.5,"total":10,"name":"Olena",
+		"items":["a","b","c"],"user":{"first":"O"},"flag":true,"n":1}`), &data); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]string{
+		`{{ range items }}{{ if eq . "b" }}{{ break }}{{ end }}{{ . }}{{ end }}`:    "a",
+		`{{ range items }}{{ if eq . "a" }}{{ continue }}{{ end }}{{ . }}{{ end }}`: "bc",
+		`{{ if eq count 3 }}y{{ end }}`:                                             "y",
+		`{{ if gt count 2 }}y{{ end }}`:                                             "y",
+		`{{ if lt price 10 }}y{{ end }}`:                                            "y",
+		`{{ if ge total 9.5 }}y{{ end }}`:                                           "y",
+		`{{ if ne name "x" }}y{{ end }}`:                                            "y",
+		`{{ if eq name "x" "Olena" }}y{{ end }}`:                                    "y",
+		`{{ range count }}{{ . }}{{ end }}`:                                         "012",
+		`{{ index items n }}`:                                                       "b",
+		`{{ slice name 0 n }}`:                                                      "O",
+		`{{ printf "%.2f %.1f %d" total price count }}`:                             "10.00 9.5 3",
+		`{{ printf "%[2]d-%.1[1]f" total count }}`:                                  "3-10.0",
+		`{{ user.first }}`:                                                          "O",
+		`{{ $n := name }}{{ $n }}`:                                                  "Olena",
+		`{{ if and flag (gt (len items) 1) }}y{{ end }}`:                            "y",
+		`{{ with user }}{{ first }}{{ end }}`:                                       "O",
+		`{{ define "x" }}[{{ . }}]{{ end }}{{ template "x" name }}`:                 "[Olena]",
+	}
+	r := &Renderer{}
+	for src, want := range cases {
+		out, err := r.Render(&Input{Subject: src, HTML: src}, data)
+		if err != nil {
+			t.Errorf("%s: %v", src, err)
+
+			continue
+		}
+
+		if out.Subject != want || out.HTML != want {
+			t.Errorf("%s: subject %q html %q, want %q", src, out.Subject, out.HTML, want)
+		}
+	}
+}
+
+// A missing key compares as nothing, not as an error, on a lenient render.
+func TestAMissingKeyComparesUnequal(t *testing.T) {
+	r := &Renderer{MissingKeyBehavior: MissingKeyZero}
+	out, err := r.Render(&Input{Subject: `{{ if eq plan "pro" }}pro{{ else }}free{{ end }}`}, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out.Subject != "free" {
+		t.Errorf("got %q", out.Subject)
+	}
+}
+
+func TestComparingAStringWithANumberFails(t *testing.T) {
+	r := &Renderer{}
+	if _, err := r.Render(&Input{Subject: `{{ if eq name 1 }}{{ end }}`}, map[string]any{"name": "x"}); err == nil {
+		t.Error("compared a string with a number")
 	}
 }
 

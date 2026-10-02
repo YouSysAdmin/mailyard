@@ -67,20 +67,38 @@ want is optional:
 <p>Hello {{ name }}, order {{ order_id }} is on its way.</p>
 ```
 
-`{{ .name }}` works too and is left exactly as written. So are `$variables`, pipelines and function calls — anything
-with an operator or a pipe in it is passed through untouched, on the grounds that whoever wrote it knows the syntax.
+The template language is Go's own ([text/template](https://pkg.go.dev/text/template), with
+[html/template](https://pkg.go.dev/html/template)'s escaping on the HTML part), so everything it has works here:
+`if` / `else if` / `else`, `range` with `$index, $value`, `break` and `continue`, `with`, variables, pipelines,
+`define` / `template` / `block`, and the builtin functions (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `and`, `or`, `not`,
+`len`, `index`, `slice`, `print`, `printf`, `println`, `html`, `js`, `urlquery`).
 
-Control structures work the same way, with the keyword left alone and its arguments dotted:
+The dot is optional wherever a name means data. Any name that is not one of the functions above is read as a field,
+in any position - `{{ slice name 0 1 }}`, `{{ if gt (len items) 1 }}`, `{{ user.first }}`. `{{ .name }}` works too and
+is left exactly as written.
 
 ```html
 {{ if premium }}<p>Your priority support line: 555-0100</p>{{ end }}
 
 <ul>
-{{ range items }}
-  <li>{{ .name }} - {{ .price }}</li>
+{{ range $i, $item := items }}
+  {{ if ge $i 5 }}{{ break }}{{ end }}
+  <li>{{ $item.name }} - {{ printf "%.2f" $item.price }}</li>
+{{ else }}
+  <li>Nothing in this order</li>
 {{ end }}
 </ul>
 ```
+
+{{< callout type="note" title="Numbers from JSON compare as numbers" >}}
+A JSON number has no integer type, and Go's comparisons refuse to compare a fraction with a whole number. Mailyard
+compares any two numbers by value, so `{{ if gt count 2 }}` and `{{ if lt price 9.99 }}` both work. A whole number
+in the data is an integer, which is what `range`, `index`, `slice` and `%d` need, and `printf "%.2f"` still prints it
+as `10.00`.
+{{< /callout >}}
+
+What is NOT there is a library of extra functions: no `upper`, `default` or date formatting. Format a value before
+sending it.
 
 {{< callout type="tip" title="Whitespace trimming survives" >}}
 `{{- name -}}` keeps its trim markers, which is how you stop a control structure leaving blank lines through the middle

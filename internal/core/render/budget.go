@@ -5,7 +5,10 @@ package render
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"text/template/parse"
 )
@@ -82,7 +85,10 @@ func plant(trees map[string]*parse.Tree) (map[string]any, error) {
 		t.Root.Nodes = append([]parse.Node{tickTree.Root.Nodes[0].Copy()}, t.Root.Nodes...)
 	}
 
-	return map[string]any{budgetFunc: b.tick, "printf": printfFunc}, nil
+	funcs := map[string]any{budgetFunc: b.tick, "printf": printfFunc}
+	maps.Copy(funcs, comparisons)
+
+	return funcs, nil
 }
 
 // printfFunc stands in for the builtin at execution, so a format
@@ -94,7 +100,64 @@ func printfFunc(format string, a ...any) (string, error) {
 		return "", fmt.Errorf("%w: %s", ErrFormatWidth, format)
 	}
 
-	return fmt.Sprintf(format, a...), nil
+	return fmt.Sprintf(format, floatArgs(format, a)...), nil
+}
+
+// floatArgs hands a float verb a float. Whole numbers in the data are
+// integers (see wholeNumbers), and `%.2f` of an int64 prints
+// %!f(int64=10) where the author wanted 10.00.
+func floatArgs(format string, a []any) []any {
+	var out []any
+	arg := 0
+	for i := 0; i < len(format); i++ {
+		if format[i] != '%' {
+			continue
+		}
+
+		i++
+		for i < len(format) && strings.IndexByte("+-# 0123456789.[", format[i]) >= 0 {
+			if format[i] != '[' {
+				i++
+
+				continue
+			}
+
+			end := strings.IndexByte(format[i:], ']')
+			if end < 0 {
+				return a
+			}
+
+			n, err := strconv.Atoi(format[i+1 : i+end])
+			if err != nil {
+				return a
+			}
+
+			arg = n - 1
+			i += end + 1
+		}
+
+		if i >= len(format) || format[i] == '%' {
+			continue
+		}
+
+		if strings.IndexByte("eEfFgG", format[i]) >= 0 && arg >= 0 && arg < len(a) {
+			if n, ok := a[arg].(int64); ok {
+				if out == nil {
+					out = slices.Clone(a)
+				}
+
+				out[arg] = float64(n)
+			}
+		}
+
+		arg++
+	}
+
+	if out == nil {
+		return a
+	}
+
+	return out
 }
 
 func plantList(l *parse.ListNode) error {

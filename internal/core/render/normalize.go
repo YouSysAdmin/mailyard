@@ -3,8 +3,9 @@
 package render
 
 import (
-	"regexp"
+	"slices"
 	"strings"
+	"text/template/parse"
 )
 
 // Normalize lets a template author write {{ name }} where Go wants
@@ -15,98 +16,111 @@ import (
 // reference in every template - which makes it pure ceremony for the
 // person writing one. They are writing marketing copy, not Go.
 //
-// WHAT IS LEFT ALONE MATTERS MORE THAN WHAT IS REWRITTEN. A token that
-// already resolves - `.field`, `$var`, `.` itself - is somebody who knows
-// the syntax and must not be second-guessed. A keyword is the template
-// language, not data. And anything with an operator, a pipe or a call in
-// it is beyond what this can safely rearrange, so it passes through
-// untouched and Go reports the error if there is one.
+// The source is parsed with Go's own parser, function checks off, and
+// every identifier that names no function gets a dot inserted in front
+// of it. Nothing else in the text moves, so trim markers, comments and
+// line numbers in error messages are the author's own. A source that
+// does not parse is answered unchanged and the real parse reports it.
 //
-//	{{ name }}            -> {{ .name }}
-//	{{ range features }}  -> {{ range .features }}
-//	{{ if active }}       -> {{ if .active }}
-//	{{- name -}}          -> {{- .name -}}      trim markers survive
-//	{{ .name }} {{ $x }}  -> unchanged
-//	{{ end }} {{ else }}  -> unchanged
-//	{{ len .xs | printf }} -> unchanged
+//	{{ name }}                    -> {{ .name }}
+//	{{ range $i, $x := items }}   -> {{ range $i, $x := .items }}
+//	{{ if gt (len items) 1 }}     -> {{ if gt (len .items) 1 }}
+//	{{ slice name 0 2 }}          -> {{ slice .name 0 2 }}
+//	{{ user.first }}              -> {{ .user.first }}
+//	{{ .name }} {{ $x }} {{ . }}  -> unchanged
+//	{{ break }} {{ continue }}    -> unchanged
 func Normalize(s string) string {
-	return action.ReplaceAllStringFunc(s, func(match string) string {
-		parts := action.FindStringSubmatch(match)
-		if parts == nil {
-			return match
+	t := parse.New("t")
+	t.Mode = parse.SkipFuncCheck
+	set := map[string]*parse.Tree{}
+	if _, err := t.Parse(s, "", "", set); err != nil {
+		return s
+	}
+
+	var at []int
+	for _, tree := range set {
+		if tree != nil {
+			at = bareFields(tree.Root, s, at)
 		}
+	}
 
-		openTrim, inner, closeTrim := parts[1], parts[2], parts[3]
+	if len(at) == 0 {
+		return s
+	}
 
-		return "{{" + openTrim + " " + dotFields(inner) + " " + closeTrim + "}}"
-	})
+	slices.Sort(at)
+	at = slices.Compact(at)
+
+	var b strings.Builder
+	b.Grow(len(s) + len(at))
+	prev := 0
+	for _, p := range at {
+		b.WriteString(s[prev:p])
+		b.WriteByte('.')
+		prev = p
+	}
+
+	b.WriteString(s[prev:])
+
+	return b.String()
 }
 
-// action matches one {{ ... }} block, capturing the trim markers so they
-// can be put back, and the inner text so it can be rewritten.
-var action = regexp.MustCompile(`\{\{(-?)\s*(.*?)\s*(-?)\}\}`)
-
-// bareIdentifier is a name with nothing in front of it - the only shape
-// that can be safely dotted.
-var bareIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
-// keywords is the template language itself: control words, builtin
-// functions and literals. Dotting any of these would turn a working
-// template into one that looks up a field nobody has.
-var keywords = map[string]bool{
-	// Control.
-	"if": true, "else": true, "end": true, "range": true, "with": true,
-	"template": true, "block": true, "define": true,
-	// Literals.
-	"nil": true, "true": true, "false": true,
-	// Builtin functions.
+// functions is every name a template can call: the builtins plus what
+// plant and the comparisons add. Anything else is data.
+var functions = map[string]bool{
 	"and": true, "call": true, "html": true, "index": true, "js": true,
 	"len": true, "not": true, "or": true, "print": true, "printf": true,
-	"println": true, "urlquery": true,
-	// Comparison.
+	"println": true, "slice": true, "urlquery": true,
 	"eq": true, "ge": true, "gt": true, "le": true, "lt": true, "ne": true,
+	budgetFunc: true,
 }
 
-// dotFields rewrites the inside of one action.
-//
-// Only two arrangements are touched, and both are ones where every token
-// after the first is unambiguously a field name: a lone token, and a
-// keyword followed by its arguments. Anything else - two bare words, a
-// pipeline, a method call - is left exactly as written, because guessing
-// which half of it is data is how a normalizer breaks a template that
-// worked.
-func dotFields(inner string) string {
-	tokens := strings.Fields(inner)
-	if len(tokens) == 0 {
-		return inner
+// bareFields collects the offsets of identifiers that name no function.
+func bareFields(n parse.Node, src string, at []int) []int {
+	switch n := n.(type) {
+	case *parse.ListNode:
+		if n == nil {
+			return at
+		}
+
+		for _, c := range n.Nodes {
+			at = bareFields(c, src, at)
+		}
+	case *parse.ActionNode:
+		at = bareFields(n.Pipe, src, at)
+	case *parse.IfNode:
+		at = bareBranch(&n.BranchNode, src, at)
+	case *parse.RangeNode:
+		at = bareBranch(&n.BranchNode, src, at)
+	case *parse.WithNode:
+		at = bareBranch(&n.BranchNode, src, at)
+	case *parse.TemplateNode:
+		at = bareFields(n.Pipe, src, at)
+	case *parse.PipeNode:
+		if n == nil {
+			return at
+		}
+
+		for _, cmd := range n.Cmds {
+			for _, arg := range cmd.Args {
+				at = bareFields(arg, src, at)
+			}
+		}
+	case *parse.ChainNode:
+		at = bareFields(n.Node, src, at)
+	case *parse.IdentifierNode:
+		p := int(n.Pos)
+		if !functions[n.Ident] && p < len(src) && strings.HasPrefix(src[p:], n.Ident) {
+			at = append(at, p)
+		}
 	}
 
-	if len(tokens) == 1 {
-		return dotted(tokens[0])
-	}
-
-	if !keywords[tokens[0]] {
-		return inner
-	}
-
-	out := make([]string, len(tokens))
-	out[0] = tokens[0]
-	for i, tok := range tokens[1:] {
-		out[i+1] = dotted(tok)
-	}
-
-	return strings.Join(out, " ")
+	return at
 }
 
-// dotted prefixes a bare field name, and answers anything else unchanged.
-func dotted(token string) string {
-	if strings.HasPrefix(token, ".") || strings.HasPrefix(token, "$") {
-		return token
-	}
+func bareBranch(n *parse.BranchNode, src string, at []int) []int {
+	at = bareFields(n.Pipe, src, at)
+	at = bareFields(n.List, src, at)
 
-	if keywords[token] || !bareIdentifier.MatchString(token) {
-		return token
-	}
-
-	return "." + token
+	return bareFields(n.ElseList, src, at)
 }
