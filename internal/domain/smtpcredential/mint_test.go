@@ -24,7 +24,8 @@ func TestTheListenerHostIsDialable(t *testing.T) {
 	}{
 		{":587", "mailyard", "https://mail.example.com", "mail.example.com"},
 		{":587", "mailyard", "", "localhost"},
-		{"10.0.0.5:587", "mailyard", "https://mail.example.com", "10.0.0.5"},
+		{"10.0.0.5:587", "mailyard", "https://mail.example.com", "mail.example.com"},
+		{"10.0.0.5:587", "mailyard", "", "10.0.0.5"},
 		{":587", "smtp.example.com", "https://mail.example.com", "smtp.example.com"},
 	}
 	for _, tc := range cases {

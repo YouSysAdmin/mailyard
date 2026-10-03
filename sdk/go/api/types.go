@@ -870,6 +870,13 @@ type GroupUpdateInput struct {
 	MakeDefault bool    `json:"make_default"`
 }
 
+// ImportError is the wire body.
+type ImportError struct {
+	Index int64  `json:"index"`
+	Email string `json:"email"`
+	Error string `json:"error"`
+}
+
 // ImportInput is the request body.
 type ImportInput struct {
 	Subscribers []SubscriberUpsertInput `json:"subscribers"`
@@ -877,10 +884,10 @@ type ImportInput struct {
 
 // ImportResponse is the response body.
 type ImportResponse struct {
-	Created int64            `json:"created"`
-	Updated int64            `json:"updated"`
-	Skipped int64            `json:"skipped"`
-	Errors  []map[string]any `json:"errors"`
+	Created int64         `json:"created"`
+	Updated int64         `json:"updated"`
+	Skipped int64         `json:"skipped"`
+	Errors  []ImportError `json:"errors"`
 }
 
 // InboundAttachment is the wire body.
@@ -1350,6 +1357,28 @@ type PasskeyResetResponse struct {
 	Removed int64 `json:"removed"`
 }
 
+// PatchInput is the request body.
+type PatchInput struct {
+	Name                 *string  `json:"name"`
+	Slug                 *string  `json:"slug"`
+	Type                 *string  `json:"type"`
+	ClientID             *string  `json:"client_id"`
+	Secret               *string  `json:"client_secret"`
+	Issuer               *string  `json:"issuer"`
+	AuthURL              *string  `json:"auth_url"`
+	TokenURL             *string  `json:"token_url"`
+	UserInfoURL          *string  `json:"userinfo_url"`
+	Scopes               []string `json:"scopes"`
+	Enabled              *bool    `json:"enabled"`
+	Hidden               *bool    `json:"hidden"`
+	AutoRegister         *bool    `json:"auto_register"`
+	RequireEmailVerified *bool    `json:"require_email_verified"`
+	AllowedDomains       []string `json:"allowed_domains"`
+	AllowedEmails        []string `json:"allowed_emails"`
+	GroupsClaim          *string  `json:"groups_claim"`
+	AllowedGroups        []string `json:"allowed_groups"`
+}
+
 // Plan is the wire body.
 type Plan struct {
 	ID                      string     `json:"id"`
@@ -1603,6 +1632,20 @@ type RoleResponse struct {
 	Role *Role `json:"role"`
 }
 
+// RoleUpdateInput is the request body.
+type RoleUpdateInput struct {
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	Permissions *[]string `json:"permissions"`
+}
+
+// RunJobResponse is the response body.
+type RunJobResponse struct {
+	Jobs   []Status `json:"jobs"`
+	Ran    string   `json:"ran"`
+	Failed bool     `json:"failed"`
+}
+
 // SandboxAttachment is the wire body.
 type SandboxAttachment struct {
 	Filename    string `json:"filename"`
@@ -1770,6 +1813,7 @@ type SettingItem struct {
 	Value       string     `json:"value"`
 	Overridden  bool       `json:"overridden"`
 	Unit        string     `json:"unit,omitempty"`
+	Max         int64      `json:"max,omitempty"`
 	ManagedAt   string     `json:"managed_at,omitempty"`
 	ManagedIn   string     `json:"managed_in,omitempty"`
 	Ref         string     `json:"ref,omitempty"`
@@ -2107,6 +2151,7 @@ type SubscriberUpsertInput struct {
 // SubscriberlistListResponse is the response body.
 type SubscriberlistListResponse struct {
 	SubscriberLists []*List `json:"subscriber_lists"`
+	Total           int64   `json:"total"`
 }
 
 // SubscriberlistMember is the wire body.
@@ -2178,6 +2223,7 @@ type SuppressionCreateInput struct {
 	Email  string `json:"email"`
 	Kind   string `json:"kind"`
 	Reason string `json:"reason"`
+	ListID string `json:"list_id"`
 }
 
 // SuppressionImportInput is the request body.
@@ -2328,7 +2374,7 @@ type TemplateSendInput struct {
 
 // TemplateUpdateInput is the request body.
 type TemplateUpdateInput struct {
-	Name            string  `json:"name"`
+	Name            *string `json:"name"`
 	Description     *string `json:"description"`
 	DefaultLanguage string  `json:"default_language"`
 	SampleData      *string `json:"sample_data"`
@@ -2435,7 +2481,7 @@ type UnsubscribelistListResponse struct {
 
 // UnsubscribelistUpdateInput is the request body.
 type UnsubscribelistUpdateInput struct {
-	Name        string  `json:"name"`
+	Name        *string `json:"name"`
 	PublicName  *string `json:"public_name"`
 	Description *string `json:"description"`
 	Active      *bool   `json:"active"`

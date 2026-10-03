@@ -119,8 +119,8 @@ func (c *Client) ListAdminJobs(ctx context.Context, opts ...RequestOption) (Jobs
 // RunAdminJob Run job.
 //
 // POST /admin/jobs/:name/run
-func (c *Client) RunAdminJob(ctx context.Context, name string, opts ...RequestOption) (JobsResponse, error) {
-	return do[JobsResponse](ctx, c, "POST", fmt.Sprintf("/admin/jobs/%s/run", escape(name)), nil, opts)
+func (c *Client) RunAdminJob(ctx context.Context, name string, opts ...RequestOption) (RunJobResponse, error) {
+	return do[RunJobResponse](ctx, c, "POST", fmt.Sprintf("/admin/jobs/%s/run", escape(name)), nil, opts)
 }
 
 // ListAdminOauthProviders List.
@@ -154,7 +154,7 @@ func (c *Client) GetAdminOauthProvider(ctx context.Context, id string, opts ...R
 // UpdateAdminOauthProvider Update.
 //
 // PATCH /admin/oauth-providers/:id
-func (c *Client) UpdateAdminOauthProvider(ctx context.Context, id string, body UpsertInput, opts ...RequestOption) (ProviderResponse, error) {
+func (c *Client) UpdateAdminOauthProvider(ctx context.Context, id string, body PatchInput, opts ...RequestOption) (ProviderResponse, error) {
 	return do[ProviderResponse](ctx, c, "PATCH", fmt.Sprintf("/admin/oauth-providers/%s", escape(id)), body, opts)
 }
 
@@ -1067,7 +1067,7 @@ func (c *Client) DeleteProjectRole(ctx context.Context, id string, roleId string
 // UpdateProjectRole Update role.
 //
 // PATCH /projects/:id/roles/:roleId
-func (c *Client) UpdateProjectRole(ctx context.Context, id string, roleId string, body RoleInput, opts ...RequestOption) (RoleResponse, error) {
+func (c *Client) UpdateProjectRole(ctx context.Context, id string, roleId string, body RoleUpdateInput, opts ...RequestOption) (RoleResponse, error) {
 	return do[RoleResponse](ctx, c, "PATCH", fmt.Sprintf("/projects/%s/roles/%s", escape(id), escape(roleId)), body, opts)
 }
 
