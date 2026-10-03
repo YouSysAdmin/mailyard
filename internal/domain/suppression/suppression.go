@@ -8,6 +8,7 @@ package suppression
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -136,16 +137,45 @@ func (s *Store) Upsert(ctx context.Context, sup *supmodel.Suppression) error {
 	}
 
 	sup.Email = strings.ToLower(strings.TrimSpace(sup.Email))
-	_, err := s.Exec(ctx, `
+
+	// RETURNING the row that holds the block, so on a refresh the
+	// caller sees the existing id and creation time, not the fresh ones
+	// that were never stored.
+	return s.QueryRow(ctx, `
         INSERT INTO suppressions (id, project_id, email, kind, reason, unsubscribe_list_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(project_id, email, unsubscribe_list_id) DO UPDATE SET
             kind   = excluded.kind,
             reason = excluded.reason
+        RETURNING id, created_at
     `, sup.ID, sup.ProjectID, sup.Email, sup.Kind, sup.Reason,
-		database.NullStr(sup.UnsubscribeListID), sup.CreatedAt)
+		database.NullStr(sup.UnsubscribeListID), sup.CreatedAt).Scan(&sup.ID, &sup.CreatedAt)
+}
 
-	return err
+// Insert adds the block for (project, email, list) and reports false,
+// writing nothing, when that exact block already exists.
+func (s *Store) Insert(ctx context.Context, sup *supmodel.Suppression) (bool, error) {
+	if sup.ID == "" {
+		sup.ID = ids.New()
+	}
+
+	if sup.CreatedAt.IsZero() {
+		sup.CreatedAt = time.Now().UTC()
+	}
+
+	sup.Email = strings.ToLower(strings.TrimSpace(sup.Email))
+	err := s.QueryRow(ctx, `
+        INSERT INTO suppressions (id, project_id, email, kind, reason, unsubscribe_list_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(project_id, email, unsubscribe_list_id) DO NOTHING
+        RETURNING id
+    `, sup.ID, sup.ProjectID, sup.Email, sup.Kind, sup.Reason,
+		database.NullStr(sup.UnsubscribeListID), sup.CreatedAt).Scan(&sup.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	return err == nil, err
 }
 
 // Delete removes the global block on an address and nothing else.
@@ -341,21 +371,70 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
+	names, ok, err := h.listNames(c, []createInput{in})
+	if !ok {
+		return err
+	}
+
+	sup := in.suppression(rc.Project.ID)
+	sup.UnsubscribeListName = names[sup.UnsubscribeListID]
+	created, err := h.Runtime.Store.Suppression.Insert(c.Context(), sup)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !created {
+		return response.Conflict(c, "this address is already suppressed in that scope")
+	}
+
+	return response.Created(c, CreateResponse{Suppression: sup})
+}
+
+// suppression is the row one entry writes, manual unless it says
+// otherwise.
+func (in createInput) suppression(projID string) *supmodel.Suppression {
 	sup := &supmodel.Suppression{
-		ProjectID: rc.Project.ID,
-		Email:     in.Email,
-		Kind:      in.Kind,
-		Reason:    in.Reason,
+		ProjectID:         projID,
+		Email:             in.Email,
+		Kind:              in.Kind,
+		Reason:            in.Reason,
+		UnsubscribeListID: in.ListID,
 	}
 	if sup.Kind == "" {
 		sup.Kind = supmodel.KindManual
 	}
 
-	if err := h.Runtime.Store.Suppression.Upsert(c.Context(), sup); err != nil {
-		return response.Internal(c, err)
+	return sup
+}
+
+// listNames resolves every list_id the entries name within the project,
+// keyed by id. A list another project owns, or none at all, refuses
+// the request before anything is written.
+func (h *Handler) listNames(c fiber.Ctx, entries []createInput) (map[string]string, bool, error) {
+	rc := domain.GetRequestContext(c)
+	names := map[string]string{}
+	for _, in := range entries {
+		if in.ListID == "" {
+			continue
+		}
+
+		if _, seen := names[in.ListID]; seen {
+			continue
+		}
+
+		l, err := h.Runtime.Store.UnsubscribeList.Get(c.Context(), rc.Project.ID, in.ListID)
+		if err != nil {
+			return nil, false, response.Internal(c, err)
+		}
+
+		if l == nil {
+			return nil, false, response.BadRequest(c, "unsubscribe list "+in.ListID+" not found in this project")
+		}
+
+		names[in.ListID] = l.Name
 	}
 
-	return response.Created(c, CreateResponse{Suppression: sup})
+	return names, true, nil
 }
 
 // Import blocks every address in the body, up to a thousand per
@@ -369,18 +448,12 @@ func (h *Handler) Import(c fiber.Ctx) error {
 		return resp
 	}
 
-	for _, item := range in.Suppressions {
-		sup := &supmodel.Suppression{
-			ProjectID: rc.Project.ID,
-			Email:     item.Email,
-			Kind:      item.Kind,
-			Reason:    item.Reason,
-		}
-		if sup.Kind == "" {
-			sup.Kind = supmodel.KindManual
-		}
+	if _, ok, err := h.listNames(c, in.Suppressions); !ok {
+		return err
+	}
 
-		if err := h.Runtime.Store.Suppression.Upsert(c.Context(), sup); err != nil {
+	for _, item := range in.Suppressions {
+		if err := h.Runtime.Store.Suppression.Upsert(c.Context(), item.suppression(rc.Project.ID)); err != nil {
 			return response.Internal(c, err)
 		}
 	}

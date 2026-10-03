@@ -106,7 +106,7 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 		req.Subject = out.Subject
 		req.HTML = out.HTML
 		req.Text = out.Text
-		if err := svc.Validate(c.Context(), rc.Project.ID, req); err != nil {
+		if _, err := svc.DryRun(c.Context(), rc.Project.ID, req); err != nil {
 			return sendFailure(c, err)
 		}
 

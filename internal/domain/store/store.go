@@ -706,12 +706,14 @@ type EmailFilter struct {
 	Cursor   keyset.Cursor
 	Limit    int
 
-	Sender       string
-	Recipient    string
-	Exact        bool
-	Template     string
-	Tag          string
-	APIKeyID     string
+	Sender    string
+	Recipient string
+	Exact     bool
+	Template  string
+	Tag       string
+	APIKeyID  string
+
+	// SMTPServerID matches the server that delivered the message.
 	SMTPServerID string
 	From         *time.Time
 	To           *time.Time
@@ -733,7 +735,7 @@ type EmailStore interface {
 	GetAny(ctx context.Context, id string) (*email.Email, error)
 	List(ctx context.Context, projID string, f EmailFilter) ([]*email.Email, error)
 	Put(ctx context.Context, e *email.Email) error
-	Reset(ctx context.Context, projID, id string) (bool, error)
+	Reset(ctx context.Context, projID, id string, recipients []string) (bool, error)
 
 	// Cancel takes a message out of the queue before a worker claims
 	// it, reporting whether it was still there to take. createdAt
@@ -834,6 +836,11 @@ type SuppressionFilter struct {
 type SuppressionStore interface {
 	List(ctx context.Context, projID string, f SuppressionFilter) ([]*suppression.Suppression, error)
 	Upsert(ctx context.Context, s *suppression.Suppression) error
+
+	// Insert writes a new block and reports false, writing nothing,
+	// when the same (email, list) block already exists - the manual
+	// create answers 409 there, where Upsert refreshes kind and reason.
+	Insert(ctx context.Context, s *suppression.Suppression) (bool, error)
 
 	// Delete lifts the global block, DeleteForList lifts one list
 	// opt-out, and PurgeForAddress takes every scope for the erasure

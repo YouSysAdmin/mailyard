@@ -21,7 +21,9 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
 	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
+	"github.com/yousysadmin/mailyard/internal/core/retention"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/settings"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	coretracking "github.com/yousysadmin/mailyard/internal/core/tracking"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
@@ -43,6 +45,17 @@ func NewRequestError(msg string) *RequestError { return &RequestError{msg: msg} 
 
 func reqErrf(format string, args ...any) error {
 	return &RequestError{msg: fmt.Sprintf(format, args...)}
+}
+
+// ConflictError is a request that is well formed but refused by the
+// state the message is in. The endpoint maps it to a 409.
+type ConflictError struct{ msg string }
+
+// Error renders the refusal for a log or a caller.
+func (e *ConflictError) Error() string { return e.msg }
+
+func conflictf(format string, args ...any) error {
+	return &ConflictError{msg: fmt.Sprintf(format, args...)}
 }
 
 // HeaderDisplayTo, HeaderDisplayCc and HeaderReplyTo are the keys
@@ -120,6 +133,10 @@ type Service struct {
 	// an opt-out list. Nil or disabled means no link is minted.
 	Tracking *coretracking.Signer
 
+	// Settings answers the retention windows a retry is judged
+	// against. Nil skips that check.
+	Settings *settings.Service
+
 	// Quota is told what each volume check saw, so somebody hears about
 	// a plan limit before and when it refuses a send. Nil means the
 	// check just answers, which is how this worked while
@@ -156,6 +173,7 @@ func NewService(rt *env.Runtime) *Service {
 		Log:         rt.Log,
 		Blob:        rt.Blob,
 		Tracking:    rt.Tracking,
+		Settings:    rt.Settings,
 
 		// Read lazily, for the reason Quota below is.
 		Cancelled: func(ctx context.Context, projID, emailID string) {
@@ -377,12 +395,10 @@ func (s *Service) Validate(ctx context.Context, projID string, req *SendRequest)
 			return err
 		}
 
+		// An inactive list still filters the send. It only stops new
+		// links being minted, which Send decides.
 		if l == nil {
 			return reqErrf("unsubscribe list %q not found in this project", req.UnsubscribeListID)
-		}
-
-		if !l.Active {
-			return reqErrf("unsubscribe list %q is inactive", l.Name)
 		}
 	}
 
@@ -468,11 +484,11 @@ func (s *Service) ValidateShape(req *SendRequest) error {
 		}
 	}
 
-	if req.Subject == "" {
+	if strings.TrimSpace(req.Subject) == "" {
 		return reqErrf("subject is required")
 	}
 
-	if req.HTML == "" && req.Text == "" {
+	if strings.TrimSpace(req.HTML) == "" && strings.TrimSpace(req.Text) == "" {
 		return reqErrf("either html or text body is required")
 	}
 
@@ -624,7 +640,12 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	// waits until the id exists, below, because the web view variable
 	// shares that pass and cannot be built any earlier.
 	unsubURL := ""
-	if req.UnsubscribeListID != "" && len(allowed) == 1 && s.Tracking != nil && s.Tracking.Enabled() {
+	mint, err := s.mintsLinks(ctx, projID, req.UnsubscribeListID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if mint && len(allowed) == 1 && s.Tracking != nil && s.Tracking.Enabled() {
 		addr := strings.ToLower(smtpclient.EnvelopeAddress(allowed[0]))
 		unsubURL = s.Tracking.ListUnsubscribeURL(req.UnsubscribeListID, addr)
 		// RFC 8058: mailbox providers surface their own unsubscribe
@@ -746,7 +767,51 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	return e, blocked, nil
 }
 
+// mintsLinks reports whether a send scoped to listID gets a one-click
+// link: the list exists in the project and is active. An inactive list
+// keeps filtering its opt-outs and mints nothing new.
+func (s *Service) mintsLinks(ctx context.Context, projID, listID string) (bool, error) {
+	if listID == "" {
+		return false, nil
+	}
+
+	l, err := s.Store.UnsubscribeList.Get(ctx, projID, listID)
+	if err != nil {
+		return false, err
+	}
+
+	return l != nil && l.Active, nil
+}
+
+// DryRun runs every check Send runs and writes nothing: the message,
+// the sender, the route, the plan's volume and the suppression list.
+// It answers the recipients a real send would drop. The volume check
+// raises no quota notification, since nothing was sent.
+func (s *Service) DryRun(ctx context.Context, projID string, req *SendRequest) ([]string, error) {
+	if err := s.Validate(ctx, projID, req); err != nil {
+		return nil, err
+	}
+
+	if req.System {
+		return nil, nil
+	}
+
+	if err := quota.CheckSend(ctx, s.Store, projID, nil); err != nil {
+		return nil, err
+	}
+
+	_, blocked, err := s.Store.Suppression.FilterSuppressedForList(ctx, projID, req.UnsubscribeListID, req.To)
+
+	return blocked, err
+}
+
 // Retry re-queues a failed email with a fresh attempt budget.
+//
+// Two refusals besides the status. A message past a content retention
+// window may have lost its body or attachments, and sending what is
+// left would deliver an empty or incomplete message. And recipients
+// suppressed since the failure are dropped, the way a new send drops
+// them, so a hard bounce is not sent the same message again.
 func (s *Service) Retry(ctx context.Context, projID, id string) (*emailmodel.Email, error) {
 	e, err := s.Store.Email.Get(ctx, projID, id)
 	if err != nil {
@@ -761,7 +826,24 @@ func (s *Service) Retry(ctx context.Context, projID, id string) (*emailmodel.Ema
 		return nil, reqErrf("only failed emails can be retried (status is %q)", e.Status)
 	}
 
-	ok, err := s.Store.Email.Reset(ctx, projID, id)
+	if s.contentRetired(e) {
+		return nil, conflictf("the content of this email is past its retention window and may have been removed, " +
+			"so it cannot be retried. Send it again as a new message")
+	}
+
+	recipients := e.Recipients
+	if !e.System {
+		recipients, _, err = s.Store.Suppression.FilterSuppressedForList(ctx, projID, e.UnsubscribeListID, e.Recipients)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(recipients) == 0 {
+			return nil, conflictf("every recipient of this email is now suppressed")
+		}
+	}
+
+	ok, err := s.Store.Email.Reset(ctx, projID, id, recipients)
 	if err != nil {
 		return nil, err
 	}
@@ -773,6 +855,30 @@ func (s *Service) Retry(ctx context.Context, projID, id string) (*emailmodel.Ema
 	s.Wake()
 
 	return s.Store.Email.Get(ctx, projID, id)
+}
+
+// contentRetired reports whether a retention sweep may have cleared the
+// message's content: the body is already empty, or the row is older
+// than the body or attachment window. The sweep empties the attachment
+// list, so the row's age is the only evidence left of what it held.
+func (s *Service) contentRetired(e *emailmodel.Email) bool {
+	if strings.TrimSpace(e.HTMLBody) == "" && strings.TrimSpace(e.TextBody) == "" {
+		return true
+	}
+
+	if s.Settings == nil {
+		return false
+	}
+
+	bodyDays, attDays := retention.ContentWindows(s.Settings)
+	now := time.Now().UTC()
+	for _, days := range []int{bodyDays, attDays} {
+		if days > 0 && e.CreatedAt.Before(now.AddDate(0, 0, -days)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Cancel withdraws a message that has not been handed to a worker:

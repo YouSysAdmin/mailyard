@@ -203,16 +203,20 @@ func APIDocs() []apidoc.Route {
 			},
 		},
 		{
-			Method:      "POST",
-			Path:        "/emails/:id/retry",
-			Permission:  "emails:write",
-			Summary:     "Requeue a failed email",
-			Description: "Only a message in a terminal failed state can be retried.",
-			PathParams:  []apidoc.Param{{Name: "id", Format: "uuid"}},
+			Method:     "POST",
+			Path:       "/emails/:id/retry",
+			Permission: "emails:write",
+			Summary:    "Requeue a failed email",
+			Description: "Only a message in a terminal failed state can be retried. A message older than the " +
+				"body or attachment retention window answers 409, since its content may be gone, and so " +
+				"does one whose every recipient is now suppressed. Recipients suppressed since the failure " +
+				"are dropped from the retry.",
+			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
 			Responses: []apidoc.Response{
 				apidoc.OK("The requeued email.", EmailResponse{}),
 				apidoc.BadRequest,
 				apidoc.NotFound,
+				apidoc.Conflict,
 			},
 		},
 		{

@@ -78,6 +78,17 @@ That is what you want after fixing the cause — new credentials, a corrected DN
 message that failed for a permanent reason, which will simply spend the whole budget again.
 {{< /callout >}}
 
+Two more refusals, both `409 Conflict`:
+
+- **The content may be gone.** A message older than the body or attachment retention window (see
+  [retention](/docs/admin/platform-settings)) cannot be retried, because the sweep may already have emptied its body or
+  dropped its attachments, and a retry would deliver what is left. Send it again as a new message instead. Failed
+  messages are not exempt from the content windows: retention is the operator's statement of how long content is
+  kept.
+- **Nobody is left to send to.** Recipients suppressed since the failure - a hard bounce on the first attempt
+  suppresses the address - are dropped from the retry, the way a new send drops them. When that leaves nobody, the
+  retry is refused.
+
 The response is the full email record, not the status summary. The worker is woken immediately, so a healthy queue
 picks the message up in the same second rather than at the next poll.
 

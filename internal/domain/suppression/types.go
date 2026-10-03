@@ -22,6 +22,10 @@ type createInput struct {
 	Email  string `json:"email"  validate:"required,email,max=320" normalize:"normalize"`
 	Kind   string `json:"kind"   validate:"omitempty,oneof=bounce complaint manual"`
 	Reason string `json:"reason" validate:"omitempty,max=500"      normalize:"trim"`
+
+	// ListID scopes the block to one unsubscribe list of this project.
+	// Empty is a global block.
+	ListID string `json:"list_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 }
 
 // importInput is a block list brought in whole, from another

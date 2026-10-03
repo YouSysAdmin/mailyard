@@ -31,10 +31,13 @@ func APIDocs() []apidoc.Route {
 			Path:       "/suppressions",
 			Permission: "suppressions:write",
 			Summary:    "Block an address",
-			Request:    createInput{},
+			Description: "Without `list_id` the block is global. With it, the address is opted out " +
+				"of that one unsubscribe list of this project. The same block twice is a 409.",
+			Request: createInput{},
 			Responses: []apidoc.Response{
 				apidoc.Created("The suppression row.", CreateResponse{}),
 				apidoc.BadRequest,
+				apidoc.Conflict,
 			},
 		},
 		{

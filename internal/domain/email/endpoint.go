@@ -89,21 +89,13 @@ func (h *Handler) Send(c fiber.Ctx) error {
 		req.Track = TrackOff
 	}
 
+	// The checks Send runs, through the service, so a dry run cannot
+	// disagree with the send it stands for - the plan's volume and a
+	// list-scoped opt-out included.
 	if in.DryRun {
-		if err := svc.Validate(c.Context(), rc.Project.ID, req); err != nil {
-			return sendFailure(c, err)
-		}
-
-		// The same filter the real send uses. FilterSuppressed sees only
-		// global blocks, so a dry run submitted with unsubscribe_list_id
-		// reported a recipient as deliverable when Service.Send - which
-		// calls FilterSuppressedForList - was going to drop them for
-		// having opted out of that list. A dry run that disagrees with
-		// to send is worse than no dry run.
-		_, blocked, err := h.Runtime.Store.Suppression.FilterSuppressedForList(
-			c.Context(), rc.Project.ID, req.UnsubscribeListID, req.To)
+		blocked, err := svc.DryRun(c.Context(), rc.Project.ID, req)
 		if err != nil {
-			return response.Internal(c, err)
+			return sendFailure(c, err)
 		}
 
 		return response.Success(c, DryRunResponse{
@@ -614,6 +606,10 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 func sendFailure(c fiber.Ctx, err error) error {
 	if re, ok := errors.AsType[*RequestError](err); ok {
 		return response.BadRequest(c, re.Error())
+	}
+
+	if ce, ok := errors.AsType[*ConflictError](err); ok {
+		return response.Conflict(c, ce.Error())
 	}
 
 	if qe, ok := errors.AsType[*quota.Error](err); ok {

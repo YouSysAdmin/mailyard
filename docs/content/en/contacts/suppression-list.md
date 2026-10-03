@@ -33,7 +33,10 @@ curl -X POST http://localhost:3000/api/v1/suppressions \
   -d '{"email": "unsubscribed@example.com", "reason": "User requested removal"}'
 ```
 
-Manually created suppressions are stored with `kind: "manual"`. Returns `409 Conflict` if already suppressed.
+`kind` may also be `bounce` or `complaint`, and defaults to `manual`. A `list_id` must name an unsubscribe list of
+this project, or the request is refused with `400`. Returns `201 Created` with the row, or `409 Conflict` if the
+address is already suppressed in that scope, leaving the existing row as it was. A global block and a list opt-out
+for the same address are different scopes and can both exist.
 
 ## Importing a block list
 
@@ -42,7 +45,7 @@ POST /api/v1/suppressions/import
 ```
 
 A list brought over whole, from another provider or a spreadsheet: `suppressions`, up to a thousand entries, each
-with the same `email`, `kind` and `reason` a single block takes. One malformed address refuses the whole body before
+with the same `email`, `kind`, `reason` and `list_id` a single block takes. One malformed address refuses the whole body before
 anything is written, so a list is never half applied. An address already blocked takes the kind and reason sent
 rather than failing, which is what lets the same file be imported twice. The answer is `{"imported": n}`.
 
@@ -132,17 +135,12 @@ The tradeoff is that you can only go forward. For finding one address, use `sear
 ## Remove from Suppression List
 
 ```
-DELETE /api/v1/suppressions
+DELETE /api/v1/suppressions?email=resubscribed@example.com
 ```
 
-```json
-{
-    "email": "resubscribed@example.com"
-}
-```
-
-Include `list_id` to remove only the list-scoped suppression; omit it to remove the global block. Returns
-`204 No Content`.
+Both parameters ride in the query string. Include `list_id` to remove only that list-scoped suppression, omit it to
+remove the global block. Returns `204 No Content`, or `404` when there is no suppression for the address in that
+scope.
 
 ## What a suppression does to a send
 

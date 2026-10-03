@@ -76,6 +76,26 @@ func inboundAttachmentDays(attSetting, inboundDays int) int {
 	return attSetting
 }
 
+// ContentWindows answers the email body and attachment windows, in days,
+// that a sweep applies: each one clamped to the metadata window, since
+// content never outlives the row it hangs off. 0 means kept forever.
+func ContentWindows(st *settings.Service) (bodyDays, attDays int) {
+	metaDays := st.Int(smodel.KeyRetentionDays)
+	clamp := func(days int) int {
+		if days <= 0 {
+			return metaDays
+		}
+
+		if metaDays > 0 && days > metaDays {
+			return metaDays
+		}
+
+		return days
+	}
+
+	return clamp(st.Int(smodel.KeyEmailBodyRetentionDays)), clamp(st.Int(smodel.KeyEmailAttachmentRetentionDays))
+}
+
 // Run executes a full sweep. It keeps going after a per-section
 // error: one failing table must not stop the rest from being
 // trimmed. Every section error is joined and returned, so the job is
@@ -95,22 +115,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 	}
 
 	metaDays := s.Settings.Int(smodel.KeyRetentionDays)
-
-	// Content windows never outlive the row they hang off.
-	clamp := func(days int) int {
-		if days <= 0 {
-			return metaDays
-		}
-
-		if metaDays > 0 && days > metaDays {
-			return metaDays
-		}
-
-		return days
-	}
-
-	bodyDays := clamp(s.Settings.Int(smodel.KeyEmailBodyRetentionDays))
-	attDays := clamp(s.Settings.Int(smodel.KeyEmailAttachmentRetentionDays))
+	bodyDays, attDays := ContentWindows(s.Settings)
 	inboundDays := s.Settings.Int(smodel.KeyInboundRetentionDays)
 	if inboundDays <= 0 {
 		inboundDays = metaDays

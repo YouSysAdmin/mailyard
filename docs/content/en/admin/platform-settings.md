@@ -117,6 +117,9 @@ visits this page never loses data - and never reclaims space either. Set the win
   not delete is logged and skipped rather than blocking the sweep - the result is an orphaned object, not a stuck job.
 - Emails still in flight (`queued`, `scheduled`, `processing`) are **never** purged, however old. Deleting one would
   strand work the delivery queue is about to claim.
+- A `failed` email is not in flight, so its content is cleared like any other. Once it is older than the body or
+  attachment window it can no longer be [retried](/docs/email-sending/email-status) - the retry answers `409` rather
+  than send an empty or incomplete message.
 
 The sweep runs as the `retention-cleanup` [scheduled job](/docs/admin/scheduled-jobs).
 

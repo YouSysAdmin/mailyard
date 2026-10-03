@@ -348,8 +348,10 @@ func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmode
 		args = append(args, f.APIKeyID)
 	}
 
+	// The server that carried the message, not the one a caller pinned:
+	// after a failover walk or a group send the two differ.
 	if f.SMTPServerID != "" {
-		query += ` AND smtp_server_id = ?`
+		query += ` AND delivered_via = ?`
 		args = append(args, f.SMTPServerID)
 	}
 
@@ -469,13 +471,15 @@ func emptyMetadata(in map[string]string) map[string]string {
 }
 
 // Reset returns a failed row to the queue for a manual retry:
-// attempts start over and the row is due immediately.
-func (s *Store) Reset(ctx context.Context, projID, id string) (bool, error) {
+// attempts start over, the row is due immediately and goes to
+// recipients, which the caller has already filtered.
+func (s *Store) Reset(ctx context.Context, projID, id string, recipients []string) (bool, error) {
 	res, err := s.Exec(ctx, `
         UPDATE emails
-        SET status = ?, error_message = '', attempts = 0, next_attempt_at = ?, claimed_at = NULL
+        SET status = ?, error_message = '', attempts = 0, next_attempt_at = ?, claimed_at = NULL,
+            recipients = ?
         WHERE project_id = ? AND id = ? AND status = ?
-    `, emailmodel.StatusQueued, time.Now().UTC(), projID, id, emailmodel.StatusFailed)
+    `, emailmodel.StatusQueued, time.Now().UTC(), database.MustJSON(recipients), projID, id, emailmodel.StatusFailed)
 	if err != nil {
 		return false, err
 	}

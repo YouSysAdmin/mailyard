@@ -138,6 +138,9 @@ func (f *fakeSuppressions) Upsert(_ context.Context, s *suppressionmodel.Suppres
 
 	return nil
 }
+func (f *fakeSuppressions) Insert(ctx context.Context, s *suppressionmodel.Suppression) (bool, error) {
+	return true, f.Upsert(ctx, s)
+}
 func (f *fakeSuppressions) Delete(context.Context, string, string) (bool, error) { return false, nil }
 func (f *fakeSuppressions) PurgeForAddress(context.Context, string, string) (int64, error) {
 	return 0, nil
