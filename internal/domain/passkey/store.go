@@ -143,6 +143,27 @@ func (s *Store) CountForUser(ctx context.Context, userID string) (int, error) {
 	return n, err
 }
 
+// SpendChallenge records a finished ceremony's challenge and reports
+// whether this was its first use. expiresAt is when the ceremony
+// would have lapsed, after which the row is pruned.
+func (s *Store) SpendChallenge(ctx context.Context, challenge string, expiresAt time.Time) (bool, error) {
+	if _, err := s.Exec(ctx, `DELETE FROM passkey_challenges WHERE expires_at < now()`); err != nil {
+		return false, err
+	}
+
+	res, err := s.Exec(ctx, `
+        INSERT INTO passkey_challenges (challenge, expires_at) VALUES (?, ?)
+        ON CONFLICT (challenge) DO NOTHING
+    `, challenge, expiresAt)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
 func scanPasskey(r interface{ Scan(...any) error }) (*pkmodel.Passkey, error) {
 	var m pkmodel.Passkey
 	var lastUsed sql.NullTime

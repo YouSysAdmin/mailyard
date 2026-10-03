@@ -18,6 +18,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	corepasskey "github.com/yousysadmin/mailyard/internal/core/passkey"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
@@ -133,9 +134,8 @@ func (h *Handler) setCeremony(c fiber.Ctx, name string, sess *corepasskey.Sessio
 	return nil
 }
 
-// takeCeremony reads the ceremony cookie and CLEARS it, so a
-// challenge is answerable exactly once. Leaving it in place would let
-// the same challenge be replayed for as long as the cookie lived.
+// takeCeremony reads the ceremony cookie, CLEARS it and spends its
+// challenge, so a challenge is answerable exactly once.
 func (h *Handler) takeCeremony(c fiber.Ctx, name string) (*corepasskey.SessionData, error) {
 	raw := c.Cookies(name)
 	c.Cookie(&fiber.Cookie{
@@ -155,6 +155,23 @@ func (h *Handler) takeCeremony(c fiber.Ctx, name string) (*corepasskey.SessionDa
 	var sd corepasskey.SessionData
 	if err := json.Unmarshal([]byte(plain), &sd); err != nil {
 		return nil, err
+	}
+
+	// Clearing the cookie stops a browser, not a copy of the request.
+	// The challenge is spent in the database, so a replay is refused on
+	// every node.
+	expires := sd.Expires
+	if expires.IsZero() {
+		expires = time.Now().Add(passkeyCeremonyTTL)
+	}
+
+	first, err := h.Runtime.Store.Passkey.SpendChallenge(c.Context(), sd.Challenge, expires)
+	if err != nil {
+		return nil, err
+	}
+
+	if !first {
+		return nil, fmt.Errorf("ceremony already used")
 	}
 
 	return &sd, nil
@@ -258,13 +275,8 @@ func (h *Handler) PasskeyRegisterBegin(c fiber.Ctx) error {
 		return bindResp
 	}
 
-	if !h.reauthenticated(c.Context(), u, in.Password) {
-		h.Runtime.Audit.Security(c, &amodel.Event{
-			Type: amodel.TypeLoginFailed, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusForbidden,
-			Detail: "wrong password confirming passkey enrolment",
-		})
-
-		return response.Forbidden(c, "incorrect password")
+	if refusal, refused := h.refuseReauth(c, u, in.Password, amodel.TypeLoginFailed, "passkey enrolment"); refused {
+		return refusal
 	}
 
 	n, err := h.Runtime.Store.Passkey.CountForUser(c.Context(), u.ID)
@@ -337,14 +349,7 @@ func (h *Handler) PasskeyRegisterFinish(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	name := c.Query("name")
-	if len(name) > maxPasskeyName {
-		name = name[:maxPasskeyName]
-	}
-
-	if name == "" {
-		name = "Passkey"
-	}
+	name := passkeyLabel(c.Query("name"))
 
 	row := &pkmodel.Passkey{
 		ID:           ids.New(),
@@ -403,8 +408,8 @@ func (h *Handler) PasskeyDelete(c fiber.Ctx) error {
 		return bindResp
 	}
 
-	if !h.reauthenticated(c.Context(), u, in.Password) {
-		return response.Forbidden(c, "incorrect password")
+	if refusal, refused := h.refuseReauth(c, u, in.Password, amodel.TypeLoginFailed, "passkey removal"); refused {
+		return refusal
 	}
 
 	// The name is read first so the audit trail can say which one went.
@@ -574,6 +579,19 @@ func (h *Handler) PasskeyLoginFinish(c fiber.Ctx) error {
 	})
 
 	return response.Success(c, UserResponse{User: matched})
+}
+
+// passkeyLabel cleans the label sent at enrolment: valid UTF-8, trimmed,
+// cut at maxPasskeyName characters rather than bytes, and a default
+// when nothing is left.
+func passkeyLabel(raw string) string {
+	name := strings.TrimSpace(safetext.Clamp(strings.TrimSpace(raw), maxPasskeyName))
+
+	if name == "" {
+		return "Passkey"
+	}
+
+	return name
 }
 
 // emailOf is nil-safe, because a failed assertion may never have

@@ -16,7 +16,7 @@ Passkeys are on by default and nothing changes until somebody enrols one.
 **Profile -> Passkeys -> Add a passkey.** You are asked for your account password, then your device asks you to confirm
 with whatever it uses - Touch ID, Windows Hello, a security key, your phone.
 
-Name it something you will recognise. If you enrol three, the name is the only thing that tells them apart when one
+Name it something you will recognise - up to 60 characters. If you enrol three, the name is the only thing that tells them apart when one
 needs revoking.
 
 The password confirmation is not ceremony. Adding a passkey creates a new way into the account, so a borrowed or
@@ -86,3 +86,8 @@ reason [2FA reset](/docs/security/two-factor-auth) is.
 - A sign counter that fails to advance means the credential may have been copied, and Mailyard refuses the sign-in.
   Synced passkeys (iCloud Keychain, Google Password Manager) report a zero counter and never trigger this - it only
   catches hardware keys that count.
+- **Each sign-in and enrolment challenge answers once**, on every node: the challenge is recorded when the ceremony
+  finishes and a second finish carrying it is refused. That is what stops a captured sign-in being replayed for a
+  synced passkey, whose counter never moves.
+- The password confirmation spends the same lockout as sign-in. While the account is locked by failed attempts the
+  confirmation is refused with a message saying so, a right password included.

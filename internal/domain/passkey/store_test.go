@@ -187,3 +187,39 @@ func TestDeletingTheUserRemovesItsPasskeys(t *testing.T) {
 		t.Error("the passkey outlived the account it belonged to")
 	}
 }
+
+// A challenge is spent once. A second finish with the same challenge,
+// from a copied request on any node, is refused, and an expired row
+// does not linger.
+func TestAChallengeIsSpentOnce(t *testing.T) {
+	s := newStore(t)
+	ctx := t.Context()
+	later := time.Now().Add(5 * time.Minute)
+
+	first, err := s.SpendChallenge(ctx, "challenge-a", later)
+	if err != nil || !first {
+		t.Fatalf("first use: %v %v", first, err)
+	}
+
+	again, err := s.SpendChallenge(ctx, "challenge-a", later)
+	if err != nil || again {
+		t.Fatalf("replay: %v %v, want refused", again, err)
+	}
+
+	if _, err := s.SpendChallenge(ctx, "challenge-old", time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.SpendChallenge(ctx, "challenge-b", later); err != nil {
+		t.Fatal(err)
+	}
+
+	var n int
+	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM passkey_challenges WHERE challenge = 'challenge-old'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+
+	if n != 0 {
+		t.Fatal("an expired challenge was not pruned")
+	}
+}

@@ -213,6 +213,10 @@ type PasskeyStore interface {
 	Delete(ctx context.Context, userID, id string) (bool, error)
 	DeleteAllForUser(ctx context.Context, userID string) (int, error)
 	CountForUser(ctx context.Context, userID string) (int, error)
+
+	// SpendChallenge records a finished WebAuthn ceremony and is false
+	// when its challenge was already spent, on any node.
+	SpendChallenge(ctx context.Context, challenge string, expiresAt time.Time) (bool, error)
 }
 
 // AuditStore persists the operational and security trails. Reads are
