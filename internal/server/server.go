@@ -199,6 +199,10 @@ func New(opts Options) (*Server, error) {
 	app.Use(securityHeaders(scriptSrcFor(docsite.FS()),
 		strings.HasPrefix(strings.ToLower(opts.Runtime.Config.Server.PublicURL), "https://")))
 	app.Use(cachePolicy)
+
+	// Ahead of the access log - see refusalLogEvery.
+	app.Use(newAdmission(opts.Runtime.Config.Server.MaxConcurrentRequests,
+		opts.Runtime.Config.Server.MaxConcurrentPerIP, resolver, opts.Runtime.Log).handler)
 	app.Use(skipPaths(
 		// redactURLs first: the paths whose URL is itself a credential
 		// are logged by route pattern and never reach slog-fiber, which
@@ -208,8 +212,6 @@ func New(opts Options) (*Server, error) {
 		streamingPaths...,
 	))
 	app.Use(requestContext(opts.Runtime, resolver))
-	app.Use(newAdmission(opts.Runtime.Config.Server.MaxConcurrentRequests,
-		opts.Runtime.Config.Server.MaxConcurrentPerIP).handler)
 
 	registerRoutes(app, opts.Runtime, opts.HealthOnly)
 

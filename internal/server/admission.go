@@ -3,6 +3,7 @@
 package server
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -11,6 +12,12 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 )
+
+// refusalLogEvery is how often a run of refusals is summarized in the
+// log. The refusals sit ahead of the access log, since a node at its
+// ceiling writing an error line per refused request is the log filling
+// at exactly the moment somebody needs to read it.
+const refusalLogEvery = 10 * time.Second
 
 // uncredentialedReadTimeout is how long a request naming no credential
 // may take to arrive, body included. Its body is capped at
@@ -27,16 +34,32 @@ const uncredentialedReadTimeout = 30 * time.Second
 // orchestrator, and so are the streams, which hold a request for their
 // whole life and are bounded by the event bus instead.
 type admission struct {
-	limit int
-	perIP int
+	limit    int
+	perIP    int
+	resolver *clientip.Resolver
+	log      *slog.Logger
 
 	mu       sync.Mutex
 	inFlight int
 	byIP     map[string]int
+	refused  int
+	loggedAt time.Time
 }
 
-func newAdmission(limit, perIP int) *admission {
-	return &admission{limit: limit, perIP: perIP, byIP: map[string]int{}}
+// newAdmission builds the gate. resolver may be nil, which reads the TCP
+// peer, and so may log.
+func newAdmission(limit, perIP int, resolver *clientip.Resolver, log *slog.Logger) *admission {
+	return &admission{limit: limit, perIP: perIP, resolver: resolver, log: log, byIP: map[string]int{}}
+}
+
+// caller is the address the per-caller bound counts, resolved here
+// because admission runs ahead of the middleware that stamps it.
+func (a *admission) caller(c fiber.Ctx) string {
+	if a.resolver == nil {
+		return clientip.From(c)
+	}
+
+	return a.resolver.Resolve(c)
 }
 
 // exemptFromAdmission are the paths admission never refuses.
@@ -54,9 +77,10 @@ func (a *admission) handler(c fiber.Ctx) error {
 		return c.Next()
 	}
 
-	ip := clientip.From(c)
+	ip := a.caller(c)
 	ok, overall := a.enter(ip)
 	if !ok {
+		a.noteRefusal(overall)
 		c.Set(fiber.HeaderRetryAfter, "1")
 		if overall {
 			return response.Unavailable(c, "the server is at its limit of requests in progress, retry shortly")
@@ -88,6 +112,28 @@ func (a *admission) enter(ip string) (ok, overall bool) {
 	a.byIP[ip]++
 
 	return true, false
+}
+
+// noteRefusal counts a refusal and writes one summary line per
+// refusalLogEvery.
+func (a *admission) noteRefusal(overall bool) {
+	a.mu.Lock()
+	a.refused++
+	now := time.Now()
+	if now.Sub(a.loggedAt) < refusalLogEvery {
+		a.mu.Unlock()
+
+		return
+	}
+
+	n := a.refused
+	a.refused, a.loggedAt = 0, now
+	a.mu.Unlock()
+
+	if a.log != nil {
+		a.log.Warn("requests refused at the in-progress ceiling",
+			"refused", n, "overall_limit", a.limit, "per_ip_limit", a.perIP, "last_was_overall", overall)
+	}
 }
 
 func (a *admission) leave(ip string) {

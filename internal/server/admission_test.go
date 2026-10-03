@@ -24,7 +24,7 @@ func TestAdmissionRefusesInTheEnvelopeAndSparesTheProbes(t *testing.T) {
 		{"per caller", 10, 2, fiber.StatusTooManyRequests},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			adm := newAdmission(tc.limit, tc.perIP)
+			adm := newAdmission(tc.limit, tc.perIP, nil, nil)
 			release := make(chan struct{})
 			var holding sync.WaitGroup
 			holding.Add(2)
