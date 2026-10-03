@@ -324,20 +324,24 @@ func InlineCSS(html, css string) string {
 }
 
 // MaxInlineWork bounds how much inlining one message may ask for,
-// counted as rules plus declarations times tags. premailer matches
-// every rule against the whole document and merges every declaration
-// into every element it matched, so its time grows with that product
-// and has no bound of its own: a few hundred kilobytes of both ran
-// for half a minute, on a preview anyone with read access can call.
-// A real message is under a tenth of this. Past it the style block is
-// kept as it is, the same answer as a stylesheet that fails to inline.
+// counted as selectors plus declarations times tags. premailer matches
+// every selector against the whole document and merges every
+// declaration into every element it matched, so its time grows with
+// that product and has no bound of its own: a few hundred kilobytes of
+// both ran for half a minute, on a preview anyone with read access can
+// call. A real message is under a tenth of this. Past it the style
+// block is kept as it is, the same answer as a stylesheet that fails to
+// inline.
 const MaxInlineWork = 4_000_000
 
-// inlineWork estimates premailer's cost for one document.
+// inlineWork estimates premailer's cost for one document. Each selector
+// in a comma list is matched on its own, so the commas count: one rule
+// listing thousands of selectors is thousands of matches. A comma inside
+// a declaration (a font list) is counted too, which only overestimates.
 func inlineWork(html, css string) int64 {
-	rules := strings.Count(css, "{") + strings.Count(css, ":")
+	units := strings.Count(css, "{") + strings.Count(css, ",") + strings.Count(css, ":")
 
-	return int64(rules) * int64(strings.Count(html, "<"))
+	return int64(units) * int64(strings.Count(html, "<"))
 }
 
 // withStyleBlock puts the stylesheet where a browser would look for it.

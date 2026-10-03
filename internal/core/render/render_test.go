@@ -3,6 +3,7 @@ package render
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -187,6 +188,33 @@ func TestInlineCSSFallsBackOnBareFragment(t *testing.T) {
 	got := InlineCSS("<p>hi</p>", "p { color: blue; }")
 	if !strings.Contains(got, "hi") {
 		t.Errorf("content lost: %q", got)
+	}
+}
+
+// One rule listing thousands of selectors is thousands of matches, and
+// a document past the work cap keeps its style block instead of being
+// inlined for minutes.
+func TestACommaSelectorListCountsTowardTheInlineCap(t *testing.T) {
+	sels := make([]string, 4000)
+	for i := range sels {
+		sels[i] = "p.c" + strconv.Itoa(i)
+	}
+
+	css := strings.Join(sels, ",") + "{color:red}"
+	html := "<html><head></head><body>" + strings.Repeat("<p class=a>t</p>", 2000) + "</body></html>"
+
+	if w := inlineWork(html, css); w <= MaxInlineWork {
+		t.Fatalf("work estimated at %d, want past %d", w, MaxInlineWork)
+	}
+
+	start := time.Now()
+	got := InlineCSS(html, css)
+	if took := time.Since(start); took > 2*time.Second {
+		t.Errorf("took %v, want the cap to skip inlining", took)
+	}
+
+	if !strings.Contains(got, "<style>") || strings.Contains(got, `style="color`) {
+		t.Errorf("want the style block kept and nothing inlined")
 	}
 }
 
