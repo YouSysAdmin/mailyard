@@ -129,11 +129,13 @@ function validSampleData(): boolean {
 
 async function saveTemplate() {
   if (!form.value.name.trim()) return
+  // The previous attempt's server errors describe values that may have
+  // been corrected since, so they go before anything else is judged.
+  clear()
   if (!validSampleData()) {
     notify.error('Sample data must be valid JSON')
     return
   }
-  clear()
   saving.value = true
   try {
     if (editing.value) {
