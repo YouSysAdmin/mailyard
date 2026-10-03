@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/project"
@@ -79,6 +80,17 @@ func stampProject(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 		rc.Project = proj
 		rc.ProjectOwner = true
 		rc.Permissions = permission.NewSet(permission.All)
+
+		return true, nil
+	}
+
+	// A project id that is not a uuid names nothing, which is the same
+	// as naming a project that cannot be reached: rc.Project stays nil
+	// and permOn answers on the routes that need one.
+	if projID != "" && !ids.Valid(projID) {
+		if rc.User == nil && rc.AdminAPIKey == nil {
+			return false, response.Unauthorized(c, "authentication required")
+		}
 
 		return true, nil
 	}

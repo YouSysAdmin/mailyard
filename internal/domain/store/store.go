@@ -482,6 +482,10 @@ type ProjectStore interface {
 	// project pointing at something it cannot resolve.
 	SetDefaultRole(ctx context.Context, projID, roleID string) (bool, error)
 
+	// SetPlan is the only writer of projects.plan_id once the row
+	// exists. false means no such project.
+	SetPlan(ctx context.Context, projID, planID string) (bool, error)
+
 	PutInvitation(ctx context.Context, inv *project.Invitation) error
 	GetInvitationByToken(ctx context.Context, token string) (*project.Invitation, error)
 	ListInvitations(ctx context.Context, projID string) ([]*project.Invitation, error)

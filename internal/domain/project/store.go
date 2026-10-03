@@ -63,7 +63,8 @@ func (s *Store) GetBySlug(ctx context.Context, slug string) (*projmodel.Project,
 	return w, err
 }
 
-// Put upserts the project keyed by id.
+// Put upserts the project keyed by id. On conflict it leaves plan_id
+// and default_role_id alone, since each has a writer of its own.
 func (s *Store) Put(ctx context.Context, w *projmodel.Project) error {
 	if w.CreatedAt.IsZero() {
 		w.CreatedAt = time.Now().UTC()
@@ -83,8 +84,6 @@ func (s *Store) Put(ctx context.Context, w *projmodel.Project) error {
             description      = excluded.description,
             owner_id         = excluded.owner_id,
             default_language = excluded.default_language,
-            plan_id          = excluded.plan_id,
-            default_role_id  = excluded.default_role_id,
             strict_senders   = excluded.strict_senders,
             track_opens      = excluded.track_opens,
             track_clicks     = excluded.track_clicks,
@@ -586,6 +585,21 @@ func (s *Store) SetDefaultRole(ctx context.Context, projID, roleID string) (bool
               SELECT 1 FROM project_roles r WHERE r.id = ? AND r.project_id = p.id
           ))
     `, database.NullStr(roleID), projID, database.NullStr(roleID), database.NullStr(roleID))
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// SetPlan is the only writer of projects.plan_id on an existing row.
+// false means no such project.
+func (s *Store) SetPlan(ctx context.Context, projID, planID string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE projects SET plan_id = ?, updated_at = ? WHERE id = ?
+    `, database.NullStr(planID), time.Now().UTC(), projID)
 	if err != nil {
 		return false, err
 	}

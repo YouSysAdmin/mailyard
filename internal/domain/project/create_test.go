@@ -4,7 +4,11 @@ package project
 
 import (
 	"context"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/settings"
@@ -111,5 +115,31 @@ func TestAuthDisabledCreatesFreely(t *testing.T) {
 
 	if !MayCreate(rt, nil) {
 		t.Error("auth disabled must not gate project creation")
+	}
+}
+
+// An explicit slug ends up in URLs, so one that is not URL-safe is
+// refused rather than stored.
+func TestAnExplicitSlugMustBeURLSafe(t *testing.T) {
+	app := fiber.New()
+	app.Post("/", func(c fiber.Ctx) error {
+		c.Locals(domain.ContextKey, member(true))
+
+		return (&Handler{Runtime: runtimeWith(t, true, false)}).Create(c)
+	})
+
+	for _, slug := range []string{"has spaces!", "a--b", "-lead", "x_y"} {
+		req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{"name":"x","slug":"`+slug+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_ = res.Body.Close()
+
+		if res.StatusCode != fiber.StatusBadRequest {
+			t.Errorf("slug %q: %d, want 400", slug, res.StatusCode)
+		}
 	}
 }

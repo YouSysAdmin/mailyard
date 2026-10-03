@@ -60,7 +60,7 @@ The updated project is returned as `{"project": {...}}`.
 GET /api/v1/usage
 ```
 
-Any member of the active project. It answers with the effective plan and what the project has actually used:
+Needs `analytics:read` in the active project. It answers with the effective plan and what the project has actually used:
 
 ```json
 {

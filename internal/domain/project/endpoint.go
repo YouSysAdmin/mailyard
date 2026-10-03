@@ -150,7 +150,12 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
-	slug := in.Slug
+	// An explicit slug ends up in URLs, so it must already be one.
+	slug := strings.ToLower(in.Slug)
+	if slug != "" && slugify(slug) != slug {
+		return response.BadRequest(c, "slug may only hold lowercase letters, digits and single dashes between them")
+	}
+
 	if slug == "" {
 		slug = slugify(in.Name)
 	}
@@ -450,19 +455,10 @@ func (h *Handler) AddMember(c fiber.Ctx) error {
 	// than one with no role: memberSelect scopes the join to the project,
 	// so COALESCE(m.role_id, p.default_role_id) keeps the dead id over
 	// the default and the permission set comes back empty.
-	if in.RoleID != "" {
-		role, err := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, in.RoleID)
-		if err != nil {
-			return response.Internal(c, err)
-		}
-
-		if role == nil {
-			return response.NotFound(c, "role not found")
-		}
-
-		if resp, refused := refuseDelegating(c, acc, role); refused {
-			return resp
-		}
+	//
+	// No role means the default role, which is checked the same way.
+	if resp, refused := h.refuseAssigning(c, w, acc, in.RoleID); refused {
+		return resp
 	}
 
 	if err := h.Runtime.Store.Project.PutMember(c.Context(), &projmodel.Member{
@@ -530,22 +526,26 @@ func (h *Handler) UpdateMember(c fiber.Ctx) error {
 		return response.NotFound(c, "member not found")
 	}
 
-	if in.RoleID != nil && *in.RoleID != "" {
-		// Read the role before assigning it, so what it grants can be
-		// checked against what the caller holds. See refuseDelegating.
-		role, rerr := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, *in.RoleID)
-		if rerr != nil {
-			return response.Internal(c, rerr)
-		}
-
-		if role == nil {
-			// One answer for a role that does not exist and one that
-			// belongs to another project - the tenancy rule.
-			return response.NotFound(c, "role not found")
-		}
-
-		if resp, refused := refuseDelegating(c, acc, role); refused {
+	// The role is checked against what the caller holds before anything
+	// is written, and clearing it is checked against the default role
+	// the member then inherits. See refuseDelegating.
+	if in.RoleID != nil {
+		if resp, refused := h.refuseAssigning(c, w, acc, *in.RoleID); refused {
 			return resp
+		}
+	}
+
+	// Ownership first: the last-owner guard can refuse it, and a refused
+	// request must leave the role as it was.
+	if in.Owner != nil && *in.Owner != m.Owner {
+		changed, err := h.Runtime.Store.Project.SetMemberOwner(c.Context(), w.ID, userID, *in.Owner)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if !changed {
+			return response.Conflict(c,
+				"a project must keep at least one owner - promote somebody else first")
 		}
 	}
 
@@ -557,18 +557,6 @@ func (h *Handler) UpdateMember(c fiber.Ctx) error {
 
 		if !assigned {
 			return response.NotFound(c, "role not found")
-		}
-	}
-
-	if in.Owner != nil && *in.Owner != m.Owner {
-		changed, err := h.Runtime.Store.Project.SetMemberOwner(c.Context(), w.ID, userID, *in.Owner)
-		if err != nil {
-			return response.Internal(c, err)
-		}
-
-		if !changed {
-			return response.Conflict(c,
-				"a project must keep at least one owner - promote somebody else first")
 		}
 	}
 
@@ -683,19 +671,9 @@ func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 	// AcceptInvitation writes inv.RoleID straight into the membership, so
 	// an id from another project offered at invite time became a member
 	// with an unresolvable role and no permissions at all.
-	if in.RoleID != "" {
-		role, err := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, in.RoleID)
-		if err != nil {
-			return response.Internal(c, err)
-		}
-
-		if role == nil {
-			return response.NotFound(c, "role not found")
-		}
-
-		if resp, refused := refuseDelegating(c, acc, role); refused {
-			return resp
-		}
+	// No role means the default role at accept time, checked as of now.
+	if resp, refused := h.refuseAssigning(c, w, acc, in.RoleID); refused {
+		return resp
 	}
 
 	token, err := randomToken()
@@ -835,6 +813,21 @@ func (h *Handler) AcceptInvitation(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	// The audit trail records the act under the project joined, not
+	// the one the header names.
+	rc.Project = w
+
+	// Re-read, so an existing member gets the row that is stored rather
+	// than the one the INSERT skipped.
+	stored, err := h.Runtime.Store.Project.GetMember(c.Context(), inv.ProjectID, rc.User.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if stored != nil {
+		m = stored
+	}
+
 	return response.Success(c, JoinedResponse{Project: w, Member: m})
 }
 
@@ -868,6 +861,11 @@ func (h *Handler) DeclineInvitation(c fiber.Ctx) error {
 	inv.Status = projmodel.InvitationDeclined
 	if err := h.Runtime.Store.Project.PutInvitation(c.Context(), inv); err != nil {
 		return response.Internal(c, err)
+	}
+
+	// Recorded under the inviting project, see AcceptInvitation.
+	if w, err := h.Runtime.Store.Project.Get(c.Context(), inv.ProjectID); err == nil && w != nil {
+		rc.Project = w
 	}
 
 	return response.Success(c, DeclinedResponse{Declined: true})

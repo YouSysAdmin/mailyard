@@ -22,19 +22,6 @@ import (
 // Treating either as harmless because the other exists is how
 // members:write quietly becomes project-admin.
 
-// catalogueSize is how many permissions the catalogue actually
-// defines, used to reject an absurd input list before parsing it.
-// Summed from the declared actions rather than assuming three per
-// resource, which would be wrong for most of them.
-func catalogueSize() int {
-	n := 0
-	for _, d := range perm.Registry {
-		n += len(d.Actions)
-	}
-
-	return n
-}
-
 // normalizeRolePermissions is the STRICT write-side counterpart of the
 // tolerant FromStrings. Reading skips what it cannot parse, because
 // stored data outlives code. Writing refuses, because a typo accepted
@@ -47,7 +34,7 @@ func catalogueSize() int {
 // "contacts:write" is rejected here as firmly as a misspelling. It
 // names a real resource and a real action and still grants nothing.
 func normalizeRolePermissions(in []string) ([]string, string) {
-	if len(in) > catalogueSize() {
+	if len(in) > perm.Size() {
 		return nil, "too many permissions - the catalogue is smaller than this list"
 	}
 
@@ -136,10 +123,10 @@ func (h *Handler) CreateRole(c fiber.Ctx) error {
 	return response.Created(c, RoleResponse{Role: role})
 }
 
-// UpdateRole renames or repermissions a role. The id is the reference
-// members carry, so a rename is cosmetic and an edited permission list
-// applies to every holder on their next request - there is no cache to
-// invalidate.
+// UpdateRole renames or repermissions a role, changing only the fields
+// sent. The id is the reference members carry, so a rename is cosmetic
+// and an edited permission list applies to every holder on their next
+// request - there is no cache to invalidate.
 func (h *Handler) UpdateRole(c fiber.Ctx) error {
 	w, access, err := h.loadWithMember(c)
 	if err != nil || w == nil || !access.perms.Has(perm.ResourceMembers, perm.ActionWrite) {
@@ -155,30 +142,39 @@ func (h *Handler) UpdateRole(c fiber.Ctx) error {
 		return response.NotFound(c, "role not found")
 	}
 
-	in, resp, ok := validation.Bind[roleInput](c)
+	in, resp, ok := validation.Bind[roleUpdateInput](c)
 	if !ok {
 		return resp
 	}
 
-	perms, why := normalizeRolePermissions(in.Permissions)
-	if why != "" {
-		return response.BadRequest(c, why)
-	}
-
-	// You cannot GRANT what you do not hold - see refuseDelegating.
-	if resp, refused := refuseGranting(c, access, perms); refused {
-		return resp
-	}
-
-	for _, other := range mustListRoles(h, c, w.ID) {
-		if other.ID != role.ID && strings.EqualFold(other.Name, in.Name) {
-			return response.Conflict(c, "a role with this name already exists")
+	if in.Permissions != nil {
+		perms, why := normalizeRolePermissions(*in.Permissions)
+		if why != "" {
+			return response.BadRequest(c, why)
 		}
+
+		// You cannot GRANT what you do not hold - see refuseDelegating.
+		if resp, refused := refuseGranting(c, access, perms); refused {
+			return resp
+		}
+
+		role.Permissions = perms
 	}
 
-	role.Name = in.Name
-	role.Description = in.Description
-	role.Permissions = perms
+	if in.Name != "" {
+		for _, other := range mustListRoles(h, c, w.ID) {
+			if other.ID != role.ID && strings.EqualFold(other.Name, in.Name) {
+				return response.Conflict(c, "a role with this name already exists")
+			}
+		}
+
+		role.Name = in.Name
+	}
+
+	if in.Description != nil {
+		role.Description = strings.TrimSpace(*in.Description)
+	}
+
 	if err := h.Runtime.Store.Project.PutRole(c.Context(), role); err != nil {
 		return response.Internal(c, err)
 	}
@@ -307,6 +303,50 @@ func refuseDelegating(c fiber.Ctx, caller access, role *projmodel.Role) (error, 
 
 	return response.Forbidden(c,
 		"the role "+role.Name+" grants permissions you do not hold yourself: "+
+			strings.Join(short, ", ")+" - ask a project owner"), true
+}
+
+// refuseAssigning checks the role a member will carry after an
+// assignment. An empty roleID means they inherit the project default,
+// so that is what gets checked. ok false means a response was written.
+func (h *Handler) refuseAssigning(c fiber.Ctx, w *projmodel.Project, caller access, roleID string) (error, bool) {
+	inherited := roleID == ""
+	if inherited {
+		roleID = w.DefaultRoleID
+	}
+
+	if roleID == "" {
+		return nil, false
+	}
+
+	role, err := h.Runtime.Store.Project.GetRole(c.Context(), w.ID, roleID)
+	if err != nil {
+		return response.Internal(c, err), true
+	}
+
+	if role == nil {
+		if inherited {
+			// A default naming nothing resolves to no permissions.
+			return nil, false
+		}
+
+		// One answer for a role that does not exist and one that
+		// belongs to another project - the tenancy rule.
+		return response.NotFound(c, "role not found"), true
+	}
+
+	if !inherited {
+		return refuseDelegating(c, caller, role)
+	}
+
+	short := caller.perms.Missing(role.Permissions)
+	if len(short) == 0 {
+		return nil, false
+	}
+
+	return response.Forbidden(c,
+		"without a role of their own this member inherits the default role "+role.Name+
+			", which grants permissions you do not hold yourself: "+
 			strings.Join(short, ", ")+" - ask a project owner"), true
 }
 

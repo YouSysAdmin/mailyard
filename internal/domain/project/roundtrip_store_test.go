@@ -203,3 +203,36 @@ func findProject(t *testing.T, list []*projmodel.Project, id string) *projmodel.
 
 	return nil
 }
+
+// A settings save carries a project read earlier, so it must not write
+// back the plan or the default role, which have writers of their own.
+func TestASettingsSaveKeepsThePlanAndTheDefaultRole(t *testing.T) {
+	s := roundTripStore(t)
+	stale := distinctProject("0c0a6b8e-4f6e-4d61-9a43-2f0f8a1b7c11", "stale-save")
+	if err := s.Put(t.Context(), stale); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+
+	const plan = "b8f1d2a4-0e3c-4c5a-9b7e-6a1d2c3b4e5f"
+	if ok, err := s.SetPlan(t.Context(), stale.ID, plan); err != nil || !ok {
+		t.Fatalf("set plan: %v %v", ok, err)
+	}
+
+	if _, err := s.SetDefaultRole(t.Context(), stale.ID, ""); err != nil {
+		t.Fatalf("set default role: %v", err)
+	}
+
+	stale.Name = "Renamed"
+	if err := s.Put(t.Context(), stale); err != nil {
+		t.Fatalf("stale put: %v", err)
+	}
+
+	got, err := s.Get(t.Context(), stale.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+
+	if got.Name != "Renamed" || got.PlanID != plan || got.DefaultRoleID != "" {
+		t.Fatalf("name %q plan %q default role %q", got.Name, got.PlanID, got.DefaultRoleID)
+	}
+}

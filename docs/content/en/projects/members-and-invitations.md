@@ -64,6 +64,9 @@ PATCH /api/v1/projects/{id}/members/{user_id}
 project's default role - and to nothing at all if the project has named none. A role id that does not exist in this
 project answers `404`, the same answer a role belonging to another project gets.
 
+You may only hand out what you hold yourself. A role granting a permission you lack answers `403`, and so does clearing
+a role when the project's default role grants one - the member would inherit it.
+
 The same endpoint grants and revokes **ownership**:
 
 ```json
@@ -74,7 +77,8 @@ The same endpoint grants and revokes **ownership**:
 
 Ownership is not a role and is gated harder than one. `members:write` hands out roles, and roles are bounded by the
 permission catalogue - ownership is the ability to delete the project, so only an existing owner may grant or revoke it
-(`403` otherwise). A project must keep at least one owner: demoting the last one answers `409`.
+(`403` otherwise). A project must keep at least one owner: demoting the last one answers `409`, and nothing in that
+request is applied, the role included.
 
 Roles themselves are managed at `GET/POST /api/v1/projects/{id}/roles` and
 `PATCH/DELETE /api/v1/projects/{id}/roles/{roleId}`, and the project's default role at
@@ -110,7 +114,9 @@ POST /api/v1/projects/{id}/invitations
 
 Only `email` is required. Leaving `role_id` out offers the project's default role, which is how most people are meant to
 be invited. There is no way to invite somebody as an owner - ownership is granted afterwards, deliberately, by an owner.
-If the email already belongs to a member, the request returns `409`. The inviter's email must be verified.
+The role offered, named or default, is bounded like any other assignment: one granting a permission you do not hold
+answers `403`. Inviting an address that already belongs to a member is accepted, and redeeming it changes nothing for
+them (see below).
 
 A pending invitation is created with a unique token, valid for **7 days**, and an invitation email is sent to the
 address with an accept link of the form `/<app>/invitations?token=<token>`.
@@ -139,7 +145,8 @@ Response (`201`):
 GET /api/v1/projects/{id}/invitations
 ```
 
-Returns the project's pending invitations as an array of the object shown above.
+Returns the project's invitations as an array of the object shown above - pending ones and past ones alike, with
+`status` saying which (`pending`, `accepted`, `declined`).
 
 ### Cancel an invitation
 
@@ -164,9 +171,11 @@ Neither takes a body: the token in the path is the whole claim.
 On accept the invitee joins the project carrying the invited role - or the project default, if the invitation named none
 or named a role that has since been deleted - and the invitation is marked accepted. Somebody who is already a member
 keeps the role they have: an invitation is an offer to join, not the moment to overwrite a role somebody set
-deliberately. The invitation's address must match the signed-in account, otherwise
-`403`. A non-pending or expired invitation is `400`. If the account is already a member the invitation is marked
-accepted and the call answers `409`.
+deliberately, and the invitation is marked accepted with `200` and their existing membership in the response. The
+invitation's address must match the signed-in account, otherwise `403`. A token that is unknown or already used answers
+`404`, an expired one `410`.
+
+Accepting or declining is recorded in the audit trail of the project the invitation came from.
 
 {{< callout type="note" title="There is no list-my-invitations endpoint" >}}
 An invitation is redeemed from the link in its mail, or from the copyable link the project admin sees after creating it.

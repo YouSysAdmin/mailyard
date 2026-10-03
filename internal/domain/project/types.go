@@ -129,6 +129,14 @@ type roleInput struct {
 	Permissions []string `json:"permissions" validate:"required"`
 }
 
+// roleUpdateInput patches a role. Each field is applied only when
+// sent, and an empty permissions list is still a lockdown.
+type roleUpdateInput struct {
+	Name        string    `json:"name"        validate:"omitempty,min=1,max=100" normalize:"trim"`
+	Description *string   `json:"description" validate:"omitzero,max=500"`
+	Permissions *[]string `json:"permissions"`
+}
+
 // ----------------------------------------------------------------------------
 // Responses
 // ----------------------------------------------------------------------------

@@ -311,11 +311,17 @@ func (h *Handler) Assign(c fiber.Ctx) error {
 		}
 	}
 
-	w.PlanID = in.PlanID
-	w.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Project.Put(c.Context(), w); err != nil {
+	found, err := h.Runtime.Store.Project.SetPlan(c.Context(), w.ID, in.PlanID)
+	if err != nil {
 		return response.Internal(c, err)
 	}
+
+	if !found {
+		return response.NotFound(c, "project not found")
+	}
+
+	w.PlanID = in.PlanID
+	w.UpdatedAt = new(time.Now().UTC())
 
 	return response.Success(c, AssignResponse{Project: w})
 }

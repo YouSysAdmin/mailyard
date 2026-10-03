@@ -40,10 +40,10 @@ The catalogue is closed - 21 resources - and each one declares the actions it ac
 | Emails                            | yes  |  yes  |   -    |
 | Campaigns                         | yes  |  yes  |  yes   |
 | Templates, stylesheets, languages | yes  |  yes  |  yes   |
-| Contacts                          | yes  |   -   |   -    |
+| Contacts                          | yes  |   -   |  yes   |
 | Subscribers and lists             | yes  |  yes  |  yes   |
 | Suppressions, unsubscribe lists   | yes  |  yes  |  yes   |
-| Bounces                           | yes  |  yes  |   -    |
+| Bounces                           | yes  |  yes  |  yes   |
 | Inbound mail                      | yes  |  yes  |  yes   |
 | Analytics                         | yes  |   -   |   -    |
 | Notifications                     | yes  |  yes  |  yes   |
@@ -66,7 +66,8 @@ that do nothing are not drawn.
 
 `delete` is separate from `write` because "may edit but not remove" is the most requested shape of a role, and two
 actions could not say it. The mapping is mechanical: the `DELETE` method needs `delete`, and the handful of erasing
-POSTs (`/sandbox/clear`, the two data erasures) say so explicitly.
+POSTs (`/sandbox/clear`, the two data erasures) say so explicitly. Two `DELETE`s undo a write rather than remove a record
+and take `domains:write`: cancelling a pending DKIM rotation and ending a domain share.
 
 The catalogue itself is served by the running binary at
 `GET /api/v1/permissions`, so the console checkboxes cannot offer a permission the server does not enforce.
@@ -206,7 +207,7 @@ These routes address the project by **path id**, so they do not use the
 | `GET`    | `/api/v1/projects/{id}/members`             | `members:read`                                   |
 | `POST`   | `/api/v1/projects/{id}/members`             | `members:write`                                  |
 | `PATCH`  | `/api/v1/projects/{id}/members/{user_id}`   | `members:write`, and ownership to change `owner` |
-| `DELETE` | `/api/v1/projects/{id}/members/{user_id}`   | `members:delete`, or yourself                    |
+| `DELETE` | `/api/v1/projects/{id}/members/{user_id}`   | `members:delete`, or yourself, ownership for an owner |
 | `GET`    | `/api/v1/projects/{id}/roles`               | `members:read`                                   |
 | `POST`   | `/api/v1/projects/{id}/roles`               | `members:write`                                  |
 | `PATCH`  | `/api/v1/projects/{id}/roles/{roleId}`      | `members:write`                                  |
@@ -217,12 +218,10 @@ These routes address the project by **path id**, so they do not use the
 | `DELETE` | `/api/v1/projects/{id}/invitations/{invId}` | `members:delete`                                 |
 | `POST`   | `/api/v1/invitations/{token}/accept`        | any signed-in account                            |
 | `POST`   | `/api/v1/invitations/{token}/decline`       | any signed-in account                            |
-| `POST`   | `/api/v1/projects/invitations/{id}/accept`  | No                                               | Accept an invitation by ID |
-| `POST`   | `/api/v1/projects/invitations/{id}/decline` | No                                               | Decline an invitation by ID |
-| `GET`    | `/api/v1/plan`                              | Yes                                              | Get the effective plan and limits |
-| `GET`    | `/api/v1/admin/settings`                    | Yes                                              | Get operational settings |
-| `PUT`    | `/api/v1/admin/settings`                    | Yes                                              | Update operational settings (admin+) |
-| `GET`    | `/api/v1/audit-log`                         | Yes                                              | Project audit trail (admin+) |
+
+The active project's plan and usage (`GET /api/v1/usage`, `analytics:read`) and its audit trail
+(`GET /api/v1/audit-log`, `audit:read`) are ordinary header-addressed routes. Platform settings live under
+`/api/v1/admin/settings`, platform administrators only.
 
 Member and invitation details are documented in [Members and Invitations](./members-and-invitations). Operational
 settings, plan, and the audit log are documented in [Settings, Plan, and Audit Log](./settings).
@@ -245,7 +244,7 @@ POST /api/v1/projects
 Only `name` is required, and the caller becomes the project **owner**.
 
 `slug` is derived from the name when you leave it out, and must be unique across the installation — lowercase letters,
-digits and hyphens. It is **immutable** once set, because it ends up in operator bookmarks and scripts, so it is worth
+digits and single hyphens between them, anything else answers `400`. It is **immutable** once set, because it ends up in operator bookmarks and scripts, so it is worth
 a moment's thought rather than accepting whatever the name produces.
 
 `default_language` falls back to `en`.
