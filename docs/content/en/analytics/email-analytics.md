@@ -14,8 +14,8 @@ Also available as `GET /api/v1/analytics` with an API key holding `analytics:rea
 
 | Parameter | Default             | Description                                  |
 |-----------|---------------------|----------------------------------------------|
-| `from`    | 30 days before `to` | Start date, `YYYY-MM-DD`, inclusive          |
-| `to`      | today               | End date, `YYYY-MM-DD`, inclusive            |
+| `from`    | 30 days before `to` | A date (`2026-07-01`) or an RFC 3339 timestamp, inclusive |
+| `to`      | today               | A date, inclusive of that whole day, or an RFC 3339 timestamp, exclusive |
 | `status`  | -                   | Narrow `daily_counts` to one delivery status |
 
 ```json
@@ -44,7 +44,8 @@ Also available as `GET /api/v1/analytics` with an API key holding `analytics:rea
 }
 ```
 
-Both dates are inclusive: a range of `2026-07-01` to `2026-07-01` covers that whole day.
+Both dates are inclusive: a range of `2026-07-01` to `2026-07-01` covers that whole day. A timestamp narrows the
+window to the instant, and `daily_counts` still has one row for every day the window touches.
 
 {{< callout type="note" title="Every day is present" >}}
 `daily_counts` includes days with **zero** emails. A chart fed only the days that had traffic silently rescales its
@@ -63,10 +64,10 @@ Bad input is refused rather than silently coerced:
 
 ```json
 {
-    "error": "from must be a date in YYYY-MM-DD form"
+    "error": "from must be a date (2026-08-01) or an RFC 3339 timestamp"
 }
 {
-    "error": "from must be before to"
+    "error": "to must be after from"
 }
 {
     "error": "the range must not exceed 366 days"

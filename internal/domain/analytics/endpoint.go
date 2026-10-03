@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	amodel "github.com/yousysadmin/mailyard/internal/models/analytics"
@@ -71,36 +72,29 @@ func (h *Handler) Analytics(c fiber.Ctx) error {
 	})
 }
 
-// parseRange reads from/to as YYYY-MM-DD, defaulting to the trailing
-// 30 days. The returned window is half-open [from, to) with `to`
-// advanced to the end of its day, so a range of one day includes that
-// whole day rather than only its first instant.
+// parseRange reads from/to through paging.TimeWindow like every other
+// window, defaulting to the trailing 30 days. The returned window is
+// half-open [from, to), and a bare date on the to side includes that
+// whole day.
 func parseRange(c fiber.Ctx) (from, to time.Time, err error) {
-	const layout = "2006-01-02"
+	f, t, err := paging.TimeWindow(c)
+	if err != nil {
+		return from, to, err
+	}
+
 	now := time.Now().UTC()
-
 	to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
-	if raw := c.Query("to"); raw != "" {
-		parsed, perr := time.Parse(layout, raw)
-		if perr != nil {
-			return from, to, errBadDate("to")
-		}
-
-		to = parsed.UTC().AddDate(0, 0, 1)
+	if t != nil {
+		to = t.UTC()
 	}
 
 	from = to.AddDate(0, 0, -30)
-	if raw := c.Query("from"); raw != "" {
-		parsed, perr := time.Parse(layout, raw)
-		if perr != nil {
-			return from, to, errBadDate("from")
-		}
-
-		from = parsed.UTC()
+	if f != nil {
+		from = f.UTC()
 	}
 
 	if !from.Before(to) {
-		return from, to, errRange("from must be before to")
+		return from, to, errRange("to must be after from")
 	}
 
 	if to.Sub(from) > maxRange {
@@ -115,7 +109,4 @@ type rangeError struct{ msg string }
 // Error renders the failure for a log or a caller.
 func (e *rangeError) Error() string { return e.msg }
 
-func errBadDate(field string) error {
-	return &rangeError{msg: field + " must be a date in YYYY-MM-DD form"}
-}
 func errRange(msg string) error { return &rangeError{msg: msg} }

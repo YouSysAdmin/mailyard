@@ -32,7 +32,7 @@ GET /api/v1/dashboard/stats
 GET /api/v1/analytics?from=2026-01-01&to=2026-01-31
 ```
 
-`from` and `to` are plain `YYYY-MM-DD` dates. The window defaults to the trailing 30 days and may not exceed 366.
+`from` and `to` are dates or RFC 3339 timestamps, a bare `to` date including that whole day. The window defaults to the trailing 30 days and may not exceed 366.
 `daily_counts` fills days with no traffic, so a quiet week cannot silently rescale a chart's axis. Both routes exist on
 the machine API too (`/api/v1/...`) with an API key holding the relevant `:read` permissions. Details in
 [Email Analytics](/docs/analytics/email-analytics).

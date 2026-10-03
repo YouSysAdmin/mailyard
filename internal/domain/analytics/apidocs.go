@@ -25,8 +25,8 @@ func APIDocs() []apidoc.Route {
 				"`daily_counts` includes days with no traffic, so a chart cannot silently " +
 				"rescale its axis, and `from`/`to` echo the window actually applied.",
 			Query: []apidoc.Param{
-				{Name: "from", Format: "date", Description: "YYYY-MM-DD."},
-				{Name: "to", Format: "date", Description: "YYYY-MM-DD, inclusive of that whole day."},
+				{Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."},
+				{Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."},
 				{Name: "status"},
 			},
 			Responses: []apidoc.Response{
