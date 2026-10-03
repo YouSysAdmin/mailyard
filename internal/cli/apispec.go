@@ -33,7 +33,7 @@ func newExportAPISpecCmd() *cobra.Command {
 		Long: "Writes the OpenAPI descriptions generated from the response types this\n" +
 			"binary returns.\n\n" +
 			"  api  the machine surface (/api/v1), what integrators build against\n" +
-			"  app  the console surface (/api), which belongs to the web UI and\n" +
+			"  app  the console surface (/app/api), which belongs to the web UI and\n" +
 			"       moves with it\n\n" +
 			"With no --out the document goes to stdout, which only works for one\n" +
 			"surface at a time.",

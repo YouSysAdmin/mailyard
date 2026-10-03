@@ -106,13 +106,13 @@ const (
 	// looked at is still trying to say something.
 	KeyNotificationRetentionDays = "notification_retention_days"
 
-	// KeyBounceAlertPercent is the bounce rate, as a percentage of a
-	// project's finished sends in the last hour, that raises an
-	// alert. Zero turns the alert off.
+	// KeyBounceAlertPercent is the bounce rate, as a percentage of the
+	// finished messages among those a project accepted in the last
+	// hour, that raises an alert. Zero turns the alert off.
 	KeyBounceAlertPercent = "bounce_alert_percent"
 
-	// KeyBounceAlertMinVolume is how many messages must have finished
-	// in the window before the rate is trusted. Two bounces out of
+	// KeyBounceAlertMinVolume is how many messages accepted in the
+	// window must have finished before the rate is trusted. Two bounces out of
 	// three sends is 66% and means nothing.
 	KeyBounceAlertMinVolume = "bounce_alert_min_volume"
 
@@ -253,11 +253,11 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyBounceAlertPercent, Type: TypeInt, Default: "10", Unit: "%", Max: 100,
-		Description: "Bounce rate over the last hour that raises a project alert. 0 turns the alert off.",
+		Description: "Bounce rate, among the messages accepted in the last hour that have finished, that raises a project alert. 0 turns the alert off.",
 	},
 	{
 		Key: KeyBounceAlertMinVolume, Type: TypeInt, Default: "20", Unit: "emails", Max: MaxCount,
-		Description: "How many sends must finish in the hour before the bounce rate is judged.",
+		Description: "How many of the messages accepted in the last hour must have finished before the bounce rate is judged.",
 	},
 	{
 		Key: KeyRetentionDays, Type: TypeInt, Default: "30", Unit: "days", Max: MaxDays,

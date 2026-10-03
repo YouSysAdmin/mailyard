@@ -129,7 +129,7 @@ grants `notifications:read` sees the same list, and marking one read clears it f
 | Campaign finished               | info             | A campaign has sent its last message, with the sent / failed / skipped totals |
 | Campaign held by the plan limit | warning          | The plan's sending window stops a campaign, once an hour while it lasts |
 | Plan quota                      | warning / error  | 80% of an hourly or daily limit, and the limit itself                 |
-| Bounce rate                     | warning          | 10% or more of the last hour's finished messages failed (platform settings) |
+| Bounce rate                     | warning          | 10% or more of the finished messages accepted in the last hour failed (platform settings) |
 | SMTP server out of rotation     | error            | A server refused its login or presented a certificate that does not verify |
 | Webhook disabled                | warning          | Repeated delivery failures switched a webhook off                     |
 | Signing certificate expiring    | warning / error  | A sender's S/MIME or PGP key is within 30 days of expiry, or past it  |

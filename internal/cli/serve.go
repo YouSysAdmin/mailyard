@@ -648,8 +648,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	}()
 
 	// Scheduled maintenance. Every job is idempotent and safe to run
-	// concurrently on several nodes - they are all delete-by-age
-	// sweeps - so no leader election is needed.
+	// concurrently on several nodes, so no leader election is needed.
 	rt.Cron = cron.New(log)
 
 	// The assignment sweep, on worker nodes: a pull node that stopped

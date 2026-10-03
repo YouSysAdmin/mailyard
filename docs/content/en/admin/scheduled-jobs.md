@@ -36,9 +36,19 @@ Response:
 POST /api/v1/admin/jobs/{name}/run
 ```
 
-Runs the job immediately, out of band, and returns the refreshed job list. A job that is already in flight is rejected
-rather than started twice. Both routes require the platform
-`admin` role.
+Runs the job immediately, out of band, and answers with the refreshed job list plus what the run did:
+
+```json
+{
+    "jobs": [ ... ],
+    "ran": "retention-cleanup",
+    "failed": false
+}
+```
+
+A job that ran and failed is still an answered request: `200` with `failed: true`, and the failure is on that job's
+row as `last_error`. A name this node does not run answers `404` - which jobs a node runs depends on its role - and a job
+already in flight answers `409` rather than being started twice. Both routes require the platform `admin` role.
 
 Each entry carries `name`, which is what the run route takes, and `schedule`, which is display only — see the
 scheduling model below.
@@ -53,11 +63,17 @@ failed sweep surfaces — a job that errors is logged and retried on its next ti
 
 ## Built-in Jobs
 
-| Job                 | Schedule           | Description                                                                                                                                                                                                       |
-|---------------------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `retention-cleanup` | Daily at 03:00 UTC | Purges expired email logs, received mail, attachment blobs, webhook deliveries, and tracking events according to the [retention settings](/docs/admin/platform-settings). Also drops spent password reset tokens. |
-| `bounce-alert`      | Every 15 minutes   | Judges the recent bounce rate and raises a notification when it crosses the configured threshold. A rate is a property of a window, so it cannot be evaluated from the delivery path.                             |
-| `settings-refresh`  | Every 5 minutes    | Reloads platform settings from the database so a node that did not serve the write converges.                                                                                                                     |
+| Job                     | Schedule           | Role      | Description                                                                                                                                                                                                       |
+|-------------------------|--------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `retention-cleanup`     | Daily at 03:00 UTC | worker    | Purges expired email logs, received mail, attachment blobs, webhook deliveries, tracking events, audit entries and read notifications according to the [retention settings](/docs/admin/platform-settings). Also drops spent password reset tokens, expired sessions and the volume counters. |
+| `partition-maintenance` | Every hour         | worker    | Creates the daily partitions of the email log ahead of time. Also run once at boot.                                                                                                                               |
+| `partition-ceiling`     | Daily at 03:30 UTC | worker    | Mails the administrators when the email log nears its partition ceiling, which only an installation keeping everything forever reaches.                                                                           |
+| `email-stats`           | Every 10 minutes   | worker    | Recomputes the daily delivery trend the dashboard chart reads.                                                                                                                                                     |
+| `bounce-alert`          | Every 15 minutes   | worker    | Judges the recent bounce rate and raises a notification when it crosses the configured threshold. A rate is a property of a window, so it cannot be evaluated from the delivery path.                             |
+| `certificate-expiry`    | Every 6 hours      | worker    | Mails the administrators about TLS certificates nearing expiry, at most once a day.                                                                                                                               |
+| `signing-key-expiry`    | Every 6 hours      | worker    | Warns a project about sender signing certificates nearing expiry.                                                                                                                                                 |
+| `relay-assignments`     | Every minute       | worker    | Takes back messages handed to a pull-mode relay node that stopped claiming, so the next candidate delivers them.                                                                                                  |
+| `settings-refresh`      | Every 5 minutes    | every     | Reloads platform settings from the database so a node that did not serve the write converges.                                                                                                                     |
 
 ## Scheduling Model
 
@@ -68,12 +84,13 @@ Jobs do not backfill. A node that is down at 03:00 does not run the sweep late, 
 
 {{< callout type="warning" title="Every node runs every job it registers" >}}
 There is no leader election. Each node runs its full job set on its own schedule. That is safe for the built-in jobs
-because they are all delete-by-age statements, which converge rather than conflict - but any job added later must be
-idempotent and tolerate concurrent execution.
+because each one converges rather than conflicts when two nodes run it at once: the sweeps delete by age, the rollup
+recomputes in one transaction, the partition job creates what is missing, and the alerts are deduped - but any job added
+later must be idempotent and tolerate concurrent execution.
 {{< /callout >}}
 
-Which jobs a node registers depends on its role. The maintenance sweeps -
-`retention-cleanup` and `bounce-alert` - are registered by `serve` and `worker` nodes only. `settings-refresh` is
+Which jobs a node registers depends on its role, as the table says. Every job marked `worker` is registered by `serve`
+and `worker` nodes only. `settings-refresh` is
 registered by **every** role including `api`, because it is not maintenance: it is how a node's settings cache learns
 about a change written somewhere else. So `GET /api/v1/admin/jobs` on an `api` node lists one job, and that is correct.
 

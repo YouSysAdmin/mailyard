@@ -80,13 +80,14 @@ it far more often than it opens the list.
 
 ### Bounce rate alerts
 
-A scheduled job (`bounce-alert`, every 15 minutes) measures each project's bounce rate over the last hour and raises a
-warning when it crosses the threshold.
+A scheduled job (`bounce-alert`, every 15 minutes) measures each project's bounce rate over the messages it accepted in
+the last hour and raises a warning when it crosses the threshold. The window is when a message was accepted, not when it
+finished - a message accepted two hours ago that failed a minute ago is not counted.
 
 | Setting                       | Default | Meaning                                                                                                                   |
 |-------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------|
 | `bounce_alert_percent`        | `10`    | Rate that raises an alert. **0 turns it off.**                                                                            |
-| `bounce_alert_min_volume`     | `20`    | Messages that must finish in the hour before the rate is judged. Two bounces out of three sends is 66% and means nothing. |
+| `bounce_alert_min_volume`     | `20`    | Messages accepted in the hour that must have finished before the rate is judged. Two bounces out of three sends is 66% and means nothing. |
 | `notification_retention_days` | `30`    | How long **read** notifications are kept. Unread ones are never purged by age.                                            |
 
 Only terminal outcomes count toward the rate - queued and processing messages have not decided yet, and including them

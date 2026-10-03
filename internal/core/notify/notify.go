@@ -180,7 +180,7 @@ func (b *BounceAlerter) Run(ctx context.Context) error {
 			Severity:  nmodel.SeverityWarning,
 			Title:     fmt.Sprintf("Bounce rate is %d%%", rate),
 			Body: fmt.Sprintf(
-				"%d of %d messages that finished in the last hour failed. "+
+				"%d of %d finished messages accepted in the last hour failed. "+
 					"Check the bounces list for the reasons, and pause sending if the addresses are stale.",
 				failed, total),
 			Link:      "/bounces",
