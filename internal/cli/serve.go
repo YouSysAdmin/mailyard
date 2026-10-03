@@ -427,69 +427,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		AttemptTimeout: cfg.Worker.AttemptTimeout,
 	}, log)
 
-	worker.OnFinal = func(job *emailmodel.Email, status, errMsg string, refused []string) {
-		metrics.EmailsFinalized.WithLabelValues(status).Inc()
-
-		// Platform mail through a project is not the project's: no
-		// campaign to mark, no contact to record, nothing for its live
-		// feed or its webhooks. Finalize already cleared the body.
-		if job.System {
-			return
-		}
-
-		// Sync the campaign message (no-op for transactional sends).
-		msgStatus := map[string]string{
-			emailmodel.StatusSent:       campaignmodel.MsgSent,
-			emailmodel.StatusFailed:     campaignmodel.MsgFailed,
-			emailmodel.StatusSuppressed: campaignmodel.MsgSkipped,
-		}[status]
-		if msgStatus != "" {
-			if err := campaign.Settle(context.Background(), st, dispatcher.Emit, rt.Notify,
-				job.ProjectID, job.ID, msgStatus, errMsg); err != nil {
-				log.Error("campaign: settle message", "email_id", job.ID, "err", err)
-			}
-		}
-
-		// Fold the outcome into the per-recipient contact tallies.
-		// Only terminal sent/failed count: a suppressed message was
-		// never attempted, so recording it as a failure would blame
-		// the address for a decision we made about it.
-		if status == emailmodel.StatusSent || status == emailmodel.StatusFailed {
-			trackContacts(context.Background(), st, log, job, status == emailmodel.StatusSent, refused)
-		}
-
-		// Push to any live console viewer. Best effort and
-		// non-blocking - see core/eventbus.
-		if busType := map[string]string{
-			emailmodel.StatusSent:   eventbus.TypeEmailSent,
-			emailmodel.StatusFailed: eventbus.TypeEmailFailed,
-		}[status]; busType != "" {
-			rt.Events.Publish(eventbus.Event{
-				Type:      busType,
-				ProjectID: job.ProjectID,
-				Data: map[string]any{
-					"id":         job.ID,
-					"subject":    job.Subject,
-					"recipients": job.Recipients,
-					"status":     status,
-					"error":      errMsg,
-				},
-			})
-		}
-
-		event := map[string]string{
-			emailmodel.StatusSent:       webhookmodel.EventEmailSent,
-			emailmodel.StatusFailed:     webhookmodel.EventEmailFailed,
-			emailmodel.StatusSuppressed: webhookmodel.EventEmailSuppressed,
-		}[status]
-		if event == "" {
-			return
-		}
-
-		job.Status = status
-		job.ErrorMessage = errMsg
-		dispatcher.Emit(context.Background(), job.ProjectID, event, job.Sender, email.EventPayload(job))
-	}
+	worker.OnFinal = finalHook(rt, st, dispatcher, log)
 
 	rt.Queue = worker
 	// WithCancelCause so the long-lived loops can report WHY they
@@ -859,6 +797,75 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 	rt.Log.Info("auth: bootstrap user created", "email", u.Email, "user_id", u.ID)
 
 	return nil
+}
+
+// finalHook is the worker's OnFinal, run once a message reaches a final
+// status. It reads rt.Notify when it runs rather than when it is built,
+// because the raiser is set after the worker.
+func finalHook(rt *env.Runtime, st *store.Store, dispatcher *dispatch.Dispatcher, log *slog.Logger) func(*emailmodel.Email, string, string, []string) {
+	return func(job *emailmodel.Email, status, errMsg string, refused []string) {
+		metrics.EmailsFinalized.WithLabelValues(status).Inc()
+
+		// Platform mail through a project is not the project's: no
+		// campaign to mark, no contact to record, nothing for its live
+		// feed or its webhooks. Finalize already cleared the body.
+		if job.System {
+			return
+		}
+
+		// Sync the campaign message (no-op for transactional sends).
+		msgStatus := map[string]string{
+			emailmodel.StatusSent:       campaignmodel.MsgSent,
+			emailmodel.StatusFailed:     campaignmodel.MsgFailed,
+			emailmodel.StatusSuppressed: campaignmodel.MsgSkipped,
+		}[status]
+		if msgStatus != "" {
+			if err := campaign.Settle(context.Background(), st, dispatcher.Emit, rt.Notify,
+				job.ProjectID, job.ID, msgStatus, errMsg); err != nil {
+				log.Error("campaign: settle message", "email_id", job.ID, "err", err)
+			}
+		}
+
+		// Fold the outcome into the per-recipient contact tallies.
+		// Only terminal sent/failed count: a suppressed message was
+		// never attempted, so recording it as a failure would blame
+		// the address for a decision we made about it.
+		if status == emailmodel.StatusSent || status == emailmodel.StatusFailed {
+			trackContacts(context.Background(), st, log, job, status == emailmodel.StatusSent, refused)
+		}
+
+		// Push to any live console viewer. Best effort and
+		// non-blocking - see core/eventbus.
+		if busType := map[string]string{
+			emailmodel.StatusSent:   eventbus.TypeEmailSent,
+			emailmodel.StatusFailed: eventbus.TypeEmailFailed,
+		}[status]; busType != "" {
+			rt.Events.Publish(eventbus.Event{
+				Type:      busType,
+				ProjectID: job.ProjectID,
+				Data: map[string]any{
+					"id":         job.ID,
+					"subject":    job.Subject,
+					"recipients": job.Recipients,
+					"status":     status,
+					"error":      errMsg,
+				},
+			})
+		}
+
+		event := map[string]string{
+			emailmodel.StatusSent:       webhookmodel.EventEmailSent,
+			emailmodel.StatusFailed:     webhookmodel.EventEmailFailed,
+			emailmodel.StatusSuppressed: webhookmodel.EventEmailSuppressed,
+		}[status]
+		if event == "" {
+			return
+		}
+
+		job.Status = status
+		job.ErrorMessage = errMsg
+		dispatcher.Emit(context.Background(), job.ProjectID, event, job.Sender, email.EventPayload(job))
+	}
 }
 
 // trackContacts records one terminal delivery outcome against each
