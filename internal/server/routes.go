@@ -1051,7 +1051,12 @@ func mountDocs(app *fiber.App, site fs.FS, gate fiber.Handler) {
 		// the site root would answer at BOTH /docs and /docs/, and the
 		// redirect below, which exists to keep one canonical URL for
 		// it, would never run.
-		Next: func(c fiber.Ctx) bool { return c.Path() == "/docs" },
+		//
+		// The 404 page is handed past too, so asking for it by name gets
+		// the fallback below and the status that page means.
+		Next: func(c fiber.Ctx) bool {
+			return c.Path() == "/docs" || c.Path() == "/docs/404.html"
+		},
 	}))
 	// static.Config.NotFoundHandler is not set on purpose - the 404 page
 	// has to carry a 404 status, and a handler set there would be inside

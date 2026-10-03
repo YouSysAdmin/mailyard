@@ -73,6 +73,7 @@ func TestADocumentationPageAnswersWithAndWithoutATrailingSlash(t *testing.T) {
 		// A moved or misspelled page.
 		{"/docs/email-sending/no-such-page", 404, "<h1>Page not found</h1>"},
 		{"/docs/nope/", 404, "<h1>Page not found</h1>"},
+		{"/docs/404.html", 404, "<h1>Page not found</h1>"},
 
 		// The OpenAPI document the reference page fetches, answered by
 		// the server rather than found in the site, under the same gate.
