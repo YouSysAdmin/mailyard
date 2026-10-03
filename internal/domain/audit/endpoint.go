@@ -59,7 +59,7 @@ func listFilter(c fiber.Ctx) (store.AuditFilter, error, bool) {
 
 	var err error
 	if f.From, f.To, err = paging.TimeWindow(c); err != nil {
-		return f, response.BadRequest(c, "from and to "+err.Error()), false
+		return f, response.BadRequest(c, err.Error()), false
 	}
 
 	return f, nil, true

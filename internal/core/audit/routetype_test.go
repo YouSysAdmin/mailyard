@@ -25,6 +25,24 @@ func TestRouteType(t *testing.T) {
 		{"DELETE", "/api/subscriber-lists/" + uid + "/members/" + uid, "subscriberlist.member.deleted"},
 		// Numeric ids are treated as identifiers too.
 		{"DELETE", "/api/languages/42", "language.deleted"},
+		// An action followed by an id is still the action.
+		{"POST", "/api/v1/templates/" + uid + "/activate/" + uid, "template.activate"},
+		// A collection directly under the resource is a nested resource.
+		{"POST", "/api/v1/sandbox/credentials", "sandbox.credential.created"},
+		{"PATCH", "/api/v1/sandbox/credentials/" + uid, "sandbox.credential.updated"},
+		{"POST", "/api/v1/sandbox/credentials/" + uid + "/revoke", "sandbox.credential.revoke"},
+		{"POST", "/api/v1/sandbox/inboxes", "sandbox.inbox.created"},
+		{"PATCH", "/api/v1/sandbox/inboxes/" + uid, "sandbox.inbox.updated"},
+		{"DELETE", "/api/v1/sandbox/inboxes/" + uid, "sandbox.inbox.deleted"},
+		{"DELETE", "/api/v1/sandbox/" + uid, "sandbox.deleted"},
+		{"POST", "/api/v1/sandbox/clear", "sandbox.clear"},
+		// An action word that ends in s.
+		{"POST", "/api/v1/data/delete-contacts", "data.deletecontacts"},
+		// A namespace names itself and the action.
+		{"POST", "/api/v1/admin/users", "admin.users"},
+		{"DELETE", "/api/v1/admin/users/" + uid, "admin.deleted"},
+		{"POST", "/api/v1/admin/api-keys/" + uid + "/revoke", "admin.revoke"},
+		{"POST", "/api/v1/admin/users/" + uid + "/revoke-sessions", "admin.revokesessions"},
 	}
 	for _, c := range cases {
 		if got := RouteType(c.method, c.path); got != c.want {

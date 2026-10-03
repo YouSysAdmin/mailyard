@@ -75,9 +75,11 @@ func (s *Store) ListProject(ctx context.Context, projID string, f store.AuditFil
 // to args. withActor is false on one account's own trail, where
 // naming an actor would either repeat the scope or escape it.
 func narrow(sb *strings.Builder, args []any, f store.AuditFilter, withActor bool) []any {
+	// Types are stored lower-case, so lowering the value keeps the
+	// filter case-insensitive and still on the type index.
 	if f.Type != "" {
 		sb.WriteString(` AND type = ?`)
-		args = append(args, f.Type)
+		args = append(args, strings.ToLower(f.Type))
 	}
 
 	// An actor is named by id or by address. The id column is a uuid,

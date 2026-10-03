@@ -4,6 +4,7 @@ package inbound
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -28,8 +29,15 @@ type Handler struct {
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	w := paging.WindowFrom(c)
+	status := strings.ToLower(strings.TrimSpace(c.Query("status")))
+	switch status {
+	case "", imodel.StatusReceived, imodel.StatusRejected, imodel.StatusFailed:
+	default:
+		return response.BadRequest(c, "status must be received, rejected or failed")
+	}
+
 	f := store.InboundFilter{
-		Status:    c.Query("status"),
+		Status:    status,
 		Sender:    paging.Search(c, "sender"),
 		Recipient: paging.Search(c, "recipient"),
 		Search:    paging.Search(c, "search"),
@@ -66,7 +74,7 @@ func (h *Handler) Stats(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	from, to, err := paging.TimeWindow(c)
 	if err != nil {
-		return response.BadRequest(c, "from and to "+err.Error())
+		return response.BadRequest(c, err.Error())
 	}
 
 	counts, err := h.Runtime.Store.Inbound.CountByStatus(c.Context(), rc.Project.ID, from, to)

@@ -61,6 +61,7 @@ func TestTheDeliveryLogKeepsTheBodyAndNarrows(t *testing.T) {
 		{"all", store.DeliveryFilter{Limit: 10}, 3},
 		{"failed", store.DeliveryFilter{Status: whmodel.DeliveryFailed, Limit: 10}, 2},
 		{"event", store.DeliveryFilter{Event: "email.sent", Limit: 10}, 2},
+		{"event in another case", store.DeliveryFilter{Event: "Email.SENT", Limit: 10}, 2},
 		{"both", store.DeliveryFilter{Event: "email.sent", Status: whmodel.DeliveryFailed, Limit: 10}, 1},
 	}
 	for _, tc := range cases {

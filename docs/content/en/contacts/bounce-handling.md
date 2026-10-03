@@ -85,7 +85,7 @@ after that is trusted. Treat the credential accordingly.
 GET /api/v1/bounces?limit=50&type=hard&search=acme-industrial.example
 ```
 
-Keyset paged, newest first: follow `next_cursor` until it comes back empty. `type` filters to one class, `search`
+Keyset paged, newest first: follow `next_cursor` until it comes back empty. `type` filters to one class (`hard`, `soft` or `complaint`, without regard to case, anything else is a `400`), `search`
 matches the start of the recipient and `email` one whole recipient address.
 
 Each row carries `id`, `email_id`, `recipient`, `type`, `reason` and `created_at`.

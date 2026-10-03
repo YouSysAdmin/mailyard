@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -250,9 +251,11 @@ func (s *Store) ListDeliveries(ctx context.Context, projID, webhookID string, f 
 		args = append(args, f.Status)
 	}
 
+	// Event names are lower-case, so lowering the value is what makes
+	// the filter case-insensitive.
 	if f.Event != "" {
 		query += ` AND event = ?`
-		args = append(args, f.Event)
+		args = append(args, strings.ToLower(f.Event))
 	}
 
 	if !f.Cursor.IsZero() {
@@ -696,7 +699,7 @@ func (h *Handler) Deliveries(c fiber.Ctx) error {
 		return response.NotFound(c, "webhook not found")
 	}
 
-	status := c.Query("status")
+	status := strings.ToLower(strings.TrimSpace(c.Query("status")))
 	if status != "" && status != whmodel.DeliverySuccess && status != whmodel.DeliveryFailed {
 		return response.BadRequest(c, "status must be success or failed")
 	}

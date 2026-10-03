@@ -148,8 +148,15 @@ type Handler struct {
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	w := paging.WindowFrom(c)
+
+	// An unknown type would match nothing and read as no bounces.
+	btype := strings.ToLower(strings.TrimSpace(c.Query("type")))
+	if _, ok := bmodel.ValidTypes[btype]; btype != "" && !ok {
+		return response.BadRequest(c, "type must be hard, soft or complaint")
+	}
+
 	rows, err := h.Runtime.Store.Bounce.List(c.Context(), rc.Project.ID, store.BounceFilter{
-		Type:   c.Query("type"),
+		Type:   btype,
 		Search: paging.Search(c, "search"),
 		Email:  paging.Search(c, "email"),
 		Limit:  w.Fetch(),

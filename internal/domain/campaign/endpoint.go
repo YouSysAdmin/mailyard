@@ -198,7 +198,7 @@ func (h *Handler) Analytics(c fiber.Ctx) error {
 
 	from, to, err := paging.TimeWindow(c)
 	if err != nil {
-		return response.BadRequest(c, "from and to "+err.Error())
+		return response.BadRequest(c, err.Error())
 	}
 
 	openSeries, err := h.Runtime.Store.Campaign.EventSeries(c.Context(), cam.ID, cmodel.EventOpen, from, to)

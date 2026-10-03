@@ -31,42 +31,63 @@ func RouteType(method, path string) string {
 		return "request." + verb(method)
 	}
 
-	resource := singular(segs[0])
-	if len(segs) == 1 {
-		return resource + "." + verb(method)
-	}
-
-	last := segs[len(segs)-1]
-
-	// Trailing identifier: the action is on a specific object. When
-	// the segment before it is a collection word the object is a
-	// nested resource - DELETE /api/projects/:id/members/:userId
-	// is project.member.deleted, not project.deleted.
-	if looksLikeID(last) {
-		if len(segs) >= 4 && isCollection(segs[len(segs)-2]) {
-			return resource + "." + singular(segs[len(segs)-2]) + "." + verb(method)
+	// A namespace groups unrelated resources, so its types name the
+	// namespace and the action: admin.users, admin.revoke, and
+	// admin.deleted or admin.updated for any object under it. The event
+	// carries the path, which is what says which object.
+	if namespaces[segs[0]] {
+		last := segs[len(segs)-1]
+		if len(segs) > 1 && !looksLikeID(last) {
+			return segs[0] + "." + normalize(last)
 		}
 
-		return resource + "." + verb(method)
+		return segs[0] + "." + verb(method)
 	}
 
-	// Trailing collection word: creating or listing a nested
-	// resource. POST /api/projects/:id/members -> member.created.
-	if len(segs) >= 3 && isCollection(last) {
-		return resource + "." + singular(last) + "." + verb(method)
+	resource := singular(segs[0])
+
+	// Below the resource the path is read left to right. A collection
+	// word names a nested resource (members, credentials), an id names
+	// an object of whatever came before it, and any other word is an
+	// action (send, revoke, activate). The last noun and the last action
+	// decide the type:
+	//
+	//	POST   /projects/:id/members          project.member.created
+	//	DELETE /projects/:id/invitations/:id  project.invitation.deleted
+	//	PATCH  /sandbox/credentials/:id       sandbox.credential.updated
+	//	POST   /templates/:id/activate/:vid   template.activate
+	//	POST   /smtp-servers/:id/test         smtpserver.test
+	noun, action := "", ""
+	for _, s := range segs[1:] {
+		switch {
+		case looksLikeID(s):
+		case isCollection(s):
+			noun, action = singular(s), ""
+		default:
+			action = normalize(s)
+		}
 	}
 
-	// Anything else trailing is a named action:
-	// POST /api/smtp-servers/:id/test -> smtpserver.test
-	// POST /api/emails/send            -> email.send
-	return resource + "." + normalize(last)
+	if noun != "" {
+		resource += "." + noun
+	}
+
+	if action != "" {
+		return resource + "." + action
+	}
+
+	return resource + "." + verb(method)
 }
 
+// namespaces are the first path segments that are not a resource.
+var namespaces = map[string]bool{"admin": true, "my": true}
+
 // isCollection reports whether a path segment names a collection
-// rather than an action. Plural nouns are collections, verbs are
-// actions, and none of the action words in this API end in "s".
+// rather than an action. Plural nouns are collections and verbs are
+// actions. An action word ending in "s" starts with its verb
+// (delete-contacts), which is how it is told apart.
 func isCollection(s string) bool {
-	return strings.HasSuffix(s, "s")
+	return strings.HasSuffix(s, "s") && !strings.HasPrefix(s, "delete-")
 }
 
 func splitPath(path string) []string {
@@ -124,7 +145,7 @@ func singular(s string) string {
 	switch {
 	case strings.HasSuffix(s, "ies"):
 		return strings.TrimSuffix(s, "ies") + "y"
-	case strings.HasSuffix(s, "sses"):
+	case strings.HasSuffix(s, "sses"), strings.HasSuffix(s, "xes"):
 		return strings.TrimSuffix(s, "es")
 	case strings.HasSuffix(s, "s") && !strings.HasSuffix(s, "ss"):
 		return strings.TrimSuffix(s, "s")

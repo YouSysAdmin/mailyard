@@ -17,7 +17,7 @@ GET /api/v1/audit-log?limit=50&offset=0
 
 | Param             | Notes                                                                                                                           |
 |-------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| `type`            | One event type exactly, such as `apikey.created`                                                                                |
+| `type`            | One event type exactly, such as `apikey.created`, without regard to case                                                        |
 | `actor`           | An account id or its address                                                                                                    |
 | `from`, `to`      | A window. Each is a date (`2026-08-01`) or an RFC 3339 instant, `to` exclusive, and a bare date on `to` includes that whole day |
 | `limit`, `offset` | Default 50, maximum 200                                                                                                         |
@@ -75,8 +75,12 @@ Types recorded here:
 Project events are captured by middleware on every **successful mutating** request, so a new endpoint is covered the day
 it is added rather than the day somebody remembers to add a log line. Event types are derived from the route:
 `POST /api/v1/api-keys` becomes
-`apikey.created`, `POST /api/v1/smtp-servers/{id}/test` becomes `smtpserver.test`. Every row also carries the raw method
-and path, so a derived type that reads oddly is still traceable.
+`apikey.created`, `POST /api/v1/smtp-servers/{id}/test` becomes `smtpserver.test`. A collection under a resource is
+named in the type, so `PATCH /api/v1/sandbox/credentials/{id}` becomes `sandbox.credential.updated`, and an action
+followed by an id is still that action, so `POST /api/v1/templates/{id}/activate/{versionId}` becomes
+`template.activate`. Platform administration is the exception: everything under `/api/v1/admin` is `admin.` plus the
+action, or `admin.updated` and `admin.deleted` for any object there. Every row also carries the raw method and path, so
+a derived type that reads oddly is still traceable.
 
 Two consequences worth knowing:
 

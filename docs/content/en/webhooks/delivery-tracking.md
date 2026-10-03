@@ -72,7 +72,7 @@ tab should not fail a list request.
 
 There is no total. The cursor coming back empty is how you know you have reached the end.
 
-`status=failed` narrows the log to what did not get through, `event=email.sent` to one event name.
+`status=failed` narrows the log to what did not get through, `event=email.sent` to one event name. Both ignore case.
 
 ## Sending one again
 

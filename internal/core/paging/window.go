@@ -49,12 +49,13 @@ func Instant(c fiber.Ctx, name string) (*time.Time, error) {
 
 // TimeWindow reads ?from= and ?to= as a half-open window, either end
 // optional. A bare date on the to side includes that whole day, which
-// is what somebody typing it means.
+// is what somebody typing it means. The error is a whole sentence that
+// names the parameter, ready to show as it is.
 func TimeWindow(c fiber.Ctx) (from, to *time.Time, err error) {
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
 		t, _, err := Bound(raw)
 		if err != nil {
-			return nil, nil, ErrBound
+			return nil, nil, errors.New("from " + ErrBound.Error())
 		}
 
 		from = &t
@@ -63,7 +64,7 @@ func TimeWindow(c fiber.Ctx) (from, to *time.Time, err error) {
 	if raw := strings.TrimSpace(c.Query("to")); raw != "" {
 		t, dateOnly, err := Bound(raw)
 		if err != nil {
-			return nil, nil, ErrBound
+			return nil, nil, errors.New("to " + ErrBound.Error())
 		}
 
 		if dateOnly {

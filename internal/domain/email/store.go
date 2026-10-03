@@ -330,16 +330,17 @@ func (s *Store) List(ctx context.Context, projID string, f Filter) ([]*emailmode
 	}
 
 	if f.Template != "" {
-		query += ` AND template_name = ?`
-		args = append(args, f.Template)
+		query += ` AND LOWER(template_name) = ?`
+		args = append(args, strings.ToLower(f.Template))
 	}
 
 	// Containment rather than the jsonb ? operator, which the
-	// placeholder rewriter would turn into a parameter. @> is what the
-	// expression index serves.
+	// placeholder rewriter would turn into a parameter. @> over the
+	// lowered tags is what the expression index serves, and what makes
+	// the match case-insensitive.
 	if f.Tag != "" {
-		query += ` AND tags::jsonb @> ?::jsonb`
-		args = append(args, database.MustJSON([]string{f.Tag}))
+		query += ` AND lower(tags)::jsonb @> ?::jsonb`
+		args = append(args, database.MustJSON([]string{strings.ToLower(f.Tag)}))
 	}
 
 	if f.APIKeyID != "" {

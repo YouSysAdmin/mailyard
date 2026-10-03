@@ -40,8 +40,8 @@ curl "http://localhost:3000/api/v1/emails?limit=50&status=failed" \
 | `sender`         | Part of the From mailbox, without regard to case                                                                                             |
 | `recipient`      | Part of any recipient, Cc and Bcc included                                                                                                   |
 | `match`          | `contains` (the default) or `exact`. Exact makes `sender` and `recipient` one whole address each, found bare or inside `Name <address>`       |
-| `template`       | The name of the template the message was rendered from                                                                                       |
-| `tag`            | Only messages carrying this tag                                                                                                              |
+| `template`       | The name of the template the message was rendered from, without regard to case                                                               |
+| `tag`            | Only messages carrying this tag, without regard to case                                                                                      |
 | `api_key_id`     | Only mail accepted through this API key                                                                                                      |
 | `smtp_server_id` | Only mail delivered through this server                                                                                                      |
 | `from`, `to`     | A `created_at` window. Each is a date (`2026-08-01`) or an RFC 3339 instant, `to` exclusive, and a bare date on `to` includes that whole day |

@@ -16,7 +16,7 @@ GET /api/v1/inbound-emails?limit=50&status=received
 
 | Param       | Notes                                                                             |
 |-------------|-----------------------------------------------------------------------------------|
-| `status`    | One of the three below                                                            |
+| `status`    | One of the three below, without regard to case. Anything else is a `400`          |
 | `limit`     | Default 50, maximum 200                                                           |
 | `cursor`    | The `next_cursor` of the previous page                                            |
 | `sender`    | Part of the From header, without regard to case                                   |

@@ -234,7 +234,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 	// Each value is checked by name: an unknown status would match
 	// nothing and read as an empty log.
 	for status := range strings.SplitSeq(c.Query("status"), ",") {
-		status = strings.TrimSpace(status)
+		status = strings.ToLower(strings.TrimSpace(status))
 		if status == "" {
 			continue
 		}
@@ -253,7 +253,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 	}
 
 	if f.From, f.To, err = paging.TimeWindow(c); err != nil {
-		return response.BadRequest(c, "from and to "+err.Error())
+		return response.BadRequest(c, err.Error())
 	}
 
 	if f.After, err = paging.Instant(c, "after"); err != nil {
@@ -284,7 +284,7 @@ func (h *Handler) Stats(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	from, to, err := paging.TimeWindow(c)
 	if err != nil {
-		return response.BadRequest(c, "from and to "+err.Error())
+		return response.BadRequest(c, err.Error())
 	}
 
 	counts, err := h.Runtime.Store.Email.CountByStatus(c.Context(), rc.Project.ID, from, to)
