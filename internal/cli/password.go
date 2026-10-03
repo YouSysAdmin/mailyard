@@ -108,13 +108,6 @@ func newPassword(raw string) (string, error) {
 		return "", usage("password must be at least 12 characters")
 	}
 
-	// bcrypt refuses anything longer outright. Say so here rather than
-	// letting HashPassword fail with a library error after the operator
-	// has typed it twice.
-	if len(password) > 72 {
-		return "", usage("password must be at most 72 bytes (bcrypt's limit)")
-	}
-
 	return password, nil
 }
 

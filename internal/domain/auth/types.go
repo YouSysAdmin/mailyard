@@ -46,7 +46,7 @@ type registerInput struct {
 	// needs no credential to reach must not have the weakest one. The
 	// number is repeated in each tag because a struct tag cannot name a
 	// constant, and tests/passwordpolicy_test.go keeps the copies equal.
-	Password string `json:"password" validate:"required,min=12,max=256,bcryptlen" normalize:"trim"`
+	Password string `json:"password" validate:"required,min=12,max=256" normalize:"trim"`
 }
 
 // passkeyReauthInput is the password confirmation guarding the
@@ -67,14 +67,14 @@ type resetRequestInput struct {
 
 type resetConfirmInput struct {
 	Token    string `json:"token"    validate:"required,min=32,max=128" normalize:"trim"`
-	Password string `json:"password" validate:"required,min=12,max=256,bcryptlen" normalize:"trim"`
+	Password string `json:"password" validate:"required,min=12,max=256" normalize:"trim"`
 }
 
 // changePasswordInput is the signed-in change, so it proves the
 // current password rather than a mailed token.
 type changePasswordInput struct {
 	CurrentPassword string `json:"current_password" validate:"required,min=1,max=256" normalize:"trim"`
-	Password        string `json:"password"         validate:"required,min=12,max=256,bcryptlen" normalize:"trim"`
+	Password        string `json:"password"         validate:"required,min=12,max=256" normalize:"trim"`
 }
 
 type verifyConfirmInput struct {

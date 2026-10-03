@@ -51,49 +51,6 @@ func TestIPCIDRMessage(t *testing.T) {
 	}
 }
 
-// bcryptlen exists because x/crypto refuses a password over 72 bytes
-// outright: without the tag the value reaches HashPassword, fails
-// there, and the handler reports a 500 - a typo'd input surfacing as
-// a server fault with no field named.
-//
-// The byte-vs-rune distinction is the whole reason it is a custom tag
-// rather than `max=72`, which counts runes: a 40-character Cyrillic
-// passphrase is 80 bytes and would sail past a rune limit straight
-// into the hasher.
-func TestBcryptLenTag(t *testing.T) {
-	v := Init()
-
-	type input struct {
-		Password string `validate:"required,bcryptlen"`
-	}
-
-	ok := []string{
-		"short",
-		strings.Repeat("a", 72),
-		// 36 Cyrillic runes = 72 bytes, exactly at the edge.
-		strings.Repeat("д", 36),
-	}
-	for _, pw := range ok {
-		if err := v.Struct(input{Password: pw}); err != nil {
-			t.Errorf("password of %d bytes rejected: %v", len(pw), err)
-		}
-	}
-
-	tooLong := []string{
-		strings.Repeat("a", 73),
-		strings.Repeat("a", 256),
-		// 37 Cyrillic runes = 74 bytes. `max=72` would ACCEPT this,
-		// which is exactly the case this tag exists for.
-		strings.Repeat("д", 37),
-	}
-	for _, pw := range tooLong {
-		if err := v.Struct(input{Password: pw}); err == nil {
-			t.Errorf("password of %d bytes (%d runes) accepted, bcrypt will refuse it",
-				len(pw), len([]rune(pw)))
-		}
-	}
-}
-
 // A group slug is named in a send, so only the derived shape is taken.
 func TestSlugTag(t *testing.T) {
 	v := Init()

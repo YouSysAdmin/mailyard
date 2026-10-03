@@ -135,8 +135,6 @@ func defaultMessage(fe validator.FieldError) string {
 		return field + " must be an email address or *@domain"
 	case "certname":
 		return field + " may contain letters, digits, dot, dash and underscore"
-	case "bcryptlen":
-		return field + " must be at most 72 bytes (a long passphrase in a non-latin script hits this sooner than 72 characters)"
 	case "timezone":
 		return field + " must be an IANA timezone such as Europe/Lisbon"
 	case "uuid", "uuid4", "uuid5":

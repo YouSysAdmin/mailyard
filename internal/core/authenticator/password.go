@@ -18,7 +18,24 @@ import (
 const (
 	passwordCost       = 12
 	generatedPasswordN = 16 // base64-url chars, ~96 bits of entropy
+
+	// bcryptMaxBytes is all of a password bcrypt reads.
+	bcryptMaxBytes = 72
 )
+
+// bcryptInput is the part of a password bcrypt reads. A longer one is
+// cut rather than refused, the same cut on hashing and on checking, so
+// the whole password a person types keeps working everywhere. Bytes,
+// not runes: a cut through a multi-byte rune is still the same bytes
+// both times.
+func bcryptInput(plaintext string) []byte {
+	b := []byte(plaintext)
+	if len(b) > bcryptMaxBytes {
+		b = b[:bcryptMaxBytes]
+	}
+
+	return b
+}
 
 // Username brute force protection.
 // dummyHash is a real cost-12 bcrypt hash over an unknown random
@@ -51,7 +68,7 @@ func VerifyDummyPassword(plaintext string) bool {
 		return false
 	}
 
-	return bcrypt.CompareHashAndPassword([]byte(h), []byte(plaintext)) == nil
+	return bcrypt.CompareHashAndPassword([]byte(h), bcryptInput(plaintext)) == nil
 }
 
 // HashPassword returns a bcrypt hash at the cost this package fixes.
@@ -61,7 +78,7 @@ func HashPassword(plaintext string) (string, error) {
 		return "", errors.New("password required")
 	}
 
-	h, err := bcrypt.GenerateFromPassword([]byte(plaintext), passwordCost)
+	h, err := bcrypt.GenerateFromPassword(bcryptInput(plaintext), passwordCost)
 	if err != nil {
 		return "", err
 	}
@@ -77,7 +94,7 @@ func VerifyPassword(hash, plaintext string) bool {
 		return false
 	}
 
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plaintext)) == nil
+	return bcrypt.CompareHashAndPassword([]byte(hash), bcryptInput(plaintext)) == nil
 }
 
 // GeneratePassword returns a URL-safe random password.

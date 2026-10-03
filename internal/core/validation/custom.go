@@ -41,21 +41,6 @@ func registerCustom(v *validator.Validate) {
 		return err == nil
 	})
 
-	// bcryptlen caps a password at what bcrypt will actually accept.
-	//
-	// x/crypto refuses anything over 72 bytes outright (older versions
-	// truncated silently, which was worse), so without this rule a
-	// longer password reaches HashPassword, fails there, and the caller
-	// turns it into a 500 - an input mistake reported as a server
-	// fault, with no field named.
-	//
-	// It has to count bytes, not runes: `max=72` uses rune count, so a
-	// 72-character password in any non-latin script sails past it and
-	// then blows up at the hasher anyway.
-	_ = v.RegisterValidation("bcryptlen", func(fl validator.FieldLevel) bool {
-		return len(fl.Field().String()) <= 72
-	})
-
 	// provider is a mail provider this binary actually has.
 	//
 	// Asked of the transport registry rather than spelled as a oneof,

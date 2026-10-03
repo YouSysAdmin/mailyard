@@ -33,8 +33,9 @@ func TestSetPasswordStoresWhatSignInSends(t *testing.T) {
 	}
 }
 
-// The floors are counted on the trimmed password.
-func TestSetPasswordLimitsCountTheTrimmedPassword(t *testing.T) {
+// The floor is counted on the trimmed password. There is no ceiling:
+// what bcrypt does not read is cut when it is hashed.
+func TestSetPasswordFloorCountsTheTrimmedPassword(t *testing.T) {
 	cases := []struct {
 		name string
 		raw  string
@@ -42,9 +43,7 @@ func TestSetPasswordLimitsCountTheTrimmedPassword(t *testing.T) {
 	}{
 		{"spaces do not make up the floor", "   short-pw    ", false},
 		{"twelve characters", "  twelve-chars  ", true},
-		{"72 bytes", strings.Repeat("a", 72), true},
-		{"73 bytes", strings.Repeat("a", 73), false},
-		{"72 bytes inside spaces", "  " + strings.Repeat("a", 72) + "  ", true},
+		{"far past what bcrypt reads", strings.Repeat("a", 200), true},
 	}
 
 	for _, tc := range cases {
