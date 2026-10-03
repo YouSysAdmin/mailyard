@@ -79,29 +79,51 @@ const (
 	WindowDay  = "day"
 )
 
+// Volume is the send limits a plan sets, zero meaning unbounded, for
+// the insert that has to hold them.
+type Volume struct {
+	Hourly int
+	Daily  int
+	Plan   string
+}
+
+// Bounded reports whether either window has a limit.
+func (v Volume) Bounded() bool { return v.Hourly > 0 || v.Daily > 0 }
+
+// Refused is the error for a send the insert refused in window, one of
+// WindowHour or WindowDay.
+func (v Volume) Refused(window string) error {
+	if window == WindowHour {
+		return errf("hourly email limit reached (%d per hour on plan %q)", v.Hourly, v.Plan)
+	}
+
+	return errf("daily email limit reached (%d per day on plan %q)", v.Daily, v.Plan)
+}
+
 // CheckSend enforces the hourly and daily email volume limits for
-// one new send.
+// one new send, and returns the limits so the insert can hold them.
 //
-// A read followed, later in the request, by the insert that counts,
-// so N sends arriving together at limit-1 all pass. The overrun is
-// bounded by sends in flight. Closing it takes a transaction spanning
-// this check and the email insert, and a plan is a soft ceiling rather
-// than a per-message contract.
-func CheckSend(ctx context.Context, st *store.Store, projID string, obs Observer) error {
+// This read refuses early and feeds the observer. It cannot hold the
+// limit alone - sends arriving together all read limit-1 - so a bounded
+// plan's insert goes through EmailStore.PutWithin, which counts again
+// under a per-project lock in the same transaction as the insert.
+func CheckSend(ctx context.Context, st *store.Store, projID string, obs Observer) (Volume, error) {
 	p, err := planFor(ctx, st, projID)
 	if err != nil {
-		return err
+		return Volume{}, err
 	}
 
 	if p == nil || (p.HourlyEmailLimit <= 0 && p.DailyEmailLimit <= 0) {
-		return nil
+		return Volume{}, nil
 	}
+
+	vol := Volume{Hourly: max(p.HourlyEmailLimit, 0), Daily: max(p.DailyEmailLimit, 0), Plan: p.Name}
 
 	now := time.Now().UTC()
 	if p.HourlyEmailLimit > 0 {
 		n, err := st.Email.AcceptedSince(ctx, projID, now.Add(-time.Hour))
 		if err != nil {
-			return err
+			return vol, err
 		}
 
 		if obs != nil {
@@ -109,14 +131,14 @@ func CheckSend(ctx context.Context, st *store.Store, projID string, obs Observer
 		}
 
 		if n >= p.HourlyEmailLimit {
-			return errf("hourly email limit reached (%d per hour on plan %q)", p.HourlyEmailLimit, p.Name)
+			return vol, vol.Refused(WindowHour)
 		}
 	}
 
 	if p.DailyEmailLimit > 0 {
 		n, err := st.Email.AcceptedSince(ctx, projID, now.Add(-24*time.Hour))
 		if err != nil {
-			return err
+			return vol, err
 		}
 
 		if obs != nil {
@@ -124,61 +146,78 @@ func CheckSend(ctx context.Context, st *store.Store, projID string, obs Observer
 		}
 
 		if n >= p.DailyEmailLimit {
-			return errf("daily email limit reached (%d per day on plan %q)", p.DailyEmailLimit, p.Name)
+			return vol, vol.Refused(WindowDay)
 		}
 	}
 
-	return nil
+	return vol, nil
 }
 
-// CheckResource enforces a resource cap before creating adding more
-// of the named resource. adding is how many the caller is about to
-// create (1 for single creates, N for imports).
-func CheckResource(ctx context.Context, st *store.Store, projID string, resource string, adding int) error {
+// HoldResource enforces a resource cap before creating adding more of
+// the named resource, and keeps the cap held until release is called.
+// adding is how many the caller is about to create (1 for single
+// creates, N for imports).
+//
+// The count and the create are two statements in two places, so on a
+// bounded plan the count is taken under a per-project lock for that
+// resource and the caller creates BEFORE releasing it - otherwise
+// concurrent creates each see room for one more. release is never nil
+// and is safe to call on every path, refusal included.
+func HoldResource(ctx context.Context, st *store.Store, projID string, resource string, adding int) (func(), error) {
+	noop := func() {}
+
 	p, err := planFor(ctx, st, projID)
 	if err != nil {
-		return err
+		return noop, err
 	}
 
 	if p == nil {
-		return nil
+		return noop, nil
 	}
 
-	var limit, current int
+	var limit int
+	var count func(context.Context, string) (int, error)
 	switch resource {
 	case ResAPIKeys:
-		limit = p.MaxAPIKeys
-		if limit > 0 {
-			current, err = st.APIKey.Count(ctx, projID)
-		}
+		limit, count = p.MaxAPIKeys, st.APIKey.Count
 	case ResSMTPServers:
-		limit = p.MaxSMTPServers
-		if limit > 0 {
-			current, err = st.SMTPServer.Count(ctx, projID)
-		}
+		limit, count = p.MaxSMTPServers, st.SMTPServer.Count
 	case ResDomains:
-		limit = p.MaxDomains
-		if limit > 0 {
-			current, err = st.Domain.Count(ctx, projID)
-		}
+		limit, count = p.MaxDomains, st.Domain.Count
 	case ResSubscribers:
-		limit = p.MaxSubscribers
-		if limit > 0 {
-			current, err = st.Subscriber.Count(ctx, projID)
-		}
+		limit, count = p.MaxSubscribers, st.Subscriber.Count
 	default:
-		return fmt.Errorf("unknown quota resource %q", resource)
+		return noop, fmt.Errorf("unknown quota resource %q", resource)
 	}
 
+	if limit <= 0 {
+		return noop, nil
+	}
+
+	release := noop
+	if st.Locks != nil {
+		held, err := st.Locks.Hold(ctx, "quota."+resource, projID)
+		if err != nil {
+			return noop, err
+		}
+
+		release = held
+	}
+
+	current, err := count(ctx, projID)
 	if err != nil {
-		return err
+		release()
+
+		return noop, err
 	}
 
-	if limit > 0 && current+adding > limit {
-		return errf("plan %q allows at most %d %s (currently %d)", p.Name, limit, resource, current)
+	if current+adding > limit {
+		release()
+
+		return noop, errf("plan %q allows at most %d %s (currently %d)", p.Name, limit, resource, current)
 	}
 
-	return nil
+	return release, nil
 }
 
 // Sandbox is what a project's plan allows its sandbox: the ring buffer,

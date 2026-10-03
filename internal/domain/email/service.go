@@ -615,17 +615,18 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 	// the quota is the plan's and the suppressions are the project's,
 	// and a password reset is neither.
 	allowed, blocked := req.To, []string(nil)
+	var vol quota.Volume
 	if !req.System {
 		var observe quota.Observer
 		if s.Quota != nil {
 			observe = s.Quota(projID)
 		}
 
-		if err := quota.CheckSend(ctx, s.Store, projID, observe); err != nil {
+		var err error
+		if vol, err = quota.CheckSend(ctx, s.Store, projID, observe); err != nil {
 			return nil, nil, err
 		}
 
-		var err error
 		allowed, blocked, err = s.Store.Suppression.FilterSuppressedForList(
 			ctx, projID, req.UnsubscribeListID, req.To)
 		if err != nil {
@@ -726,7 +727,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		e.Status = emailmodel.StatusSuppressed
 		e.ErrorMessage = "all recipients are suppressed"
 		e.NextAttemptAt = nil
-		if err := s.Store.Email.Put(ctx, e); err != nil {
+		if err := s.put(ctx, e, vol); err != nil {
 			return nil, nil, err
 		}
 
@@ -749,7 +750,7 @@ func (s *Service) Send(ctx context.Context, projID, createdBy, apiKeyID string, 
 		return nil, nil, fmt.Errorf("offload attachments: %w", err)
 	}
 
-	if err := s.Store.Email.Put(ctx, e); err != nil {
+	if err := s.put(ctx, e, vol); err != nil {
 		return nil, nil, err
 	}
 
@@ -796,13 +797,33 @@ func (s *Service) DryRun(ctx context.Context, projID string, req *SendRequest) (
 		return nil, nil
 	}
 
-	if err := quota.CheckSend(ctx, s.Store, projID, nil); err != nil {
+	if _, err := quota.CheckSend(ctx, s.Store, projID, nil); err != nil {
 		return nil, err
 	}
 
 	_, blocked, err := s.Store.Suppression.FilterSuppressedForList(ctx, projID, req.UnsubscribeListID, req.To)
 
 	return blocked, err
+}
+
+// put writes the row, holding the plan's volume limits when it has
+// any. The insert is what counts the send, so it is also the only
+// place the limit can be held against concurrent sends.
+func (s *Service) put(ctx context.Context, e *emailmodel.Email, vol quota.Volume) error {
+	if !vol.Bounded() {
+		return s.Store.Email.Put(ctx, e)
+	}
+
+	window, err := s.Store.Email.PutWithin(ctx, e, vol.Hourly, vol.Daily)
+	if err != nil {
+		return err
+	}
+
+	if window != "" {
+		return vol.Refused(window)
+	}
+
+	return nil
 }
 
 // Retry re-queues a failed email with a fresh attempt budget.

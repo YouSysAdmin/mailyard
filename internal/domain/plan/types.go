@@ -42,7 +42,7 @@ type updatePlanInput struct {
 // Pointers, because the route is a PATCH and 0 does not mean "no change"
 // here, it means UNLIMITED: a plain int would read an absent limit as 0
 // and `PATCH /admin/plans/:id {"name":"Starter"}` would silently remove
-// every limit on the plan, since quota.CheckSend and CheckResource both
+// every limit on the plan, since quota.CheckSend and HoldResource both
 // return nil at 0.
 //
 // Same shape and same reason as oauthprovider's admission lists.

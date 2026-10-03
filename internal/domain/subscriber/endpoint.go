@@ -128,13 +128,16 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResSubscribers, 1); err != nil {
+	release, err := quota.HoldResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResSubscribers, 1)
+	if err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
 
 		return response.Internal(c, err)
 	}
+
+	defer release()
 
 	existing, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), rc.Project.ID, in.Email)
 	if err != nil {
@@ -316,13 +319,16 @@ func (h *Handler) ImportCSV(c fiber.Ctx) error {
 
 // runImport applies the upserts, tolerating per-row failures.
 func (h *Handler) runImport(c fiber.Ctx, projID string, items []upsertInput) error {
-	if err := quota.CheckResource(c.Context(), h.Runtime.Store, projID, quota.ResSubscribers, len(items)); err != nil {
+	release, err := quota.HoldResource(c.Context(), h.Runtime.Store, projID, quota.ResSubscribers, len(items))
+	if err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
 
 		return response.Internal(c, err)
 	}
+
+	defer release()
 
 	created, updated := 0, 0
 	rowErrors := []ImportError{}

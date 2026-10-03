@@ -25,13 +25,17 @@ A value of `0` means **unlimited** for every limit below.
 | `daily_email_limit`  | `0`     | Emails accepted per rolling day                 |
 | `max_api_keys`       | `0`     | API keys per project                            |
 | `max_smtp_servers`   | `0`     | SMTP servers per project                        |
-| `max_domains`        | `0`     | Verified domains per project                    |
+| `max_domains`        | `0`     | Domains per project, pending ones included      |
 | `max_subscribers`    | `0`     | Subscribers per project                         |
 
 The two send limits are checked when a message is accepted and refused with HTTP `429`
 (or `452` over SMTP submission). The resource caps are checked at create time, so you find out when adding the key or
-the domain, not later. Counts come from the primary tables rather than from counters, so nothing can drift out of step
-with reality.
+the domain, not later. Resource counts come from the primary tables rather than from counters, so nothing can drift out
+of step with reality. A domain counts from the moment it is added, not from verification, so a cap cannot be stepped
+around by adding names and never verifying them.
+
+Both kinds of limit hold under concurrent requests: a project's count and the write it allows are serialized, so twenty
+sends arriving together against room for seven accept exactly seven.
 
 ## Creating a Plan
 

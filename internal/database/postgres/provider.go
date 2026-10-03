@@ -7,6 +7,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/domain/analytics"
 	"github.com/yousysadmin/mailyard/internal/domain/apikey"
 	"github.com/yousysadmin/mailyard/internal/domain/audit"
@@ -68,6 +69,7 @@ func BindStore(p *Postgres, cr *crypto.Service, reads env.ReplicaReadsConfig) *s
 	}
 
 	return &store.Store{
+		Locks:           database.NewLocks(p.db),
 		User:            user.NewStore(p.db),
 		Project:         project.NewStore(p.db),
 		AlertRecipients: project.NewAlertRecipients(p.db),

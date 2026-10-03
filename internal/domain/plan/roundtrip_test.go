@@ -107,7 +107,7 @@ func TestEveryLimitSurvivesTheRoundTrip(t *testing.T) {
 //
 // 0 is not "unset" here, it MEANS unlimited, so an absent limit read
 // as 0 would remove every limit on the plan: quota.CheckSend and
-// CheckResource both return nil at 0. An absent is_default read as
+// HoldResource both return nil at 0. An absent is_default read as
 // false would make every project with no explicit assignment
 // unlimited too.
 func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {

@@ -71,13 +71,16 @@ func (h *Handler) Create(c fiber.Ctx) error {
 				strings.Join(short, ", ")+" - ask a project owner")
 	}
 
-	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResAPIKeys, 1); err != nil {
+	release, err := quota.HoldResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResAPIKeys, 1)
+	if err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
 
 		return response.Internal(c, err)
 	}
+
+	defer release()
 
 	var expiresAt *time.Time
 	if in.ExpiresAt != "" {
@@ -97,7 +100,6 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	// 12-char prefix would shadow each other at auth time. The odds
 	// are negligible (~48 bits) but a retry at mint time removes the edge entirely.
 	var plaintext, prefix, hash string
-	var err error
 	for attempt := 0; ; attempt++ {
 		plaintext, prefix, hash, err = akmodel.Generate()
 		if err != nil {

@@ -434,7 +434,14 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
 		query = putSystemSQL
 	}
 
-	_, err := s.Exec(ctx, query,
+	_, err := s.Exec(ctx, query, putArgs(e)...)
+
+	return err
+}
+
+// putArgs is the argument list for putValues, in putColumns order.
+func putArgs(e *emailmodel.Email) []any {
+	return []any{
 		e.ID, e.ProjectID, e.CreatedBy, database.NullStr(e.APIKeyID),
 		database.NullStr(e.CredentialID), database.NullStr(e.SMTPServerID), database.NullStr(e.SMTPGroupID), e.Sender,
 		database.MustJSON(e.Recipients), e.Subject, e.TemplateName, e.HTMLBody, e.TextBody,
@@ -446,9 +453,70 @@ func (s *Store) Put(ctx context.Context, e *emailmodel.Email) error {
 		e.CreatedAt, database.NullTime(e.ScheduledAt), database.NullTime(e.SentAt),
 		e.Tracked, e.Signing, database.MustJSON(emptyTags(e.Tags)), database.MustJSON(emptyMetadata(e.Metadata)),
 		e.System,
-	)
+	}
+}
 
-	return err
+// Windows PutWithin can refuse in.
+const (
+	refusedHour = "hour"
+	refusedDay  = "day"
+)
+
+// PutWithin inserts the row only while the project's volume windows
+// have room, counting and inserting under one transaction-scoped lock
+// keyed on the project.
+//
+// The lock is per project, and only a bounded plan's sends take it, so
+// an unlimited project and every other project pay nothing. Under READ
+// COMMITTED each statement after the lock sees every send committed by
+// the previous holder, so N sends racing at limit-1 admit exactly one.
+func (s *Store) PutWithin(ctx context.Context, e *emailmodel.Email, hourly, daily int) (string, error) {
+	if e.CreatedAt.IsZero() {
+		e.CreatedAt = time.Now().UTC()
+	}
+
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		s.Q(`SELECT pg_advisory_xact_lock(hashtext('email_volume'), hashtext(?::text))`), e.ProjectID); err != nil {
+		return "", err
+	}
+
+	for _, w := range []struct {
+		limit  int
+		since  time.Duration
+		window string
+	}{
+		{hourly, time.Hour, refusedHour},
+		{daily, 24 * time.Hour, refusedDay},
+	} {
+		if w.limit <= 0 {
+			continue
+		}
+
+		var n int
+		if err := tx.QueryRowContext(ctx, s.Q(`
+            SELECT COALESCE(SUM(accepted), 0) FROM email_volume
+            WHERE project_id = ? AND minute >= date_trunc('minute', ?::timestamptz)`),
+			e.ProjectID, e.CreatedAt.Add(-w.since)).Scan(&n); err != nil {
+			return "", err
+		}
+
+		if n >= w.limit {
+			return w.window, nil
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, s.Q(putSQL), putArgs(e)...); err != nil {
+		return "", err
+	}
+
+	return "", tx.Commit()
 }
 
 // emptyTags and emptyMetadata keep a nil slice or map from being

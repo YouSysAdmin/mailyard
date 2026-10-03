@@ -50,6 +50,11 @@ import (
 // Store bundles every per-domain store.
 // Handlers depend on this struct, never on a concrete backend.
 type Store struct {
+	// Locks serializes work that must not interleave across nodes,
+	// such as counting a plan's resources and creating one more. Nil
+	// where nothing needs it, and then nothing is held.
+	Locks LockStore
+
 	User            UserStore
 	Project         ProjectStore
 	SMTPServer      SMTPServerStore
@@ -583,6 +588,13 @@ type SharedSMTPStore interface {
 	Count(ctx context.Context) (int, error)
 }
 
+// LockStore holds named locks shared by every node.
+type LockStore interface {
+	// Hold waits for the lock named by scope and key and returns the
+	// function that releases it.
+	Hold(ctx context.Context, scope, key string) (func(), error)
+}
+
 // CertificateStore persists certificates and their sealed private
 // halves. Get decrypts, every listing path deliberately does not -
 // see the package doc in domain/certificate.
@@ -743,6 +755,13 @@ type EmailStore interface {
 	GetAny(ctx context.Context, id string) (*email.Email, error)
 	List(ctx context.Context, projID string, f EmailFilter) ([]*email.Email, error)
 	Put(ctx context.Context, e *email.Email) error
+
+	// PutWithin is Put for a project whose plan bounds its volume: the
+	// windows are summed under a per-project lock in the same
+	// transaction as the insert, and nothing is written when one is
+	// full. refused names that window ("hour" or "day"), empty when the
+	// row went in. A limit of zero is unbounded.
+	PutWithin(ctx context.Context, e *email.Email, hourly, daily int) (refused string, err error)
 	Reset(ctx context.Context, projID, id string, recipients []string) (bool, error)
 
 	// Cancel takes a message out of the queue before a worker claims

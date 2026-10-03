@@ -605,13 +605,16 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResDomains, 1); err != nil {
+	release, err := quota.HoldResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResDomains, 1)
+	if err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())
 		}
 
 		return response.Internal(c, err)
 	}
+
+	defer release()
 
 	// A claim is per project until it verifies, so only this project's
 	// own row is a duplicate. A name another project VERIFIED is refused
