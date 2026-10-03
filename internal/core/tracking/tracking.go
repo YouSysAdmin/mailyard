@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"regexp"
 	"strconv"
 	"strings"
@@ -292,13 +293,13 @@ type TrackOpts struct {
 // and injects the open pixel before the closing body tag, according
 // to opts. Links already pointing at this installation are left
 // alone. Returns the rewritten HTML plus the discovered links.
-func (s *Signer) ProcessHTML(html string, opts TrackOpts) (string, []Link) {
-	if html == "" || !s.Enabled() || opts.EmailID == "" {
-		return html, nil
+func (s *Signer) ProcessHTML(body string, opts TrackOpts) (string, []Link) {
+	if body == "" || !s.Enabled() || opts.EmailID == "" {
+		return body, nil
 	}
 
 	if !opts.Opens && !opts.Clicks {
-		return html, nil
+		return body, nil
 	}
 
 	trackingPrefix := s.baseURL + "/tracking/"
@@ -306,37 +307,40 @@ func (s *Signer) ProcessHTML(html string, opts TrackOpts) (string, []Link) {
 	var links []Link
 
 	if opts.Clicks {
-		html = linkRe.ReplaceAllStringFunc(html, func(match string) string {
+		body = linkRe.ReplaceAllStringFunc(body, func(match string) string {
 			sub := linkRe.FindStringSubmatch(match)
 			if len(sub) < 2 {
 				return match
 			}
 
-			original := sub[1]
-			if strings.HasPrefix(original, trackingPrefix) {
+			// The attribute value is HTML, the link is what a browser
+			// would follow: an escaped "&amp;" is one "&" in the URL.
+			attr := sub[1]
+			target := html.UnescapeString(attr)
+			if strings.HasPrefix(target, trackingPrefix) {
 				return match
 			}
 
-			hash := HashLink(opts.LinkScope, original)
+			hash := HashLink(opts.LinkScope, target)
 			if !seen[hash] {
 				seen[hash] = true
-				links = append(links, Link{URL: original, Hash: hash})
+				links = append(links, Link{URL: target, Hash: hash})
 			}
 
-			return strings.Replace(match, original, s.ClickURL(opts.EmailID, hash), 1)
+			return strings.Replace(match, attr, s.ClickURL(opts.EmailID, hash), 1)
 		})
 	}
 
 	if opts.Opens {
 		pixel := fmt.Sprintf(`<img src="%s" width="1" height="1" alt="" style="display:none" />`, s.OpenURL(opts.EmailID))
-		if strings.Contains(html, "</body>") {
-			html = strings.Replace(html, "</body>", pixel+"</body>", 1)
+		if strings.Contains(body, "</body>") {
+			body = strings.Replace(body, "</body>", pixel+"</body>", 1)
 		} else {
-			html += pixel
+			body += pixel
 		}
 	}
 
-	return html, links
+	return body, links
 }
 
 // botUASubstrings marks user agents that fetch a pixel without a human

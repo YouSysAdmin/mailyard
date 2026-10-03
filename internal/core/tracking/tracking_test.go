@@ -152,6 +152,30 @@ func TestProcessHTML(t *testing.T) {
 	}
 }
 
+func TestProcessHTMLStoresTheLinkABrowserWouldFollow(t *testing.T) {
+	s := signer()
+	body := `<a href="https://shop.example.com/p?utm_source=news&amp;utm_medium=email&amp;x=1">A</a>
+<a href="https://shop.example.com/p?utm_source=news&utm_medium=email&x=1">B</a>
+<a href="https://shop.example.com/q?a=&#x26;b">C</a>`
+	out, links := s.ProcessHTML(body, TrackOpts{EmailID: "msg-1", LinkScope: "camp-1", Clicks: true})
+
+	if len(links) != 2 {
+		t.Fatalf("links = %d, want the escaped and bare forms as one (%+v)", len(links), links)
+	}
+
+	if want := "https://shop.example.com/p?utm_source=news&utm_medium=email&x=1"; links[0].URL != want {
+		t.Errorf("stored %q, want %q", links[0].URL, want)
+	}
+
+	if want := "https://shop.example.com/q?a=&b"; links[1].URL != want {
+		t.Errorf("stored %q, want %q", links[1].URL, want)
+	}
+
+	if strings.Contains(out, "shop.example.com") || strings.Contains(out, "&amp;") {
+		t.Errorf("every attribute must be the bare click URL: %s", out)
+	}
+}
+
 // Through the public surface, not the placeholder strings: what has to
 // hold is that whatever WithSystemVars injects is exactly what
 // SubstituteSystemLinks later resolves. Naming the strings would let the
