@@ -91,6 +91,24 @@ func (ctx *RequestContext) IsPlatformAdmin() bool {
 	return ctx.AdminAPIKey != nil || (ctx.User != nil && ctx.User.IsAdmin())
 }
 
+// Actor names whoever made the request, for a record of who changed
+// something: the user's id and address, or the credential's name when a
+// key made the call. id is empty for a key, which has no account.
+func (ctx *RequestContext) Actor() (id, label string) {
+	switch {
+	case ctx == nil:
+		return "", ""
+	case ctx.AdminAPIKey != nil:
+		return "", "admin api key " + ctx.AdminAPIKey.Name
+	case ctx.APIKey != nil:
+		return "", "api key " + ctx.APIKey.Name
+	case ctx.User != nil:
+		return ctx.User.ID, ctx.User.Email
+	}
+
+	return "", ""
+}
+
 // IsSandboxCredential reports that everything this caller sends is
 // captured rather than delivered.
 //

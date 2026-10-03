@@ -340,10 +340,7 @@ func (h *Handler) ResetTOTP(c fiber.Ctx) error {
 		Status: fiber.StatusOK,
 		Detail: "2FA reset by admin for " + u.Email,
 	}
-	if rc != nil && rc.User != nil {
-		ev.ActorID = rc.User.ID
-		ev.ActorEmail = rc.User.Email
-	}
+	ev.ActorID, ev.ActorEmail = rc.Actor()
 
 	h.Runtime.Audit.Security(c, ev)
 
@@ -390,10 +387,7 @@ func (h *Handler) ResetPasskeys(c fiber.Ctx) error {
 		Status: fiber.StatusOK,
 		Detail: "passkeys reset by admin for " + u.Email,
 	}
-	if rc != nil && rc.User != nil {
-		ev.ActorID = rc.User.ID
-		ev.ActorEmail = rc.User.Email
-	}
+	ev.ActorID, ev.ActorEmail = rc.Actor()
 
 	h.Runtime.Audit.Security(c, ev)
 
@@ -429,10 +423,7 @@ func (h *Handler) RevokeSessions(c fiber.Ctx) error {
 		Status: fiber.StatusOK,
 		Detail: "all sessions revoked by admin for " + u.Email,
 	}
-	if rc != nil && rc.User != nil {
-		ev.ActorID = rc.User.ID
-		ev.ActorEmail = rc.User.Email
-	}
+	ev.ActorID, ev.ActorEmail = rc.Actor()
 
 	h.Runtime.Audit.Security(c, ev)
 
