@@ -84,7 +84,7 @@ async function submit() {
         label="New password"
         for="new-password"
         field="password"
-        hint="At least {{ MIN_LENGTH }} characters."
+        :hint="`At least ${MIN_LENGTH} characters.`"
       >
         <input
           id="new-password"

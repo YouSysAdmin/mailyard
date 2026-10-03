@@ -239,7 +239,7 @@ watch(() => props.version.id, load, { immediate: true })
         <input
           v-model="editor.form.subject"
           class="form-input"
-          placeholder="Welcome {{name}}!"
+          placeholder="Welcome {{ .name }}!"
         />
       </FormField>
 

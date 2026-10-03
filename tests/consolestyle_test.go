@@ -105,6 +105,12 @@ func TestTheConsoleDoesOneThingOneWay(t *testing.T) {
 				"layout polled every open tab forever for a badge nobody could see",
 		},
 		{
+			name:    "{{ }} inside a static attribute",
+			pattern: regexp.MustCompile(`\s(?:hint|label|title|text|message|aria-label)="[^"]*\{\{`),
+			why: "an attribute is not interpolated, so the reader sees the braces and the\n" +
+				"name. Bind it instead, :hint=\"`At least ${n} characters`\"",
+		},
+		{
 			name:    "class=\"table\", which no rule matches",
 			pattern: regexp.MustCompile(`<table class="table"`),
 			why:     "bare <table> is styled - the class was inert on 18 views",
