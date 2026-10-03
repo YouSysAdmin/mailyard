@@ -18,6 +18,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
 import CopyButton from '../../components/CopyButton.vue'
+import DateTimeInput from '../../components/DateTimeInput.vue'
 import FormField from '../../components/FormField.vue'
 import { useFieldErrors } from '../../composables/fieldErrors'
 
@@ -252,13 +253,7 @@ onMounted(load)
           <input v-model="expiresNever" type="checkbox" />
           <span>Never expires</span>
         </label>
-        <input
-          v-if="!expiresNever"
-          v-model="expiresAt"
-          type="datetime-local"
-          class="form-input"
-          required
-        />
+        <DateTimeInput v-if="!expiresNever" v-model="expiresAt" required />
       </FormField>
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="showCreateModal = false">

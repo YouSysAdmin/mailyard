@@ -17,6 +17,7 @@ import { useNotificationStore } from '../../stores/notification'
 import { useExpiry } from '../../composables/useExpiry'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import BaseModal from '../../components/BaseModal.vue'
+import DateTimeInput from '../../components/DateTimeInput.vue'
 import FormField from '../../components/FormField.vue'
 import PermissionGrid from '../../components/PermissionGrid.vue'
 
@@ -146,7 +147,7 @@ async function submit() {
       </label>
       <!-- A date is REQUIRED unless "never" is ticked, so a cleared
            field cannot quietly mint a permanent credential. -->
-      <input v-if="!never" v-model="at" type="datetime-local" class="form-input" required />
+      <DateTimeInput v-if="!never" v-model="at" required />
     </FormField>
 
     <template #footer>

@@ -9,10 +9,11 @@
 // closes.
 import { ref } from 'vue'
 import BaseModal from '../../components/BaseModal.vue'
+import DateTimeInput from '../../components/DateTimeInput.vue'
 import FormField from '../../components/FormField.vue'
 
 const emit = defineEmits<{
-  /** The chosen moment, as the datetime-local control gives it. */
+  /** The chosen moment, as DateTimeInput gives it (YYYY-MM-DDTHH:mm). */
   (e: 'schedule', at: string): void
   (e: 'close'): void
 }>()
@@ -23,7 +24,7 @@ const at = ref('')
 <template>
   <BaseModal title="Schedule Campaign" @close="emit('close')">
     <FormField label="Send At" hint="The campaign starts sending at this time.">
-      <input v-model="at" type="datetime-local" class="form-input" />
+      <DateTimeInput v-model="at" />
     </FormField>
 
     <template #footer>

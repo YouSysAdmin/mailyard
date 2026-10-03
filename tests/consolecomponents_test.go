@@ -51,6 +51,9 @@ func TestTheConsoleUsesItsOwnComponents(t *testing.T) {
 		// stacks plain labelled numbers with no glyph and no header,
 		// which is a different shape - what StatCard owns is the CARD.
 		{regexp.MustCompile(`class="stat-card"`), "components/StatCard.vue", "StatCard"},
+		// The native date-and-time and time controls follow the browser
+		// locale and show AM/PM in en-US. The console has one clock.
+		{regexp.MustCompile(`type="(datetime-local|time)"`), "components/DateTimeInput.vue", "DateTimeInput"},
 		// The inline notice. The component takes the severity and the
 		// lead line as props and the body as its slot, so the severity
 		// is one value rather than two classes that have to agree.

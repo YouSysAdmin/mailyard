@@ -18,6 +18,7 @@ import { useProjectStore } from '../../stores/project'
 import SenderSelect from '../../components/SenderSelect.vue'
 import type { EmailAttachment, Language, SMTPServerGroup, Template } from '../../api/types'
 import PageHeader from '../../components/PageHeader.vue'
+import DateTimeInput from '../../components/DateTimeInput.vue'
 import FormField from '../../components/FormField.vue'
 import AttachmentPicker, { type PendingAttachment } from './AttachmentPicker.vue'
 import HeaderEditor from '../../components/HeaderEditor.vue'
@@ -591,7 +592,7 @@ function handleSubmit() {
             field="send_at"
             hint="Leave empty to send immediately."
           >
-            <input id="send-at" v-model="sendAt" type="datetime-local" class="form-input" />
+            <DateTimeInput id="send-at" v-model="sendAt" />
           </FormField>
 
           <button

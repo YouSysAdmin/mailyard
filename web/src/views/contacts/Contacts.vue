@@ -11,6 +11,7 @@ import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import BaseModal from '../../components/BaseModal.vue'
+import DateTimeInput from '../../components/DateTimeInput.vue'
 import FormField from '../../components/FormField.vue'
 import ActionMenu from '../../components/ActionMenu.vue'
 
@@ -287,13 +288,7 @@ function addAsSubscriber(c: Contact) {
         history and blocks nothing.
       </p>
       <FormField label="No activity since" for="cleanup-before">
-        <input
-          id="cleanup-before"
-          v-model="cleanupBefore"
-          type="datetime-local"
-          class="form-input"
-          required
-        />
+        <DateTimeInput id="cleanup-before" v-model="cleanupBefore" required />
       </FormField>
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="cleanupOpen = false">Cancel</button>
