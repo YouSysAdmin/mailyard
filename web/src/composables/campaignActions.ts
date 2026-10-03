@@ -15,6 +15,24 @@ import type { Campaign } from '../api/types'
 import { useNotificationStore } from '../stores/notification'
 import { useConfirm } from './useConfirm'
 
+// withLocalOffset turns a datetime-local value into RFC 3339 carrying the
+// browser's offset at that instant. A campaign sent at each subscriber's
+// local time keeps the wall clock as written, so the offset must travel
+// with it - toISOString would turn 09:00 in Kyiv into 06:00Z and deliver
+// at 06:00 everywhere.
+export function withLocalOffset(at: string): string {
+  const d = new Date(at)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const off = -d.getTimezoneOffset()
+  const sign = off >= 0 ? '+' : '-'
+  const abs = Math.abs(off)
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:00` +
+    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
+  )
+}
+
 /** Enough of a campaign to act on it and to name it in a question. */
 export interface CampaignRef {
   id: string
@@ -58,10 +76,10 @@ export function useCampaignActions(reload: () => Promise<unknown>) {
     await run(() => campaignsApi.send(c.id), 'Campaign is sending', 'Failed to send campaign')
   }
 
-  /** @param at a datetime-local value, converted to UTC here. */
+  /** @param at a datetime-local value, sent with the browser's offset. */
   async function schedule(c: CampaignRef, at: string) {
     await run(
-      () => campaignsApi.send(c.id, { scheduled_at: new Date(at).toISOString() }),
+      () => campaignsApi.send(c.id, { scheduled_at: withLocalOffset(at) }),
       'Campaign scheduled',
       'Failed to schedule campaign',
     )
