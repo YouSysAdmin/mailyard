@@ -111,17 +111,17 @@ func (h *Handler) Claim(c fiber.Ctx) error {
 	}
 
 	wait := min(time.Duration(in.WaitSeconds)*time.Second, cfg.ClaimWaitMax)
-	// One parked claim per node. A second concurrent claim answers at
-	// once instead of parking, so a node - or whoever holds its token -
-	// cannot turn the chatter budget into hundreds of held connections.
-	if !parkedClaims.enter(node.ID) {
-		wait = 0
-	} else {
-		defer parkedClaims.leave(node.ID)
-	}
 
 	ctx := c.Context()
 	now := time.Now().UTC()
+
+	// One parked claim per node, and the NEWEST one parks: a new claim
+	// releases the one before it, which answers empty. Answering the new
+	// one empty instead kept a restarted node's dead claim parked and
+	// sent the live node round a loop of instant empty answers. Either
+	// way a token holds one slot, never hundreds.
+	parked, release := parkedClaims.enter(ctx, node.ID)
+	defer release()
 
 	// A node waiting for approval, or suspended, is assigned nothing,
 	// so its claim parks and answers empty like any claim with nothing
@@ -135,8 +135,10 @@ func (h *Handler) Claim(c fiber.Ctx) error {
 
 		select {
 		case <-timer.C:
-		case <-ctx.Done():
-			return nil
+		case <-parked.Done():
+			if ctx.Err() != nil {
+				return nil
+			}
 		}
 
 		return response.Success(c, claimOutput{Messages: []claimedMessage{}})
@@ -165,9 +167,13 @@ func (h *Handler) Claim(c fiber.Ctx) error {
 		// The bell is global - any assignment to any node rings it -
 		// so a ring is a reason to look, not an answer. Bounded so a
 		// lost notify costs a few seconds and never the whole wait.
-		h.Runtime.RelayBell.Wait(ctx, min(remaining, bellPoll))
+		h.Runtime.RelayBell.Wait(parked, min(remaining, bellPoll))
 		if ctx.Err() != nil {
 			return nil
+		}
+
+		if parked.Err() != nil {
+			break
 		}
 	}
 
@@ -201,32 +207,44 @@ const bellPoll = 5 * time.Second
 // claimMaxBytes bounds one claim response.
 const claimMaxBytes = 32 * 1024 * 1024
 
-// parkedClaims is the set of nodes with a claim parked right now, on
-// this process. Per process is enough: the limiter in front is per
-// address, and the point is that one token cannot hold many slots.
-var parkedClaims = &claimGate{nodes: map[string]bool{}}
+// parkedClaims is the claim parked right now for each node, on this
+// process. Per process is enough: the limiter in front is per address,
+// and the point is that one token cannot hold many slots.
+var parkedClaims = &claimGate{nodes: map[string]*parkedClaim{}}
 
 type claimGate struct {
 	mu    sync.Mutex
-	nodes map[string]bool
+	nodes map[string]*parkedClaim
 }
 
-func (g *claimGate) enter(nodeID string) bool {
+type parkedClaim struct {
+	cancel context.CancelFunc
+}
+
+// enter makes this claim the node's parked one and releases the one
+// before it. The returned context ends when this claim is released or
+// superseded, and release must be called when the claim answers.
+func (g *claimGate) enter(parent context.Context, nodeID string) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(parent)
+	mine := &parkedClaim{cancel: cancel}
+
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.nodes[nodeID] {
-		return false
+	if prev := g.nodes[nodeID]; prev != nil {
+		prev.cancel()
 	}
 
-	g.nodes[nodeID] = true
+	g.nodes[nodeID] = mine
+	g.mu.Unlock()
 
-	return true
-}
+	return ctx, func() {
+		g.mu.Lock()
+		if g.nodes[nodeID] == mine {
+			delete(g.nodes, nodeID)
+		}
 
-func (g *claimGate) leave(nodeID string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.nodes, nodeID)
+		g.mu.Unlock()
+		cancel()
+	}
 }
 
 // completeAssigned applies a node's report to the messages it holds:

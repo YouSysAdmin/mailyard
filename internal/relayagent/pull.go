@@ -44,6 +44,7 @@ func (a *Agent) pullLoop(ctx context.Context) {
 			max = 8
 		}
 
+		started := time.Now()
 		msgs, err := a.ctrl.Claim(ctx, a.nodeID, a.token, max, claimWait, holding)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -81,8 +82,22 @@ func (a *Agent) pullLoop(ctx context.Context) {
 			a.log.Info("relay node: claimed", "messages", len(msgs), "spooled", spooled)
 			a.Deliverer.Wake()
 		}
+
+		// An empty answer that came back long before the wait it asked
+		// for did not park, so asking again at once would loop on the
+		// control plane and spend the address's chatter budget for every
+		// node behind it.
+		if len(msgs) == 0 && time.Since(started) < claimEarly {
+			select {
+			case <-time.After(claimRetry):
+			case <-ctx.Done():
+			}
+		}
 	}
 }
+
+// claimEarly is how soon an empty claim counts as one that did not park.
+const claimEarly = 2 * time.Second
 
 // spoolClaimed puts one claimed message into the spool, one entry per
 // recipient domain the way the listener does, and reports how many it
