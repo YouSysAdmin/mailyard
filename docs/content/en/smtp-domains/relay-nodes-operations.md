@@ -207,6 +207,9 @@ Three things to know:
 - **A report finishes the message.** Every recipient delivered or refused is what turns the row `sent` or `failed`, and
   every hook a worker-delivered message fires - webhooks, the live feed, campaign status, contact tallies - fires from
   that report.
+- **A node that is not approved claims nothing.** While it waits for approval, or after it is suspended, its claim
+  parks for the wait and answers an empty batch, and the messages it says it holds are not kept alive - so a suspended
+  node's assignments expire and go to the next server.
 
 A fleet can mix modes: each node reports its own on every heartbeat.
 

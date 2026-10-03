@@ -100,10 +100,6 @@ func (h *Handler) Claim(c fiber.Ctx) error {
 		return resp
 	}
 
-	if srv.Status != ssmodel.StatusEnabled {
-		return response.Unavailable(c, "this node is not approved yet")
-	}
-
 	if !node.Pulls() {
 		return response.BadRequest(c, "this node is not in pull mode")
 	}
@@ -126,6 +122,25 @@ func (h *Handler) Claim(c fiber.Ctx) error {
 
 	ctx := c.Context()
 	now := time.Now().UTC()
+
+	// A node waiting for approval, or suspended, is assigned nothing,
+	// so its claim parks and answers empty like any claim with nothing
+	// waiting. A refusal here was answered every few seconds for as long
+	// as approval took, each one an error in the log. Its holdings are
+	// not extended, so a suspended node's assignments still expire and
+	// go back to the queue.
+	if srv.Status != ssmodel.StatusEnabled {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return nil
+		}
+
+		return response.Success(c, claimOutput{Messages: []claimedMessage{}})
+	}
 
 	// The node is alive and still holds these. Said on every claim, so
 	// the expiry only ever passes on a node that has stopped talking.
