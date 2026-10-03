@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 	"time"
 
@@ -86,13 +87,33 @@ func (f *fakeEmailStore) ReferencesTemplateAttachment(_ context.Context, _, id s
 	return f.referenced[id], nil
 }
 
-// fakeTemplateStore holds deleted template attachments for the sweep.
+// fakeTemplateStore holds deleted template attachments and unused
+// builder images for the sweep.
 type fakeTemplateStore struct {
 	store.TemplateStore
-	deleted []*tmodel.Attachment
-	cutoff  time.Time
-	purged  []string
-	log     *[]string
+	deleted     []*tmodel.Attachment
+	cutoff      time.Time
+	purged      []string
+	log         *[]string
+	marked      bool
+	assetKeys   []string
+	assetCutoff time.Time
+}
+
+func (f *fakeTemplateStore) MarkUnreferencedAssets(context.Context, time.Time) (int64, int64, error) {
+	f.marked = true
+
+	return 0, 0, nil
+}
+
+func (f *fakeTemplateStore) PurgeUnreferencedAssets(_ context.Context, cutoff time.Time) ([]string, error) {
+	if f.log != nil {
+		*f.log = append(*f.log, "asset:purge")
+	}
+
+	f.assetCutoff = cutoff
+
+	return f.assetKeys, nil
 }
 
 func (f *fakeTemplateStore) DeletedAttachmentsBefore(_ context.Context, before time.Time) ([]*tmodel.Attachment, error) {
@@ -424,5 +445,78 @@ func TestWithoutAWindowTheGraceHourIsTheCutoff(t *testing.T) {
 	want := time.Now().Add(-deletedAttachmentGrace)
 	if d := tpl.cutoff.Sub(want); d > time.Minute || d < -time.Minute {
 		t.Errorf("cutoff %v, want about %v", tpl.cutoff, want)
+	}
+}
+
+// An unused builder image goes once the email log window has passed,
+// its row before its blob, and an inline one has no blob to delete.
+func TestUnusedBuilderImagesFollowTheEmailLogWindow(t *testing.T) {
+	var calls []string
+	tpl := &fakeTemplateStore{log: &calls, assetKeys: []string{"template-assets/p/a.png", ""}}
+	bl := &fakeBlob{log: &calls}
+	sw := newSweeper(t, &fakeEmailStore{log: &calls}, &fakeInboundStore{}, bl)
+	sw.Store.Template = tpl
+
+	if err := sw.Run(t.Context()); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	if !tpl.marked {
+		t.Error("the sweep did not mark unused images")
+	}
+
+	if want := time.Now().AddDate(0, 0, -30); tpl.assetCutoff.Sub(want).Abs() > time.Minute {
+		t.Errorf("asset cutoff %v, want the 30 day email log window %v", tpl.assetCutoff, want)
+	}
+
+	if len(bl.deleted) != 1 || bl.deleted[0] != "template-assets/p/a.png" {
+		t.Fatalf("deleted blobs %v, want only the stored image", bl.deleted)
+	}
+
+	if i := slices.Index(calls, "asset:purge"); i < 0 || i > slices.Index(calls, "blob:delete") {
+		t.Errorf("the blob went before its row: %v", calls)
+	}
+}
+
+// retention_days 0 keeps every image, though marking still runs.
+func TestAZeroWindowKeepsUnusedBuilderImages(t *testing.T) {
+	set := settings.New(loader{
+		smodel.KeyRetentionDays:                "0",
+		smodel.KeyWebhookDeliveryRetentionDays: "0",
+		smodel.KeyAuditLogRetentionDays:        "0",
+		smodel.KeyNotificationRetentionDays:    "0",
+		smodel.KeyTrackingEventRetentionDays:   "0",
+	})
+	if err := set.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	tpl := &fakeTemplateStore{log: &calls, assetKeys: []string{"template-assets/p/a.png"}}
+	bl := &fakeBlob{log: &calls}
+	sw := &Sweeper{
+		Store: &store.Store{
+			Email:         &fakeEmailStore{log: &calls},
+			Inbound:       &fakeInboundStore{},
+			Template:      tpl,
+			Session:       fakeSessionStore{},
+			Sandbox:       fakeSandboxStore{},
+			PasswordReset: fakeResetStore{},
+			SignupVerify:  fakeVerifyStore{},
+		},
+		Settings: set,
+		Blob:     bl,
+		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	if err := sw.Run(t.Context()); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	if !tpl.marked {
+		t.Error("marking did not run with the window off")
+	}
+
+	if slices.Contains(calls, "asset:purge") || len(bl.deleted) != 0 {
+		t.Errorf("images were purged with retention_days 0: %v", calls)
 	}
 }

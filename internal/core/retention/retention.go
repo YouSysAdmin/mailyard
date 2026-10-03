@@ -42,23 +42,24 @@ type Sweeper struct {
 
 // Result reports what one pass removed, for the log line and tests.
 type Result struct {
-	EmailsPurged        int64
-	PartitionsDropped   int
-	EmailBodiesCleared  int64
-	EmailAttsCleared    int64
-	TemplateAttsPurged  int64
-	InboundPurged       int64
-	SandboxPurged       int64
-	InboundCleared      int64
-	DeliveriesPurged    int64
-	TrackingPurged      int64
-	AuditPurged         int64
-	ResetsPurged        int64
-	VerificationsPurged int64
-	SessionsPurged      int64
-	NotificationsPurged int64
-	BlobsDeleted        int
-	BlobErrors          int
+	EmailsPurged         int64
+	PartitionsDropped    int
+	EmailBodiesCleared   int64
+	EmailAttsCleared     int64
+	TemplateAttsPurged   int64
+	TemplateAssetsPurged int64
+	InboundPurged        int64
+	SandboxPurged        int64
+	InboundCleared       int64
+	DeliveriesPurged     int64
+	TrackingPurged       int64
+	AuditPurged          int64
+	ResetsPurged         int64
+	VerificationsPurged  int64
+	SessionsPurged       int64
+	NotificationsPurged  int64
+	BlobsDeleted         int
+	BlobErrors           int
 }
 
 // inboundAttachmentDays is the window after which received mail loses
@@ -202,6 +203,14 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		res.BlobErrors += e
 	}
 
+	{
+		n, d, e, err := s.purgeTemplateAssets(ctx, now, metaDays)
+		note("template assets", err)
+		res.TemplateAssetsPurged = n
+		res.BlobsDeleted += d
+		res.BlobErrors += e
+	}
+
 	if inboundDays > 0 {
 		cutoff := now.AddDate(0, 0, -inboundDays)
 		keys, err := s.Store.Inbound.StorageKeysOlderThan(ctx, cutoff)
@@ -321,6 +330,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		"bodies_cleared", res.EmailBodiesCleared,
 		"attachments_cleared", res.EmailAttsCleared,
 		"template_attachments_purged", res.TemplateAttsPurged,
+		"template_assets_purged", res.TemplateAssetsPurged,
 		"inbound_purged", res.InboundPurged,
 		"inbound_cleared", res.InboundCleared,
 		"sandbox_purged", res.SandboxPurged,
@@ -389,6 +399,40 @@ func (s *Sweeper) purgeTemplateAttachments(ctx context.Context, now time.Time, a
 	}
 
 	return purged, blobsDeleted, blobErrors, nil
+}
+
+// purgeTemplateAssets stamps builder images no template uses, clears
+// the stamp on images used again, and deletes images unused for longer
+// than the email log window. A window of 0 keeps them forever.
+//
+// Row before blob, the reverse of the other sections: the delete is
+// where "still unused" is decided, in the same statement, so a blob
+// removed first could belong to an image put back into a template
+// meanwhile. A failed blob delete leaves bytes nothing serves.
+func (s *Sweeper) purgeTemplateAssets(ctx context.Context, now time.Time, metaDays int) (purged int64, blobsDeleted, blobErrors int, err error) {
+	if _, _, err := s.Store.Template.MarkUnreferencedAssets(ctx, now); err != nil {
+		return 0, 0, 0, err
+	}
+
+	if metaDays <= 0 {
+		return 0, 0, 0, nil
+	}
+
+	keys, err := s.Store.Template.PurgeUnreferencedAssets(ctx, now.AddDate(0, 0, -metaDays))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	stored := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if k != "" {
+			stored = append(stored, k)
+		}
+	}
+
+	blobsDeleted, blobErrors = s.deleteBlobs(ctx, stored)
+
+	return int64(len(keys)), blobsDeleted, blobErrors, nil
 }
 
 // deleteBlobs removes objects, tolerating individual failures - a

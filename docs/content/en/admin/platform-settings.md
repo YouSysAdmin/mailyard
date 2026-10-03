@@ -122,6 +122,10 @@ visits this page never loses data - and never reclaims space either. Set the win
 - A template attachment deleted from its template keeps its bytes while any message references it. The sweep removes it,
   blob first, once it was deleted longer ago than the attachment window (or an hour ago when that window is `0`) and no
   message references it any more - a message scheduled past the window still holds it.
+- A [visual builder image](/docs/templates/creating-templates) that no template uses any more is removed once
+  `retention_days` has passed since the last template stopped using it. The row goes first and the blob after it, so an
+  image put back into a template meanwhile is never left pointing at missing bytes. With `retention_days` at `0` such
+  images are kept.
 - Emails still in flight (`queued`, `scheduled`, `processing`) are **never** purged, however old. Deleting one would
   strand work the delivery queue is about to claim.
 - A `failed` email is not in flight, so its content is cleared like any other. Once it is older than the body or

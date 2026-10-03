@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -278,5 +279,137 @@ func TestTheAssetEndpoints(t *testing.T) {
 	if code, body, _ := call(own, "POST", "/template-assets", upload(pngBytes)); code != 400 ||
 		!strings.Contains(body, "public_url") {
 		t.Errorf("upload without public_url: %d %s, want 400 naming it", code, body)
+	}
+}
+
+// unreferencedSince reads the sweep's stamp on one image, nil when
+// unset.
+func unreferencedSince(t *testing.T, s *Store, id string) *time.Time {
+	t.Helper()
+	var at *time.Time
+	if err := s.QueryRow(t.Context(),
+		`SELECT unreferenced_since FROM template_assets WHERE id = ?`, id).Scan(&at); err != nil {
+		t.Fatalf("read unreferenced_since: %v", err)
+	}
+
+	return at
+}
+
+// The sweep stamps an image no template uses, leaves a used one alone,
+// and clears the stamp once a template uses the image again.
+func TestUnusedAssetsAreMarkedAndUsedOnesCleared(t *testing.T) {
+	s := openAssetStore(t)
+	ctx := t.Context()
+	used := newAsset(projID, "used", "k-used")
+	unused := newAsset(projID, "unused", "k-unused")
+	for _, a := range []*tmodel.Asset{used, unused} {
+		if _, err := s.CreateAsset(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tpl := newTemplate(t, s, "welcome")
+	l := loc("en")
+	l.VersionID = *tpl.ActiveVersionID
+	l.HTML = `<img src="https://mail.example.com/assets/` + used.PublicToken + `">`
+	if err := s.PutLocalization(ctx, projID, l); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	if marked, cleared, err := s.MarkUnreferencedAssets(ctx, now); err != nil || marked != 1 || cleared != 0 {
+		t.Fatalf("first mark = %d, %d, %v, want 1 marked", marked, cleared, err)
+	}
+
+	if at := unreferencedSince(t, s, unused.ID); at == nil || !at.Equal(now) {
+		t.Fatalf("unused image stamp = %v, want %v", at, now)
+	}
+
+	if at := unreferencedSince(t, s, used.ID); at != nil {
+		t.Fatalf("used image stamped %v", at)
+	}
+
+	// A later pass keeps the first stamp, the image has been unused
+	// since then.
+	if marked, _, err := s.MarkUnreferencedAssets(ctx, now.Add(time.Hour)); err != nil || marked != 0 {
+		t.Fatalf("second mark = %d, %v, want nothing new", marked, err)
+	}
+
+	if at := unreferencedSince(t, s, unused.ID); at == nil || !at.Equal(now) {
+		t.Fatalf("the stamp moved to %v", at)
+	}
+
+	l.HTML = `<img src="https://mail.example.com/assets/` + unused.PublicToken + `">`
+	if err := s.PutLocalization(ctx, projID, l); err != nil {
+		t.Fatal(err)
+	}
+
+	if marked, cleared, err := s.MarkUnreferencedAssets(ctx, now); err != nil || marked != 1 || cleared != 1 {
+		t.Fatalf("swap mark = %d, %d, %v, want one each way", marked, cleared, err)
+	}
+
+	if at := unreferencedSince(t, s, unused.ID); at != nil {
+		t.Fatalf("an image back in a template kept its stamp %v", at)
+	}
+
+	if at := unreferencedSince(t, s, used.ID); at == nil {
+		t.Fatal("the image taken out of the template was not stamped")
+	}
+}
+
+// The purge takes only images unused since before the cutoff, never
+// one a template uses again, and returns their storage keys.
+func TestThePurgeTakesOnlyLongUnusedAssets(t *testing.T) {
+	s := openAssetStore(t)
+	ctx := t.Context()
+	old := newAsset(projID, "old", "k-old")
+	inline := newAsset(otherProjID, "inline", "")
+	young := newAsset(projID, "young", "k-young")
+	back := newAsset(projID, "back", "k-back")
+	for _, a := range []*tmodel.Asset{old, inline, young, back} {
+		if _, err := s.CreateAsset(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	now := time.Now().UTC()
+	if _, _, err := s.MarkUnreferencedAssets(ctx, now.AddDate(0, 0, -40)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.Exec(ctx, `UPDATE template_assets SET unreferenced_since = ? WHERE id = ?`,
+		now.AddDate(0, 0, -5), young.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Put back into a template after the stamp, before any pass clears it.
+	tpl := newTemplate(t, s, "welcome")
+	l := loc("en")
+	l.VersionID = *tpl.ActiveVersionID
+	l.HTML = `<img src="https://mail.example.com/assets/` + back.PublicToken + `">`
+	if err := s.PutLocalization(ctx, projID, l); err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err := s.PurgeUnreferencedAssets(ctx, now.AddDate(0, 0, -30))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	slices.Sort(keys)
+	if want := []string{"", "k-old"}; !slices.Equal(keys, want) {
+		t.Fatalf("purged keys %q, want %q", keys, want)
+	}
+
+	for _, a := range []*tmodel.Asset{old, inline} {
+		if got, err := s.GetAsset(ctx, a.ProjectID, a.ID); err != nil || got != nil {
+			t.Fatalf("%s survived the purge: %+v, %v", a.SHA256, got, err)
+		}
+	}
+
+	for _, a := range []*tmodel.Asset{young, back} {
+		if got, err := s.GetAsset(ctx, a.ProjectID, a.ID); err != nil || got == nil {
+			t.Fatalf("%s was purged: %v", a.SHA256, err)
+		}
 	}
 }

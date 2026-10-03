@@ -958,12 +958,7 @@ func (s *Store) DeleteAsset(ctx context.Context, projID, id string) (bool, error
 	res, err := s.Exec(ctx, `
         DELETE FROM template_assets a
         WHERE a.project_id = ? AND a.id = ?
-          AND NOT EXISTS (
-              SELECT 1 FROM template_localizations l
-              JOIN template_versions v ON v.id = l.version_id
-              JOIN templates t ON t.id = v.template_id
-              WHERE t.project_id = a.project_id
-                AND strpos(l.html_template, a.public_token) > 0)`, projID, id)
+          AND NOT `+assetReferenced, projID, id)
 	if err != nil {
 		return false, err
 	}
@@ -971,6 +966,73 @@ func (s *Store) DeleteAsset(ctx context.Context, projID, id string) (bool, error
 	n, err := res.RowsAffected()
 
 	return n > 0, err
+}
+
+// assetReferenced is true while a localization of the image's project
+// names its token. The one answer to "is this image in use", shared by
+// the delete and the retention sweep. Reads the row as alias a.
+const assetReferenced = `EXISTS (
+              SELECT 1 FROM template_localizations l
+              JOIN template_versions v ON v.id = l.version_id
+              JOIN templates t ON t.id = v.template_id
+              WHERE t.project_id = a.project_id
+                AND strpos(l.html_template, a.public_token) > 0)`
+
+// MarkUnreferencedAssets stamps now on every image no template uses
+// that is not stamped yet, and clears the stamp on every image a
+// template uses again. Across all projects.
+func (s *Store) MarkUnreferencedAssets(ctx context.Context, now time.Time) (marked, cleared int64, err error) {
+	res, err := s.Exec(ctx, `
+        UPDATE template_assets a SET unreferenced_since = ?
+        WHERE a.unreferenced_since IS NULL
+          AND NOT `+assetReferenced, now)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if marked, err = res.RowsAffected(); err != nil {
+		return 0, 0, err
+	}
+
+	res, err = s.Exec(ctx, `
+        UPDATE template_assets a SET unreferenced_since = NULL
+        WHERE a.unreferenced_since IS NOT NULL
+          AND `+assetReferenced)
+	if err != nil {
+		return marked, 0, err
+	}
+
+	cleared, err = res.RowsAffected()
+
+	return marked, cleared, err
+}
+
+// PurgeUnreferencedAssets deletes every image unused since before
+// cutoff, re-checking in the same statement that no template uses it
+// now, and returns the storage key of each deleted row, empty for one
+// held inline). Across all projects.
+func (s *Store) PurgeUnreferencedAssets(ctx context.Context, cutoff time.Time) ([]string, error) {
+	rows, err := s.Query(ctx, `
+        DELETE FROM template_assets a
+        WHERE a.unreferenced_since < ?
+          AND NOT `+assetReferenced+`
+        RETURNING a.storage_key`, cutoff)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+
+		keys = append(keys, k)
+	}
+
+	return keys, rows.Err()
 }
 
 func scanAsset(r interface{ Scan(...any) error }) (*tmodel.Asset, error) {

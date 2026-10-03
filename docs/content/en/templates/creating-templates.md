@@ -126,6 +126,9 @@ reused in another template.
   unguessable, and it is tied to no secret, so rotating keys never breaks an image in mail already delivered.
 - **Deleting an image** is refused with `409` while any template still references it. Once deleted, mail already
   delivered that shows it displays a broken image instead.
+- **Images no template uses are removed automatically** by the nightly retention sweep, once the email log window
+  (`retention_days`) has passed since the last template stopped using them. Putting an image back into a template
+  before then keeps it. With `retention_days` at `0` unused images are kept.
 
 The library is also on the API:
 

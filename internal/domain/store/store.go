@@ -723,6 +723,14 @@ type TemplateStore interface {
 	// DeleteAsset refuses, reporting false, while a localization of the
 	// project's templates names the image.
 	DeleteAsset(ctx context.Context, projID, id string) (bool, error)
+
+	// MarkUnreferencedAssets stamps images no template uses and clears
+	// the stamp on images used again, across all projects.
+	MarkUnreferencedAssets(ctx context.Context, now time.Time) (marked, cleared int64, err error)
+
+	// PurgeUnreferencedAssets deletes images unused since before cutoff
+	// that are still unused, returning each deleted row's storage key.
+	PurgeUnreferencedAssets(ctx context.Context, cutoff time.Time) ([]string, error)
 }
 
 // StylesheetStore persists reusable CSS blocks.
