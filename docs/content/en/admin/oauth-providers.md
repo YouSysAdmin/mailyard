@@ -149,10 +149,14 @@ List fields (`scopes`, `allowed_domains`, `allowed_emails`, `allowed_groups`) ar
 strings. `client_secret` is write-only: omit it on a `PATCH`
 to keep the stored value.
 
-The slug is derived from the name when you do not supply one. It appears in the sign-in URL, so changing it changes the
-redirect URI and the provider has to be updated to match.
+A `PATCH` changes only the fields it names - every other field keeps its stored value, and an explicit `""` clears a
+text field. `name` is not required on a `PATCH`.
 
-The sign-in page reads its provider list from an open endpoint, which is returns only each provider's name, slug, type,
+On create, the slug is derived from the name when you do not supply one. It is never re-derived afterwards: renaming a
+provider keeps its slug. The slug appears in the sign-in URL, so changing it explicitly changes the redirect URI and the
+provider has to be updated to match.
+
+The sign-in page reads its provider list from an open endpoint, which returns only each provider's name, slug, type,
 and start URL - never client ids, issuers, or allowlists.
 
 ## Projects Do Not Pin a Provider

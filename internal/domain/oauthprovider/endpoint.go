@@ -103,7 +103,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		// about before turning off.
 		RequireEmailVerified: true,
 	}
-	if ok, resp := h.apply(c, p, in); !ok {
+	if ok, resp := h.apply(c, p, in.patch()); !ok {
 		return resp
 	}
 
@@ -125,11 +125,14 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.NotFound(c, "oauth provider not found")
 	}
 
-	in, resp, ok := validation.Bind[upsertInput](c)
+	in, resp, ok := validation.Bind[patchInput](c)
 	if !ok {
 		return resp
 	}
 
+	// The cache is keyed on the slug, so the old one is dropped too
+	// when a patch moves it.
+	oldSlug := p.Slug
 	if ok, resp := h.apply(c, p, in); !ok {
 		return resp
 	}
@@ -137,6 +140,8 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	if err := h.Runtime.Store.OAuthProvider.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
+
+	h.Runtime.OAuth.Forget(oldSlug)
 
 	// The cached discovery result is keyed on the row's updated_at, so
 	// a config change invalidates it without an explicit purge. Drop
@@ -191,38 +196,53 @@ func (h *Handler) Test(c fiber.Ctx) error {
 // package: the response.* helpers write the status and return nil, so
 // a single error return would make a rejected request indistinguishable
 // from an accepted one and the caller would save it anyway.
-func (h *Handler) apply(c fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool, error) {
-	p.Name = in.Name
+func (h *Handler) apply(c fiber.Ctx, p *opmodel.Provider, in patchInput) (bool, error) {
+	creating := p.Slug == ""
 
-	p.Type = strings.ToLower(in.Type)
-	if p.Type == "" {
-		p.Type = opmodel.TypeOIDC
+	if in.Name != nil {
+		p.Name = strings.TrimSpace(*in.Name)
+	}
+
+	if p.Name == "" {
+		return false, response.BadRequest(c, "name must not be empty")
+	}
+
+	if in.Type != nil || creating {
+		p.Type = strings.ToLower(trimmed(in.Type))
+		if p.Type == "" {
+			p.Type = opmodel.TypeOIDC
+		}
 	}
 
 	if _, ok := opmodel.ValidTypes[p.Type]; !ok {
 		return false, response.BadRequest(c, "unknown provider type "+p.Type)
 	}
 
-	slug := opmodel.NormalizeSlug(in.Slug)
-	if slug == "" {
-		slug = opmodel.NormalizeSlug(in.Name)
-	}
-	if slug == "" {
-		return false, response.BadRequest(c, "slug is empty after normalization, use letters or digits")
+	// Derived from the name on create only. The slug is in the redirect
+	// URI registered at the IdP, so an update moves it only when told to.
+	if in.Slug != nil || creating {
+		slug := opmodel.NormalizeSlug(trimmed(in.Slug))
+		if slug == "" && creating {
+			slug = opmodel.NormalizeSlug(p.Name)
+		}
+
+		if slug == "" {
+			return false, response.BadRequest(c, "slug is empty after normalization, use letters or digits")
+		}
+
+		taken, err := h.Runtime.Store.OAuthProvider.SlugTaken(c.Context(), slug, p.ID)
+		if err != nil {
+			return false, response.Internal(c, err)
+		}
+
+		if taken {
+			return false, response.BadRequest(c, "another provider already uses the slug "+slug)
+		}
+
+		p.Slug = slug
 	}
 
-	taken, err := h.Runtime.Store.OAuthProvider.SlugTaken(c.Context(), slug, p.ID)
-	if err != nil {
-		return false, response.Internal(c, err)
-	}
-
-	if taken {
-		return false, response.BadRequest(c, "another provider already uses the slug "+slug)
-	}
-
-	p.Slug = slug
-
-	p.ClientID = in.ClientID
+	setText(&p.ClientID, in.ClientID)
 	if in.Secret != nil {
 		p.ClientSecret = strings.TrimSpace(*in.Secret)
 	}
@@ -235,10 +255,10 @@ func (h *Handler) apply(c fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool,
 	// that provider impossible to configure at all - the operator
 	// typed the slash, this line deleted it, and discovery then
 	// refused the mismatch it had just created.
-	p.Issuer = in.Issuer
-	p.AuthURL = in.AuthURL
-	p.TokenURL = in.TokenURL
-	p.UserInfoURL = in.UserInfoURL
+	setText(&p.Issuer, in.Issuer)
+	setText(&p.AuthURL, in.AuthURL)
+	setText(&p.TokenURL, in.TokenURL)
+	setText(&p.UserInfoURL, in.UserInfoURL)
 
 	if in.Enabled != nil {
 		p.Enabled = *in.Enabled
@@ -291,7 +311,7 @@ func (h *Handler) apply(c fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool,
 		p.AllowedGroups = cleanList(in.AllowedGroups, true)
 	}
 
-	p.GroupsClaim = in.GroupsClaim
+	setText(&p.GroupsClaim, in.GroupsClaim)
 
 	// An oidc provider with neither an issuer nor explicit endpoints
 	// can never complete a sign-in. Reject at write time rather than
@@ -306,6 +326,22 @@ func (h *Handler) apply(c fiber.Ctx, p *opmodel.Provider, in upsertInput) (bool,
 	}
 
 	return true, nil
+}
+
+// trimmed reads an optional text field, "" when absent.
+func trimmed(v *string) string {
+	if v == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*v)
+}
+
+// setText writes a text field the body named and leaves one it did not.
+func setText(dst *string, v *string) {
+	if v != nil {
+		*dst = strings.TrimSpace(*v)
+	}
 }
 
 // checkIssuerHost catches the recurring mistake of pointing the

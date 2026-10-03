@@ -16,7 +16,7 @@ import "time"
 // Requests
 // ----------------------------------------------------------------------------
 
-// upsertInput is the create and update body.
+// upsertInput is the create body.
 //
 // ClientSecret is a pointer so an update can distinguish "leave the
 // stored secret alone" (field absent) from "set it to this" (field
@@ -45,6 +45,49 @@ type upsertInput struct {
 	AllowedEmails        []string `json:"allowed_emails"  validate:"omitempty,max=200"`
 	GroupsClaim          string   `json:"groups_claim"    validate:"omitempty,max=100" normalize:"trim"`
 	AllowedGroups        []string `json:"allowed_groups"  validate:"omitempty,max=100"`
+}
+
+// patchInput is the update body. Every field is a pointer, so a field
+// the body does not name keeps its stored value: a PATCH fixing a label
+// must not clear client_id or groups_claim. An explicit "" clears a
+// text field, where clearing is allowed at all.
+//
+// The slug is never derived on update. It is part of the redirect URI
+// registered at the IdP, so renaming a provider must not move it.
+type patchInput struct {
+	Name     *string `json:"name"          validate:"omitzero,min=1,max=100"`
+	Slug     *string `json:"slug"          validate:"omitzero,max=60"`
+	Type     *string `json:"type"          validate:"omitzero,max=20"`
+	ClientID *string `json:"client_id"     validate:"omitzero,max=400"`
+	Secret   *string `json:"client_secret" validate:"omitzero,max=1000"`
+
+	Issuer      *string `json:"issuer"       validate:"omitzero,url,max=400"`
+	AuthURL     *string `json:"auth_url"     validate:"omitzero,url,max=400"`
+	TokenURL    *string `json:"token_url"    validate:"omitzero,url,max=400"`
+	UserInfoURL *string `json:"userinfo_url" validate:"omitzero,url,max=400"`
+
+	Scopes []string `json:"scopes" validate:"omitempty,max=20"`
+
+	Enabled      *bool `json:"enabled"`
+	Hidden       *bool `json:"hidden"`
+	AutoRegister *bool `json:"auto_register"`
+
+	RequireEmailVerified *bool    `json:"require_email_verified"`
+	AllowedDomains       []string `json:"allowed_domains" validate:"omitempty,max=50"`
+	AllowedEmails        []string `json:"allowed_emails"  validate:"omitempty,max=200"`
+	GroupsClaim          *string  `json:"groups_claim"    validate:"omitzero,max=100"`
+	AllowedGroups        []string `json:"allowed_groups"  validate:"omitempty,max=100"`
+}
+
+// patch is the create body as an update that names every field.
+func (in upsertInput) patch() patchInput {
+	return patchInput{
+		Name: &in.Name, Slug: &in.Slug, Type: &in.Type, ClientID: &in.ClientID, Secret: in.Secret,
+		Issuer: &in.Issuer, AuthURL: &in.AuthURL, TokenURL: &in.TokenURL, UserInfoURL: &in.UserInfoURL,
+		Scopes: in.Scopes, Enabled: in.Enabled, Hidden: in.Hidden, AutoRegister: in.AutoRegister,
+		RequireEmailVerified: in.RequireEmailVerified, AllowedDomains: in.AllowedDomains,
+		AllowedEmails: in.AllowedEmails, GroupsClaim: &in.GroupsClaim, AllowedGroups: in.AllowedGroups,
+	}
 }
 
 // ----------------------------------------------------------------------------

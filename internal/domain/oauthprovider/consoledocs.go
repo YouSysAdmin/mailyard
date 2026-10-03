@@ -49,9 +49,9 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "PATCH",
 			Path:        "/oauth-providers/:id",
 			Summary:     "Update",
-			Description: "Platform admin.",
+			Description: "Platform admin. A field the body does not name keeps its value, and the slug is never re-derived from the name.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
-			Request:     upsertInput{},
+			Request:     patchInput{},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ProviderResponse{})},
 		},
 		{
