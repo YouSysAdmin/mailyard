@@ -132,3 +132,79 @@ func TestNilServiceIsSafe(t *testing.T) {
 		t.Error("nil service must snapshot empty")
 	}
 }
+
+// A day count past the ceiling is refused at the write, and one already
+// stored is read back clamped, so no retention cutoff can land in the
+// future.
+func TestIntSettingsAreBounded(t *testing.T) {
+	for _, tc := range []struct {
+		key, value string
+		ok         bool
+	}{
+		{smodel.KeyAuditLogRetentionDays, "9223372036854775807", false},
+		{smodel.KeyAuditLogRetentionDays, "100000000", false},
+		{smodel.KeyAuditLogRetentionDays, "3650", true},
+		{smodel.KeyAuditLogRetentionDays, "3651", false},
+		{smodel.KeyBounceAlertPercent, "100", true},
+		{smodel.KeyBounceAlertPercent, "101", false},
+		{smodel.KeySandboxMaxMessages, "2000000", false},
+	} {
+		_, err := Validate(tc.key, tc.value)
+		if (err == nil) != tc.ok {
+			t.Errorf("Validate(%s, %s) err = %v, want ok=%v", tc.key, tc.value, err, tc.ok)
+		}
+	}
+
+	s := New(&fakeLoader{rows: []*smodel.Setting{
+		{Key: smodel.KeyAuditLogRetentionDays, Value: "9223372036854775807"},
+		{Key: smodel.KeyRetentionDays, Value: "-5"},
+		{Key: smodel.KeyBounceAlertPercent, Value: "500"},
+	}})
+	if err := s.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := s.Int(smodel.KeyAuditLogRetentionDays); got != smodel.MaxDays {
+		t.Errorf("stored huge window read as %d, want the ceiling %d", got, smodel.MaxDays)
+	}
+
+	if got := s.Int(smodel.KeyRetentionDays); got != 0 {
+		t.Errorf("stored negative window read as %d, want 0 (keep)", got)
+	}
+
+	if got := s.Int(smodel.KeyBounceAlertPercent); got != 100 {
+		t.Errorf("stored percentage read as %d, want 100", got)
+	}
+}
+
+func TestPerKeyRulesRefuseWhatCannotWork(t *testing.T) {
+	for _, tc := range []struct {
+		key, value string
+		ok         bool
+	}{
+		{smodel.KeyACMEHosts, `["mail.example.com"]`, true},
+		{smodel.KeyACMEHosts, `["*.example.com"]`, false},
+		{smodel.KeyACMEHosts, `["bad host"]`, false},
+		{smodel.KeyACMEHosts, `["10.0.0.1"]`, false},
+		{smodel.KeyACMEHosts, `["localhost"]`, false},
+		{smodel.KeyACMEHosts, `not json`, false},
+		{smodel.KeyACMEEmail, "ops@example.com", true},
+		{smodel.KeyACMEEmail, "bad", false},
+		{smodel.KeyACMEEmail, "", true},
+		{smodel.KeyACMEDirectoryURL, "https://acme-staging-v02.api.letsencrypt.org/directory", true},
+		{smodel.KeyACMEDirectoryURL, "ftp://x", false},
+		{smodel.KeyACMEDirectoryURL, "http://x", false},
+		{smodel.KeyPlatformMailFromName, "Acme Ops", true},
+		{smodel.KeyPlatformMailFromName, "Acme\r\nBcc: x@y", false},
+	} {
+		_, err := Validate(tc.key, tc.value)
+		if (err == nil) != tc.ok {
+			t.Errorf("Validate(%s, %q) err = %v, want ok=%v", tc.key, tc.value, err, tc.ok)
+		}
+	}
+
+	got, err := Validate(smodel.KeyACMEHosts, `["Mail.Example.COM"]`)
+	if err != nil || got != `["mail.example.com"]` {
+		t.Errorf("hosts normalized to %q, %v", got, err)
+	}
+}

@@ -207,6 +207,11 @@ type Definition struct {
 	// Unit is a display hint ("days", empty for none).
 	Unit string `json:"unit,omitempty"`
 
+	// Max is the largest value an int setting takes. Every int setting
+	// declares one: a day count far past any sane window overflows the
+	// date arithmetic and turns a retention cutoff into the future.
+	Max int `json:"max,omitempty"`
+
 	// ManagedAt is the console route with the real editor for this
 	// setting, ManagedIn is that page's name. Empty means the settings
 	// list is the only editor. Set, it shows the value read-only and
@@ -219,6 +224,16 @@ type Definition struct {
 	// RefProject is the only kind.
 	Ref string `json:"ref,omitempty"`
 }
+
+// Ceilings for the int settings.
+const (
+	// MaxDays is ten years, the longest window any retention setting
+	// takes.
+	MaxDays = 3650
+
+	// MaxCount bounds a message count or volume threshold.
+	MaxCount = 1_000_000
+)
 
 // RefProject is the Ref of a setting holding a project id.
 const RefProject = "project"
@@ -233,51 +248,51 @@ const (
 // Registry is the full set of settable keys.
 var Registry = []Definition{
 	{
-		Key: KeyNotificationRetentionDays, Type: TypeInt, Default: "30", Unit: "days",
+		Key: KeyNotificationRetentionDays, Type: TypeInt, Default: "30", Unit: "days", Max: MaxDays,
 		Description: "Days to keep notifications that have been read. Unread ones are always kept.",
 	},
 	{
-		Key: KeyBounceAlertPercent, Type: TypeInt, Default: "10", Unit: "%",
+		Key: KeyBounceAlertPercent, Type: TypeInt, Default: "10", Unit: "%", Max: 100,
 		Description: "Bounce rate over the last hour that raises a project alert. 0 turns the alert off.",
 	},
 	{
-		Key: KeyBounceAlertMinVolume, Type: TypeInt, Default: "20", Unit: "emails",
+		Key: KeyBounceAlertMinVolume, Type: TypeInt, Default: "20", Unit: "emails", Max: MaxCount,
 		Description: "How many sends must finish in the hour before the bounce rate is judged.",
 	},
 	{
-		Key: KeyRetentionDays, Type: TypeInt, Default: "30", Unit: "days",
+		Key: KeyRetentionDays, Type: TypeInt, Default: "30", Unit: "days", Max: MaxDays,
 		Description: "Days to keep email log rows. Whole DAILY partitions past this window are dropped rather than deleted row by row, so the window you set is the window you get. 0 keeps them forever, which means a disk that fills while nobody has decided anything - and, since partitions are never dropped either, a partition count that grows by 365 a year until concurrent queue claims start failing.",
 	},
 	{
-		Key: KeyEmailBodyRetentionDays, Type: TypeInt, Default: "0", Unit: "days",
+		Key: KeyEmailBodyRetentionDays, Type: TypeInt, Default: "0", Unit: "days", Max: MaxDays,
 		Description: "Days to keep rendered HTML and text on an email row. 0 follows the email log window.",
 	},
 	{
-		Key: KeyEmailAttachmentRetentionDays, Type: TypeInt, Default: "0", Unit: "days",
+		Key: KeyEmailAttachmentRetentionDays, Type: TypeInt, Default: "0", Unit: "days", Max: MaxDays,
 		Description: "Days to keep attachment bytes. 0 follows the email log window.",
 	},
 	{
-		Key: KeyInboundRetentionDays, Type: TypeInt, Default: "0", Unit: "days",
+		Key: KeyInboundRetentionDays, Type: TypeInt, Default: "0", Unit: "days", Max: MaxDays,
 		Description: "Days to keep received mail. 0 follows the email log window.",
 	},
 	{
-		Key: KeyWebhookDeliveryRetentionDays, Type: TypeInt, Default: "30", Unit: "days",
+		Key: KeyWebhookDeliveryRetentionDays, Type: TypeInt, Default: "30", Unit: "days", Max: MaxDays,
 		Description: "Days to keep webhook delivery history. 0 keeps it forever.",
 	},
 	{
-		Key: KeyTrackingEventRetentionDays, Type: TypeInt, Default: "0", Unit: "days",
+		Key: KeyTrackingEventRetentionDays, Type: TypeInt, Default: "0", Unit: "days", Max: MaxDays,
 		Description: "Days to keep open and click events. 0 keeps them forever.",
 	},
 	{
-		Key: KeyAuditLogRetentionDays, Type: TypeInt, Default: "90", Unit: "days",
+		Key: KeyAuditLogRetentionDays, Type: TypeInt, Default: "90", Unit: "days", Max: MaxDays,
 		Description: "Days to keep audit log entries. 0 keeps them forever.",
 	},
 	{
-		Key: KeySandboxRetentionDays, Type: TypeInt, Default: "7", Unit: "days",
+		Key: KeySandboxRetentionDays, Type: TypeInt, Default: "7", Unit: "days", Max: MaxDays,
 		Description: "Days to keep a captured sandbox message. 0 keeps it until the per-project cap pushes it out. A sender may ask for a shorter window per message, never a longer one.",
 	},
 	{
-		Key: KeySandboxMaxMessages, Type: TypeInt, Default: "500", Unit: "messages",
+		Key: KeySandboxMaxMessages, Type: TypeInt, Default: "500", Unit: "messages", Max: MaxCount,
 		Description: "How many sandbox messages one project keeps. The oldest are dropped past this. 0 is unlimited, which on a project wired into CI means the table grows until the disk says otherwise.",
 	},
 	{

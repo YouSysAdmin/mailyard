@@ -17,6 +17,7 @@ package cron
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -217,21 +218,29 @@ func (m *Manager) runDue(ctx context.Context) {
 	}
 }
 
+// Refusals RunNow reports before running anything, so a caller can
+// tell them from the job's own failure.
+var (
+	ErrUnknownJob = errors.New("unknown job")
+	ErrJobRunning = errors.New("job is already running")
+)
+
 // RunNow executes one job out of band, for the admin trigger. It
-// reports an error when the job is unknown or already in flight.
+// reports ErrUnknownJob or ErrJobRunning without running anything, and
+// otherwise what the job itself returned.
 func (m *Manager) RunNow(ctx context.Context, name string) error {
 	m.mu.Lock()
 	st, ok := m.jobs[name]
 	if !ok {
 		m.mu.Unlock()
 
-		return fmt.Errorf("unknown job %q", name)
+		return fmt.Errorf("%w %q", ErrUnknownJob, name)
 	}
 
 	if st.running {
 		m.mu.Unlock()
 
-		return fmt.Errorf("job %q is already running", name)
+		return fmt.Errorf("%w: %q", ErrJobRunning, name)
 	}
 
 	st.running = true

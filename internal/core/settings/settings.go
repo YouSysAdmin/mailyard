@@ -17,12 +17,16 @@ import (
 	"context"
 	"encoding/json/v2"
 	"maps"
+	"net"
 	"net/mail"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
+	"github.com/yousysadmin/mailyard/internal/core/dnsname"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
 
@@ -121,22 +125,41 @@ func (s *Service) String(key string) string {
 // never constructed answer "delete mail older than a month" for
 // retention_days. A nil service knows nothing, and for a value that
 // drives deletion the honest form of nothing is zero.
+//
+// The answer is clamped to the key's declared range, so a row written
+// before the ceiling existed, or by hand, cannot hand a retention sweep
+// a negative window or one that overflows the date arithmetic.
 func (s *Service) Int(key string) int {
 	if s == nil {
 		return 0
 	}
 
+	d, known := smodel.Lookup(key)
 	if n, err := strconv.Atoi(s.String(key)); err == nil {
-		return n
+		return clampInt(n, d)
 	}
 
-	if d, ok := smodel.Lookup(key); ok {
+	if known {
 		if n, err := strconv.Atoi(d.Default); err == nil {
-			return n
+			return clampInt(n, d)
 		}
 	}
 
 	return 0
+}
+
+// clampInt holds n inside [0, d.Max]. A definition with no Max leaves
+// the upper side alone.
+func clampInt(n int, d smodel.Definition) int {
+	if n < 0 {
+		return 0
+	}
+
+	if d.Max > 0 && n > d.Max {
+		return d.Max
+	}
+
+	return n
 }
 
 // Bool returns the value as a boolean, defaulting to false when it
@@ -190,6 +213,10 @@ func Validate(key, value string) (string, error) {
 		return "", nil
 	}
 
+	if v, handled, err := validateByKey(key, value); handled {
+		return v, err
+	}
+
 	switch d.Type {
 	case smodel.TypeInt:
 		n, err := strconv.Atoi(value)
@@ -199,6 +226,10 @@ func Validate(key, value string) (string, error) {
 
 		if n < 0 {
 			return "", &Error{msg: key + " must not be negative"}
+		}
+
+		if d.Max > 0 && n > d.Max {
+			return "", &Error{msg: key + " must be at most " + strconv.Itoa(d.Max)}
 		}
 
 		return strconv.Itoa(n), nil
@@ -229,6 +260,82 @@ func Validate(key, value string) (string, error) {
 	default:
 		return value, nil
 	}
+}
+
+// validateByKey holds the rules that belong to one key rather than to
+// its type. handled is false for a key with no rule of its own.
+func validateByKey(key, value string) (string, bool, error) {
+	v := strings.TrimSpace(value)
+
+	switch key {
+	case smodel.KeyACMEHosts:
+		if v == "" {
+			return "", true, nil
+		}
+
+		var items []string
+		if err := json.Unmarshal([]byte(v), &items); err != nil {
+			return "", true, &Error{msg: key + " must be a JSON array of strings"}
+		}
+
+		for _, h := range items {
+			h = strings.TrimSpace(h)
+			if h == "" {
+				continue
+			}
+
+			if strings.Contains(h, "*") {
+				return "", true, &Error{msg: key + ": " + h + " is a wildcard, and ACME here cannot issue one"}
+			}
+
+			if net.ParseIP(h) != nil || !dnsname.Valid(h) || !strings.Contains(h, ".") {
+				return "", true, &Error{msg: key + ": " + h + " is not a fully qualified host name"}
+			}
+		}
+
+		return smodel.EncodeStringList(lowerAll(items)), true, nil
+	case smodel.KeyACMEEmail:
+		if v == "" {
+			return "", true, nil
+		}
+
+		parsed, err := mail.ParseAddress(v)
+		if err != nil || parsed.Name != "" || parsed.Address != v {
+			return "", true, &Error{msg: key + " must be a bare address like ops@example.com"}
+		}
+
+		return v, true, nil
+	case smodel.KeyACMEDirectoryURL:
+		if v == "" {
+			return "", true, nil
+		}
+
+		u, err := url.Parse(v)
+		if err != nil || u.Scheme != "https" || u.Host == "" {
+			return "", true, &Error{msg: key + " must be an https URL"}
+		}
+
+		return v, true, nil
+	case smodel.KeyPlatformMailFromName:
+		if strings.ContainsFunc(v, unicode.IsControl) {
+			return "", true, &Error{msg: key + " must be one line of text"}
+		}
+
+		return v, true, nil
+	}
+
+	return "", false, nil
+}
+
+// lowerAll lowercases every item, since a host name is compared without
+// regard to case.
+func lowerAll(items []string) []string {
+	out := make([]string, len(items))
+	for i, v := range items {
+		out[i] = strings.ToLower(v)
+	}
+
+	return out
 }
 
 // Error marks a rejected setting write.

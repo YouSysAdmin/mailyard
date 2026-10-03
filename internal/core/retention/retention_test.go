@@ -254,3 +254,55 @@ func TestTheAttachmentWindowReachesReceivedMail(t *testing.T) {
 		}
 	}
 }
+
+type fakeAuditStore struct {
+	store.AuditStore
+	cutoff time.Time
+}
+
+func (f *fakeAuditStore) PurgeOlderThan(_ context.Context, cutoff time.Time) (int64, error) {
+	f.cutoff = cutoff
+
+	return 0, nil
+}
+
+// A stored window far past the ceiling overflowed the date arithmetic
+// and put the cutoff in the future, which deletes everything. It is
+// read back clamped, so the cutoff stays in the past.
+func TestAnOutOfRangeWindowNeverReachesTheFuture(t *testing.T) {
+	var calls []string
+	set := settings.New(loader{
+		smodel.KeyRetentionDays:                "0",
+		smodel.KeyWebhookDeliveryRetentionDays: "0",
+		smodel.KeyAuditLogRetentionDays:        "9223372036854775807",
+		smodel.KeyNotificationRetentionDays:    "0",
+		smodel.KeyTrackingEventRetentionDays:   "0",
+	})
+	if err := set.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	audit := &fakeAuditStore{}
+	sw := &Sweeper{
+		Store: &store.Store{
+			Email:         &fakeEmailStore{log: &calls},
+			Inbound:       &fakeInboundStore{},
+			Audit:         audit,
+			Session:       fakeSessionStore{},
+			Sandbox:       fakeSandboxStore{},
+			PasswordReset: fakeResetStore{},
+			SignupVerify:  fakeVerifyStore{},
+		},
+		Settings: set,
+		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	if err := sw.Run(t.Context()); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	limit := time.Now().AddDate(0, 0, -(smodel.MaxDays - 1))
+	if audit.cutoff.IsZero() || audit.cutoff.After(limit) {
+		t.Errorf("audit cutoff = %v, want at least %d days back", audit.cutoff, smodel.MaxDays)
+	}
+}

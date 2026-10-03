@@ -95,6 +95,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 			Description: d.Description,
 			Value:       effective[d.Key],
 			Unit:        d.Unit,
+			Max:         d.Max,
 			ManagedAt:   d.ManagedAt,
 			ManagedIn:   d.ManagedIn,
 			Ref:         d.Ref,
@@ -200,11 +201,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		}
 	}
 
-	rc := domain.GetRequestContext(c)
-	updatedBy := ""
-	if rc != nil && rc.User != nil {
-		updatedBy = rc.User.Email
-	}
+	_, updatedBy := domain.GetRequestContext(c).Actor()
 
 	now := time.Now().UTC()
 
@@ -315,15 +312,28 @@ func (h *Handler) Jobs(c fiber.Ctx) error {
 	return response.Success(c, JobsResponse{Jobs: h.Runtime.Cron.Statuses()})
 }
 
-// RunJob triggers one job out of band.
+// RunJob triggers one job out of band: 404 for a job this node does not
+// run, 409 while it is already running.
 func (h *Handler) RunJob(c fiber.Ctx) error {
 	if h.Runtime.Cron == nil {
 		return response.BadRequest(c, "the scheduler is not running")
 	}
 
-	if err := h.Runtime.Cron.RunNow(c.Context(), c.Params("name")); err != nil {
-		return response.BadRequest(c, err.Error())
+	name := c.Params("name")
+	err := h.Runtime.Cron.RunNow(c.Context(), name)
+
+	switch {
+	case errors.Is(err, cron.ErrUnknownJob):
+		return response.NotFound(c, "no job called "+name+" runs on this node")
+	case errors.Is(err, cron.ErrJobRunning):
+		return response.Conflict(c, name+" is already running")
 	}
 
-	return response.Success(c, JobsResponse{Jobs: h.Runtime.Cron.Statuses()})
+	// The job ran. Its own failure is an outcome, reported on its row as
+	// last_error beside every other job, not a refused request.
+	return response.Success(c, RunJobResponse{
+		Jobs:   h.Runtime.Cron.Statuses(),
+		Ran:    name,
+		Failed: err != nil,
+	})
 }

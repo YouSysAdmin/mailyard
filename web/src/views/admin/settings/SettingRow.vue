@@ -79,6 +79,7 @@ function setBool(checked: boolean) {
           v-model="staged"
           type="number"
           min="0"
+          :max="setting.max"
           class="form-input"
           :aria-label="setting.key"
         />

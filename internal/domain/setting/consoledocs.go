@@ -25,9 +25,13 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "POST",
 			Path:        "/jobs/:name/run",
 			Summary:     "Run job",
-			Description: "Platform admin.",
+			Description: "Platform admin. 404 for a job this node does not run, 409 while it is already running.",
 			PathParams:  []apidoc.Param{{Name: "name"}},
-			Responses:   []apidoc.Response{apidoc.OK("The result.", JobsResponse{})},
+			Responses: []apidoc.Response{
+				apidoc.OK("The roster after the run. A failed run sets failed and its row carries last_error.", RunJobResponse{}),
+				apidoc.NotFound,
+				apidoc.Conflict,
+			},
 		},
 		{
 			Method:      "GET",

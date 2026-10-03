@@ -38,8 +38,13 @@ async function load() {
 async function run(name: string) {
   running.value = name
   try {
-    jobs.value = (await settingsApi.runJob(name)).data.jobs ?? []
-    notify.success(`${name} finished`)
+    const res = (await settingsApi.runJob(name)).data
+    jobs.value = res.jobs ?? []
+    if (res.failed) {
+      notify.error(`${name} failed - its last error is on the row`)
+    } else {
+      notify.success(`${name} finished`)
+    }
   } catch (e) {
     notify.error(apiErrorMessage(e, `${name} failed`))
     // The run failed, so the rows on screen are stale - but the notice

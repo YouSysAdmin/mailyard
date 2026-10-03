@@ -19,3 +19,17 @@ func TestEveryRefIsAKnownKind(t *testing.T) {
 		}
 	}
 }
+
+// An int setting with no ceiling takes any int64, and a day count that
+// large wraps the retention cutoff into the future.
+func TestEveryIntSettingDeclaresACeiling(t *testing.T) {
+	for _, d := range Registry {
+		if d.Type == TypeInt && d.Max <= 0 {
+			t.Errorf("%s: an int setting must declare Max", d.Key)
+		}
+
+		if d.Type != TypeInt && d.Max != 0 {
+			t.Errorf("%s: Max applies to int settings only", d.Key)
+		}
+	}
+}

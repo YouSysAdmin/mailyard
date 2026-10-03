@@ -65,13 +65,17 @@ storing a redundant copy.
 An unknown key is rejected. Settings exist only when something reads them, so the registry is the full list of what can
 be set.
 
+Every `int` setting has a ceiling, reported as `max` in the listing: ten years (`3650`) for a day count, `100` for a
+percentage, and `1000000` for a message count. A larger value is refused. `acme_hosts` takes fully qualified host
+names only - no wildcard, no IP address - `acme_email` a bare address, and `acme_directory_url` an `https` URL.
+
 Both routes require the platform `admin` role.
 
 ## Available Settings
 
 | Key                               | Type   | Default | Description                                                                                                                                                                                                  |
 |-----------------------------------|--------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `retention_days`                  | int    | `30`    | Days to keep email log rows. `0` keeps them forever. The emails table is partitioned by week, so whole partitions past this window are dropped rather than deleted row by row.                               |
+| `retention_days`                  | int    | `30`    | Days to keep email log rows. `0` keeps them forever. The emails table is partitioned by day, so whole partitions past this window are dropped rather than deleted row by row.                               |
 | `email_body_retention_days`       | int    | `0`     | Days to keep rendered HTML and text on an email row. `0` follows `retention_days`.                                                                                                                           |
 | `email_attachment_retention_days` | int    | `0`     | Days to keep attachment bytes, including the blobs in object storage. `0` follows `retention_days`. Received mail too: when shorter than `inbound_retention_days` its content is stripped and the envelope kept. |
 | `inbound_retention_days`          | int    | `0`     | Days to keep received mail. `0` follows `retention_days`.                                                                                                                                                    |

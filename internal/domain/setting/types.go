@@ -59,6 +59,10 @@ type SettingItem struct {
 	// Unit is a display hint ("days"), absent when there is none.
 	Unit string `json:"unit,omitempty"`
 
+	// Max is the largest value an int setting takes, absent for the
+	// other types.
+	Max int `json:"max,omitempty"`
+
 	// Where the real editor is, when it is not this list. Sent by the
 	// server so the console keeps no copy of the mapping.
 	ManagedAt string `json:"managed_at,omitempty"`
@@ -79,4 +83,13 @@ type SettingItem struct {
 // and that is correct rather than a missing job.
 type JobsResponse struct {
 	Jobs []cron.Status `json:"jobs"`
+}
+
+// RunJobResponse is the roster after an out of band run, with what that
+// run did. A failed run is still an answered request: the job's error is
+// on its row as last_error.
+type RunJobResponse struct {
+	Jobs   []cron.Status `json:"jobs"`
+	Ran    string        `json:"ran"`
+	Failed bool          `json:"failed"`
 }

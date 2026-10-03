@@ -4,6 +4,7 @@ package dnsname
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -36,6 +37,29 @@ func TestCoveringNamesNeverCrossesALabelBoundary(t *testing.T) {
 	for _, lookalike := range []string{"evilmanagebac.com", "notmanagebac.com", "managebac.com.evil.net"} {
 		if slices.Contains(Covering(lookalike), "managebac.com") {
 			t.Errorf("%q was treated as being under managebac.com", lookalike)
+		}
+	}
+}
+
+func TestValidHostNames(t *testing.T) {
+	for name, want := range map[string]bool{
+		"mail.example.com":               true,
+		"mail.example.com.":              true,
+		"localhost":                      true,
+		"xn--bcher-kva.de":               true,
+		"a-b.example":                    true,
+		"":                               false,
+		"*.example.com":                  false,
+		"bad host!":                      false,
+		"x..y":                           false,
+		"-a.example":                     false,
+		"a-.example":                     false,
+		"exa_mple.com":                   false,
+		"10.0.0.1":                       false,
+		strings.Repeat("a", 64) + ".com": false,
+	} {
+		if got := Valid(name); got != want {
+			t.Errorf("Valid(%q) = %v, want %v", name, got, want)
 		}
 	}
 }

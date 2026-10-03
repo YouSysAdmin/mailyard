@@ -15,6 +15,8 @@ export interface PlatformSetting {
   value: string
   overridden: boolean
   unit?: string
+  // The largest value an int setting takes. The server refuses more.
+  max?: number
   // The console page that OWNS this setting, and its name. Present on
   // the seven keys with a purpose-built editor - the ACME four and the
   // three listener assignments - which this page then shows read-only
@@ -45,5 +47,6 @@ export const settingsApi = {
   update: (settings: Array<{ key: string; value: string }>) =>
     api.put<{ settings: PlatformSetting[] }>('/admin/settings', { settings }),
   jobs: () => api.get<{ jobs: ScheduledJob[] }>('/admin/jobs'),
-  runJob: (name: string) => api.post<{ jobs: ScheduledJob[] }>(`/admin/jobs/${name}/run`),
+  runJob: (name: string) =>
+    api.post<{ jobs: ScheduledJob[]; ran: string; failed: boolean }>(`/admin/jobs/${name}/run`),
 }
