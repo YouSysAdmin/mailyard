@@ -36,13 +36,14 @@ type Config struct {
 //
 // OnFinal, when set, is invoked after a row reaches a terminal status
 // (sent, failed, suppressed) - the webhook dispatcher hangs off it.
-// Set it before Start.
+// refused names the recipients a sent message did not reach. Set it
+// before Start.
 type Worker struct {
 	src     Source
 	proc    Processor
 	cfg     Config
 	log     *slog.Logger
-	OnFinal func(job *emailmodel.Email, status, errMsg string)
+	OnFinal func(job *emailmodel.Email, status, errMsg string, refused []string)
 
 	// Broadcast, when set, carries a wake to the other nodes. Set it
 	// before Start. See Wake.
@@ -325,14 +326,17 @@ func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome)
 		w.log.Info("queue: handed to a relay node", "email_id", job.ID, "project_id", job.ProjectID)
 	case KindDone:
 		now := time.Now().UTC()
-		ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusSent, "", out.ServerID, &now)
+		// errMsg is empty unless some recipients were refused, and then
+		// it is what the log shows beside the sent status.
+		ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusSent, errMsg, out.ServerID, &now)
 		if !w.write(job, "finalize sent", ok, err) {
 			return
 		}
 
 		job.SentAt = &now
-		w.log.Info("queue: sent", "email_id", job.ID, "project_id", job.ProjectID, "attempts", job.Attempts)
-		w.notify(job, emailmodel.StatusSent, "")
+		w.log.Info("queue: sent", "email_id", job.ID, "project_id", job.ProjectID, "attempts", job.Attempts,
+			"refused", len(out.Refused))
+		w.notifyRefused(job, emailmodel.StatusSent, errMsg, out.Refused)
 	case KindRetry:
 		maxi := job.MaxAttempts
 		if maxi <= 0 {
@@ -397,8 +401,12 @@ func (w *Worker) write(job *emailmodel.Email, what string, ok bool, err error) b
 }
 
 func (w *Worker) notify(job *emailmodel.Email, status, errMsg string) {
+	w.notifyRefused(job, status, errMsg, nil)
+}
+
+func (w *Worker) notifyRefused(job *emailmodel.Email, status, errMsg string, refused []string) {
 	if w.OnFinal != nil {
-		w.OnFinal(job, status, errMsg)
+		w.OnFinal(job, status, errMsg, refused)
 	}
 }
 

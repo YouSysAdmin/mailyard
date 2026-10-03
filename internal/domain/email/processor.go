@@ -364,6 +364,19 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		}
 
 		sendErr = p.deliver(ctx, spec, msg)
+
+		// Some recipients refused by name. Each is that address's
+		// bounce, and the message is sent when anybody else took it -
+		// one 550 must not fail the message for everybody.
+		if r, ok := errors.AsType[transport.Refusals](sendErr); ok {
+			refused := p.recordRefusals(ctx, e, r)
+			if r.Accepted() {
+				return queue.DoneRefusing(srv.ID, sendErr, refused)
+			}
+
+			return queue.Fail(sendErr)
+		}
+
 		if f, ok := errors.AsType[transport.ServerFault](sendErr); ok && f.ServerFault() {
 			p.takeOutOfRotation(ctx, srv, sendErr)
 
@@ -431,6 +444,23 @@ func (p *Processor) takeOutOfRotation(ctx context.Context, srv *ssmodel.Server, 
 		Link:      "/smtp-servers/" + srv.ID,
 		DedupeKey: "smtp_invalid:" + srv.ID + ":" + strconv.FormatInt(time.Now().Unix(), 10),
 	})
+}
+
+// recordRefusals records each recipient a delivery refused by name and
+// answers their addresses.
+func (p *Processor) recordRefusals(ctx context.Context, e *emailmodel.Email, r transport.Refusals) []string {
+	var refused []string
+	for _, err := range r.Refused() {
+		f, ok := err.(transport.Failure)
+		if !ok || f.RejectedRecipient() == "" {
+			continue
+		}
+
+		p.recordRejection(ctx, e, f)
+		refused = append(refused, f.RejectedRecipient())
+	}
+
+	return refused
 }
 
 // recordRejection writes the bounce row and (optionally) the

@@ -153,6 +153,19 @@ type Failure interface {
 	RejectedRecipient() string
 }
 
+// Refusals is a delivery on which the provider refused some recipients
+// by name, each with its own reply. Optional, checked before Failure.
+// Accepted says whether anybody else took the message - then it was
+// sent, and only the refused addresses bounced. Each entry of Refused
+// is a Failure naming one recipient.
+//
+// SES never produces one: it takes or refuses the message whole.
+type Refusals interface {
+	error
+	Accepted() bool
+	Refused() []error
+}
+
 // ServerFault is a delivery error caused by the server's own settings -
 // a refused login, a certificate that does not verify - and not by the
 // message. Optional, checked beside Failure: such an error is never

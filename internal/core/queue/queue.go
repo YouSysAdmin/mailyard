@@ -57,6 +57,11 @@ type Outcome struct {
 	// in the failover loop and nothing outside the processor can know
 	// it.
 	ServerID string
+
+	// Refused names the recipients the server refused for good on a
+	// message it took for the others. Set on KindDone only, with Err
+	// describing the refusals for the log.
+	Refused []string
 }
 
 // Done is the terminal success outcome: the message left and nothing
@@ -70,6 +75,12 @@ func Handed() Outcome { return Outcome{Kind: KindHanded} }
 // DoneVia is Done plus the server that carried it.
 func DoneVia(serverID string) Outcome {
 	return Outcome{Kind: KindDone, ServerID: serverID}
+}
+
+// DoneRefusing is DoneVia for a message that reached some recipients
+// while the server refused the ones named, for the reason in err.
+func DoneRefusing(serverID string, err error, refused []string) Outcome {
+	return Outcome{Kind: KindDone, ServerID: serverID, Err: err, Refused: refused}
 }
 
 // Retry asks the worker to try again later, counting an attempt

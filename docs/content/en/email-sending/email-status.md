@@ -41,7 +41,7 @@ or a client generator.
 | `queued`     | Accepted and waiting for a worker               | When a worker claims it  |
 | `scheduled`  | Held for a future `send_at`                     | At that time             |
 | `processing` | Claimed and being handed to SMTP                | Within one attempt       |
-| `sent`       | An SMTP server accepted it                      | Terminal                 |
+| `sent`       | A server accepted it for one recipient or more  | Terminal                 |
 | `failed`     | Every attempt was spent                         | Terminal, unless retried |
 | `suppressed` | Every recipient was blocked before sending      | Terminal                 |
 | `cancelled`  | Withdrawn by the caller before a worker took it | Terminal                 |
@@ -53,6 +53,8 @@ reasons and is never written. Filtering on it always returns nothing.
 It records that a receiving SMTP server took the message. What happens after that — a mailbox that is full, a spam
 folder, a delayed bounce — arrives separately, as a [bounce](/docs/contacts/bounce-handling) or a
 [webhook](/docs/webhooks/event-types). A message can be `sent` and bounced at the same time, and both facts are true.
+When the server refused some recipients and took the message for the rest, it is `sent` and `error_message` names the
+refused addresses.
 {{< /callout >}}
 
 Between `queued` and `sent` a message may be tried against several SMTP servers. `attempts` counts attempts, not

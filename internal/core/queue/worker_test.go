@@ -261,7 +261,7 @@ func TestWorkerSurvivesPanicInOnFinal(t *testing.T) {
 	panicked := 0
 	w := NewWorker(src, funcProcessor(func(*emailmodel.Email) Outcome { return Done() }),
 		cfg, slog.New(slog.DiscardHandler))
-	w.OnFinal = func(*emailmodel.Email, string, string) {
+	w.OnFinal = func(*emailmodel.Email, string, string, []string) {
 		mu.Lock()
 		panicked++
 		mu.Unlock()

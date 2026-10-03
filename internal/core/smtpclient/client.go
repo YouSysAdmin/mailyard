@@ -122,7 +122,7 @@ func smtpReply(err error) (int, string) {
 
 // wrapSendError turns a stage failure into a *SendError carrying the
 // SMTP reply code and recipient, preserving the original error string.
-func wrapSendError(stage, recipient string, err error) error {
+func wrapSendError(stage, recipient string, err error) *SendError {
 	code, msg := smtpReply(err)
 
 	return &SendError{Stage: stage, Recipient: recipient, Code: code, Msg: msg, Err: err}
@@ -257,11 +257,25 @@ func sendViaClient(client *smtp.Client, auth smtp.Auth, msg *Message) error {
 		return wrapSendError("MAIL FROM", envFrom, fmt.Errorf("smtp mail from failed: %w", err))
 	}
 
+	// A permanent refusal of one recipient is that recipient's bounce,
+	// and the message still goes to the rest. Anything else at RCPT TO -
+	// a 4xx, a dropped connection - is about the attempt, and fails it
+	// whole so the retry offers every recipient again.
+	var refused []*SendError
 	for _, addr := range msg.To {
 		rcpt := EnvelopeAddress(addr)
 		if err := client.Rcpt(rcpt); err != nil {
-			return wrapSendError("RCPT TO", rcpt, fmt.Errorf("smtp rcpt to failed: %w", err))
+			se := wrapSendError("RCPT TO", rcpt, fmt.Errorf("smtp rcpt to failed: %w", err))
+			if !se.Permanent() || len(msg.To) == 1 {
+				return se
+			}
+
+			refused = append(refused, se)
 		}
+	}
+
+	if len(refused) == len(msg.To) {
+		return &RecipientRefusals{Refusals: refused}
 	}
 
 	raw, err := msg.Build()
@@ -296,7 +310,14 @@ func sendViaClient(client *smtp.Client, auth smtp.Auth, msg *Message) error {
 		return wrapSendError("DATA", "", fmt.Errorf("smtp close failed: %w", err))
 	}
 
-	return client.Quit()
+	// The server holds the message once DATA is accepted. A failed
+	// QUIT after that changes nothing about who it reached.
+	quitErr := client.Quit()
+	if len(refused) > 0 {
+		return &RecipientRefusals{Refusals: refused, Delivered: true}
+	}
+
+	return quitErr
 }
 
 // FormatAddress renders a display name and an address as one RFC 5322

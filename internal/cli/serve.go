@@ -11,6 +11,7 @@ import (
 	"net/mail"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -417,7 +418,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		AttemptTimeout: cfg.Worker.AttemptTimeout,
 	}, log)
 
-	worker.OnFinal = func(job *emailmodel.Email, status, errMsg string) {
+	worker.OnFinal = func(job *emailmodel.Email, status, errMsg string, refused []string) {
 		metrics.EmailsFinalized.WithLabelValues(status).Inc()
 
 		// Platform mail through a project is not the project's: no
@@ -445,7 +446,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		// never attempted, so recording it as a failure would blame
 		// the address for a decision we made about it.
 		if status == emailmodel.StatusSent || status == emailmodel.StatusFailed {
-			trackContacts(context.Background(), st, log, job, status == emailmodel.StatusSent)
+			trackContacts(context.Background(), st, log, job, status == emailmodel.StatusSent, refused)
 		}
 
 		// Push to any live console viewer. Best effort and
@@ -1109,7 +1110,8 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 }
 
 // trackContacts records one terminal delivery outcome against each
-// recipient's contact row.
+// recipient's contact row. A recipient the server refused on a message
+// it took for the others counts as a failure for that address alone.
 //
 // Best effort: a contact tally is reporting, not delivery. A failure is
 // logged and dropped rather than retried - the message has already been
@@ -1117,7 +1119,7 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 //
 // Runs inline in the worker's finalize hook: one upsert per recipient
 // per message, the same order of writes a campaign already does.
-func trackContacts(ctx context.Context, st *store.Store, log *slog.Logger, job *emailmodel.Email, sent bool) {
+func trackContacts(ctx context.Context, st *store.Store, log *slog.Logger, job *emailmodel.Email, sent bool, refused []string) {
 	now := time.Now().UTC()
 
 	for _, raw := range job.Recipients {
@@ -1126,7 +1128,8 @@ func trackContacts(ctx context.Context, st *store.Store, log *slog.Logger, job *
 			continue
 		}
 
-		if err := st.Contact.RecordOutcome(ctx, job.ProjectID, addr, name, sent, now); err != nil {
+		delivered := sent && !slices.ContainsFunc(refused, func(r string) bool { return strings.EqualFold(r, addr) })
+		if err := st.Contact.RecordOutcome(ctx, job.ProjectID, addr, name, delivered, now); err != nil {
 			log.Warn("contacts: record outcome failed",
 				"email_id", job.ID, "recipient", addr, "err", err)
 		}

@@ -23,7 +23,11 @@ briefly full would lose you a real customer.
 
 Three routes, and they do not behave alike:
 
-1. **The delivery path.** A permanent SMTP rejection during sending is recorded by the worker directly.
+1. **The delivery path.** A permanent SMTP rejection during sending is recorded by the worker directly. On a message
+   with several recipients, a server refusing one of them at `RCPT TO` bounces that address alone: the message still
+   goes to the recipients the server accepted and is marked `sent`, with the refused addresses named in its
+   `error_message`. Only when every recipient is refused does the message fail. A temporary refusal (a `4xx`) of any
+   recipient fails the attempt as a whole, and the retry offers every recipient again.
 2. **A return path.** A DSN arriving at the address messages were sent from, or an
    [SES notification](/docs/smtp-domains/ses-notifications). These are attributed strictly: the report must name a
    message this project sent, via the `X-Mailyard-Email-Id` header, **and** a recipient that message actually went to.
