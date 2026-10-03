@@ -121,6 +121,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		Description:     in.Description,
 		DefaultLanguage: in.DefaultLanguage,
 		SampleData:      in.SampleData,
+		EmbedImages:     in.EmbedImages,
 		CreatedBy:       callerID(rc),
 	}
 	if t.DefaultLanguage == "" {
@@ -167,7 +168,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
-	p := &tmodel.Patch{LastEditedBy: callerID(rc), SampleData: in.SampleData}
+	p := &tmodel.Patch{LastEditedBy: callerID(rc), SampleData: in.SampleData, EmbedImages: in.EmbedImages}
 	if in.Name != nil {
 		// omitzero passes an empty string, so a blank name is refused
 		// here rather than stored or read as absent.

@@ -43,6 +43,7 @@ func (h *Handler) Export(c fiber.Ctx) error {
 			Description:     t.Description,
 			DefaultLanguage: t.DefaultLanguage,
 			SampleData:      t.SampleData,
+			EmbedImages:     t.EmbedImages,
 		},
 	}
 	for _, v := range versions {
@@ -114,6 +115,7 @@ func (h *Handler) Import(c fiber.Ctx) error {
 		Description:     doc.Template.Description,
 		DefaultLanguage: doc.Template.DefaultLanguage,
 		SampleData:      doc.Template.SampleData,
+		EmbedImages:     doc.Template.EmbedImages,
 		CreatedBy:       callerID(rc),
 	}
 	if t.DefaultLanguage == "" {

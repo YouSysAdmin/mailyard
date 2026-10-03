@@ -71,7 +71,7 @@ func TestAMessageReferencesTheTemplatesAttachment(t *testing.T) {
 			tpl, att := templateWithFile(t, ts, bs, "PDF BYTES")
 			svc := &Service{Store: &store.Store{Template: ts, Email: es}, Blob: bs}
 			req := &SendRequest{}
-			if err := svc.AttachTemplateFiles(ctx, filesProject, tpl.ID, req); err != nil {
+			if err := svc.AttachTemplateFiles(ctx, filesProject, tpl, req); err != nil {
 				t.Fatal(err)
 			}
 

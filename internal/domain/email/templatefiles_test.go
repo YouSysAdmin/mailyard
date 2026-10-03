@@ -90,15 +90,22 @@ func TestTheProcessorDeliversAReferencedTemplateFile(t *testing.T) {
 	}
 }
 
-// A caller cannot point an attachment at stored bytes. Only the server
-// writes a storage key or a template reference.
+// A caller cannot point an attachment at stored bytes or make it an
+// embedded part. Only the server writes a storage key, a template
+// reference, an image reference or a Content-ID.
 func TestACallerCannotNameStoredBytes(t *testing.T) {
 	got := callerAttachments([]emailmodel.Attachment{{
 		Filename: "a.txt", Content: "eA==", StorageKey: "templates/other/secret.pdf",
 		TemplateAttachmentID: "4b1c4c1e-0d0e-4f53-9a41-6f0c6c3b4b11",
+		TemplateAssetID:      "0199a6a4-7c4e-7000-8000-0000000000aa",
+		ContentID:            "0199a6a4-7c4e-7000-8000-0000000000aa@mailyard",
 	}})
 	if got[0].StorageKey != "" || got[0].TemplateAttachmentID != "" || got[0].Content != "eA==" {
 		t.Errorf("caller attachment kept server fields: %+v", got[0])
+	}
+
+	if got[0].TemplateAssetID != "" || got[0].ContentID != "" {
+		t.Errorf("caller attachment kept an image reference: %+v", got[0])
 	}
 }
 
@@ -115,6 +122,16 @@ func TestReferencesCountTowardTheAttachmentTotal(t *testing.T) {
 	ref.Size = 60
 	if err := svc.validateAttachments([]emailmodel.Attachment{own, ref}); err != nil {
 		t.Errorf("exactly the total was refused: %v", err)
+	}
+
+	img := emailmodel.Attachment{Filename: "logo.png", Size: 30, ContentID: "x@mailyard", TemplateAssetID: "0199a6a4-7c4e-7000-8000-0000000000aa"}
+	if err := svc.validateAttachments([]emailmodel.Attachment{own, img}); err != nil {
+		t.Errorf("40 own bytes plus a 30 byte image were refused: %v", err)
+	}
+
+	img.Size = 61
+	if err := svc.validateAttachments([]emailmodel.Attachment{own, img}); err == nil {
+		t.Error("an embedded image did not count toward the total")
 	}
 }
 

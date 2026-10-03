@@ -159,6 +159,8 @@ type Attachment struct {
 	StorageKey           string `json:"storage_key,omitempty"`
 	Size                 int64  `json:"size,omitzero"`
 	TemplateAttachmentID string `json:"template_attachment_id,omitempty"`
+	TemplateAssetID      string `json:"template_asset_id,omitempty"`
+	ContentID            string `json:"content_id,omitempty"`
 }
 
 // AttachmentInput is the request body.
@@ -2315,6 +2317,7 @@ type Template struct {
 	LastEditedBy    string     `json:"last_edited_by,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	EmbedImages     bool       `json:"embed_images"`
 }
 
 // TemplateAttachment is the wire body.
@@ -2335,6 +2338,7 @@ type TemplateCreateInput struct {
 	Description     string `json:"description"`
 	DefaultLanguage string `json:"default_language"`
 	SampleData      string `json:"sample_data"`
+	EmbedImages     bool   `json:"embed_images"`
 	Subject         string `json:"subject"`
 	HTML            string `json:"html"`
 	Text            string `json:"text"`
@@ -2406,6 +2410,7 @@ type TemplateUpdateInput struct {
 	Description     *string `json:"description"`
 	DefaultLanguage string  `json:"default_language"`
 	SampleData      *string `json:"sample_data"`
+	EmbedImages     *bool   `json:"embed_images"`
 }
 
 // TestResponse is the response body.
@@ -2453,6 +2458,7 @@ type TransferTemplate struct {
 	Description     string `json:"description"`
 	DefaultLanguage string `json:"default_language"`
 	SampleData      string `json:"sample_data"`
+	EmbedImages     bool   `json:"embed_images"`
 }
 
 // TransferVersion is the wire body.

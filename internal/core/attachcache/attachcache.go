@@ -1,14 +1,15 @@
 // Mailyard, Copyright (c) 2021-2026 YouSysAdmin
 
-// Package attachcache keeps the content of template attachments in
-// memory, so a campaign whose every message carries the same file reads
-// it from the database or the object store once rather than once per
-// recipient.
+// Package attachcache keeps the content of template attachments and
+// embedded builder images in memory, so a campaign whose every message
+// carries the same file reads it from the database or the object store
+// once rather than once per recipient.
 //
-// The content of one template attachment id never changes: a new upload
-// is a new row and a soft delete leaves the bytes alone. Nothing is
-// invalidated, and an entry expires after a TTL only so that a row the
-// retention sweep purged stops being served within that window.
+// The content of one template attachment or image id never changes: a
+// new upload is a new row and a soft delete leaves the bytes alone.
+// Nothing is invalidated, and an entry expires after a TTL only so that
+// a row the retention sweep purged stops being served within that
+// window.
 package attachcache
 
 import (

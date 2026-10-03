@@ -183,7 +183,7 @@ These settings are **per node**. Three nodes at concurrency 4 give you twelve pa
 | `MAILYARD_WORKER_RETRY_MAX_DELAY`        | `1h`       | Ceiling for that backoff                                                                                                                                                                                                                               |
 | `MAILYARD_WORKER_CLAIM_TIMEOUT`          | `15m`      | Re-queues `processing` rows older than this, which is how a crashed node's in-flight mail is recovered. Must be longer than `MAILYARD_WORKER_ATTEMPT_TIMEOUT`, or a running attempt is requeued and sent twice - the server refuses to start otherwise |
 | `MAILYARD_WORKER_ATTEMPT_TIMEOUT`        | `10m`      | Ceiling on one delivery attempt, connect to QUIT. Two minutes of silence on the connection also ends it. An attempt that runs out is scored as a transient failure and retried                                                                         |
-| `MAILYARD_WORKER_ATTACHMENT_CACHE_BYTES` | `67108864` | Memory, in bytes, holding template attachment content between messages, so a campaign reads its attachment once rather than once per recipient. An entry is reloaded after ten minutes. `0` turns the cache off                                        |
+| `MAILYARD_WORKER_ATTACHMENT_CACHE_BYTES` | `67108864` | Memory, in bytes, holding template attachment and embedded image content between messages, so a campaign reads each file once rather than once per recipient. An entry is reloaded after ten minutes. `0` turns the cache off                          |
 
 ## Campaigns
 

@@ -27,6 +27,10 @@ type Template struct {
 	LastEditedBy    string     `json:"last_edited_by,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+
+	// EmbedImages sends the template's builder images inside every
+	// message as inline parts rather than as links to the hosted copy.
+	EmbedImages bool `json:"embed_images"`
 }
 
 // Version is one numbered revision of a template. Content lives in
@@ -111,5 +115,6 @@ type Patch struct {
 	Description     *string
 	DefaultLanguage *string
 	SampleData      *string
+	EmbedImages     *bool
 	LastEditedBy    string
 }

@@ -131,6 +131,10 @@ type Service struct {
 	// inline as base64 in the row).
 	Blob blob.Store
 
+	// PublicURL is server.public_url, the origin builder images are
+	// served from, which is how an embedding template finds them.
+	PublicURL string
+
 	// Tracking signs the hosted unsubscribe link for sends scoped to
 	// an opt-out list. Nil or disabled means no link is minted.
 	Tracking *coretracking.Signer
@@ -174,6 +178,7 @@ func NewService(rt *env.Runtime) *Service {
 		Emit:        emit,
 		Log:         rt.Log,
 		Blob:        rt.Blob,
+		PublicURL:   rt.Config.Server.PublicURL,
 		Tracking:    rt.Tracking,
 		Settings:    rt.Settings,
 
@@ -954,7 +959,7 @@ func (s *Service) offloadAttachments(ctx context.Context, e *emailmodel.Email) e
 
 	for i := range e.Attachments {
 		a := &e.Attachments[i]
-		if a.Content == "" || a.StorageKey != "" || a.TemplateAttachmentID != "" {
+		if a.Content == "" || a.StorageKey != "" || a.TemplateAttachmentID != "" || a.TemplateAssetID != "" {
 			continue
 		}
 
@@ -979,13 +984,13 @@ func (s *Service) offloadAttachments(ctx context.Context, e *emailmodel.Email) e
 }
 
 // validateAttachments checks the caller's own attachments, and counts
-// the template's references, which carry a size and no content, toward
-// the total.
+// the template's references and embedded images, which carry a size and
+// no content, toward the total.
 func (s *Service) validateAttachments(atts []emailmodel.Attachment) error {
 	var own []emailmodel.Attachment
 	var total int64
 	for _, a := range atts {
-		if a.TemplateAttachmentID == "" {
+		if a.TemplateAttachmentID == "" && a.TemplateAssetID == "" {
 			own = append(own, a)
 			total += decodedLen(a.Content)
 			continue
@@ -1019,19 +1024,20 @@ func decodedLen(b64 string) int64 {
 }
 
 // ErrAttachmentGone reports a message attachment whose referenced
-// template attachment is no longer stored.
+// template attachment or builder image is no longer stored.
 var ErrAttachmentGone = errors.New("attachment is no longer stored")
 
 // LoadAttachment returns the decoded bytes of one attachment of a
-// message in projID: its own inline content or blob object, or the
-// template attachment it references, deleted or not. Every reader of
-// message attachment bytes goes through here or attachmentContent.
+// message in projID: its own inline content or blob object, the
+// template attachment it references, deleted or not, or the builder
+// image it embeds. Every reader of message attachment bytes goes
+// through here or attachmentContent.
 func LoadAttachment(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, projID string, a *emailmodel.Attachment) ([]byte, error) {
-	if !isTemplateReference(a) {
+	if !isTemplateReference(a) && !isAssetReference(a) {
 		return blob.Load(ctx, bs, a.StorageKey, a.Content, a.Filename)
 	}
 
-	b64, err := templateAttachmentContent(ctx, ts, bs, cache, projID, a)
+	b64, err := attachmentContent(ctx, ts, bs, cache, projID, a)
 	if err != nil {
 		return nil, err
 	}
@@ -1040,10 +1046,15 @@ func LoadAttachment(ctx context.Context, ts store.TemplateStore, bs blob.Store, 
 }
 
 // attachmentContent is LoadAttachment answering base64, which is what a
-// message carries. A template reference comes from the cache.
+// message carries. A template reference or an embedded image comes
+// from the cache.
 func attachmentContent(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, projID string, a *emailmodel.Attachment) (string, error) {
 	if isTemplateReference(a) {
 		return templateAttachmentContent(ctx, ts, bs, cache, projID, a)
+	}
+
+	if isAssetReference(a) {
+		return assetContent(ctx, ts, bs, cache, projID, a)
 	}
 
 	raw, err := blob.Load(ctx, bs, a.StorageKey, a.Content, a.Filename)
@@ -1058,6 +1069,34 @@ func attachmentContent(ctx context.Context, ts store.TemplateStore, bs blob.Stor
 // attachment's rather than its own.
 func isTemplateReference(a *emailmodel.Attachment) bool {
 	return a.TemplateAttachmentID != "" && a.Content == ""
+}
+
+// isAssetReference reports an attachment whose bytes are a builder
+// image's.
+func isAssetReference(a *emailmodel.Attachment) bool {
+	return a.TemplateAssetID != "" && a.Content == ""
+}
+
+// assetContent returns an embedded builder image as base64, through the
+// cache under a key of its own. The bytes of one image id never change.
+func assetContent(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, projID string, a *emailmodel.Attachment) (string, error) {
+	return cache.Get(ctx, projID+"/asset/"+a.TemplateAssetID, func(ctx context.Context) (string, error) {
+		ta, err := ts.GetAsset(ctx, projID, a.TemplateAssetID)
+		if err != nil {
+			return "", err
+		}
+
+		if ta == nil {
+			return "", fmt.Errorf("image %q: %w", a.Filename, ErrAttachmentGone)
+		}
+
+		raw, err := blob.Load(ctx, bs, ta.StorageKey, ta.Content, a.Filename)
+		if err != nil {
+			return "", err
+		}
+
+		return base64.StdEncoding.EncodeToString(raw), nil
+	})
 }
 
 // templateAttachmentContent returns a referenced template attachment as
@@ -1085,7 +1124,7 @@ func templateAttachmentContent(ctx context.Context, ts store.TemplateStore, bs b
 // hasBytesElsewhere reports whether an attachment's bytes are not in
 // its own Content and have to be loaded.
 func hasBytesElsewhere(a *emailmodel.Attachment) bool {
-	return a.Content == "" && (a.StorageKey != "" || a.TemplateAttachmentID != "")
+	return a.Content == "" && (a.StorageKey != "" || a.TemplateAttachmentID != "" || a.TemplateAssetID != "")
 }
 
 // toClientAttachments converts the model attachments to the transport
@@ -1093,7 +1132,7 @@ func hasBytesElsewhere(a *emailmodel.Attachment) bool {
 func toClientAttachments(in []emailmodel.Attachment) []smtpclient.Attachment {
 	out := make([]smtpclient.Attachment, len(in))
 	for i, a := range in {
-		out[i] = smtpclient.Attachment{Filename: a.Filename, Content: a.Content, ContentType: a.ContentType}
+		out[i] = smtpclient.Attachment{Filename: a.Filename, Content: a.Content, ContentType: a.ContentType, ContentID: a.ContentID}
 	}
 
 	return out

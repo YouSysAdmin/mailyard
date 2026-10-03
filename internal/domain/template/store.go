@@ -35,7 +35,7 @@ func NewStore(db *sql.DB) *Store {
 // ----------------------------------------------------------------------------
 const templateSelect = `
 SELECT id, project_id, name, description, default_language, active_version_id,
-       sample_data, created_by, last_edited_by, created_at, updated_at
+       sample_data, embed_images, created_by, last_edited_by, created_at, updated_at
 FROM templates`
 
 // Get returns one template within projID, or nil when there is no such
@@ -138,18 +138,19 @@ func (s *Store) Put(ctx context.Context, t *tmodel.Template) error {
 	_, err := s.Exec(ctx, `
         INSERT INTO templates (
             id, project_id, name, description, default_language,
-            sample_data, created_by, last_edited_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sample_data, embed_images, created_by, last_edited_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name              = excluded.name,
             description       = excluded.description,
             default_language  = excluded.default_language,
             sample_data       = excluded.sample_data,
+            embed_images      = excluded.embed_images,
             last_edited_by    = excluded.last_edited_by,
             updated_at        = excluded.updated_at
     `,
 		t.ID, t.ProjectID, t.Name, t.Description, t.DefaultLanguage,
-		t.SampleData, t.CreatedBy, t.LastEditedBy,
+		t.SampleData, t.EmbedImages, t.CreatedBy, t.LastEditedBy,
 		t.CreatedAt, database.NullTime(t.UpdatedAt),
 	)
 
@@ -167,10 +168,11 @@ func (s *Store) Update(ctx context.Context, projID, id string, p *tmodel.Patch) 
             description      = COALESCE(?, description),
             default_language = COALESCE(?, default_language),
             sample_data      = COALESCE(?, sample_data),
+            embed_images     = COALESCE(?, embed_images),
             last_edited_by   = ?,
             updated_at       = ?
         WHERE project_id = ? AND id = ?
-    `, p.Name, p.Description, p.DefaultLanguage, p.SampleData, p.LastEditedBy,
+    `, p.Name, p.Description, p.DefaultLanguage, p.SampleData, p.EmbedImages, p.LastEditedBy,
 		time.Now().UTC(), projID, id)
 	if err != nil {
 		return false, err
@@ -217,10 +219,10 @@ func (s *Store) Create(ctx context.Context, t *tmodel.Template, drafts []*tmodel
 	if _, err := tx.ExecContext(ctx, s.Q(`
         INSERT INTO templates (
             id, project_id, name, description, default_language,
-            sample_data, created_by, last_edited_by, created_at, last_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sample_data, embed_images, created_by, last_edited_by, created_at, last_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `), t.ID, t.ProjectID, t.Name, t.Description, t.DefaultLanguage,
-		t.SampleData, t.CreatedBy, t.LastEditedBy, t.CreatedAt, last); err != nil {
+		t.SampleData, t.EmbedImages, t.CreatedBy, t.LastEditedBy, t.CreatedAt, last); err != nil {
 		return err
 	}
 
@@ -635,7 +637,7 @@ func scanTemplate(r interface{ Scan(...any) error }) (*tmodel.Template, error) {
 	var active sql.NullString
 	var updated sql.NullTime
 	if err := r.Scan(&t.ID, &t.ProjectID, &t.Name, &t.Description, &t.DefaultLanguage,
-		&active, &t.SampleData, &t.CreatedBy, &t.LastEditedBy, &t.CreatedAt, &updated); err != nil {
+		&active, &t.SampleData, &t.EmbedImages, &t.CreatedBy, &t.LastEditedBy, &t.CreatedAt, &updated); err != nil {
 		return nil, err
 	}
 
@@ -950,15 +952,45 @@ func (s *Store) FindAssets(ctx context.Context, projID string, limit, offset int
 	return out, total, rows.Err()
 }
 
+// AssetsByTokens returns the project's images among the public tokens
+// given, without their bytes. A token of another project matches
+// nothing.
+func (s *Store) AssetsByTokens(ctx context.Context, projID string, tokens []string) ([]*tmodel.Asset, error) {
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+
+	rows, err := s.Query(ctx, `
+        SELECT id, project_id, filename, content_type, size, sha256, public_token, storage_key, '', created_at
+        FROM template_assets WHERE project_id = ? AND public_token = ANY(?::text[])`, projID, tokens)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	var out []*tmodel.Asset
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, a)
+	}
+
+	return out, rows.Err()
+}
+
 // DeleteAsset removes one image unless a localization of the project's
-// templates still names its token, in the same statement so a save
-// cannot slip between the check and the delete. It reports whether
-// the row went.
+// templates still names its token or a message waiting to be sent
+// embeds it, in the same statement so a save or a send cannot slip
+// between the check and the delete. It reports whether the row went.
 func (s *Store) DeleteAsset(ctx context.Context, projID, id string) (bool, error) {
 	res, err := s.Exec(ctx, `
         DELETE FROM template_assets a
         WHERE a.project_id = ? AND a.id = ?
-          AND NOT `+assetReferenced, projID, id)
+          AND NOT `+assetReferenced+`
+          AND NOT `+assetPending, projID, id)
 	if err != nil {
 		return false, err
 	}
@@ -977,6 +1009,39 @@ const assetReferenced = `EXISTS (
               JOIN templates t ON t.id = v.template_id
               WHERE t.project_id = a.project_id
                 AND strpos(l.html_template, a.public_token) > 0)`
+
+// AssetPending reports whether a message of the project waiting to be
+// sent embeds the image.
+func (s *Store) AssetPending(ctx context.Context, projID, id string) (bool, error) {
+	var found bool
+	err := s.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1 FROM template_assets a
+            WHERE a.project_id = ? AND a.id = ? AND `+assetPending+`
+        )`, projID, id).Scan(&found)
+
+	return found, err
+}
+
+// assetPending is true while a message of the image's project that is
+// not sent yet embeds it. The status literals let the partial queue
+// index answer. Reads the row as alias a.
+const assetPending = `EXISTS (
+              SELECT 1 FROM emails e
+              WHERE e.project_id = a.project_id
+                AND e.status IN ('pending', 'queued', 'scheduled', 'processing')
+                AND e.attachments_json LIKE '%"template_asset_id":"' || a.id::text || '"%')`
+
+// assetEmbedded is true while any message of the image's project embeds
+// it, whatever its status. A message embeds an image only while a
+// template used it, so one created after the image was found unused,
+// past a grace hour for a send still in progress, cannot, and the bound
+// prunes the newer partitions. Reads the row as alias a.
+const assetEmbedded = `EXISTS (
+              SELECT 1 FROM emails e
+              WHERE e.project_id = a.project_id
+                AND e.created_at < a.unreferenced_since + interval '1 hour'
+                AND e.attachments_json LIKE '%"template_asset_id":"' || a.id::text || '"%')`
 
 // MarkUnreferencedAssets stamps now on every image no template uses
 // that is not stamped yet, and clears the stamp on every image a
@@ -1009,13 +1074,14 @@ func (s *Store) MarkUnreferencedAssets(ctx context.Context, now time.Time) (mark
 
 // PurgeUnreferencedAssets deletes every image unused since before
 // cutoff, re-checking in the same statement that no template uses it
-// now, and returns the storage key of each deleted row, empty for one
-// held inline). Across all projects.
+// now and no stored message embeds it, and returns the storage key of
+// each deleted row, empty for one held inline. Across all projects.
 func (s *Store) PurgeUnreferencedAssets(ctx context.Context, cutoff time.Time) ([]string, error) {
 	rows, err := s.Query(ctx, `
         DELETE FROM template_assets a
         WHERE a.unreferenced_since < ?
           AND NOT `+assetReferenced+`
+          AND NOT `+assetEmbedded+`
         RETURNING a.storage_key`, cutoff)
 	if err != nil {
 		return nil, err

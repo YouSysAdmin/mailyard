@@ -412,7 +412,8 @@ type WorkerConfig struct {
 	AttemptTimeout time.Duration `mapstructure:"attempt_timeout"`
 
 	// AttachmentCacheBytes bounds the memory holding template
-	// attachment content between messages. 0 turns the cache off.
+	// attachment and embedded image content between messages. 0 turns
+	// the cache off.
 	AttachmentCacheBytes int64 `mapstructure:"attachment_cache_bytes"`
 }
 

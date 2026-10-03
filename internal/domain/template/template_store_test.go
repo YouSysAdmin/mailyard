@@ -273,3 +273,33 @@ func TestACampaignStillUsingATemplateIsFound(t *testing.T) {
 		t.Errorf("another project sees %q", got)
 	}
 }
+
+// The embed flag is stored on create, and an update that does not name
+// it leaves it alone.
+func TestTheEmbedFlagSurvivesAPartialUpdate(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := t.Context()
+	tpl := &tmodel.Template{ID: ids.New(), ProjectID: projID, Name: "embed", DefaultLanguage: "en", EmbedImages: true}
+	if err := s.Create(ctx, tpl, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	desc := "changed"
+	if found, err := s.Update(ctx, projID, tpl.ID, &tmodel.Patch{Description: &desc}); err != nil || !found {
+		t.Fatalf("update: %v %v", found, err)
+	}
+
+	got, err := s.Get(ctx, projID, tpl.ID)
+	if err != nil || got == nil || !got.EmbedImages || got.Description != "changed" {
+		t.Fatalf("after a partial update = %+v, %v, want embed kept", got, err)
+	}
+
+	off := false
+	if _, err := s.Update(ctx, projID, tpl.ID, &tmodel.Patch{EmbedImages: &off}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, _ := s.Get(ctx, projID, tpl.ID); got == nil || got.EmbedImages || got.Description != "changed" {
+		t.Fatalf("after turning it off = %+v", got)
+	}
+}

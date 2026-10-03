@@ -579,8 +579,9 @@ func (h *Handler) Cancel(c fiber.Ctx) error {
 }
 
 // callerAttachments keeps what a caller may say about an attachment.
-// A storage key or a template attachment id names stored bytes, which
-// only the server decides.
+// A storage key, a template attachment id or an image id names stored
+// bytes, and an embedded part is the template's, which only the server
+// decides.
 func callerAttachments(in []emailmodel.Attachment) []emailmodel.Attachment {
 	if len(in) == 0 {
 		return in
@@ -590,6 +591,8 @@ func callerAttachments(in []emailmodel.Attachment) []emailmodel.Attachment {
 	for i, a := range in {
 		a.StorageKey = ""
 		a.TemplateAttachmentID = ""
+		a.TemplateAssetID = ""
+		a.ContentID = ""
 		out[i] = a
 	}
 

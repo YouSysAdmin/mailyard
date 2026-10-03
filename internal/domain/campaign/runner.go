@@ -480,7 +480,7 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		DisableSigning: c.DisableSigning,
 		TemplateName:   t.Name,
 	}
-	if err := r.EmailService.AttachTemplateFiles(ctx, c.ProjectID, t.ID, req); err != nil {
+	if err := r.EmailService.AttachTemplateFiles(ctx, c.ProjectID, t, req); err != nil {
 		return err
 	}
 

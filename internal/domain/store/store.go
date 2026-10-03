@@ -720,16 +720,26 @@ type TemplateStore interface {
 	GetAssetByToken(ctx context.Context, token string) (*template.Asset, error)
 	FindAssets(ctx context.Context, projID string, limit, offset int) ([]*template.Asset, int, error)
 
+	// AssetsByTokens answers the project's images among public tokens,
+	// without their bytes.
+	AssetsByTokens(ctx context.Context, projID string, tokens []string) ([]*template.Asset, error)
+
 	// DeleteAsset refuses, reporting false, while a localization of the
-	// project's templates names the image.
+	// project's templates names the image or a message waiting to be
+	// sent embeds it.
 	DeleteAsset(ctx context.Context, projID, id string) (bool, error)
+
+	// AssetPending reports a message waiting to be sent that embeds the
+	// image.
+	AssetPending(ctx context.Context, projID, id string) (bool, error)
 
 	// MarkUnreferencedAssets stamps images no template uses and clears
 	// the stamp on images used again, across all projects.
 	MarkUnreferencedAssets(ctx context.Context, now time.Time) (marked, cleared int64, err error)
 
 	// PurgeUnreferencedAssets deletes images unused since before cutoff
-	// that are still unused, returning each deleted row's storage key.
+	// that are still unused and embedded in no stored message, returning
+	// each deleted row's storage key.
 	PurgeUnreferencedAssets(ctx context.Context, cutoff time.Time) ([]string, error)
 }
 

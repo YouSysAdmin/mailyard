@@ -78,7 +78,7 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 			})
 		}
 
-		if aerr := svc.AttachTemplateFiles(c.Context(), rc.Project.ID, t.ID, req); aerr != nil {
+		if aerr := svc.AttachTemplateFiles(c.Context(), rc.Project.ID, t, req); aerr != nil {
 			return response.Internal(c, aerr)
 		}
 

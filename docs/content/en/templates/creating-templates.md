@@ -43,6 +43,8 @@ Two details the shape does not show:
   goes on the wire escaped, as above. An object is refused.
 - **`default_language` defaults to `en`** when omitted, and it is that field — not the project
   [language registry](/docs/templates/languages) — that a send falls back to.
+- **`embed_images`** (default `false`) sends the template's builder images inside every message rather than as links,
+  see [Embedding the images in the message](#embedding-the-images-in-the-message).
 
 The response is `201` with the template:
 
@@ -54,7 +56,8 @@ The response is `201` with the template:
     "description": "Sent once, on signup",
     "default_language": "en",
     "active_version_id": "0198f6a1-3c80-7c44-b6e1-9d2f7a0c5188",
-    "created_at": "2026-01-01T00:00:00Z"
+    "created_at": "2026-01-01T00:00:00Z",
+    "embed_images": false
   }
 }
 ```
@@ -124,11 +127,34 @@ reused in another template.
   directly it is a document that can run script. The size cap is `sending.max_attachment_size`.
 - **The URL is public** and needs no sign-in, which is what lets a mail client load it. The token in it is random and
   unguessable, and it is tied to no secret, so rotating keys never breaks an image in mail already delivered.
-- **Deleting an image** is refused with `409` while any template still references it. Once deleted, mail already
-  delivered that shows it displays a broken image instead.
+- **Deleting an image** is refused with `409` while any template still references it, or while a message waiting to
+  be sent embeds it (see below). Once deleted, mail already delivered that shows it displays a broken image instead.
 - **Images no template uses are removed automatically** by the nightly retention sweep, once the email log window
   (`retention_days`) has passed since the last template stopped using them. Putting an image back into a template
-  before then keeps it. With `retention_days` at `0` unused images are kept.
+  before then keeps it, and so does a stored message that still embeds it. With `retention_days` at `0` unused images
+  are kept.
+
+### Embedding the images in the message
+
+By default a recipient's mail client loads the images from the URL above. Some recipients never do: corporate mail
+that blocks remote images, clients set to ask before loading anything, mail read offline or kept in an archive. For a
+template meant for them, turn on **Embed images in the message** in the template's settings (`embed_images` on the
+template API).
+
+Each message sent from that template then carries its builder images inside it, as inline parts of a
+`multipart/related` message that the HTML names with `cid:` URLs. Gmail, Outlook and Apple Mail render them without
+loading anything and without a "show images" prompt.
+
+- **The message is larger** on the wire by the size of every image it shows, once per recipient, and those bytes count
+  toward `sending.max_total_attachment_size`. A hosted URL costs a few dozen bytes. Keep embedded images small.
+- **Only this project's builder images** are embedded, wherever the HTML loads them (`src` and CSS `url()`). Any other
+  URL, a link to an image, and an image of another project stay as written.
+- **The stored message holds a reference, not the bytes.** The email log keeps the `cid:` HTML and each image is
+  stored once however many messages embed it, so a campaign reads it once rather than once per recipient. The email
+  detail page shows the images, and the `.eml` download and a sandbox capture carry them.
+- **Previews keep the hosted URL.** The template and campaign previews show the image from its URL, since no message
+  exists yet.
+- **Open and click tracking are unaffected.** The open pixel stays a URL, which is how it works at all.
 
 The library is also on the API:
 
@@ -170,6 +196,9 @@ Partial — send only what changes. This route touches the container, never the 
 ```json
 { "name": "welcome-2026", "description": "Rewritten for the new plan tiers" }
 ```
+
+`embed_images` is one of those fields: `{"embed_images": true}` switches the template to embedded images and leaves
+everything else alone.
 
 Renaming onto a name another template holds is refused with `409`. A `name` that is only whitespace is refused with
 `400` rather than ignored, and `description` is trimmed. The update writes only the fields the body names, so it never

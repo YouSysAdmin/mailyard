@@ -140,7 +140,7 @@ func (s *Service) SendWithTemplate(ctx context.Context, projID, createdBy, apiKe
 	req.HTML = out.HTML
 	req.Text = out.Text
 	req.TemplateName = t.Name
-	if err := s.AttachTemplateFiles(ctx, projID, t.ID, req); err != nil {
+	if err := s.AttachTemplateFiles(ctx, projID, t, req); err != nil {
 		return nil, nil, err
 	}
 
@@ -152,8 +152,13 @@ func (s *Service) SendWithTemplate(ctx context.Context, projID, createdBy, apiKe
 // attachment row, whatever the number of messages using them, and that
 // row outlives deletion until no message can still need it (see the
 // retention sweep). LoadAttachment reads them back.
-func (s *Service) AttachTemplateFiles(ctx context.Context, projID, templateID string, req *SendRequest) error {
-	atts, err := s.Store.Template.ListAttachments(ctx, projID, templateID)
+//
+// A template that embeds its images also gets its builder images as
+// inline references, with req.HTML naming them by cid:. Called on the
+// rendered HTML and before tracking, which never touches an image
+// source.
+func (s *Service) AttachTemplateFiles(ctx context.Context, projID string, t *tmodel.Template, req *SendRequest) error {
+	atts, err := s.Store.Template.ListAttachments(ctx, projID, t.ID)
 	if err != nil {
 		return err
 	}
@@ -165,6 +170,10 @@ func (s *Service) AttachTemplateFiles(ctx context.Context, projID, templateID st
 			Size:                 a.Size,
 			TemplateAttachmentID: a.ID,
 		})
+	}
+
+	if t.EmbedImages {
+		return s.embedAssets(ctx, projID, req)
 	}
 
 	return nil

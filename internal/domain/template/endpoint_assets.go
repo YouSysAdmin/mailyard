@@ -140,7 +140,8 @@ func (h *Handler) UploadAsset(c fiber.Ctx) error {
 }
 
 // DeleteAsset serves DELETE /api/v1/template-assets/:id. Refused with
-// 409 while a template still references the image.
+// 409 while a template still references the image or a message waiting
+// to be sent embeds it.
 func (h *Handler) DeleteAsset(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	ctx := c.Context()
@@ -159,6 +160,15 @@ func (h *Handler) DeleteAsset(c fiber.Ctx) error {
 	}
 
 	if !gone {
+		pending, err := h.Runtime.Store.Template.AssetPending(ctx, rc.Project.ID, a.ID)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if pending {
+			return response.Conflict(c, "a message waiting to be sent embeds this image, delete it once the message is sent")
+		}
+
 		return response.Conflict(c, "a template still uses this image, remove it from the template first")
 	}
 

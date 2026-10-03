@@ -30,6 +30,7 @@ type createInput struct {
 	Description     string `json:"description"      validate:"omitempty,max=500"       normalize:"trim"`
 	DefaultLanguage string `json:"default_language" validate:"omitempty,min=2,max=10"  normalize:"normalize"`
 	SampleData      string `json:"sample_data"      validate:"omitempty,max=65536,json"`
+	EmbedImages     bool   `json:"embed_images"`
 	Subject         string `json:"subject"          validate:"omitempty,notblank,max=1000,template=text"`
 	HTML            string `json:"html"             validate:"omitempty,max=1048576,template=html"`
 	Text            string `json:"text"             validate:"omitempty,max=1048576,template=text"`
@@ -42,6 +43,7 @@ type updateInput struct {
 	Description     *string `json:"description"      validate:"omitzero,max=500"`
 	DefaultLanguage string  `json:"default_language" validate:"omitempty,min=2,max=10"  normalize:"normalize"`
 	SampleData      *string `json:"sample_data"      validate:"omitzero,max=65536,json"`
+	EmbedImages     *bool   `json:"embed_images"`
 }
 
 type versionInput struct {
@@ -101,6 +103,7 @@ type transferTemplate struct {
 	Description     string `json:"description"      validate:"omitempty,max=500"       normalize:"trim"`
 	DefaultLanguage string `json:"default_language" validate:"omitempty,min=2,max=10" normalize:"normalize"`
 	SampleData      string `json:"sample_data"      validate:"omitempty,max=65536,json"`
+	EmbedImages     bool   `json:"embed_images"`
 }
 
 // transferVersion is one version of the document. A zero Version is

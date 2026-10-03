@@ -413,3 +413,113 @@ func TestThePurgeTakesOnlyLongUnusedAssets(t *testing.T) {
 		}
 	}
 }
+
+// embeddingMessage stores a message of projID that embeds the image,
+// with its status and creation time.
+func embeddingMessage(t *testing.T, s *Store, projID, assetID, status string, createdAt time.Time) string {
+	t.Helper()
+	id := ids.New()
+	atts := `[{"filename":"logo.png","size":3,"template_asset_id":"` + assetID + `","content_id":"` + assetID + `@mailyard"}]`
+	if _, err := s.Exec(t.Context(), `
+        INSERT INTO emails (id, project_id, sender, recipients, subject, attachments_json, status, created_at)
+        VALUES (?, ?, 'a@b.test', '["c@d.test"]', 's', ?, ?, ?)`,
+		id, projID, atts, status, createdAt); err != nil {
+		t.Fatalf("store a message embedding the image: %v", err)
+	}
+
+	return id
+}
+
+// The project's own images are found by token, without their bytes,
+// and another project's token matches nothing.
+func TestAssetsAreFoundByTokenWithinTheProject(t *testing.T) {
+	s := openAssetStore(t)
+	ctx := t.Context()
+	mine := newAsset(projID, "mine", "")
+	mine.Content = "UE5H"
+	theirs := newAsset(otherProjID, "theirs", "k-theirs")
+	for _, a := range []*tmodel.Asset{mine, theirs} {
+		if _, err := s.CreateAsset(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := s.AssetsByTokens(ctx, projID, []string{mine.PublicToken, theirs.PublicToken, "nope"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || got[0].ID != mine.ID || got[0].Content != "" {
+		t.Fatalf("AssetsByTokens = %+v, want only the project's image without bytes", got)
+	}
+
+	if got, err := s.AssetsByTokens(ctx, projID, nil); err != nil || len(got) != 0 {
+		t.Fatalf("no tokens = %v, %v", got, err)
+	}
+}
+
+// An image a message waiting to be sent embeds is not deleted, and the
+// handler can tell that apart from a template using it. A sent message
+// does not hold it back, nor a message of another project.
+func TestAnAssetEmbeddedInAWaitingMessageIsNotDeleted(t *testing.T) {
+	s := openAssetStore(t)
+	ctx := t.Context()
+	a := newAsset(projID, "held", "k-held")
+	if _, err := s.CreateAsset(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+
+	embeddingMessage(t, s, otherProjID, a.ID, "scheduled", time.Now())
+	embeddingMessage(t, s, projID, a.ID, "sent", time.Now())
+	if pending, err := s.AssetPending(ctx, projID, a.ID); err != nil || pending {
+		t.Fatalf("pending with only a sent message = %v, %v", pending, err)
+	}
+
+	waiting := embeddingMessage(t, s, projID, a.ID, "scheduled", time.Now())
+	if pending, err := s.AssetPending(ctx, projID, a.ID); err != nil || !pending {
+		t.Fatalf("pending with a scheduled message = %v, %v, want true", pending, err)
+	}
+
+	if gone, err := s.DeleteAsset(ctx, projID, a.ID); err != nil || gone {
+		t.Fatalf("delete under a scheduled message = %v, %v, want refused", gone, err)
+	}
+
+	if _, err := s.Exec(ctx, `UPDATE emails SET status = 'sent' WHERE id = ?`, waiting); err != nil {
+		t.Fatal(err)
+	}
+
+	if gone, err := s.DeleteAsset(ctx, projID, a.ID); err != nil || !gone {
+		t.Fatalf("delete once sent = %v, %v, want deleted", gone, err)
+	}
+}
+
+// The purge keeps a long unused image while any stored message embeds
+// it, and takes it once that message is gone.
+func TestThePurgeKeepsAnAssetAMessageEmbeds(t *testing.T) {
+	s := openAssetStore(t)
+	ctx := t.Context()
+	a := newAsset(projID, "embedded", "k-embedded")
+	if _, err := s.CreateAsset(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC()
+	if _, _, err := s.MarkUnreferencedAssets(ctx, now.AddDate(0, 0, -40)); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := embeddingMessage(t, s, projID, a.ID, "scheduled", now.AddDate(0, 0, -45))
+	keys, err := s.PurgeUnreferencedAssets(ctx, now.AddDate(0, 0, -30))
+	if err != nil || len(keys) != 0 {
+		t.Fatalf("purge under an embedding message = %q, %v, want nothing", keys, err)
+	}
+
+	if _, err := s.Exec(ctx, `DELETE FROM emails WHERE id = ?`, msg); err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err = s.PurgeUnreferencedAssets(ctx, now.AddDate(0, 0, -30))
+	if err != nil || !slices.Equal(keys, []string{"k-embedded"}) {
+		t.Fatalf("purge once the message went = %q, %v", keys, err)
+	}
+}

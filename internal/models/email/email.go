@@ -40,7 +40,8 @@ func ValidStatus(s string) bool {
 
 // Attachment is a file of a stored email: inline base64 content, an
 // object of its own in the blob store, or a reference to a template
-// attachment stored once for every message that uses it.
+// attachment or a builder image stored once for every message that
+// uses it.
 type Attachment struct {
 	Filename    string `json:"filename"`
 	Content     string `json:"content,omitempty"`
@@ -57,6 +58,14 @@ type Attachment struct {
 	// TemplateAttachmentID names the template attachment whose bytes
 	// this entry carries. Set by the server only, never by a caller.
 	TemplateAttachmentID string `json:"template_attachment_id,omitempty"`
+
+	// TemplateAssetID names the builder image whose bytes this entry
+	// carries. Set by the server only, never by a caller.
+	TemplateAssetID string `json:"template_asset_id,omitempty"`
+
+	// ContentID makes the part an embedded one, named by a cid: URL in
+	// the HTML body. Set by the server only, never by a caller.
+	ContentID string `json:"content_id,omitempty"`
 }
 
 // Email is one outbound message and its delivery state.
