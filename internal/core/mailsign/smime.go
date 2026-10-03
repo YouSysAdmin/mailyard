@@ -180,6 +180,12 @@ func checkLeaf(leaf *x509.Certificate, email string) error {
 		return fmt.Errorf("mailsign: the certificate is not issued to %s", email)
 	}
 
+	// A client takes the signer for a mailbox, not an authority, and
+	// shows an authority's signature as invalid.
+	if leaf.IsCA {
+		return errors.New("mailsign: the certificate is a certificate authority, not one issued to a mailbox")
+	}
+
 	if len(leaf.ExtKeyUsage) > 0 {
 		ok := false
 		for _, eku := range leaf.ExtKeyUsage {

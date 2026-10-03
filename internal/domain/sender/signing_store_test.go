@@ -31,14 +31,22 @@ func TestASigningKeyIsSealedAndListedWithoutItsMaterial(t *testing.T) {
 	}
 
 	expires := time.Now().UTC().Add(10 * 24 * time.Hour).Truncate(time.Millisecond)
-	if err := s.PutSigning(ctx, &smodel.SigningKey{
+	if added, err := s.AddSigning(ctx, &smodel.SigningKey{
 		SenderID: m.ID, ProjectID: m.ProjectID, Kind: smodel.SigningSMIME,
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n",
 		PublicKey:   "-----BEGIN CERTIFICATE-----\npublic\n-----END CERTIFICATE-----\n",
 		Fingerprint: "ABCD", Algorithm: "RSA-2048", Subject: "CN=Billing", Issuer: "CN=CA",
 		NotAfter: &expires, Sign: true,
-	}); err != nil {
-		t.Fatal(err)
+	}); err != nil || !added {
+		t.Fatalf("add: %v %v", added, err)
+	}
+
+	// A second key for the same sender is refused, never a replacement.
+	if added, err := s.AddSigning(ctx, &smodel.SigningKey{
+		SenderID: m.ID, ProjectID: m.ProjectID, Kind: smodel.SigningPGP,
+		PrivateKey: "other", PublicKey: "other", Fingerprint: "EEEE", Sign: true,
+	}); err != nil || added {
+		t.Fatalf("second add: %v %v, want refused", added, err)
 	}
 
 	var sealed string

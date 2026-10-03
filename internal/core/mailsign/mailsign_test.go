@@ -263,6 +263,7 @@ func TestSMIMEImportRefusesWhatAClientWould(t *testing.T) {
 	_, otherLeaf, otherKey := mintMailCertificate(t, "other@example.com", time.Now(), true)
 	_, expiredLeaf, expiredKey := mintMailCertificate(t, "billing@example.com", time.Now().Add(-48*time.Hour), true)
 	_, tlsLeaf, tlsKey := mintMailCertificate(t, "billing@example.com", time.Now(), false)
+	caLeaf, caKey := mintMailCA(t, "billing@example.com")
 
 	cases := []struct {
 		name, cert, key, want string
@@ -271,6 +272,7 @@ func TestSMIMEImportRefusesWhatAClientWould(t *testing.T) {
 		{"mismatched key", leafPEM, otherKey, "does not match"},
 		{"expired", expiredLeaf, expiredKey, "expired"},
 		{"no mail usage", tlsLeaf, tlsKey, "email protection"},
+		{"a CA certificate", caLeaf, caKey, "certificate authority"},
 		{"no certificate", keyPEM, keyPEM, "no certificate"},
 		{"no key", leafPEM + caPEM, caPEM, "unsupported private key block"},
 	}
@@ -332,6 +334,42 @@ func mintMailCertificate(t *testing.T, email string, now time.Time, mail bool) (
 	keyPEM = string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
 
 	return caPEM, leafPEM, keyPEM
+}
+
+// mintMailCA is a self-signed authority that also names the address
+// and carries the mail usage, which a client still refuses as a sender
+// certificate.
+func mintMailCA(t *testing.T, email string) (certPEM, keyPEM string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(time.Now().UnixNano()),
+		Subject:               pkix.Name{CommonName: "Billing CA"},
+		EmailAddresses:        []string{email},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})),
+		string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
 }
 
 func parsePair(t *testing.T, certPEM, keyPEM string) (*x509.Certificate, any) {

@@ -38,7 +38,7 @@ func (h *Handler) SetSigning(c fiber.Ctx) error {
 	}
 
 	if m.Signing != nil {
-		return response.Conflict(c, "this sender already has a signing key, remove it first")
+		return response.Conflict(c, errHasKey)
 	}
 
 	material, field, ierr := importMaterial(&in, m)
@@ -61,12 +61,22 @@ func (h *Handler) SetSigning(c fiber.Ctx) error {
 		// reader somehow. An S/MIME signature carries its certificate.
 		AttachKey: material.Kind == smodel.SigningPGP,
 	}
-	if err := h.Runtime.Store.Sender.PutSigning(c.Context(), k); err != nil {
+	// The check above is a courtesy, this is the guard: a concurrent
+	// import that got there first is reported, never replaced.
+	added, err := h.Runtime.Store.Sender.AddSigning(c.Context(), k)
+	if err != nil {
 		return response.Internal(c, err)
+	}
+
+	if !added {
+		return response.Conflict(c, errHasKey)
 	}
 
 	return h.answerSender(c, rc.Project.ID, m.ID, response.Created)
 }
+
+// errHasKey refuses a second key for one sender.
+const errHasKey = "this sender already has a signing key, remove it first"
 
 // importMaterial turns the request into stored material, naming the
 // field a refusal belongs to.
@@ -153,6 +163,14 @@ func (h *Handler) SetSigningFlags(c fiber.Ctx) error {
 
 	if in.AttachKey != nil {
 		attach = *in.AttachKey
+	}
+
+	// Attaching the key is a PGP matter. An S/MIME signature carries its
+	// certificate already, and nothing would read the flag.
+	if attach && m.Signing.Kind != smodel.SigningPGP {
+		return response.BadRequestFields(c, "attach_key applies to PGP keys only",
+			[]validation.FieldError{{Field: "attach_key", Rule: "kind",
+				Message: "attach_key applies to PGP keys only, an S/MIME signature carries its certificate"}})
 	}
 
 	if err := h.Runtime.Store.Sender.SetSigningFlags(c.Context(), rc.Project.ID, m.ID, sign, attach); err != nil {

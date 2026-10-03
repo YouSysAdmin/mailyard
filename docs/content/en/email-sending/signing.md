@@ -43,6 +43,7 @@ The certificate is checked at import, because every one of these would otherwise
 
 - it must name the sender address, in a `rfc822Name` subject alternative name or the legacy `emailAddress` attribute,
 - it must be issued for email protection (the `emailProtection` extended key usage), so a TLS certificate is refused,
+- it must be a mailbox certificate, not a certificate authority (`CA:TRUE`),
 - it must not be expired or not yet valid,
 - the private key must match it, and be RSA or ECDSA.
 
@@ -94,7 +95,7 @@ Under `/api/v1/senders/{id}`, with the `senders` permissions:
 | Method   | Path                  | Does                                                                                                                                                                                                                                                                                                                          |
 |----------|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `POST`   | `/signing`            | Generate or import the key. `{"kind": "pgp"}` generates, `{"kind": "pgp", "private_key": "...", "passphrase": "..."}` imports, `{"kind": "smime", "pkcs12": "<base64>", "passphrase": "..."}` or `{"kind": "smime", "certificate": "...", "private_key": "..."}` stores a certificate. `409` when the sender already has one. |
-| `PATCH`  | `/signing`            | `{"sign": false}` or `{"attach_key": false}`. A field left out keeps its value.                                                                                                                                                                                                                                               |
+| `PATCH`  | `/signing`            | `{"sign": false}` or `{"attach_key": false}`. A field left out keeps its value. `attach_key` is PGP only.                                                                                                                                                                                                                     |
 | `DELETE` | `/signing`            | Remove the key.                                                                                                                                                                                                                                                                                                               |
 | `GET`    | `/signing/public-key` | The armored public key or the PEM chain, for publishing wherever recipients look keys up.                                                                                                                                                                                                                                     |
 

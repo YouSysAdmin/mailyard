@@ -330,8 +330,9 @@ type SenderStore interface {
 	// GetSigning is the one reader of the private half, for delivery.
 	GetSigning(ctx context.Context, projID, senderID string) (*sender.SigningKey, error)
 
-	// PutSigning replaces whatever key the sender had.
-	PutSigning(ctx context.Context, k *sender.SigningKey) error
+	// AddSigning stores a key for a sender that has none, reporting
+	// whether it did. It never replaces one.
+	AddSigning(ctx context.Context, k *sender.SigningKey) (bool, error)
 	SetSigningFlags(ctx context.Context, projID, senderID string, sign, attachKey bool) error
 	DeleteSigning(ctx context.Context, projID, senderID string) error
 

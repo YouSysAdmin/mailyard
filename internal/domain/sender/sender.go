@@ -164,9 +164,11 @@ func (s *Store) GetSigning(ctx context.Context, projID, senderID string) (*smode
 	return k, err
 }
 
-// PutSigning stores the key, replacing whatever the sender had. The
-// handler decides whether replacing is allowed, this just writes.
-func (s *Store) PutSigning(ctx context.Context, k *smodel.SigningKey) error {
+// AddSigning stores the key unless the sender already has one, and
+// reports whether it did. Insert-only, so of two imports racing for one
+// sender exactly one lands and the other is told, rather than quietly
+// replacing the first.
+func (s *Store) AddSigning(ctx context.Context, k *smodel.SigningKey) (bool, error) {
 	now := time.Now().UTC()
 	if k.CreatedAt.IsZero() {
 		k.CreatedAt = now
@@ -175,22 +177,23 @@ func (s *Store) PutSigning(ctx context.Context, k *smodel.SigningKey) error {
 	k.UpdatedAt = now
 	sealed, err := s.seal(k.PrivateKey)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	_, err = s.Exec(ctx, `
+	res, err := s.Exec(ctx, `
         INSERT INTO sender_signing_keys (sender_id, project_id, kind, private_key, public_key, fingerprint,
                                          algorithm, subject, issuer, not_after, sign, attach_key, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (sender_id) DO UPDATE SET
-            kind = excluded.kind, private_key = excluded.private_key, public_key = excluded.public_key,
-            fingerprint = excluded.fingerprint, algorithm = excluded.algorithm, subject = excluded.subject,
-            issuer = excluded.issuer, not_after = excluded.not_after, sign = excluded.sign,
-            attach_key = excluded.attach_key, created_at = excluded.created_at, updated_at = excluded.updated_at
+        ON CONFLICT (sender_id) DO NOTHING
     `, k.SenderID, k.ProjectID, k.Kind, sealed, k.PublicKey, k.Fingerprint,
 		k.Algorithm, k.Subject, k.Issuer, database.NullTime(k.NotAfter), k.Sign, k.AttachKey, k.CreatedAt, k.UpdatedAt)
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // SetSigningFlags updates the two switches and nothing else, so a
