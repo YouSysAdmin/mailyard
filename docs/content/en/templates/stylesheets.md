@@ -22,7 +22,8 @@ Two things follow from that:
   pseudo-element has no element to write itself onto, so it stays in the block and reaches only the clients that read
   one. Write the layout with attributes and inline-able rules, and treat the rest as progressive enhancement.
 
-If inlining fails outright the message still goes out with the `<style>` block intact. That is worse styling in some
+If inlining fails outright, or the stylesheet and the markup together are too large to inline in bounded time, the
+message still goes out with the `<style>` block intact. That is worse styling in some
 clients, which beats a failed send on a path where refusing costs somebody their mail.
 
 ## Create

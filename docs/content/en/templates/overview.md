@@ -64,7 +64,13 @@ The three parts are not rendered the same way, deliberately:
 
 A missing key is an **error** on a transactional send and a **blank** on a campaign send. The strict default is
 deliberate: rendering an empty space where a name belongs produces mail that goes out wrong and never reports it.
-Campaigns relax it because subscriber custom fields are uneven by nature.
+Campaigns relax it because subscriber custom fields are uneven by nature. Blank there means blank all the way down: a
+missing parent in `{{ user.first }}` and a missing value passed to `print` or `printf` render as nothing, never as
+`<no value>` or `<nil>`.
+
+One render is bounded in work as well as in output: 4 MiB of rendered text, a million loop iterations, and 64 MiB of text
+read and produced by the string functions (`print`, `printf`, `html`, `js`, `urlquery` and the comparisons). A template
+that grows a variable inside a loop meets the last one long before it costs the server anything.
 
 ## Stylesheets are inlined
 
@@ -73,7 +79,9 @@ document and written onto the elements as `style` attributes, because Gmail's we
 `<style>` block. Class names are kept rather than stripped, so the markup stays readable and the tracking stripper can
 still find what it needs.
 
-If inlining fails the message still goes out with the block intact. That is worse styling in some clients, which beats
+If inlining fails, or the stylesheet and the markup are together too large to inline in reasonable time (rules plus
+declarations times tags past four million, far beyond any real message), the message still goes out with the block
+intact. That is worse styling in some clients, which beats
 no mail at all on a path where refusing costs somebody their delivery.
 
 ## Attachments belong to the template

@@ -121,11 +121,12 @@ type runnable interface {
 	Execute(w io.Writer, data any) error
 }
 
-// plainTemplate renders text that nothing will interpret.
-func plainTemplate(src string, data map[string]any, onMissing string) (string, error) {
+// parsePlain parses text that nothing will interpret, with the budget
+// planted and the function map attached.
+func parsePlain(src, onMissing string) (*texttmpl.Template, error) {
 	t, err := texttmpl.New("t").Option("missingkey=" + onMissing).Parse(Normalize(src))
 	if err != nil {
-		return "", fmt.Errorf("template parse error: %w", err)
+		return nil, fmt.Errorf("template parse error: %w", err)
 	}
 
 	trees := map[string]*parse.Tree{}
@@ -133,12 +134,42 @@ func plainTemplate(src string, data map[string]any, onMissing string) (string, e
 		trees[tt.Name()] = tt.Tree
 	}
 
-	funcs, err := plant(trees)
+	funcs, err := plant(trees, onMissing == MissingKeyZero)
 	if err != nil {
-		return "", fmt.Errorf("template parse error: %w", err)
+		return nil, fmt.Errorf("template parse error: %w", err)
 	}
 
-	out, err := execute(t.Funcs(funcs), data)
+	return t.Funcs(funcs), nil
+}
+
+// parseEscaping is parsePlain for markup.
+func parseEscaping(src, onMissing string) (*htmltmpl.Template, error) {
+	t, err := htmltmpl.New("t").Option("missingkey=" + onMissing).Parse(Normalize(src))
+	if err != nil {
+		return nil, fmt.Errorf("template parse error: %w", err)
+	}
+
+	trees := map[string]*parse.Tree{}
+	for _, tt := range t.Templates() {
+		trees[tt.Name()] = tt.Tree
+	}
+
+	funcs, err := plant(trees, onMissing == MissingKeyZero)
+	if err != nil {
+		return nil, fmt.Errorf("template parse error: %w", err)
+	}
+
+	return t.Funcs(funcs), nil
+}
+
+// plainTemplate renders text that nothing will interpret.
+func plainTemplate(src string, data map[string]any, onMissing string) (string, error) {
+	t, err := parsePlain(src, onMissing)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := execute(t, data)
 	if err != nil {
 		return "", err
 	}
@@ -146,9 +177,8 @@ func plainTemplate(src string, data map[string]any, onMissing string) (string, e
 	// text/template prints a missing key of a map[string]any as
 	// "<no value>" even under missingkey=zero: the zero value of any is
 	// nil, and nil prints as that marker. html/template's escapers
-	// print the same nil as an empty string, so a lenient render put a
-	// blank in the body and this literal in the subject and text part
-	// of the same message. Lenient means blank, in every part.
+	// print the same nil as an empty string. Lenient means blank, in
+	// every part.
 	if onMissing == MissingKeyZero {
 		out = strings.ReplaceAll(out, "<no value>", "")
 	}
@@ -159,22 +189,43 @@ func plainTemplate(src string, data map[string]any, onMissing string) (string, e
 // escapingTemplate renders markup, with html/template's contextual
 // escaping applied to every value it substitutes.
 func escapingTemplate(src string, data map[string]any, onMissing string) (string, error) {
-	t, err := htmltmpl.New("t").Option("missingkey=" + onMissing).Parse(Normalize(src))
+	t, err := parseEscaping(src, onMissing)
 	if err != nil {
-		return "", fmt.Errorf("template parse error: %w", err)
+		return "", err
 	}
 
-	trees := map[string]*parse.Tree{}
-	for _, tt := range t.Templates() {
-		trees[tt.Name()] = tt.Tree
-	}
+	return execute(t, data)
+}
 
-	funcs, err := plant(trees)
+// CheckText reports whether src is a template the subject or text
+// part of a send can render: it parses, names only functions that
+// exist, and asks for no padding past the printf limit. Checked when
+// a template is saved, so a mistake is refused there rather than on
+// every send that uses it.
+func CheckText(src string) error {
+	_, err := parsePlain(src, MissingKeyZero)
+
+	return err
+}
+
+// CheckHTML is CheckText for the body. html/template decides the
+// escaping context of every action only when the template first runs,
+// so the check executes it once against no data. Only an escaping
+// error counts: a failure that depends on the data, an index out of
+// range, is the send's to report.
+func CheckHTML(src string) error {
+	t, err := parseEscaping(src, MissingKeyZero)
 	if err != nil {
-		return "", fmt.Errorf("template parse error: %w", err)
+		return err
 	}
 
-	return execute(t.Funcs(funcs), data)
+	if _, err := execute(t, nil); err != nil {
+		if _, ok := errors.AsType[*htmltmpl.Error](err); ok {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // MaxOutputBytes bounds what one template may render to. Four times
@@ -210,7 +261,7 @@ func (w *limitWriter) Write(p []byte) (int, error) {
 func execute(t runnable, data map[string]any) (string, error) {
 	var out limitWriter
 	if err := t.Execute(&out, data); err != nil {
-		if errors.Is(err, ErrOutputTooLarge) || errors.Is(err, ErrTooManyIterations) {
+		if errors.Is(err, ErrOutputTooLarge) || errors.Is(err, ErrTooManyIterations) || errors.Is(err, ErrTooMuchText) {
 			return "", err
 		}
 
@@ -233,6 +284,9 @@ func execute(t runnable, data map[string]any) (string, error) {
 // somebody their mail.
 func InlineCSS(html, css string) string {
 	styled := withStyleBlock(html, css)
+	if inlineWork(html, css) > MaxInlineWork {
+		return styled
+	}
 
 	opts := premailer.NewOptions()
 
@@ -252,6 +306,23 @@ func InlineCSS(html, css string) string {
 	}
 
 	return inlined
+}
+
+// MaxInlineWork bounds how much inlining one message may ask for,
+// counted as rules plus declarations times tags. premailer matches
+// every rule against the whole document and merges every declaration
+// into every element it matched, so its time grows with that product
+// and has no bound of its own: a few hundred kilobytes of both ran
+// for half a minute, on a preview anyone with read access can call.
+// A real message is under a tenth of this. Past it the style block is
+// kept as it is, the same answer as a stylesheet that fails to inline.
+const MaxInlineWork = 4_000_000
+
+// inlineWork estimates premailer's cost for one document.
+func inlineWork(html, css string) int64 {
+	rules := strings.Count(css, "{") + strings.Count(css, ":")
+
+	return int64(rules) * int64(strings.Count(html, "<"))
 }
 
 // withStyleBlock puts the stylesheet where a browser would look for it.

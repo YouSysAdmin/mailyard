@@ -72,7 +72,7 @@ var functions = map[string]bool{
 	"len": true, "not": true, "or": true, "print": true, "printf": true,
 	"println": true, "slice": true, "urlquery": true,
 	"eq": true, "ge": true, "gt": true, "le": true, "lt": true, "ne": true,
-	budgetFunc: true,
+	budgetFunc: true, digFunc: true,
 }
 
 // bareFields collects the offsets of identifiers that name no function.

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	texttmpl "text/template"
 	"text/template/parse"
 )
 
@@ -50,9 +51,26 @@ var tickTree = func() *parse.Tree {
 	return trees["tick"]
 }()
 
-// budget is one render's iteration allowance.
+// MaxTextBytes bounds the bytes the string functions of one render
+// may read and produce, summed over every call. A variable can be
+// reassigned inside a range, so `{{$a = print $a $a}}` doubles a
+// string per iteration while writing nothing: the output cap never
+// sees it and the iteration cap is reached only long after memory is
+// gone. Charging what each call reads and returns stops a doubling
+// within a few dozen iterations and bounds the copying a loop of
+// comparisons over a long string can do.
+const MaxTextBytes = 64 * 1024 * 1024
+
+// ErrTooMuchText is the render refusing past MaxTextBytes.
+var ErrTooMuchText = errors.New("template string functions ran past the 64 MiB limit")
+
+// budget is one render's allowance: iterations, and the bytes the
+// string functions may handle. Lenient renders print a missing value
+// as nothing rather than as fmt's <nil>.
 type budget struct {
-	left int
+	left    int
+	text    int
+	lenient bool
 }
 
 // tick is the planted function.
@@ -66,13 +84,135 @@ func (b *budget) tick() (string, error) {
 	return "", nil
 }
 
+// spend charges n bytes against the text allowance.
+func (b *budget) spend(n int) error {
+	if n > b.text {
+		b.text = 0
+
+		return ErrTooMuchText
+	}
+
+	b.text -= n
+
+	return nil
+}
+
+// textLen is the length of the string arguments, which is what a
+// string function copies or compares. Other values are small or come
+// from the request, whose size is bounded already.
+func textLen(args ...any) int {
+	n := 0
+	for _, a := range args {
+		switch v := a.(type) {
+		case string:
+			n += len(v)
+		case []byte:
+			n += len(v)
+		}
+	}
+
+	return n
+}
+
+// blanks replaces nil arguments with an empty string on a lenient
+// render, so a missing key prints as nothing in every function.
+func (b *budget) blanks(args []any) []any {
+	if !b.lenient || !slices.Contains(args, nil) {
+		return args
+	}
+
+	out := slices.Clone(args)
+	for i, a := range out {
+		if a == nil {
+			out[i] = ""
+		}
+	}
+
+	return out
+}
+
+// stringer wraps a function producing text from its arguments, charging
+// what it reads before the call and what it returned after.
+func (b *budget) stringer(fn func(...any) string) func(...any) (string, error) {
+	return func(args ...any) (string, error) {
+		if err := b.spend(textLen(args...)); err != nil {
+			return "", err
+		}
+
+		out := fn(b.blanks(args)...)
+		if err := b.spend(len(out)); err != nil {
+			return "", err
+		}
+
+		return out, nil
+	}
+}
+
+// printf is printfFunc under the same charging as stringer.
+func (b *budget) printf(format string, args ...any) (string, error) {
+	if err := b.spend(len(format) + textLen(args...)); err != nil {
+		return "", err
+	}
+
+	out, err := printfFunc(format, b.blanks(args)...)
+	if err != nil {
+		return "", err
+	}
+
+	if err := b.spend(len(out)); err != nil {
+		return "", err
+	}
+
+	return out, nil
+}
+
+// compare charges a comparison for the strings it reads.
+func (b *budget) compare(fn func(a, b any) (bool, error)) func(a, c any) (bool, error) {
+	return func(x, y any) (bool, error) {
+		if err := b.spend(textLen(x, y)); err != nil {
+			return false, err
+		}
+
+		return fn(x, y)
+	}
+}
+
+// funcs is the function map one render executes with.
+func (b *budget) funcs() map[string]any {
+	funcs := maps.Clone(comparisons)
+	funcs[budgetFunc] = b.tick
+	funcs[digFunc] = dig
+	funcs["printf"] = b.printf
+	funcs["print"] = b.stringer(fmt.Sprint)
+	funcs["println"] = b.stringer(fmt.Sprintln)
+	funcs["html"] = b.stringer(texttmpl.HTMLEscaper)
+	funcs["js"] = b.stringer(texttmpl.JSEscaper)
+	funcs["urlquery"] = b.stringer(texttmpl.URLQueryEscaper)
+	funcs["eq"] = func(x any, ys ...any) (bool, error) {
+		if err := b.spend(textLen(x) + textLen(ys...)); err != nil {
+			return false, err
+		}
+
+		return eqFunc(x, ys...)
+	}
+	funcs["ne"] = b.compare(neFunc)
+	funcs["lt"] = b.compare(orderFunc(func(c int) bool { return c < 0 }))
+	funcs["le"] = b.compare(orderFunc(func(c int) bool { return c <= 0 }))
+	funcs["gt"] = b.compare(orderFunc(func(c int) bool { return c > 0 }))
+	funcs["ge"] = b.compare(orderFunc(func(c int) bool { return c >= 0 }))
+
+	return funcs
+}
+
 // plant walks every tree a template parsed and prepends the counting
 // call to every range body and to the body of every template, checking
 // printf widths on the way. The template body is what bounds a
-// recursion through {{template}}, which needs no range to branch. It
-// returns the function map the template must be given before Execute.
-func plant(trees map[string]*parse.Tree) (map[string]any, error) {
-	b := &budget{left: MaxIterations}
+// recursion through {{template}}, which needs no range to branch. A
+// lenient render also has every nested field reference rewritten so a
+// missing level reads as nothing. It returns the function map the
+// template must be given before Execute.
+func plant(trees map[string]*parse.Tree, lenient bool) (map[string]any, error) {
+	b := &budget{left: MaxIterations, text: MaxTextBytes, lenient: lenient}
 	for _, t := range trees {
 		if t == nil || t.Root == nil {
 			continue
@@ -82,19 +222,22 @@ func plant(trees map[string]*parse.Tree) (map[string]any, error) {
 			return nil, err
 		}
 
+		if lenient {
+			if err := digList(t.Root); err != nil {
+				return nil, err
+			}
+		}
+
 		t.Root.Nodes = append([]parse.Node{tickTree.Root.Nodes[0].Copy()}, t.Root.Nodes...)
 	}
 
-	funcs := map[string]any{budgetFunc: b.tick, "printf": printfFunc}
-	maps.Copy(funcs, comparisons)
-
-	return funcs, nil
+	return b.funcs(), nil
 }
 
-// printfFunc stands in for the builtin at execution, so a format
+// printfFunc applies the width check at execution, so a format
 // assembled at run time - a variable, a print concatenation, a
-// pipeline - meets the same width check as a literal one. The parse
-// check stays for the error to name the template line.
+// pipeline - meets the same check as a literal one. The parse check
+// stays for the error to name the template line.
 func printfFunc(format string, a ...any) (string, error) {
 	if wideVerb.MatchString(format) {
 		return "", fmt.Errorf("%w: %s", ErrFormatWidth, format)
