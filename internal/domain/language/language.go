@@ -105,6 +105,14 @@ func (s *Store) Put(ctx context.Context, l *lmodel.Language) error {
 		}
 	}()
 	if l.IsDefault {
+		// Serialises the default flag per project: two writes each
+		// clearing before either sets would both be marked. NO KEY
+		// UPDATE so inserts referencing the project are not blocked.
+		if _, err := tx.ExecContext(ctx,
+			s.Q(`SELECT 1 FROM projects WHERE id = ? FOR NO KEY UPDATE`), l.ProjectID); err != nil {
+			return err
+		}
+
 		if _, err := tx.ExecContext(ctx,
 			s.Q(`UPDATE languages SET is_default = FALSE WHERE project_id = ?`),
 			l.ProjectID); err != nil {
