@@ -21,7 +21,7 @@ import (
 // ingestInput is the POST /api/v1/webhooks/bounce body, for upstream
 // providers or MTAs reporting asynchronous bounces.
 type ingestInput struct {
-	Recipient string `json:"recipient" validate:"required,email,max=320" normalize:"normalize"`
+	Recipient string `json:"recipient" validate:"required,email,max=254" normalize:"normalize"`
 	EmailID   string `json:"email_id"  validate:"omitempty,uuid"`
 	Type      string `json:"type"      validate:"omitempty,oneof=hard soft complaint"`
 	Reason    string `json:"reason"    validate:"omitempty,max=1000"     normalize:"trim"`

@@ -30,7 +30,7 @@ type createInput struct {
 	// OwnerEmail names the account that owns the project. Only a
 	// platform administrator may name another account, and a platform
 	// credential must name one.
-	OwnerEmail string `json:"owner_email" validate:"omitempty,email,max=320" normalize:"normalize"`
+	OwnerEmail string `json:"owner_email" validate:"omitempty,email,max=254" normalize:"normalize"`
 }
 
 // updateInput is the PATCH /api/projects/:id body. Empty strings
@@ -56,7 +56,7 @@ type updateInput struct {
 	//
 	// Pointer so an explicit "" clears it back to the default, which
 	// is the From address as envelope sender.
-	BounceAddress *string `json:"bounce_address" validate:"omitzero,email,max=320"`
+	BounceAddress *string `json:"bounce_address" validate:"omitzero,email,max=254"`
 
 	// AlertEmail is where this project's alerts go BESIDE its owners: a
 	// ticket queue or a shared ops mailbox rather than one person's inbox.
@@ -67,7 +67,7 @@ type updateInput struct {
 	// a ticket system almost never lives on the sending domain.
 	//
 	// Pointer so an explicit "" clears it back to owners only.
-	AlertEmail *string `json:"alert_email" validate:"omitzero,email,max=320"`
+	AlertEmail *string `json:"alert_email" validate:"omitzero,email,max=254"`
 
 	// SandboxRetentionDays is how long this project keeps a capture.
 	// Clamped to the plan's ceiling on write, so a project can ask for
@@ -94,7 +94,7 @@ type updateInput struct {
 // role names to validate against here - roles are rows this project
 // wrote, so the store's tenancy check is the validation.
 type memberInput struct {
-	Email  string `json:"email"   validate:"required,email,max=320" normalize:"normalize"`
+	Email  string `json:"email"   validate:"required,email,max=254" normalize:"normalize"`
 	RoleID string `json:"role_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 }
 
@@ -114,7 +114,7 @@ type memberRoleInput struct {
 // inviteInput offers membership to an email address, optionally at a
 // named role. Empty offers the project default - see memberInput.
 type inviteInput struct {
-	Email  string `json:"email"   validate:"required,email,max=320" normalize:"normalize"`
+	Email  string `json:"email"   validate:"required,email,max=254" normalize:"normalize"`
 	RoleID string `json:"role_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 }
 

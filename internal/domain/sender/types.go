@@ -19,7 +19,7 @@ import (
 // ----------------------------------------------------------------------------
 
 type createInput struct {
-	Email string `json:"email" validate:"required,email,max=320" normalize:"normalize"`
+	Email string `json:"email" validate:"required,email,max=254" normalize:"normalize"`
 	Name  string `json:"name"  validate:"omitempty,max=100" normalize:"trim"`
 }
 

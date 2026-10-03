@@ -28,7 +28,7 @@ import (
 // unreasonable upper bound so a runaway POST can't waste bcrypt's
 // CPU budget on a 1 MB attempt.
 type loginInput struct {
-	Email    string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
+	Email    string `json:"email"    validate:"required,email,max=254" normalize:"normalize"`
 	Password string `json:"password" validate:"required,min=1,max=256" normalize:"trim"`
 
 	// TOTPCode is required only for accounts with 2FA enabled: six
@@ -41,7 +41,7 @@ type loginInput struct {
 // than login's min=1, which only exists to reject empty input without
 // leaking policy.
 type registerInput struct {
-	Email string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
+	Email string `json:"email"    validate:"required,email,max=254" normalize:"normalize"`
 	// Twelve, the same floor reset and change carry: the one route that
 	// needs no credential to reach must not have the weakest one. The
 	// number is repeated in each tag because a struct tag cannot name a
@@ -62,7 +62,7 @@ type passkeyRenameInput struct {
 }
 
 type resetRequestInput struct {
-	Email string `json:"email" validate:"required,email,max=320" normalize:"normalize"`
+	Email string `json:"email" validate:"required,email,max=254" normalize:"normalize"`
 }
 
 type resetConfirmInput struct {
@@ -82,13 +82,13 @@ type verifyConfirmInput struct {
 }
 
 type verifyResendInput struct {
-	Email string `json:"email" validate:"required,email,max=320" normalize:"normalize"`
+	Email string `json:"email" validate:"required,email,max=254" normalize:"normalize"`
 }
 
 // systemMailTestInput optionally names an address to deliver a real
 // test message to. Without it the check stops at the connection.
 type systemMailTestInput struct {
-	To string `json:"to" validate:"omitempty,email,max=320" normalize:"normalize"`
+	To string `json:"to" validate:"omitempty,email,max=254" normalize:"normalize"`
 }
 
 type totpCodeInput struct {

@@ -208,7 +208,7 @@ type testSendInput struct {
 
 // verifyInput names the address to check.
 type verifyInput struct {
-	Email string `json:"email" validate:"required,max=320" normalize:"normalize"`
+	Email string `json:"email" validate:"required,max=254" normalize:"normalize"`
 }
 
 // ----------------------------------------------------------------------------

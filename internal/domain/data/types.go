@@ -16,7 +16,7 @@ package data
 
 // deleteContactsInput names one address, or every contact when empty.
 type deleteContactsInput struct {
-	Email string `json:"email" validate:"omitempty,email,max=320" normalize:"normalize"`
+	Email string `json:"email" validate:"omitempty,email,max=254" normalize:"normalize"`
 
 	// ConfirmAll must be true to erase every contact. Without it an
 	// empty body is treated as a mistake rather than as consent to
@@ -31,7 +31,7 @@ type deleteLogsInput struct {
 	OlderThanDays int `json:"older_than_days" validate:"omitempty,min=0,max=36500"`
 
 	// Email narrows to erase to one recipient or sender.
-	Email      string `json:"email" validate:"omitempty,email,max=320" normalize:"normalize"`
+	Email      string `json:"email" validate:"omitempty,email,max=254" normalize:"normalize"`
 	ConfirmAll bool   `json:"confirm_all"`
 }
 

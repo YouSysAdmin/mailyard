@@ -103,9 +103,9 @@ func Optional(c fiber.Ctx) Page {
 
 // MaxSearchTerm bounds a free-text search term.
 //
-// 200 characters is longer than any address (320 is the RFC ceiling
-// for a whole address, and nobody pastes one that long into a filter)
-// and longer than any subject somebody types into a box. What it stops
+// 200 characters is longer than any address somebody pastes into a
+// filter (254 is the RFC ceiling for one that can be delivered) and
+// longer than any subject somebody types into a box. What it stops
 // is the other direction: a megabyte of text becomes a megabyte LIKE
 // pattern matched against every row of a table that grows per message,
 // and the caller pays nothing to send it.

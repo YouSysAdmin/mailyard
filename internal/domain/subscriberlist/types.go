@@ -28,7 +28,7 @@ type upsertInput struct {
 
 type memberInput struct {
 	SubscriberID string `json:"subscriber_id" validate:"omitempty,uuid"`
-	Email        string `json:"email"         validate:"omitempty,email,max=320" normalize:"normalize"`
+	Email        string `json:"email"         validate:"omitempty,email,max=254" normalize:"normalize"`
 }
 
 type previewInput struct {
@@ -39,7 +39,7 @@ type previewInput struct {
 // subscriber and attach it to the list in one call.
 type subscribeInput struct {
 	ListID       string         `json:"list_id"       validate:"required,uuid"`
-	Email        string         `json:"email"         validate:"required,email,max=320" normalize:"normalize"`
+	Email        string         `json:"email"         validate:"required,email,max=254" normalize:"normalize"`
 	Name         string         `json:"name"          validate:"omitempty,max=200"      normalize:"trim"`
 	CustomFields map[string]any `json:"custom_fields" validate:"omitempty,max=50"`
 	Timezone     string         `json:"timezone"      validate:"omitempty,max=64,timezone" normalize:"trim"`
@@ -47,7 +47,7 @@ type subscribeInput struct {
 }
 
 type listEmailInput struct {
-	Email  string `json:"email"  validate:"required,email,max=320" normalize:"normalize"`
+	Email  string `json:"email"  validate:"required,email,max=254" normalize:"normalize"`
 	Reason string `json:"reason" validate:"omitempty,max=500"      normalize:"trim"`
 }
 

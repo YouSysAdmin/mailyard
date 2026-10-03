@@ -51,7 +51,7 @@ type createInput struct {
 	// SESTopicARN is where Amazon SES publishes this server's bounce
 	// and complaint notifications. Only meaningful for SES.
 	SESTopicARN   string   `json:"ses_topic_arn" validate:"omitempty,max=512" normalize:"trim"`
-	AllowedEmails []string `json:"allowed_emails" validate:"omitempty,dive,max=320,senderrule" normalize:"trim"`
+	AllowedEmails []string `json:"allowed_emails" validate:"omitempty,dive,max=254,senderrule" normalize:"trim"`
 
 	// AllowedDomains restricts the sender DOMAINS this server carries.
 	// Empty carries any. The rule a project splits relay nodes by -
@@ -79,7 +79,7 @@ type updateInput struct {
 	Encryption    string    `json:"encryption"     validate:"omitempty,oneof=none starttls ssl"`
 	SkipDKIM      *bool     `json:"skip_dkim"`
 	SESTopicARN   *string   `json:"ses_topic_arn" validate:"omitzero,max=512" normalize:"trim"`
-	AllowedEmails *[]string `json:"allowed_emails" validate:"omitzero,dive,max=320,senderrule"`
+	AllowedEmails *[]string `json:"allowed_emails" validate:"omitzero,dive,max=254,senderrule"`
 
 	// AllowedDomains is patchable to an EMPTY list, which is how a
 	// restriction is lifted - a pointer, so absent and empty are
@@ -162,7 +162,7 @@ type sharedCreateInput struct {
 	// SESTopicARN is where Amazon SES publishes this server's bounce
 	// and complaint notifications. Only meaningful for SES.
 	SESTopicARN    string   `json:"ses_topic_arn" validate:"omitempty,max=512" normalize:"trim"`
-	AllowedEmails  []string `json:"allowed_emails"  validate:"omitempty,dive,max=320,senderrule" normalize:"trim"`
+	AllowedEmails  []string `json:"allowed_emails"  validate:"omitempty,dive,max=254,senderrule" normalize:"trim"`
 	AllowedDomains []string `json:"allowed_domains" validate:"omitempty,dive,max=253,domainname" normalize:"trim"`
 	SecurityMode   string   `json:"security_mode"   validate:"omitempty,oneof=permissive strict"`
 	Priority       int      `json:"priority"        validate:"omitempty,min=0,max=10000"`
@@ -179,7 +179,7 @@ type sharedUpdateInput struct {
 	Encryption     string    `json:"encryption"      validate:"omitempty,oneof=none starttls ssl"`
 	SkipDKIM       *bool     `json:"skip_dkim"`
 	SESTopicARN    *string   `json:"ses_topic_arn" validate:"omitzero,max=512" normalize:"trim"`
-	AllowedEmails  *[]string `json:"allowed_emails"  validate:"omitzero,dive,max=320,senderrule"`
+	AllowedEmails  *[]string `json:"allowed_emails"  validate:"omitzero,dive,max=254,senderrule"`
 	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,max=253,domainname"`
 	SecurityMode   string    `json:"security_mode"   validate:"omitempty,oneof=permissive strict"`
 	Priority       *int      `json:"priority"        validate:"omitzero,min=0,max=10000"`

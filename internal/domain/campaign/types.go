@@ -22,9 +22,9 @@ import (
 type upsertInput struct {
 	Name         string         `json:"name"               validate:"required,min=1,max=200" normalize:"trim"`
 	Subject      string         `json:"subject"            validate:"omitempty,max=1000"     normalize:"trim"`
-	FromEmail    string         `json:"from_email"         validate:"required,email,max=320" normalize:"normalize"`
+	FromEmail    string         `json:"from_email"         validate:"required,email,max=254" normalize:"normalize"`
 	FromName     string         `json:"from_name"          validate:"omitempty,max=200"      normalize:"trim"`
-	ReplyTo      string         `json:"reply_to"           validate:"omitempty,email,max=320" normalize:"normalize"`
+	ReplyTo      string         `json:"reply_to"           validate:"omitempty,email,max=254" normalize:"normalize"`
 	TemplateID   string         `json:"template_id"        validate:"required,uuid"`
 	Language     string         `json:"language"           validate:"omitempty,min=2,max=10" normalize:"normalize"`
 	TemplateData map[string]any `json:"template_data"      validate:"omitempty,max=100"`

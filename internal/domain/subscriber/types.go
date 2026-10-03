@@ -20,7 +20,7 @@ import (
 // ----------------------------------------------------------------------------
 
 type upsertInput struct {
-	Email        string         `json:"email"         validate:"required,email,max=320" normalize:"normalize"`
+	Email        string         `json:"email"         validate:"required,email,max=254" normalize:"normalize"`
 	Name         string         `json:"name"          validate:"omitempty,max=200"      normalize:"trim"`
 	Status       string         `json:"status"        validate:"omitempty,oneof=subscribed unsubscribed bounced complained"`
 	CustomFields map[string]any `json:"custom_fields" validate:"omitempty,max=50"`
