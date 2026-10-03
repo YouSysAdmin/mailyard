@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	smodel "github.com/yousysadmin/mailyard/internal/models/sender"
 )
 
@@ -36,6 +37,12 @@ type Store interface {
 type Mailer interface {
 	Enabled() bool
 	Send(ctx context.Context, to []string, subject, html, text string) error
+}
+
+// Notifier files an in-app notification without mailing it, since the
+// digest below is the mail. Satisfied by notify.Raiser.
+type Notifier interface {
+	RaiseInConsole(ctx context.Context, n *nmodel.Notification)
 }
 
 // Recipients answers who in a project should hear about it.
@@ -53,6 +60,7 @@ type Checker struct {
 	Store      Store
 	Mail       Mailer
 	Recipients Recipients
+	Notify     Notifier
 	Log        *slog.Logger
 
 	// lastMailed collapses the daily mail per project. In-process, so
@@ -93,10 +101,43 @@ func (c *Checker) Run(ctx context.Context) error {
 	}
 
 	for projectID, keys := range byProject {
+		c.notify(ctx, projectID, keys)
 		c.mail(ctx, projectID, keys)
 	}
 
 	return nil
+}
+
+// notify files one console notification per project per day, whether
+// or not platform mail is configured.
+func (c *Checker) notify(ctx context.Context, projectID string, keys []*smodel.SigningKey) {
+	if c.Notify == nil {
+		return
+	}
+
+	severity := nmodel.SeverityWarning
+	lines := make([]string, 0, len(keys))
+	for _, k := range keys {
+		left := time.Until(*k.NotAfter)
+		if left <= 0 {
+			severity = nmodel.SeverityError
+			lines = append(lines, k.SenderEmail+" ("+k.Kind+") has expired")
+
+			continue
+		}
+
+		lines = append(lines, fmt.Sprintf("%s (%s) expires in %d days", k.SenderEmail, k.Kind, int(left.Hours()/24)))
+	}
+
+	c.Notify.RaiseInConsole(ctx, &nmodel.Notification{
+		ProjectID: projectID,
+		Type:      nmodel.TypeSigningKeyExpiry,
+		Severity:  severity,
+		Title:     "Sender signing certificates need renewing",
+		Body:      strings.Join(lines, ", "),
+		Link:      "/domains",
+		DedupeKey: "signing_key_expiry:" + time.Now().UTC().Format("2006-01-02"),
+	})
 }
 
 // mail sends one digest a day to a project while anything of its is

@@ -117,6 +117,25 @@ is a Support" and "this person was made a Support" survive a change to the defau
 The console menu is built from the permissions the server grants, so a page that is not offered is one the API would
 refuse. `GET /api/v1/projects/{id}` returns the caller's resolved set alongside whether they own the project.
 
+### Notifications
+
+The bell in the console holds notifications addressed to the **project**, not to a person. Every member whose role
+grants `notifications:read` sees the same list, and marking one read clears it for all of them.
+
+| Notification                    | Severity         | When                                                                  |
+|---------------------------------|------------------|-----------------------------------------------------------------------|
+| Campaign started                | info             | A campaign begins sending                                             |
+| Campaign finished               | info             | A campaign has sent its last message, with the sent / failed / skipped totals |
+| Campaign held by the plan limit | warning          | The plan's sending window stops a campaign, once an hour while it lasts |
+| Plan quota                      | warning / error  | 80% of an hourly or daily limit, and the limit itself                 |
+| Bounce rate                     | warning          | 10% or more of the last hour's finished messages failed (platform settings) |
+| SMTP server out of rotation     | error            | A server refused its login or presented a certificate that does not verify |
+| Webhook disabled                | warning          | Repeated delivery failures switched a webhook off                     |
+| Signing certificate expiring    | warning / error  | A sender's S/MIME or PGP key is within 30 days of expiry, or past it  |
+
+Warnings and errors are also mailed to the project's owners and its alert address. A webhook switched off and an
+expiring signing key already send a mail of their own, so their notification stays in the console.
+
 ## API usage
 
 These are console endpoints: they authenticate with the session cookie set at sign-in and resolve the project from the

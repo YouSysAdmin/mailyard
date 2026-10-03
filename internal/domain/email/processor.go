@@ -11,10 +11,13 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/dkim"
+	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/queue"
 	"github.com/yousysadmin/mailyard/internal/core/render"
 	"github.com/yousysadmin/mailyard/internal/core/safetext"
@@ -23,6 +26,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	bouncemodel "github.com/yousysadmin/mailyard/internal/models/bounce"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
 	supmodel "github.com/yousysadmin/mailyard/internal/models/suppression"
 )
@@ -68,6 +72,10 @@ type Processor struct {
 	// see PullAssigner. Nil where no node pulls: the candidate is then
 	// dialled as any other server is.
 	Pull PullAssigner
+
+	// Notify returns the in-app notification raiser. A function because
+	// the processor is built before serve.go has one. Nil-safe.
+	Notify func() *notify.Raiser
 
 	send func(context.Context, transport.Spec, *smtpclient.Message) error
 }
@@ -347,6 +355,12 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		}
 
 		sendErr = p.deliver(ctx, spec, msg)
+		if f, ok := errors.AsType[transport.ServerFault](sendErr); ok && f.ServerFault() {
+			p.takeOutOfRotation(ctx, srv, sendErr)
+
+			continue
+		}
+
 		if sendErr == nil {
 			if i > 0 {
 				p.Log.Info("email: delivered after failover",
@@ -374,6 +388,40 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 	}
 
 	return queue.Retry(sendErr)
+}
+
+// takeOutOfRotation marks a project's server invalid after it refused
+// its own credentials or certificate, and tells the project once.
+// The shared pool is the platform's and a relay node is dialled with
+// our own authority, so neither is touched here.
+func (p *Processor) takeOutOfRotation(ctx context.Context, srv *ssmodel.Server, cause error) {
+	if srv.ProjectID == "" || srv.IsNode() {
+		return
+	}
+
+	moved, err := p.Store.SMTPServer.MarkInvalid(ctx, srv.ProjectID, srv.ID, cause.Error())
+	if err != nil {
+		p.Log.Error("email: could not mark the smtp server invalid",
+			"server", srv.Name, "project_id", srv.ProjectID, "err", err)
+
+		return
+	}
+
+	if !moved || p.Notify == nil {
+		return
+	}
+
+	p.Log.Warn("email: smtp server taken out of rotation",
+		"server", srv.Name, "project_id", srv.ProjectID, "err", cause)
+	p.Notify().Raise(ctx, &nmodel.Notification{
+		ProjectID: srv.ProjectID,
+		Type:      nmodel.TypeSMTPInvalid,
+		Severity:  nmodel.SeverityError,
+		Title:     fmt.Sprintf("SMTP server %q was taken out of rotation", srv.Name),
+		Body:      cause.Error() + ". Test the connection to put it back.",
+		Link:      "/smtp-servers/" + srv.ID,
+		DedupeKey: "smtp_invalid:" + srv.ID + ":" + strconv.FormatInt(time.Now().Unix(), 10),
+	})
 }
 
 // recordRejection writes the bounce row and (optionally) the

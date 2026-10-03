@@ -521,19 +521,47 @@ func (s *Store) UpdateMessage(ctx context.Context, id, status, errMsg, emailID s
 }
 
 // MarkMessageByEmail syncs the message with its email's terminal
-// status (called from the queue worker's finalize hook).
-func (s *Store) MarkMessageByEmail(ctx context.Context, emailID, status, errMsg string) error {
+// status (called from the queue worker's finalize hook) and returns the
+// campaign it belongs to, empty for a transactional send.
+func (s *Store) MarkMessageByEmail(ctx context.Context, emailID, status, errMsg string) (string, error) {
 	var sentAt any
 	if status == cmodel.MsgSent {
 		sentAt = time.Now().UTC()
 	}
 
-	_, err := s.Exec(ctx, `
+	var campaignID string
+	err := s.QueryRow(ctx, `
         UPDATE campaign_messages SET status = ?, error_message = ?, sent_at = ?
         WHERE email_id = ?
-    `, status, errMsg, sentAt, emailID)
+        RETURNING campaign_id
+    `, status, errMsg, sentAt, emailID).Scan(&campaignID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
 
-	return err
+	return campaignID, err
+}
+
+// ClaimSettled stamps settled_at on a sent campaign none of whose
+// messages is still waiting to be delivered, reporting whether this
+// call did. Of several callers seeing the last message settle, exactly
+// one gets true.
+func (s *Store) ClaimSettled(ctx context.Context, projID, campaignID string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE campaigns c SET settled_at = now()
+        WHERE c.project_id = ? AND c.id = ? AND c.status = 'sent' AND c.settled_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM campaign_messages m
+            WHERE m.campaign_id = c.id AND m.status IN ('pending', 'queued')
+          )
+    `, projID, campaignID)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // SkipPending marks every remaining pending message skipped

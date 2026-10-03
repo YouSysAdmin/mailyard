@@ -4,10 +4,14 @@ package webhook
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	coreaudit "github.com/yousysadmin/mailyard/internal/core/audit"
+	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	whmodel "github.com/yousysadmin/mailyard/internal/models/webhook"
 )
 
@@ -19,6 +23,10 @@ import (
 type DispatchSink struct {
 	Store store.WebhookStore
 	Audit *coreaudit.Recorder
+
+	// Notify returns the in-app notification raiser. A function because
+	// the dispatcher is built before serve.go has one. Nil-safe.
+	Notify func() *notify.Raiser
 }
 
 // List returns the project's hooks.
@@ -45,6 +53,19 @@ func (s *DispatchSink) Disable(ctx context.Context, h *whmodel.Webhook, reason s
 		ProjectID: h.ProjectID,
 		Detail:    h.URL + " - " + reason,
 	})
+
+	// Console only: the audit event above is what mails the owners.
+	if s.Notify != nil {
+		s.Notify().RaiseInConsole(ctx, &nmodel.Notification{
+			ProjectID: h.ProjectID,
+			Type:      nmodel.TypeWebhookDisabled,
+			Severity:  nmodel.SeverityWarning,
+			Title:     "Webhook disabled after repeated failures",
+			Body:      h.URL + " - " + reason,
+			Link:      "/webhooks",
+			DedupeKey: "webhook_disabled:" + h.ID + ":" + strconv.FormatInt(time.Now().Unix(), 10),
+		})
+	}
 
 	return nil
 }

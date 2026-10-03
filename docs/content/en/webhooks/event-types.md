@@ -105,7 +105,7 @@ that distinction.
         "counts": {
             "sent": 1180,
             "failed": 12,
-            "suppressed": 8
+            "skipped": 8
         }
     }
 }
@@ -114,7 +114,8 @@ that distinction.
 `counts` differs between the two events, and that is the only difference in shape:
 
 - On `campaign.started` it is `{"recipients": N}` - how many messages were queued.
-- On `campaign.completed` it is the per-status totals, and a status with no messages is absent rather than zero.
+- On `campaign.completed` it is the per-status totals (`sent`, `failed`, `skipped`), and a status with no messages is
+  absent rather than zero. The event waits for the last message to be delivered or refused, so the totals are final.
 
 ## Inbound Payload
 

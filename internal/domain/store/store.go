@@ -500,6 +500,10 @@ type SMTPServerStore interface {
 	Put(ctx context.Context, s *smtpserver.Server) error
 	Delete(ctx context.Context, projID, id string) error
 	SetStatus(ctx context.Context, projID, id, status, validationErr string, validatedAt *time.Time) error
+
+	// MarkInvalid is the delivery worker's write: enabled to invalid
+	// only, reporting whether the row moved.
+	MarkInvalid(ctx context.Context, projID, id, reason string) (bool, error)
 	PickEnabled(ctx context.Context, projID, senderEmail string) (*smtpserver.Server, error)
 
 	// ListInGroup returns one group's servers in pick order. The
@@ -958,7 +962,11 @@ type CampaignStore interface {
 	CountPending(ctx context.Context, campaignID string) (int, error)
 	NextDeliverAt(ctx context.Context, campaignID string) (*time.Time, error)
 	UpdateMessage(ctx context.Context, id, status, errMsg, emailID string) error
-	MarkMessageByEmail(ctx context.Context, emailID, status, errMsg string) error
+	MarkMessageByEmail(ctx context.Context, emailID, status, errMsg string) (string, error)
+
+	// ClaimSettled stamps a completed campaign with nothing left in
+	// flight, true for the one caller that did.
+	ClaimSettled(ctx context.Context, projID, campaignID string) (bool, error)
 	SkipPending(ctx context.Context, campaignID, reason string) (int, error)
 	ListMessages(ctx context.Context, projID, campaignID string, f CampaignMessageFilter) ([]*campaign.Message, error)
 	MessageStats(ctx context.Context, campaignID string) (map[string]int, map[string]map[string]int, error)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 
@@ -296,6 +297,7 @@ type fakeGroupServers struct {
 	count   int
 	byGroup map[string][]*ssmodel.Server
 	byID    map[string]*ssmodel.Server
+	invalid []string
 }
 
 func (f *fakeGroupServers) Count(context.Context, string) (int, error) { return f.count, nil }
@@ -304,6 +306,17 @@ func (f *fakeGroupServers) ListInGroup(_ context.Context, _, groupID string) ([]
 }
 func (f *fakeGroupServers) Get(_ context.Context, _, id string) (*ssmodel.Server, error) {
 	return f.byID[id], nil
+}
+
+// MarkInvalid records the ids taken out of rotation and moves each once.
+func (f *fakeGroupServers) MarkInvalid(_ context.Context, _, id, _ string) (bool, error) {
+	if slices.Contains(f.invalid, id) {
+		return false, nil
+	}
+
+	f.invalid = append(f.invalid, id)
+
+	return true, nil
 }
 
 func srv(id string, mutate func(*ssmodel.Server)) *ssmodel.Server {

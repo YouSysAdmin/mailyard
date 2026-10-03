@@ -147,6 +147,16 @@ type Failure interface {
 	RejectedRecipient() string
 }
 
+// ServerFault is a delivery error caused by the server's own settings -
+// a refused login, a certificate that does not verify - and not by the
+// message. Optional, checked beside Failure: such an error is never
+// permanent for the message, since another server can still carry it,
+// but the server that raised it is out of rotation until it is fixed.
+type ServerFault interface {
+	error
+	ServerFault() bool
+}
+
 // Descriptor describes a provider to the console, so the form is built
 // from what the server supports rather than from a copy of it in
 // TypeScript - a list that drifts the day a provider is added.

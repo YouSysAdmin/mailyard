@@ -140,7 +140,7 @@ func TestConnection(ctx context.Context, cfg ServerConfig) error {
 
 	if cfg.Username != "" {
 		if err := client.Auth(cfg.auth()); err != nil {
-			return fmt.Errorf("smtp auth failed: %w", err)
+			return classifyAuth(fmt.Errorf("smtp auth failed: %w", err))
 		}
 	}
 
@@ -188,7 +188,7 @@ func dial(ctx context.Context, cfg ServerConfig) (*smtp.Client, error) {
 		if err := conn.HandshakeContext(ctx); err != nil {
 			_ = conn.Close()
 
-			return nil, fmt.Errorf("ssl dial failed: %w", err)
+			return nil, classifyTLS(fmt.Errorf("ssl dial failed: %w", err))
 		}
 
 		client, err := smtp.NewClient(conn, cfg.Host)
@@ -208,7 +208,7 @@ func dial(ctx context.Context, cfg ServerConfig) (*smtp.Client, error) {
 		if err := client.StartTLS(tlsConfig); err != nil {
 			_ = client.Close()
 
-			return nil, fmt.Errorf("starttls failed: %w", err)
+			return nil, classifyTLS(fmt.Errorf("starttls failed: %w", err))
 		}
 
 		return client, nil
@@ -244,7 +244,7 @@ func dialPlain(ctx context.Context, dialer *net.Dialer, cfg ServerConfig) (*smtp
 func sendViaClient(client *smtp.Client, auth smtp.Auth, msg *Message) error {
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("smtp auth failed: %w", err)
+			return classifyAuth(fmt.Errorf("smtp auth failed: %w", err))
 		}
 	}
 

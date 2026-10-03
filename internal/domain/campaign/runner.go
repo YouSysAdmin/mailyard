@@ -17,6 +17,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 
+	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/render"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
@@ -25,6 +26,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	cmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	submodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
 	whmodel "github.com/yousysadmin/mailyard/internal/models/webhook"
 )
@@ -42,6 +44,10 @@ type Runner struct {
 
 	// Emit fans campaign lifecycle events to webhooks (nil-safe).
 	Emit func(ctx context.Context, projID, event, sender string, payload any)
+
+	// Notify returns the in-app notification raiser. A function because
+	// the runner is built before serve.go has one. Nil-safe.
+	Notify func() *notify.Raiser
 
 	// Tracking signs pixel / click / unsubscribe / web view URLs.
 	// When disabled (no public_url) campaigns send untracked.
@@ -258,6 +264,8 @@ func (r *Runner) processBatch(ctx context.Context, c *cmodel.Campaign) {
 	// quota check - until the window rolls, up to an hour of pegging
 	// the node and the database over one oversized campaign.
 	if quotaPaused {
+		r.raiseHeld(ctx, c)
+
 		if floor := time.Now().UTC().Add(r.PollInterval); next.Before(floor) {
 			next = floor
 		}
@@ -319,6 +327,15 @@ func (r *Runner) fanOut(ctx context.Context, c *cmodel.Campaign) error {
 
 	r.Log.Info("campaign: fanned out", "campaign_id", c.ID, "recipients", len(msgs))
 	r.Emit(ctx, c.ProjectID, whmodel.EventCampaignStarted, c.FromEmail, eventPayload(c, map[string]int{"recipients": len(msgs)}))
+	r.raiser().Raise(ctx, &nmodel.Notification{
+		ProjectID: c.ProjectID,
+		Type:      nmodel.TypeCampaignStarted,
+		Severity:  nmodel.SeverityInfo,
+		Title:     fmt.Sprintf("Campaign %q started", c.Name),
+		Body:      fmt.Sprintf("Sending to %d recipients.", len(msgs)),
+		Link:      "/campaigns/" + c.ID,
+		DedupeKey: "campaign_started:" + c.ID,
+	})
 
 	return nil
 }
@@ -617,7 +634,35 @@ func (r *Runner) complete(ctx context.Context, c *cmodel.Campaign) {
 	}
 
 	r.Log.Info("campaign: completed", "campaign_id", c.ID, "stats", totals)
-	r.Emit(ctx, c.ProjectID, whmodel.EventCampaignCompleted, c.FromEmail, eventPayload(c, totals))
+
+	// Usually a no-op: the last batch is still queued and the worker
+	// finishes once it settles. Asked here for when it settled first.
+	if err := Finish(ctx, r.Store, r.Emit, r.raiser(), c.ProjectID, c.ID); err != nil {
+		r.Log.Error("campaign: finish", "campaign_id", c.ID, "err", err)
+	}
+}
+
+// raiseHeld reports a campaign the plan limit is holding back, once an
+// hour while it lasts.
+func (r *Runner) raiseHeld(ctx context.Context, c *cmodel.Campaign) {
+	r.raiser().Raise(ctx, &nmodel.Notification{
+		ProjectID: c.ProjectID,
+		Type:      nmodel.TypeCampaignHeld,
+		Severity:  nmodel.SeverityWarning,
+		Title:     fmt.Sprintf("Campaign %q is held by the plan limit", c.Name),
+		Body:      "Sending resumes on its own once the plan's sending window allows it.",
+		Link:      "/campaigns/" + c.ID,
+		DedupeKey: "campaign_held:" + c.ID + ":" + time.Now().UTC().Format("2006-01-02T15"),
+	})
+}
+
+// raiser returns the notification raiser, or nil when none is wired.
+func (r *Runner) raiser() *notify.Raiser {
+	if r.Notify == nil {
+		return nil
+	}
+
+	return r.Notify()
 }
 
 // assignVariants shuffles the audience and slices it by the variant

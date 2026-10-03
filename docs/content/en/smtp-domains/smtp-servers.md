@@ -49,6 +49,15 @@ nothing, is a legitimate configuration. The password is sealed at rest and never
 Verify SMTP credentials and connectivity before sending via `POST /api/v1/smtp-servers/{id}/test`. This validates the
 hostname, port, credentials, and encryption.
 
+### Taken out of rotation
+
+A server that refuses its login (SMTP 535, 534 or 538, or SES rejecting the access key) or presents a certificate
+that does not verify is marked `invalid` by the delivery worker. The message moves on to the next server in the group
+and the project gets a notification. An invalid server is not tried again until a test succeeds, which puts it back to
+`enabled`. A temporary refusal such as 454, a timeout or a refused connection does not take a server out.
+
+The shared pool and relay nodes are never marked this way - they are not the project's to fix.
+
 {{< callout type="warning" title="Private network targets are refused" >}}
 A project's server cannot point at loopback, RFC 1918 or other reserved address space, and neither can a provider's
 `endpoint` override. The host is a project member's choice and the connection test reports what the peer answered, so

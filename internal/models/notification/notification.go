@@ -27,14 +27,29 @@ const (
 	// configured threshold.
 	TypeBounceRate = "bounce_rate"
 
-	// TypeSMTPInvalid fires when a send marks an SMTP server invalid.
+	// TypeSMTPInvalid fires when the delivery worker takes a project's
+	// SMTP server out of rotation over an auth or certificate failure.
 	TypeSMTPInvalid = "smtp_invalid"
+
+	// TypeCampaignStarted fires when a campaign begins sending.
+	TypeCampaignStarted = "campaign_started"
 
 	// TypeCampaignDone fires when a campaign finishes sending.
 	TypeCampaignDone = "campaign_done"
 
+	// TypeCampaignHeld fires when the plan limit holds a campaign back.
+	TypeCampaignHeld = "campaign_held"
+
 	// TypeQuota fires when a project approaches its plan limit.
 	TypeQuota = "quota"
+
+	// TypeWebhookDisabled fires when repeated delivery failures switch
+	// a webhook off.
+	TypeWebhookDisabled = "webhook_disabled"
+
+	// TypeSigningKeyExpiry fires while a sender signing certificate is
+	// inside its expiry window.
+	TypeSigningKeyExpiry = "signing_key_expiry"
 )
 
 var validSeverities = map[string]struct{}{

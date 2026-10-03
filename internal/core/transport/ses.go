@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
@@ -193,6 +194,7 @@ func (t *sesTransport) Test(ctx context.Context) error {
 // sesFailure is a delivery failure SES named.
 type sesFailure struct {
 	permanent bool
+	fault     bool
 	err       error
 }
 
@@ -204,6 +206,9 @@ func (f *sesFailure) Unwrap() error { return f.err }
 
 // Permanent reports whether retrying could ever help.
 func (f *sesFailure) Permanent() bool { return f.permanent }
+
+// ServerFault reports that the row's credentials were refused.
+func (f *sesFailure) ServerFault() bool { return f.fault }
 
 // RejectedRecipient is always empty, and that is not a gap.
 //
@@ -239,6 +244,15 @@ func classifySES(err error) error {
 		is[*sestypes.BadRequestException](err),
 		is[*sestypes.NotFoundException](err):
 		return &sesFailure{permanent: true, err: err}
+	}
+
+	// The row's credentials, refused. Transient for the message, which
+	// another server can carry, and a fault of this server.
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
+		switch apiErr.ErrorCode() {
+		case "InvalidClientTokenId", "SignatureDoesNotMatch", "UnrecognizedClientException":
+			return &sesFailure{fault: true, err: err}
+		}
 	}
 
 	// Explicitly transient, listed so the reasoning is visible rather

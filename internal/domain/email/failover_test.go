@@ -4,17 +4,21 @@ package email
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"log/slog"
+	"net/textproto"
 	"testing"
 
+	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/queue"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/transport"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
 )
 
@@ -166,5 +170,85 @@ func TestSignatureIsDecidedPerServerDuringFailover(t *testing.T) {
 
 	if script.signed[1] {
 		t.Error("the skip_dkim server received a signed message")
+	}
+}
+
+// fakeNotes records what a Raiser filed.
+type fakeNotes struct {
+	store.NotificationStore
+	filed []*nmodel.Notification
+}
+
+func (f *fakeNotes) Create(_ context.Context, n *nmodel.Notification) (bool, error) {
+	f.filed = append(f.filed, n)
+
+	return true, nil
+}
+
+// anyRelayClient lets a node candidate reach the send leg.
+type anyRelayClient struct{}
+
+func (anyRelayClient) WorkerTLS(context.Context, string) (*tls.Config, error) {
+	return &tls.Config{}, nil
+}
+
+func refusedLogin() error {
+	return &smtpclient.ConfigError{Err: &textproto.Error{Code: 535, Msg: "5.7.8 bad credentials"}}
+}
+
+// A refused login is the server's fault, not the message's: the walk
+// goes on, and the server leaves rotation with one notification.
+func TestARefusedLoginTakesTheServerOutOfRotation(t *testing.T) {
+	script := &scriptedSend{byHost: map[string]error{"first": refusedLogin()}}
+	p := failoverProcessor(t, []*ssmodel.Server{
+		srv("first", func(s *ssmodel.Server) { s.Host = "first" }),
+		srv("second", func(s *ssmodel.Server) { s.Host = "second" }),
+	}, script)
+
+	notes := &fakeNotes{}
+	raiser := &notify.Raiser{Store: &store.Store{Notification: notes}}
+	p.Notify = func() *notify.Raiser { return raiser }
+
+	out := p.Process(t.Context(), delivery())
+	if out.Kind != queue.KindDone {
+		t.Fatalf("outcome %v, want done: %v", out.Kind, out.Err)
+	}
+
+	servers := p.Store.SMTPServer.(*fakeGroupServers)
+	if len(servers.invalid) != 1 || servers.invalid[0] != "first" {
+		t.Fatalf("marked invalid %v, want [first]", servers.invalid)
+	}
+
+	if len(notes.filed) != 1 || notes.filed[0].Type != nmodel.TypeSMTPInvalid {
+		t.Fatalf("filed %v, want one smtp_invalid", notes.filed)
+	}
+
+	if notes.filed[0].ProjectID != "proj-a" {
+		t.Errorf("filed for %q, want proj-a", notes.filed[0].ProjectID)
+	}
+}
+
+// The shared pool is the platform's and a relay node is ours: neither
+// is a project's to lose.
+func TestAFaultOnASharedOrNodeServerMarksNothing(t *testing.T) {
+	script := &scriptedSend{byHost: map[string]error{
+		"pool": refusedLogin(), "node": refusedLogin(),
+	}}
+	p := failoverProcessor(t, []*ssmodel.Server{
+		srv("pool", func(s *ssmodel.Server) { s.Host = "pool"; s.ProjectID = "" }),
+		srv("node", func(s *ssmodel.Server) { s.Host = "node"; s.NodeID = "n1" }),
+	}, script)
+	p.RelayClient = anyRelayClient{}
+
+	if out := p.Process(t.Context(), delivery()); out.Kind != queue.KindRetry {
+		t.Fatalf("outcome %v, want retry", out.Kind)
+	}
+
+	if len(script.tried) != 2 {
+		t.Fatalf("tried %v, want both to reach the send leg", script.tried)
+	}
+
+	if got := p.Store.SMTPServer.(*fakeGroupServers).invalid; len(got) != 0 {
+		t.Fatalf("marked invalid %v, want none", got)
 	}
 }

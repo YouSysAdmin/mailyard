@@ -40,14 +40,31 @@ type Raiser struct {
 }
 
 // Raise files a notification and, when it is genuinely new, pushes it
-// to any live subscriber.
+// to any live subscriber and mails it if it means something is wrong.
 //
 // A duplicate (same project and dedupe key) is silently dropped and
 // not published: a repeat is not news, and pushing one would make a
 // recurring check flash the console every time it ran.
 func (r *Raiser) Raise(ctx context.Context, n *nmodel.Notification) {
+	// Mailed only for a notification that is genuinely new. That matters
+	// more here than for the console badge: the bounce check runs every
+	// fifteen minutes and dedupes per hour, so mailing before that gate
+	// would send four times an hour for one problem.
+	if r.file(ctx, n) && r.Alerts != nil {
+		r.Alerts.OnNotification(n)
+	}
+}
+
+// RaiseInConsole is Raise without the mail, for a condition whose
+// producer already mails it through a channel of its own.
+func (r *Raiser) RaiseInConsole(ctx context.Context, n *nmodel.Notification) {
+	r.file(ctx, n)
+}
+
+// file stores and publishes n, reporting whether it was new.
+func (r *Raiser) file(ctx context.Context, n *nmodel.Notification) bool {
 	if r == nil || r.Store == nil || n == nil {
-		return
+		return false
 	}
 
 	created, err := r.Store.Notification.Create(ctx, n)
@@ -61,11 +78,11 @@ func (r *Raiser) Raise(ctx context.Context, n *nmodel.Notification) {
 				"project_id", n.ProjectID, "type", n.Type, "err", err)
 		}
 
-		return
+		return false
 	}
 
 	if !created {
-		return
+		return false
 	}
 
 	if r.Log != nil {
@@ -85,14 +102,8 @@ func (r *Raiser) Raise(ctx context.Context, n *nmodel.Notification) {
 			"link":     n.Link,
 		},
 	})
-	// Mailed only for a notification that is genuinely new - the
-	// duplicate check above has already returned. That matters more here
-	// than for the console badge: the bounce check runs every fifteen
-	// minutes and dedupes per hour, so mailing before that gate would
-	// send four times an hour for one problem.
-	if r.Alerts != nil {
-		r.Alerts.OnNotification(n)
-	}
+
+	return true
 }
 
 // BounceAlerter is the scheduled bounce-rate check.

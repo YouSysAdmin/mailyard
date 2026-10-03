@@ -197,6 +197,24 @@ func (s *Store) SetStatus(ctx context.Context, projID, id, status, validationErr
 	return err
 }
 
+// MarkInvalid takes an enabled server out of rotation, reporting
+// whether it moved. A disabled one stays disabled, and of two workers
+// failing on the same server only one sees true.
+func (s *Store) MarkInvalid(ctx context.Context, projID, id, reason string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE smtp_servers
+        SET status = 'invalid', validation_error = ?, validated_at = now()
+        WHERE project_id = ? AND id = ? AND status = 'enabled'
+    `, reason, projID, id)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
 // PickEnabled returns the first enabled server whose sender rules
 // admit the sender, or (nil, nil) when none qualifies. Oldest first so
 // the pick is stable.

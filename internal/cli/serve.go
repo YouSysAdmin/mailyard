@@ -379,7 +379,10 @@ func runServe(cmd *cobra.Command, r role) error {
 	// Webhook dispatcher: fans email lifecycle events out to
 	// subscribed endpoints. Built before the worker so the worker's
 	// finalize hook can emit through it.
-	dispatcher := dispatch.New(&webhook.DispatchSink{Store: st.Webhook, Audit: rt.Audit}, dispatch.Config{
+	dispatcher := dispatch.New(&webhook.DispatchSink{
+		Store: st.Webhook, Audit: rt.Audit,
+		Notify: func() *notify.Raiser { return rt.Notify },
+	}, dispatch.Config{
 		Timeout:             cfg.Webhook.Timeout,
 		MaxAttempts:         cfg.Webhook.MaxAttempts,
 		RetryDelay:          cfg.Webhook.RetryDelay,
@@ -401,6 +404,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		Blob:             rt.Blob,
 		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
 		RelayClient:      relayClient,
+		Notify:           func() *notify.Raiser { return rt.Notify },
 	}
 	worker := queue.NewWorker(st.Email, processor, queue.Config{
 		Concurrency:    cfg.Worker.Concurrency,
@@ -429,8 +433,13 @@ func runServe(cmd *cobra.Command, r role) error {
 			emailmodel.StatusSuppressed: campaignmodel.MsgSkipped,
 		}[status]
 		if msgStatus != "" {
-			if err := st.Campaign.MarkMessageByEmail(context.Background(), job.ID, msgStatus, errMsg); err != nil {
+			campaignID, err := st.Campaign.MarkMessageByEmail(context.Background(), job.ID, msgStatus, errMsg)
+			if err != nil {
 				log.Error("campaign: sync message status", "email_id", job.ID, "err", err)
+			}
+
+			if err := campaign.Finish(context.Background(), st, dispatcher.Emit, rt.Notify, job.ProjectID, campaignID); err != nil {
+				log.Error("campaign: finish", "campaign_id", campaignID, "err", err)
 			}
 		}
 
@@ -524,6 +533,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// service can wake it.
 	runner := campaign.NewRunner(st, email.NewService(rt), log,
 		dispatcher.Emit, rt.Tracking, cfg.Campaign.BatchSize, cfg.Campaign.PollInterval)
+	runner.Notify = func() *notify.Raiser { return rt.Notify }
 	rt.CampaignWake = runner.Wake
 
 	// Platform mail goes in through the same door as a tenant's, which
@@ -702,6 +712,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			Store:      st.Sender,
 			Mail:       rt.SystemMail,
 			Recipients: st.AlertRecipients.ProjectAlert,
+			Notify:     rt.Notify,
 			Log:        log,
 		}
 

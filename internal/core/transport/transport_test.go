@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 )
@@ -207,17 +208,22 @@ func TestSESClassifiesFailures(t *testing.T) {
 	for name, tc := range map[string]struct {
 		err       error
 		permanent bool
+		fault     bool
 	}{
-		"rejected":            {&types.MessageRejected{}, true},
-		"sender not verified": {&types.MailFromDomainNotVerifiedException{}, true},
-		"account suspended":   {&types.AccountSuspendedException{}, true},
-		"sending paused":      {&types.SendingPausedException{}, true},
-		"bad request":         {&types.BadRequestException{}, true},
-		"missing config set":  {&types.NotFoundException{}, true},
-		"throttled":           {&types.TooManyRequestsException{}, false},
-		"over quota":          {&types.LimitExceededException{}, false},
-		"aws internal":        {&types.InternalServiceErrorException{}, false},
-		"anything else":       {errors.New("dial tcp: i/o timeout"), false},
+		"rejected":            {&types.MessageRejected{}, true, false},
+		"sender not verified": {&types.MailFromDomainNotVerifiedException{}, true, false},
+		"account suspended":   {&types.AccountSuspendedException{}, true, false},
+		"sending paused":      {&types.SendingPausedException{}, true, false},
+		"bad request":         {&types.BadRequestException{}, true, false},
+		"missing config set":  {&types.NotFoundException{}, true, false},
+		"throttled":           {&types.TooManyRequestsException{}, false, false},
+		"over quota":          {&types.LimitExceededException{}, false, false},
+		"aws internal":        {&types.InternalServiceErrorException{}, false, false},
+		"anything else":       {errors.New("dial tcp: i/o timeout"), false, false},
+		"bad key id":          {&smithy.GenericAPIError{Code: "InvalidClientTokenId"}, false, true},
+		"bad secret":          {&smithy.GenericAPIError{Code: "SignatureDoesNotMatch"}, false, true},
+		"unknown client":      {&smithy.GenericAPIError{Code: "UnrecognizedClientException"}, false, true},
+		"other api error":     {&smithy.GenericAPIError{Code: "Throttling"}, false, false},
 	} {
 		out := classifySES(tc.err)
 		f, ok := errors.AsType[Failure](out)
@@ -228,6 +234,12 @@ func TestSESClassifiesFailures(t *testing.T) {
 
 		if f.Permanent() != tc.permanent {
 			t.Errorf("%s: Permanent() = %v, want %v", name, f.Permanent(), tc.permanent)
+		}
+
+		// Refused credentials are the row's fault, never the message's.
+		sf, ok := errors.AsType[ServerFault](out)
+		if got := ok && sf.ServerFault(); got != tc.fault {
+			t.Errorf("%s: ServerFault() = %v, want %v", name, got, tc.fault)
 		}
 
 		// Always empty for SES, whatever the failure. Naming a recipient

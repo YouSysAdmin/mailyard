@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	smodel "github.com/yousysadmin/mailyard/internal/models/sender"
 )
 
@@ -77,5 +78,43 @@ func TestEachProjectIsMailedOnceADayAboutItsOwnKeys(t *testing.T) {
 
 	if !strings.Contains(mail.last, "EXPIRED") && !strings.Contains(mail.last, "within a week") {
 		t.Errorf("the digest does not carry the urgency:\n%s", mail.last)
+	}
+}
+
+type fakeNotify struct{ filed []*nmodel.Notification }
+
+func (f *fakeNotify) RaiseInConsole(_ context.Context, n *nmodel.Notification) {
+	f.filed = append(f.filed, n)
+}
+
+// The console hears about it even where platform mail is off, one
+// notification per project, an error once anything has expired.
+func TestEachProjectGetsOneConsoleNotification(t *testing.T) {
+	notes := &fakeNotify{}
+	c := checker([]*smodel.SigningKey{
+		key("p1", "a@one.test", 10*24*time.Hour),
+		key("p1", "b@one.test", -time.Hour),
+		key("p2", "c@two.test", 20*24*time.Hour),
+	}, nil)
+	c.Mail = nil
+	c.Notify = notes
+
+	if err := c.Run(t.Context()); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if len(notes.filed) != 2 {
+		t.Fatalf("filed %d, want one per project", len(notes.filed))
+	}
+
+	for _, n := range notes.filed {
+		want := nmodel.SeverityWarning
+		if n.ProjectID == "p1" {
+			want = nmodel.SeverityError
+		}
+
+		if n.Severity != want || n.Type != nmodel.TypeSigningKeyExpiry {
+			t.Errorf("%s: type %q severity %q, want %q", n.ProjectID, n.Type, n.Severity, want)
+		}
 	}
 }
