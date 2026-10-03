@@ -111,6 +111,16 @@ func defaultMessage(fe validator.FieldError) string {
 		return field + " is required when other fields change"
 	case "email":
 		return field + " must be a valid email"
+	case "mediatype":
+		return field + " must be a MIME type such as application/pdf"
+	case "notblank":
+		return field + " must not be blank"
+	case "template":
+		if err := templateError(fe.Param(), fmt.Sprint(fe.Value())); err != nil {
+			return field + " is not a valid template: " + err.Error()
+		}
+
+		return field + " is not a valid template"
 	case "ipcidr":
 		return field + " must be an IP address or CIDR block"
 	case "ip":
@@ -163,7 +173,7 @@ var friendlyLabels = map[string]string{
 // wherever they appear in it.
 var friendlyWords = map[string]string{
 	"id": "ID", "ids": "IDs", "smtp": "SMTP", "url": "URL", "ip": "IP", "ips": "IPs",
-	"dkim": "DKIM", "ses": "SES", "arn": "ARN",
+	"dkim": "DKIM", "ses": "SES", "arn": "ARN", "html": "HTML", "css": "CSS",
 }
 
 // friendlyField converts a json tag name to a human-readable label

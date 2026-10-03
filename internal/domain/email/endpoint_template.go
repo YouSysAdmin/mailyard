@@ -199,8 +199,19 @@ func (h *Handler) SendTest(c fiber.Ctx) error {
 		return resp
 	}
 
+	// The template is the path, so a missing one is a missing resource
+	// rather than a bad body.
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if t == nil {
+		return response.NotFound(c, "template not found")
+	}
+
 	svc := NewService(h.Runtime)
-	ref := &TemplateRef{ID: c.Params("id"), Language: in.Language, Data: in.Data}
+	ref := &TemplateRef{ID: t.ID, Language: in.Language, Data: in.Data}
 	e, blocked, err := svc.SendWithTemplate(c.Context(), rc.Project.ID, callerID(rc), apiKeyID(rc),
 		ref, &SendRequest{From: in.From, To: in.To})
 	if err != nil {

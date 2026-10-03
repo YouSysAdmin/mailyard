@@ -6,7 +6,11 @@
 // one template sends resolve.
 package template
 
-import "time"
+import (
+	"time"
+
+	"github.com/yousysadmin/mailyard/internal/models/stylesheet"
+)
 
 // Template is the named container. Name is unique per project and
 // is how the send API addresses it. SampleData is a JSON object
@@ -65,4 +69,27 @@ type Attachment struct {
 	StorageKey  string    `json:"storage_key,omitempty"`
 	Content     string    `json:"-"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+// Draft is a version written together with the template that holds
+// it, by a create carrying content or by an import. A zero
+// Version.Version is numbered after the highest one in the set.
+type Draft struct {
+	Version       *Version
+	Localizations []*Localization
+
+	// Stylesheet is created with the version and referenced by it, nil
+	// for none.
+	Stylesheet *stylesheet.Stylesheet
+	Active     bool
+}
+
+// Patch names the container fields an update changes. A nil field is
+// left as it is in the row, whatever the caller read before.
+type Patch struct {
+	Name            *string
+	Description     *string
+	DefaultLanguage *string
+	SampleData      *string
+	LastEditedBy    string
 }

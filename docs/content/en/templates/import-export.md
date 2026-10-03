@@ -77,6 +77,13 @@ curl -X POST http://localhost:3000/api/v1/templates/import \
 The `format` field is checked first: a document without
 `"format": "mailyard-template-v1"` is refused with `400` rather than half-imported.
 
+The document is validated the way the individual routes validate their bodies: `sample_data` must be JSON, languages are
+trimmed and lowercased, version numbers may not be negative, and every subject and body must parse as a template. A
+version number named twice, a language named twice in one version, or more than one active version is refused with
+`400`. A `version` of `0` is numbered after the highest one the document names.
+
+The import is one transaction. A failure leaves nothing behind, so the same document can simply be sent again.
+
 {{< callout type="note" >}}
 If a template with the same name already exists the import fails with `409 Conflict`. Rename the template inside
 the document and try again, or delete the existing one first.

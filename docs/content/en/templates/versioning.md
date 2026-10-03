@@ -49,8 +49,8 @@ write:
 }
 ```
 
-Two clients creating a version at the same instant can land on the same number. One of them is refused with `409` and
-the message says to retry — the second attempt reads the new maximum and gets the number after it.
+Numbers come from a counter on the template that only goes up, so two clients creating a version at the same instant
+get consecutive numbers, and deleting the highest version does not hand its number out again.
 
 ## Update
 
@@ -67,8 +67,12 @@ Changes the same two settings. To change what the version renders, edit its
 POST /api/v1/templates/{templateId}/activate/{versionId}
 ```
 
-This is the publish step, and it is the only thing that changes what live sends resolve. The response carries the
-template with its new `active_version_id`.
+This is the publish step, and it is the only thing that changes what live sends resolve. The response names the version
+now active:
+
+```json
+{ "active_version_id": "0198f6a1-3c80-7c44-b6e1-9d2f7a0c5188" }
+```
 
 ## Delete
 

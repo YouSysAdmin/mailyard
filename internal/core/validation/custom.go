@@ -3,11 +3,13 @@
 package validation
 
 import (
+	"mime"
 	"net/netip"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 
+	"github.com/yousysadmin/mailyard/internal/core/render"
 	"github.com/yousysadmin/mailyard/internal/core/transport"
 )
 
@@ -92,4 +94,37 @@ func registerCustom(v *validator.Validate) {
 
 		return true
 	})
+
+	// notblank refuses a value that is only whitespace. required and
+	// min count characters, so "   " passes both and is stored.
+	_ = v.RegisterValidation("notblank", func(fl validator.FieldLevel) bool {
+		return strings.TrimSpace(fl.Field().String()) != ""
+	})
+
+	// mediatype is a MIME content type the message builder will accept
+	// for an attachment. Refused when stored, or the template carrying
+	// the file fails every send.
+	_ = v.RegisterValidation("mediatype", func(fl validator.FieldLevel) bool {
+		_, _, err := mime.ParseMediaType(fl.Field().String())
+
+		return err == nil
+	})
+
+	// template is a stored template part that will render: `text` for
+	// a subject or text part, `html` for a body. Checked on save so a
+	// template that cannot render is refused there instead of on every
+	// send that uses it.
+	_ = v.RegisterValidation("template", func(fl validator.FieldLevel) bool {
+		return templateError(fl.Param(), fl.Field().String()) == nil
+	})
+}
+
+// templateError is the reason src does not render as a template of
+// kind, or nil.
+func templateError(kind, src string) error {
+	if kind == "html" {
+		return render.CheckHTML(src)
+	}
+
+	return render.CheckText(src)
 }

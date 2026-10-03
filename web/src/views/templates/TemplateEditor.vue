@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
             v-model="subject"
             type="text"
             class="form-input editor-subject-input"
-            placeholder="e.g. Welcome {{ .name }}"
+            placeholder="e.g. Welcome {{ name }}"
             @input="editLocalization"
           />
         </div>

@@ -3,6 +3,8 @@
 package template
 
 import (
+	"fmt"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
@@ -101,6 +103,10 @@ func (h *Handler) Import(c fiber.Ctx) error {
 		return response.Conflict(c, "a template with this name already exists, rename it in the document")
 	}
 
+	if msg := checkVersions(doc.Versions); msg != "" {
+		return response.BadRequest(c, msg)
+	}
+
 	t := &tmodel.Template{
 		ID:              ids.New(),
 		ProjectID:       rc.Project.ID,
@@ -114,62 +120,74 @@ func (h *Handler) Import(c fiber.Ctx) error {
 		t.DefaultLanguage = "en"
 	}
 
-	if err := h.Runtime.Store.Template.Put(c.Context(), t); err != nil {
-		return response.Internal(c, err)
-	}
-
-	var activeID string
+	drafts := make([]*tmodel.Draft, 0, len(doc.Versions))
 	for _, tv := range doc.Versions {
-		v := &tmodel.Version{
-			ID:         ids.New(),
-			TemplateID: t.ID,
-			Version:    tv.Version,
-			SampleData: tv.SampleData,
+		d := &tmodel.Draft{
+			Version: &tmodel.Version{ID: ids.New(), Version: tv.Version, SampleData: tv.SampleData},
+			Active:  tv.Active,
 		}
 		if tv.Stylesheet != nil {
-			sheet := &sheetmodel.Stylesheet{
+			d.Stylesheet = &sheetmodel.Stylesheet{
 				ID:        ids.New(),
 				ProjectID: rc.Project.ID,
 				Name:      tv.Stylesheet.Name,
 				CSS:       tv.Stylesheet.CSS,
 			}
-			if err := h.Runtime.Store.Stylesheet.Put(c.Context(), sheet); err != nil {
-				return response.Internal(c, err)
-			}
-
-			v.StylesheetID = new(sheet.ID)
-		}
-
-		if err := h.Runtime.Store.Template.PutVersion(c.Context(), rc.Project.ID, v); err != nil {
-			return putError(c, err)
 		}
 
 		for _, tl := range tv.Localizations {
-			l := &tmodel.Localization{
-				ID:        ids.New(),
-				VersionID: v.ID,
-				Language:  tl.Language,
-				Subject:   tl.Subject,
-				HTML:      tl.HTML,
-				Text:      tl.Text,
-			}
-			if err := h.Runtime.Store.Template.PutLocalization(c.Context(), rc.Project.ID, l); err != nil {
-				return putError(c, err)
-			}
+			d.Localizations = append(d.Localizations, &tmodel.Localization{
+				ID:       ids.New(),
+				Language: tl.Language,
+				Subject:  tl.Subject,
+				HTML:     tl.HTML,
+				Text:     tl.Text,
+			})
 		}
 
-		if tv.Active {
-			activeID = v.ID
-		}
+		drafts = append(drafts, d)
 	}
 
-	if activeID != "" {
-		if err := h.Runtime.Store.Template.SetActiveVersion(c.Context(), rc.Project.ID, t.ID, activeID); err != nil {
-			return response.Internal(c, err)
-		}
-
-		t.ActiveVersionID = new(activeID)
+	if err := h.Runtime.Store.Template.Create(c.Context(), t, drafts); err != nil {
+		return nameTaken(c, err)
 	}
 
 	return response.Created(c, TemplateResponse{Template: t})
+}
+
+// checkVersions refuses a document that names one version number
+// twice, one language twice in a version, or more than one active
+// version. Each would otherwise surface as a failed write after
+// half the template was stored, or as a silent overwrite.
+func checkVersions(versions []transferVersion) string {
+	numbers := map[int]bool{}
+	active := 0
+	for i, v := range versions {
+		if v.Version != 0 {
+			if numbers[v.Version] {
+				return fmt.Sprintf("versions[%d]: version %d appears more than once", i, v.Version)
+			}
+
+			numbers[v.Version] = true
+		}
+
+		if v.Active {
+			active++
+		}
+
+		langs := map[string]bool{}
+		for _, l := range v.Localizations {
+			if langs[l.Language] {
+				return fmt.Sprintf("versions[%d]: language %q appears more than once", i, l.Language)
+			}
+
+			langs[l.Language] = true
+		}
+	}
+
+	if active > 1 {
+		return "only one version may be active"
+	}
+
+	return ""
 }

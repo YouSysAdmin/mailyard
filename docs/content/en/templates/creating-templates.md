@@ -10,7 +10,8 @@ weight: 20
 POST /api/v1/templates
 ```
 
-Only `name` is required, and it must be unique within the project — a repeat is refused with `409`.
+Only `name` is required, and it must be unique within the project without regard to case — `Welcome` beside `welcome`
+is refused with `409`, and a send naming `WELCOME` finds `welcome`.
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/templates \
@@ -139,7 +140,9 @@ Partial — send only what changes. This route touches the container, never the 
 { "name": "welcome-2026", "description": "Rewritten for the new plan tiers" }
 ```
 
-Renaming onto a name another template holds is refused with `409`.
+Renaming onto a name another template holds is refused with `409`. A `name` that is only whitespace is refused with
+`400` rather than ignored, and `description` is trimmed. The update writes only the fields the body names, so it never
+puts back an `active_version_id` or a field another request changed meanwhile.
 
 ## Delete
 
@@ -147,7 +150,12 @@ Renaming onto a name another template holds is refused with `409`.
 DELETE /api/v1/templates/{id}
 ```
 
-Returns `204`, and takes the versions, localizations and attachments with it.
+Returns `204`, and takes the versions, localizations and attachments with it. A template that a campaign still renders -
+one in `draft`, `scheduled`, `sending` or `paused`, directly or as an A/B variant - is refused with `409` naming the
+campaign. Finish or cancel the campaign, or point it at another template, first.
+
+Mail already queued from the template is not affected: every message carries its own copy of the template's
+attachments, so deleting an attachment or the whole template never removes a file a queued message still needs.
 
 ## Sending one
 

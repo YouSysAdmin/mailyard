@@ -631,8 +631,19 @@ type TemplateStore interface {
 	// what the filter matches.
 	Find(ctx context.Context, projID string, f ListFilter) ([]*template.Template, int, error)
 	Put(ctx context.Context, t *template.Template) error
+
+	// Create writes a template with its drafts in one transaction.
+	Create(ctx context.Context, t *template.Template, drafts []*template.Draft) error
+
+	// Update writes only the fields the patch names, and reports
+	// whether the template exists.
+	Update(ctx context.Context, projID, id string, p *template.Patch) (bool, error)
 	Delete(ctx context.Context, projID, id string) error
 	SetActiveVersion(ctx context.Context, projID, id, versionID string) error
+
+	// CampaignUsing names an unfinished campaign that renders the
+	// template, empty when none does.
+	CampaignUsing(ctx context.Context, projID, templateID string) (string, error)
 
 	GetVersion(ctx context.Context, projID, templateID, versionID string) (*template.Version, error)
 	ListVersions(ctx context.Context, projID, templateID string) ([]*template.Version, error)
@@ -640,10 +651,10 @@ type TemplateStore interface {
 	DeleteVersion(ctx context.Context, projID, templateID, versionID string) error
 
 	GetLocalization(ctx context.Context, projID, versionID, language string) (*template.Localization, error)
-	GetLocalizationByID(ctx context.Context, projID, id string) (*template.Localization, error)
+	GetLocalizationByID(ctx context.Context, projID, templateID, id string) (*template.Localization, error)
 	ListLocalizations(ctx context.Context, projID, versionID string) ([]*template.Localization, error)
 	PutLocalization(ctx context.Context, projID string, l *template.Localization) error
-	DeleteLocalization(ctx context.Context, projID, id string) error
+	DeleteLocalization(ctx context.Context, projID, templateID, id string) error
 
 	PutAttachment(ctx context.Context, a *template.Attachment) error
 	ListAttachments(ctx context.Context, projID, templateID string) ([]*template.Attachment, error)

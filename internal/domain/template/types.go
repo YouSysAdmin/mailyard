@@ -28,13 +28,15 @@ type createInput struct {
 	Description     string `json:"description"      validate:"omitempty,max=500"       normalize:"trim"`
 	DefaultLanguage string `json:"default_language" validate:"omitempty,min=2,max=10"  normalize:"normalize"`
 	SampleData      string `json:"sample_data"      validate:"omitempty,max=65536,json"`
-	Subject         string `json:"subject"          validate:"omitempty,max=1000"`
-	HTML            string `json:"html"             validate:"omitempty,max=1048576"`
-	Text            string `json:"text"             validate:"omitempty,max=1048576"`
+	Subject         string `json:"subject"          validate:"omitempty,notblank,max=1000,template=text"`
+	HTML            string `json:"html"             validate:"omitempty,max=1048576,template=html"`
+	Text            string `json:"text"             validate:"omitempty,max=1048576,template=text"`
 }
 
+// updateInput is a partial update. Name and Description are pointers
+// so a blank name is refused rather than read as absent.
 type updateInput struct {
-	Name            string  `json:"name"             validate:"omitempty,min=1,max=100" normalize:"trim"`
+	Name            *string `json:"name"             validate:"omitzero,notblank,max=100"`
 	Description     *string `json:"description"      validate:"omitzero,max=500"`
 	DefaultLanguage string  `json:"default_language" validate:"omitempty,min=2,max=10"  normalize:"normalize"`
 	SampleData      *string `json:"sample_data"      validate:"omitzero,max=65536,json"`
@@ -47,9 +49,9 @@ type versionInput struct {
 
 type localizationInput struct {
 	Language string `json:"language" validate:"required,min=2,max=10"  normalize:"normalize"`
-	Subject  string `json:"subject"  validate:"required,max=1000"`
-	HTML     string `json:"html"     validate:"omitempty,max=1048576"`
-	Text     string `json:"text"     validate:"omitempty,max=1048576"`
+	Subject  string `json:"subject"  validate:"required,notblank,max=1000,template=text"`
+	HTML     string `json:"html"     validate:"omitempty,max=1048576,template=html"`
+	Text     string `json:"text"     validate:"omitempty,max=1048576,template=text"`
 }
 
 // previewInput renders arbitrary content without touching the store.
@@ -72,7 +74,7 @@ type versionPreviewInput struct {
 // cap is sending.max_attachment_size.
 type attachmentInput struct {
 	Filename    string `json:"filename"     validate:"required,min=1,max=255"`
-	ContentType string `json:"content_type" validate:"omitempty,max=255"`
+	ContentType string `json:"content_type" validate:"omitempty,max=255,mediatype"`
 	Content     string `json:"content"      validate:"required"`
 }
 
@@ -87,15 +89,17 @@ type transferDoc struct {
 
 type transferTemplate struct {
 	Name            string `json:"name"             validate:"required,min=1,max=100" normalize:"trim"`
-	Description     string `json:"description"      validate:"omitempty,max=500"`
-	DefaultLanguage string `json:"default_language" validate:"omitempty,min=2,max=10"`
-	SampleData      string `json:"sample_data"      validate:"omitempty,max=65536"`
+	Description     string `json:"description"      validate:"omitempty,max=500"       normalize:"trim"`
+	DefaultLanguage string `json:"default_language" validate:"omitempty,min=2,max=10" normalize:"normalize"`
+	SampleData      string `json:"sample_data"      validate:"omitempty,max=65536,json"`
 }
 
+// transferVersion is one version of the document. A zero Version is
+// numbered after the highest one the document names.
 type transferVersion struct {
-	Version       int                    `json:"version"`
+	Version       int                    `json:"version"     validate:"min=0"`
 	Active        bool                   `json:"active"`
-	SampleData    string                 `json:"sample_data" validate:"omitempty,max=65536"`
+	SampleData    string                 `json:"sample_data" validate:"omitempty,max=65536,json"`
 	Stylesheet    *transferStylesheet    `json:"stylesheet,omitempty"`
 	Localizations []transferLocalization `json:"localizations" validate:"omitempty,dive"`
 }
@@ -106,10 +110,10 @@ type transferStylesheet struct {
 }
 
 type transferLocalization struct {
-	Language string `json:"language" validate:"required,min=2,max=10"`
-	Subject  string `json:"subject"  validate:"required,max=1000"`
-	HTML     string `json:"html"     validate:"omitempty,max=1048576"`
-	Text     string `json:"text"     validate:"omitempty,max=1048576"`
+	Language string `json:"language" validate:"required,min=2,max=10" normalize:"normalize"`
+	Subject  string `json:"subject"  validate:"required,notblank,max=1000,template=text"`
+	HTML     string `json:"html"     validate:"omitempty,max=1048576,template=html"`
+	Text     string `json:"text"     validate:"omitempty,max=1048576,template=text"`
 }
 
 // ----------------------------------------------------------------------------

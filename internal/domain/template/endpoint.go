@@ -8,6 +8,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -44,6 +45,16 @@ func putError(c fiber.Ctx, err error) error {
 		return response.Conflict(c, "another version was created at the same time - retry")
 	case database.UniqueViolation(err, "template_localizations_version_id_language_key"):
 		return response.Conflict(c, "a localization for this language was created at the same time - retry")
+	}
+
+	return response.Internal(c, err)
+}
+
+// nameTaken answers a create or rename that lost a race for the name
+// with the message the pre-check gives.
+func nameTaken(c fiber.Ctx, err error) error {
+	if database.UniqueViolation(err, "templates_project_lower_name_key") {
+		return response.Conflict(c, "a template with this name already exists")
 	}
 
 	return response.Internal(c, err)
@@ -116,39 +127,30 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		t.DefaultLanguage = "en"
 	}
 
-	if err := h.Runtime.Store.Template.Put(c.Context(), t); err != nil {
-		return response.Internal(c, err)
+	var drafts []*tmodel.Draft
+	if in.Subject != "" {
+		drafts = append(drafts, &tmodel.Draft{
+			Version: &tmodel.Version{ID: ids.New()},
+			Localizations: []*tmodel.Localization{{
+				ID:       ids.New(),
+				Language: t.DefaultLanguage,
+				Subject:  in.Subject,
+				HTML:     in.HTML,
+				Text:     in.Text,
+			}},
+			Active: true,
+		})
 	}
 
-	if in.Subject != "" {
-		v := &tmodel.Version{ID: ids.New(), TemplateID: t.ID}
-		if err := h.Runtime.Store.Template.PutVersion(c.Context(), rc.Project.ID, v); err != nil {
-			return putError(c, err)
-		}
-
-		l := &tmodel.Localization{
-			ID:        ids.New(),
-			VersionID: v.ID,
-			Language:  t.DefaultLanguage,
-			Subject:   in.Subject,
-			HTML:      in.HTML,
-			Text:      in.Text,
-		}
-		if err := h.Runtime.Store.Template.PutLocalization(c.Context(), rc.Project.ID, l); err != nil {
-			return putError(c, err)
-		}
-
-		if err := h.Runtime.Store.Template.SetActiveVersion(c.Context(), rc.Project.ID, t.ID, v.ID); err != nil {
-			return response.Internal(c, err)
-		}
-
-		t.ActiveVersionID = new(v.ID)
+	if err := h.Runtime.Store.Template.Create(c.Context(), t, drafts); err != nil {
+		return nameTaken(c, err)
 	}
 
 	return response.Created(c, TemplateResponse{Template: t})
 }
 
-// Update serves PATCH /api/v1/templates/:id.
+// Update serves PATCH /api/v1/templates/:id. Only the fields the body
+// names are written.
 func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
@@ -165,35 +167,55 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
-	if in.Name != "" && in.Name != t.Name {
-		other, err := h.Runtime.Store.Template.GetByName(c.Context(), rc.Project.ID, in.Name)
-		if err != nil {
-			return response.Internal(c, err)
+	p := &tmodel.Patch{LastEditedBy: callerID(rc), SampleData: in.SampleData}
+	if in.Name != nil {
+		// omitzero passes an empty string, so a blank name is refused
+		// here rather than stored or read as absent.
+		name := strings.TrimSpace(*in.Name)
+		if name == "" {
+			return response.BadRequestFields(c, "Name must not be blank", []validation.FieldError{
+				{Field: "name", Rule: "notblank", Message: "Name must not be blank"},
+			})
 		}
 
-		if other != nil {
-			return response.Conflict(c, "a template with this name already exists")
+		if !strings.EqualFold(name, t.Name) {
+			other, err := h.Runtime.Store.Template.GetByName(c.Context(), rc.Project.ID, name)
+			if err != nil {
+				return response.Internal(c, err)
+			}
+
+			if other != nil {
+				return response.Conflict(c, "a template with this name already exists")
+			}
 		}
 
-		t.Name = in.Name
+		p.Name = &name
 	}
 
 	if in.Description != nil {
-		t.Description = *in.Description
+		p.Description = new(strings.TrimSpace(*in.Description))
 	}
 
 	if in.DefaultLanguage != "" {
-		t.DefaultLanguage = in.DefaultLanguage
+		p.DefaultLanguage = &in.DefaultLanguage
 	}
 
-	if in.SampleData != nil {
-		t.SampleData = *in.SampleData
+	found, err := h.Runtime.Store.Template.Update(c.Context(), rc.Project.ID, t.ID, p)
+	if err != nil {
+		return nameTaken(c, err)
 	}
 
-	t.LastEditedBy = callerID(rc)
-	t.UpdatedAt = new(time.Now().UTC())
-	if err := h.Runtime.Store.Template.Put(c.Context(), t); err != nil {
+	if !found {
+		return response.NotFound(c, "template not found")
+	}
+
+	t, err = h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, t.ID)
+	if err != nil {
 		return response.Internal(c, err)
+	}
+
+	if t == nil {
+		return response.NotFound(c, "template not found")
 	}
 
 	return response.Success(c, TemplateResponse{Template: t})
@@ -209,6 +231,16 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 
 	if t == nil {
 		return response.NotFound(c, "template not found")
+	}
+
+	using, err := h.Runtime.Store.Template.CampaignUsing(c.Context(), rc.Project.ID, t.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if using != "" {
+		return response.Conflict(c, fmt.Sprintf(
+			"campaign %q still uses this template, finish or cancel it, or point it at another template first", using))
 	}
 
 	// Offloaded attachment objects first, because template_attachments
@@ -240,7 +272,16 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // ListVersions serves GET /api/v1/templates/:id/versions.
 func (h *Handler) ListVersions(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	versions, err := h.Runtime.Store.Template.ListVersions(c.Context(), rc.Project.ID, c.Params("id"))
+	t, err := h.Runtime.Store.Template.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if t == nil {
+		return response.NotFound(c, "template not found")
+	}
+
+	versions, err := h.Runtime.Store.Template.ListVersions(c.Context(), rc.Project.ID, t.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -354,6 +395,10 @@ func (h *Handler) DeleteVersion(c fiber.Ctx) error {
 	}
 
 	if err := h.Runtime.Store.Template.DeleteVersion(c.Context(), rc.Project.ID, t.ID, versionID); err != nil {
+		if errors.Is(err, ErrVersionActive) {
+			return response.Conflict(c, "this version is active, activate another version first")
+		}
+
 		return response.Internal(c, err)
 	}
 
@@ -380,7 +425,16 @@ func (h *Handler) Activate(c fiber.Ctx) error {
 // /api/v1/templates/:id/versions/:versionId/localizations.
 func (h *Handler) ListLocalizations(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	ls, err := h.Runtime.Store.Template.ListLocalizations(c.Context(), rc.Project.ID, c.Params("versionId"))
+	v, err := h.Runtime.Store.Template.GetVersion(c.Context(), rc.Project.ID, c.Params("id"), c.Params("versionId"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if v == nil {
+		return response.NotFound(c, "version not found")
+	}
+
+	ls, err := h.Runtime.Store.Template.ListLocalizations(c.Context(), rc.Project.ID, v.ID)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -435,7 +489,8 @@ func (h *Handler) PutLocalization(c fiber.Ctx) error {
 // /api/v1/templates/:id/localizations/:localizationId.
 func (h *Handler) DeleteLocalization(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	l, err := h.Runtime.Store.Template.GetLocalizationByID(c.Context(), rc.Project.ID, c.Params("localizationId"))
+	l, err := h.Runtime.Store.Template.GetLocalizationByID(c.Context(), rc.Project.ID,
+		c.Params("id"), c.Params("localizationId"))
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -444,7 +499,12 @@ func (h *Handler) DeleteLocalization(c fiber.Ctx) error {
 		return response.NotFound(c, "localization not found")
 	}
 
-	if err := h.Runtime.Store.Template.DeleteLocalization(c.Context(), rc.Project.ID, l.ID); err != nil {
+	if err := h.Runtime.Store.Template.DeleteLocalization(c.Context(), rc.Project.ID, c.Params("id"), l.ID); err != nil {
+		if errors.Is(err, ErrLastLocalization) {
+			return response.Conflict(c,
+				"this is the last localization of the active version, activate another version first")
+		}
+
 		return response.Internal(c, err)
 	}
 

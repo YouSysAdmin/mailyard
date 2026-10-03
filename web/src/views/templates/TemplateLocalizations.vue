@@ -236,11 +236,7 @@ watch(() => props.version.id, load, { immediate: true })
       </FormField>
 
       <FormField label="Subject" field="subject">
-        <input
-          v-model="editor.form.subject"
-          class="form-input"
-          placeholder="Welcome {{ .name }}!"
-        />
+        <input v-model="editor.form.subject" class="form-input" placeholder="Welcome {{ name }}!" />
       </FormField>
 
       <FormField label="HTML" field="html">

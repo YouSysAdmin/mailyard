@@ -167,3 +167,11 @@ func TestCheckRefusesWhatCannotRender(t *testing.T) {
 		}
 	}
 }
+
+// A missing brace is reported as one, not as an undefined function.
+func TestAnUnclosedActionNamesTheRealMistake(t *testing.T) {
+	err := CheckText("Hi {{ name")
+	if err == nil || strings.Contains(err.Error(), "not defined") || !strings.Contains(err.Error(), "unclosed") {
+		t.Errorf("got %v", err)
+	}
+}

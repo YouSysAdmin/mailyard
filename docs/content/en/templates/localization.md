@@ -31,8 +31,12 @@ curl -X PUT http://localhost:3000/api/v1/templates/$TPL/versions/$VER/localizati
   }'
 ```
 
-`language` and `subject` are required. `html` and `text` are each optional, but a version whose localization has neither
-renders an empty message.
+`language` and `subject` are required, and a subject that is only whitespace is refused. `html` and `text` are each
+optional, but a version whose localization has neither renders an empty message.
+
+Each part is checked as a template when it is saved: a subject, body or text that does not parse, or an action placed
+where the HTML escaper cannot decide its context, is refused with `400` and a `fields` entry naming the part, instead of
+being stored and then failing every send.
 
 The `language` value is trimmed and lowercased on the way in, so `FR ` and `fr` are the same localization. It is stored
 as a plain string rather than a reference — the [language registry](/docs/templates/languages) drives the console's
@@ -50,7 +54,11 @@ GET /api/v1/templates/{templateId}/versions/{versionId}/localizations
 DELETE /api/v1/templates/{templateId}/localizations/{localizationId}
 ```
 
-Note the path: deletion addresses the localization by its own id, under the template rather than under the version.
+Note the path: deletion addresses the localization by its own id, under the template rather than under the version. The
+id must belong to that template, or the answer is `404`.
+
+The last localization of the **active** version is refused with `409`: the template would have nothing to send.
+Activate another version first, or write the replacement language before deleting the old one.
 
 ## Choosing one at send time
 

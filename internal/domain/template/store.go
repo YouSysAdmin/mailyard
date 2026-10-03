@@ -6,8 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
@@ -48,9 +51,9 @@ func (s *Store) Get(ctx context.Context, projID, id string) (*tmodel.Template, e
 }
 
 // GetByName returns one template by name within projID, or nil when
-// there is no such row.
+// there is no such row. Names compare without regard to case.
 func (s *Store) GetByName(ctx context.Context, projID, name string) (*tmodel.Template, error) {
-	row := s.QueryRow(ctx, templateSelect+` WHERE project_id = ? AND name = ?`, projID, name)
+	row := s.QueryRow(ctx, templateSelect+` WHERE project_id = ? AND lower(name) = lower(?)`, projID, name)
 	t, err := scanTemplate(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -124,7 +127,9 @@ func (s *Store) List(ctx context.Context, projID string) ([]*tmodel.Template, er
 }
 
 // Put inserts the template, or updates the row when its id already
-// exists.
+// exists. It never writes active_version_id, which SetActiveVersion
+// and Create own: a caller holding a row read before an activation
+// would otherwise put the old version back.
 func (s *Store) Put(ctx context.Context, t *tmodel.Template) error {
 	if t.CreatedAt.IsZero() {
 		t.CreatedAt = time.Now().UTC()
@@ -132,24 +137,182 @@ func (s *Store) Put(ctx context.Context, t *tmodel.Template) error {
 
 	_, err := s.Exec(ctx, `
         INSERT INTO templates (
-            id, project_id, name, description, default_language, active_version_id,
+            id, project_id, name, description, default_language,
             sample_data, created_by, last_edited_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name              = excluded.name,
             description       = excluded.description,
             default_language  = excluded.default_language,
-            active_version_id = excluded.active_version_id,
             sample_data       = excluded.sample_data,
             last_edited_by    = excluded.last_edited_by,
             updated_at        = excluded.updated_at
     `,
 		t.ID, t.ProjectID, t.Name, t.Description, t.DefaultLanguage,
-		nullPtr(t.ActiveVersionID), t.SampleData, t.CreatedBy, t.LastEditedBy,
+		t.SampleData, t.CreatedBy, t.LastEditedBy,
 		t.CreatedAt, database.NullTime(t.UpdatedAt),
 	)
 
 	return err
+}
+
+// Update writes the fields p names and nothing else, so two
+// concurrent updates of different fields both land and neither puts
+// back a value the other changed. It reports whether the template
+// exists.
+func (s *Store) Update(ctx context.Context, projID, id string, p *tmodel.Patch) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE templates SET
+            name             = COALESCE(?, name),
+            description      = COALESCE(?, description),
+            default_language = COALESCE(?, default_language),
+            sample_data      = COALESCE(?, sample_data),
+            last_edited_by   = ?,
+            updated_at       = ?
+        WHERE project_id = ? AND id = ?
+    `, p.Name, p.Description, p.DefaultLanguage, p.SampleData, p.LastEditedBy,
+		time.Now().UTC(), projID, id)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// Create writes a template together with its versions, their
+// localizations and stylesheets, and the active version, in one
+// transaction: a failure part way leaves nothing behind, so the same
+// request can be sent again. Zero version numbers are assigned after
+// the highest one the drafts name, and the counter starts there.
+func (s *Store) Create(ctx context.Context, t *tmodel.Template, drafts []*tmodel.Draft) error {
+	if t.CreatedAt.IsZero() {
+		t.CreatedAt = time.Now().UTC()
+	}
+
+	last := 0
+	for _, d := range drafts {
+		last = max(last, d.Version.Version)
+	}
+
+	for _, d := range drafts {
+		if d.Version.Version == 0 {
+			last++
+			d.Version.Version = last
+		}
+	}
+
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if rerr := tx.Rollback(); rerr != nil && !errors.Is(rerr, sql.ErrTxDone) {
+			slog.Warn("store: rollback failed", "err", rerr)
+		}
+	}()
+
+	if _, err := tx.ExecContext(ctx, s.Q(`
+        INSERT INTO templates (
+            id, project_id, name, description, default_language,
+            sample_data, created_by, last_edited_by, created_at, last_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `), t.ID, t.ProjectID, t.Name, t.Description, t.DefaultLanguage,
+		t.SampleData, t.CreatedBy, t.LastEditedBy, t.CreatedAt, last); err != nil {
+		return err
+	}
+
+	var active string
+	for _, d := range drafts {
+		v := d.Version
+		v.TemplateID = t.ID
+		if v.CreatedAt.IsZero() {
+			v.CreatedAt = t.CreatedAt
+		}
+
+		if sh := d.Stylesheet; sh != nil {
+			if sh.CreatedAt.IsZero() {
+				sh.CreatedAt = t.CreatedAt
+			}
+
+			if _, err := tx.ExecContext(ctx, s.Q(`
+                INSERT INTO stylesheets (id, project_id, name, css, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            `), sh.ID, t.ProjectID, sh.Name, sh.CSS, sh.CreatedAt); err != nil {
+				return err
+			}
+
+			v.StylesheetID = new(sh.ID)
+		}
+
+		if _, err := tx.ExecContext(ctx, s.Q(`
+            INSERT INTO template_versions (id, template_id, version, stylesheet_id, sample_data, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `), v.ID, v.TemplateID, v.Version, nullPtr(v.StylesheetID), v.SampleData, v.CreatedAt); err != nil {
+			return err
+		}
+
+		for _, l := range d.Localizations {
+			l.VersionID = v.ID
+			if l.CreatedAt.IsZero() {
+				l.CreatedAt = t.CreatedAt
+			}
+
+			if _, err := tx.ExecContext(ctx, s.Q(`
+                INSERT INTO template_localizations (
+                    id, version_id, language, subject_template, html_template, text_template, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            `), l.ID, l.VersionID, l.Language, l.Subject, l.HTML, l.Text, l.CreatedAt); err != nil {
+				return err
+			}
+		}
+
+		if d.Active {
+			active = v.ID
+		}
+	}
+
+	if active != "" {
+		if _, err := tx.ExecContext(ctx, s.Q(`
+            UPDATE templates SET active_version_id = ? WHERE project_id = ? AND id = ?
+        `), active, t.ProjectID, t.ID); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	t.ActiveVersionID = nil
+	if active != "" {
+		t.ActiveVersionID = new(active)
+	}
+
+	return nil
+}
+
+// CampaignUsing names a campaign that will still render the template:
+// one not yet sent or cancelled that uses it, directly or as an A/B
+// variant. Empty when there is none.
+func (s *Store) CampaignUsing(ctx context.Context, projID, templateID string) (string, error) {
+	var name string
+	err := s.QueryRow(ctx, `
+        SELECT name FROM campaigns
+        WHERE project_id = ?
+          AND status IN ('draft', 'scheduled', 'sending', 'paused')
+          AND (template_id = ?
+               OR ab_variants::jsonb @> jsonb_build_array(jsonb_build_object('template_id', ?::text)))
+        ORDER BY created_at
+        LIMIT 1
+    `, projID, templateID, templateID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+
+	return name, err
 }
 
 // Delete removes one template from projID.
@@ -235,8 +398,10 @@ func (s *Store) ListVersions(ctx context.Context, projID, templateID string) ([]
 }
 
 // PutVersion upserts a version. A zero Version number is assigned the
-// next number for the template. The project check runs first so a
-// guessed template id in another tenant is a no-op.
+// next number from the template's counter, which only goes up, so a
+// number is never handed out twice even after the highest version is
+// deleted. The project check runs first so a guessed template id in
+// another tenant is a no-op.
 func (s *Store) PutVersion(ctx context.Context, projID string, v *tmodel.Version) error {
 	var owned int
 	err := s.QueryRow(ctx, `SELECT COUNT(*) FROM templates WHERE project_id = ? AND id = ?`,
@@ -254,8 +419,11 @@ func (s *Store) PutVersion(ctx context.Context, projID string, v *tmodel.Version
 	}
 
 	if v.Version == 0 {
-		if err := s.QueryRow(ctx, `SELECT COALESCE(MAX(version), 0) + 1 FROM template_versions WHERE template_id = ?`,
-			v.TemplateID).Scan(&v.Version); err != nil {
+		err := s.QueryRow(ctx, `
+            UPDATE templates SET last_version = last_version + 1
+            WHERE project_id = ? AND id = ?
+            RETURNING last_version`, projID, v.TemplateID).Scan(&v.Version)
+		if err != nil {
 			return err
 		}
 	}
@@ -271,15 +439,38 @@ func (s *Store) PutVersion(ctx context.Context, projID string, v *tmodel.Version
 	return err
 }
 
-// DeleteVersion removes one version from projID.
+// ErrVersionActive is a delete refused because the version is the
+// one the template sends.
+var ErrVersionActive = errors.New("this version is active")
+
+// DeleteVersion removes one version from projID, refusing the active
+// one. The statement skips it and the foreign key on
+// active_version_id refuses one activated while the delete ran.
 func (s *Store) DeleteVersion(ctx context.Context, projID, templateID, versionID string) error {
-	_, err := s.Exec(ctx, `
+	res, err := s.Exec(ctx, `
         DELETE FROM template_versions
         WHERE id = ? AND template_id = ?
           AND EXISTS (SELECT 1 FROM templates t WHERE t.id = ? AND t.project_id = ?)
-    `, versionID, templateID, templateID, projID)
+          AND NOT EXISTS (SELECT 1 FROM templates t WHERE t.id = ? AND t.active_version_id = template_versions.id)
+    `, versionID, templateID, templateID, projID, templateID)
+	if pg, ok := errors.AsType[*pgconn.PgError](err); ok && pg.Code == "23503" {
+		return ErrVersionActive
+	}
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if n == 0 {
+		return ErrVersionActive
+	}
+
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -306,11 +497,11 @@ func (s *Store) GetLocalization(ctx context.Context, projID, versionID, language
 	return l, err
 }
 
-// GetLocalizationByID returns one localization by id within projID, or
-// nil when there is no such row.
-func (s *Store) GetLocalizationByID(ctx context.Context, projID, id string) (*tmodel.Localization, error) {
+// GetLocalizationByID returns one localization of templateID by id
+// within projID, or nil when there is no such row.
+func (s *Store) GetLocalizationByID(ctx context.Context, projID, templateID, id string) (*tmodel.Localization, error) {
 	row := s.QueryRow(ctx, localizationSelect+`
-        WHERE t.project_id = ? AND l.id = ?`, projID, id)
+        WHERE t.project_id = ? AND t.id = ? AND l.id = ?`, projID, templateID, id)
 	l, err := scanLocalization(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -379,18 +570,56 @@ func (s *Store) PutLocalization(ctx context.Context, projID string, l *tmodel.Lo
 	return err
 }
 
-// DeleteLocalization removes one localization from projID.
-func (s *Store) DeleteLocalization(ctx context.Context, projID, id string) error {
-	_, err := s.Exec(ctx, `
-        DELETE FROM template_localizations
-        WHERE id = ? AND version_id IN (
-            SELECT v.id FROM template_versions v
-            JOIN templates t ON t.id = v.template_id
-            WHERE t.project_id = ?
-        )
-    `, id, projID)
+// ErrLastLocalization is a delete refused because it would leave the
+// active version with nothing to send.
+var ErrLastLocalization = errors.New("the active version would have no localization left")
 
-	return err
+// DeleteLocalization removes one localization of templateID from
+// projID. The last localization of the active version is refused:
+// every send of the template would fail. The version row is locked so
+// two deletes of its last two localizations cannot both pass.
+func (s *Store) DeleteLocalization(ctx context.Context, projID, templateID, id string) error {
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if rerr := tx.Rollback(); rerr != nil && !errors.Is(rerr, sql.ErrTxDone) {
+			slog.Warn("store: rollback failed", "err", rerr)
+		}
+	}()
+
+	var versionID string
+	var active, others bool
+	err = tx.QueryRowContext(ctx, s.Q(`
+        SELECT v.id,
+               COALESCE(t.active_version_id = v.id, FALSE),
+               EXISTS (SELECT 1 FROM template_localizations o WHERE o.version_id = v.id AND o.id <> l.id)
+        FROM template_localizations l
+        JOIN template_versions v ON v.id = l.version_id
+        JOIN templates t ON t.id = v.template_id
+        WHERE t.project_id = ? AND t.id = ? AND l.id = ?
+        FOR UPDATE OF v`), projID, templateID, id).Scan(&versionID, &active, &others)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if active && !others {
+		return ErrLastLocalization
+	}
+
+	if _, err := tx.ExecContext(ctx, s.Q(`
+        DELETE FROM template_localizations WHERE id = ? AND version_id = ?
+    `), id, versionID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func scanTemplate(r interface{ Scan(...any) error }) (*tmodel.Template, error) {

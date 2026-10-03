@@ -82,8 +82,10 @@ PATCH /api/v1/templates/{templateId}/versions/{versionId}
 { "stylesheet_id": "0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33" }
 ```
 
-That is deliberate — restyling is a content change like any other, so it goes through a draft version you can preview
-and activate rather than altering live mail the moment you save the CSS.
+The stylesheet itself is shared and live: `PUT /api/v1/stylesheets/{id}` changes the CSS of every version pointing at it,
+the active ones included, from the next send on. That is what makes a house-style correction one edit. To restyle
+through review instead, create a new stylesheet, point a draft version at it, preview, and activate that version - the
+live version keeps the old sheet until then.
 
 {{< callout type="tip" title="Export carries the CSS with it" >}}
 `GET /api/v1/templates/{id}/export` inlines the referenced stylesheet into the document instead of naming it, so a

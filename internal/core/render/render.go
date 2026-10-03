@@ -121,12 +121,27 @@ type runnable interface {
 	Execute(w io.Writer, data any) error
 }
 
+// structuralError prefers the error a parse without function checks
+// gives. Normalize cannot add the dots to a source that does not
+// parse, so the checked parse then reports the first bare name as an
+// undefined function - `Hi {{ name` read as "function name not
+// defined" where the mistake is the missing braces.
+func structuralError(src string, err error) error {
+	t := parse.New("t")
+	t.Mode = parse.SkipFuncCheck
+	if _, perr := t.Parse(src, "", "", map[string]*parse.Tree{}); perr != nil {
+		return perr
+	}
+
+	return err
+}
+
 // parsePlain parses text that nothing will interpret, with the budget
 // planted and the function map attached.
 func parsePlain(src, onMissing string) (*texttmpl.Template, error) {
 	t, err := texttmpl.New("t").Option("missingkey=" + onMissing).Parse(Normalize(src))
 	if err != nil {
-		return nil, fmt.Errorf("template parse error: %w", err)
+		return nil, fmt.Errorf("template parse error: %w", structuralError(src, err))
 	}
 
 	trees := map[string]*parse.Tree{}
@@ -146,7 +161,7 @@ func parsePlain(src, onMissing string) (*texttmpl.Template, error) {
 func parseEscaping(src, onMissing string) (*htmltmpl.Template, error) {
 	t, err := htmltmpl.New("t").Option("missingkey=" + onMissing).Parse(Normalize(src))
 	if err != nil {
-		return nil, fmt.Errorf("template parse error: %w", err)
+		return nil, fmt.Errorf("template parse error: %w", structuralError(src, err))
 	}
 
 	trees := map[string]*parse.Tree{}
@@ -220,8 +235,8 @@ func CheckHTML(src string) error {
 	}
 
 	if _, err := execute(t, nil); err != nil {
-		if _, ok := errors.AsType[*htmltmpl.Error](err); ok {
-			return err
+		if he, ok := errors.AsType[*htmltmpl.Error](err); ok {
+			return he
 		}
 	}
 
