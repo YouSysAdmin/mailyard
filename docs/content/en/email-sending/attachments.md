@@ -44,9 +44,8 @@ Base64 inflates a file by 4/3, so the request body cap on the send routes is com
 `sending.max_total_attachment_size` at startup, not set independently. It applies to the routes that carry
 attachments only - every other API route is capped at 8 MiB, whatever the attachment limits say.
 
-A request larger than that cap is rejected by the HTTP layer before any handler runs, and that response is plain text
-(`Request Entity Too Large`), not the usual JSON error shape. If you are building a client, treat a `413` as a size
-failure without trying to parse it.
+A request larger than that cap is rejected with `413` before any handler runs. The body is the usual JSON error shape,
+`{"error": "Request Entity Too Large"}`, with no `fields`, since nothing was read far enough to name one.
 {{< /callout >}}
 
 Query the effective limits instead of assuming the defaults:

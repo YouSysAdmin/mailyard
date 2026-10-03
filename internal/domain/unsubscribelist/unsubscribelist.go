@@ -274,6 +274,14 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	// The same tally Get answers, so an edit does not read as zero.
+	n, err := h.Runtime.Store.Suppression.CountForList(c.Context(), rc.Project.ID, l.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	l.SuppressedCount = n
+
 	return response.Success(c, GetResponse{UnsubscribeList: l})
 }
 
