@@ -29,6 +29,9 @@ type WorkerIdentity struct {
 	roots  *x509.CertPool
 	issued map[[sha256.Size]byte]bool
 	loaded time.Time
+
+	// recheckedAt is when the issued set was last re-read on a miss.
+	recheckedAt time.Time
 }
 
 // reloadAfter bounds how long a loaded pair is reused.
@@ -38,6 +41,12 @@ type WorkerIdentity struct {
 // the old one until restarted. Ten minutes is far shorter than the
 // renewal window and costs one query.
 const reloadAfter = 10 * time.Minute
+
+// recheckAfter paces re-reading the issued set when a node presents a
+// certificate the cached set does not hold. A node enrolled since the
+// last load is admitted on its first dial rather than ten minutes later,
+// and a removed one costs at most one query this often.
+const recheckAfter = 5 * time.Second
 
 // WorkerTLS builds the config for dialling one node.
 //
@@ -66,13 +75,42 @@ func (w *WorkerIdentity) WorkerTLS(ctx context.Context, host string) (*tls.Confi
 		// VerifyConnection, not VerifyPeerCertificate: the latter is
 		// skipped on a resumed session.
 		VerifyConnection: func(cs tls.ConnectionState) error {
-			if len(cs.PeerCertificates) == 0 || !issued[sha256.Sum256(cs.PeerCertificates[0].Raw)] {
-				return errors.New("relay node certificate is not on the authority's record - the node was removed")
+			if len(cs.PeerCertificates) == 0 {
+				return errors.New("relay node presented no certificate")
 			}
 
-			return nil
+			sum := sha256.Sum256(cs.PeerCertificates[0].Raw)
+			if issued[sum] || w.issuedNow(ctx, sum) {
+				return nil
+			}
+
+			return errors.New("relay node certificate is not on the authority's record - the node was removed")
 		},
 	}, nil
+}
+
+// issuedNow re-reads the authority's record for a certificate the
+// cached set missed, at most once per recheckAfter.
+func (w *WorkerIdentity) issuedNow(ctx context.Context, sum [sha256.Size]byte) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.issued[sum] {
+		return true
+	}
+
+	if w.Authority == nil || time.Since(w.recheckedAt) < recheckAfter {
+		return false
+	}
+
+	w.recheckedAt = time.Now()
+	issued, err := w.Authority.Issued(ctx)
+	if err != nil {
+		return false
+	}
+
+	w.issued = issued
+
+	return issued[sum]
 }
 
 func (w *WorkerIdentity) load(ctx context.Context) (*tls.Certificate, *x509.CertPool, map[[sha256.Size]byte]bool, error) {
