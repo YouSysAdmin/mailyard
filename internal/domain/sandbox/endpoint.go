@@ -20,10 +20,9 @@ import (
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
 
-// Handler owns /api/sandbox. It is the one tenant surface mounted
-// behind requireProjectMember rather than requireProject, so a member
-// ranked below viewer - the developer role - can reach it and nothing
-// else. See TestOnlySandboxSkipsTheViewerFloor.
+// Handler owns /api/v1/sandbox, gated on the sandbox resource like any
+// other tenant surface, so a role holding only sandbox permissions
+// reaches it and nothing else.
 type Handler struct {
 	Runtime *env.Runtime
 }
