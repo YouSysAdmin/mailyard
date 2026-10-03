@@ -611,16 +611,6 @@ module Mailyard
       @t.request("GET", "/inbound-emails/stats", body: nil, query: query)
     end
 
-    # Accept invitation
-    def accept_invitation(token, **query)
-      @t.request("POST", "/invitations/#{esc(token)}/accept", body: nil, query: query)
-    end
-
-    # Decline invitation
-    def decline_invitation(token, **query)
-      @t.request("POST", "/invitations/#{esc(token)}/decline", body: nil, query: query)
-    end
-
     # List
     def list_languages(**query)
       @t.request("GET", "/languages", body: nil, query: query)

@@ -474,8 +474,12 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// invitation is pending, unexpired, and issued to this account's
 	// email address.
 	//
-	v1.Post("/invitations/:token/accept", wh.AcceptInvitation)
-	v1.Post("/invitations/:token/decline", wh.DeclineInvitation)
+	// On the console surface because only a PERSON can answer one: no
+	// key carries an account to join with. auditWrites is named here
+	// because this group has none - joining is a project event, and the
+	// handler points the record at the project joined.
+	appAPI.Post("/invitations/:token/accept", requireAuth(rt), maintenanceMode(rt), auditWrites(rt), wh.AcceptInvitation)
+	appAPI.Post("/invitations/:token/decline", requireAuth(rt), maintenanceMode(rt), auditWrites(rt), wh.DeclineInvitation)
 
 	// SMTP servers - tenant-scoped: requireProject resolves the
 	// X-Mailyard-Project-Id header (falling back to the personal
@@ -1403,7 +1407,9 @@ func auditWrites(rt *env.Runtime) fiber.Handler {
 
 		rc := domain.GetRequestContext(c)
 		ev := &amodel.Event{
-			Type:   coreaudit.RouteType(c.Method(), c.Path()),
+			// The console prefix is dropped so a route keeps its type
+			// whichever surface it is mounted on.
+			Type:   coreaudit.RouteType(c.Method(), strings.TrimPrefix(c.Path(), env.ConsolePath)),
 			Method: c.Method(),
 			Path:   auditPath(c),
 			Status: status,

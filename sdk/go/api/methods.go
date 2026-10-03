@@ -833,20 +833,6 @@ func (c *Client) ListInboundEmailsStats(ctx context.Context, opts ...RequestOpti
 	return do[InboundStatsResponse](ctx, c, "GET", "/inbound-emails/stats", nil, opts)
 }
 
-// AcceptInvitation Accept invitation.
-//
-// POST /invitations/:token/accept
-func (c *Client) AcceptInvitation(ctx context.Context, token string, opts ...RequestOption) (JoinedResponse, error) {
-	return do[JoinedResponse](ctx, c, "POST", fmt.Sprintf("/invitations/%s/accept", escape(token)), nil, opts)
-}
-
-// DeclineInvitation Decline invitation.
-//
-// POST /invitations/:token/decline
-func (c *Client) DeclineInvitation(ctx context.Context, token string, opts ...RequestOption) (DeclinedResponse, error) {
-	return do[DeclinedResponse](ctx, c, "POST", fmt.Sprintf("/invitations/%s/decline", escape(token)), nil, opts)
-}
-
 // ListLanguages List.
 //
 // GET /languages/

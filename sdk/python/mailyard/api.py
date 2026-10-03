@@ -495,14 +495,6 @@ class API:
         "Count received mail by status Needs inbound:read."
         return self._t.request("GET", "/inbound-emails/stats", body=None, query=query)
 
-    def accept_invitation(self, token, **query: Any) -> Any:
-        "Accept invitation"
-        return self._t.request("POST", f"/invitations/{_esc(token)}/accept", body=None, query=query)
-
-    def decline_invitation(self, token, **query: Any) -> Any:
-        "Decline invitation"
-        return self._t.request("POST", f"/invitations/{_esc(token)}/decline", body=None, query=query)
-
     def list_languages(self, **query: Any) -> Any:
         "List"
         return self._t.request("GET", "/languages", body=None, query=query)

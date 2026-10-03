@@ -482,11 +482,6 @@ type DayCount struct {
 	Count int64  `json:"count"`
 }
 
-// DeclinedResponse is the response body.
-type DeclinedResponse struct {
-	Declined bool `json:"declined"`
-}
-
 // DefaultRoleInput is the request body.
 type DefaultRoleInput struct {
 	RoleID string `json:"role_id"`
@@ -1053,12 +1048,6 @@ type InviteInput struct {
 // JobsResponse is the response body.
 type JobsResponse struct {
 	Jobs []Status `json:"jobs"`
-}
-
-// JoinedResponse is the response body.
-type JoinedResponse struct {
-	Project *Project `json:"project"`
-	Member  *Member  `json:"member"`
 }
 
 // Key is the wire body.

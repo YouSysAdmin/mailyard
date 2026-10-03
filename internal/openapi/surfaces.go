@@ -39,9 +39,9 @@ const (
 	surfaceEnrol
 )
 
-// consoleOwnPaths are the browser ceremonies and the caller's own
-// account activity. Nothing here is usable remotely.
-var consoleOwnPaths = []string{"/auth/", "/events/", "/health", "/security-log"}
+// consoleOwnPaths are the browser ceremonies, the caller's own account
+// activity and answering an invitation. Nothing here is usable remotely.
+var consoleOwnPaths = []string{"/auth/", "/events/", "/health", "/security-log", "/invitations/"}
 
 // enrolPaths are the public relay-node handshake, which SHARES the
 // /relay-nodes prefix with the admin group and so has to be named

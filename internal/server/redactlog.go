@@ -42,7 +42,10 @@ func sensitivePathPrefixes() []string {
 		// Invitation tokens: the accept route carries one in the
 		// path, and the console page takes one in the query. Accept
 		// additionally binds to the invited address, but the token
-		// still does not belong in a log.
+		// still does not belong in a log. The /api/v1 path is gone and
+		// kept here because a console tab loaded before an upgrade
+		// still sends the token to it.
+		env.ConsolePath + "/api/invitations",
 		"/api/v1/invitations",
 		env.ConsolePath + "/invitations",
 		// SPA document requests whose query is a single-use account

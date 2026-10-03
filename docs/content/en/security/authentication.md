@@ -45,7 +45,6 @@ A few `/api/v1` routes address a project by path id and read the caller's MEMBER
 however wide its permissions are:
 
 - `/api/v1/projects` and everything under `/api/v1/projects/{id}/`
-- `/api/v1/invitations/{token}/accept` and `/decline`
 
 Do those in the console, or with a signed-in session.
 

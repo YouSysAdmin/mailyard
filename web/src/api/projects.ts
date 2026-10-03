@@ -1,4 +1,4 @@
-import api from './client'
+import api, { appApi } from './client'
 import type {
   PermissionResource,
   Project,
@@ -83,9 +83,9 @@ export const projectApi = {
     api.delete(`/projects/${id}/invitations/${invId}`),
 
   acceptInvitation: (token: string) =>
-    api.post<{ project: Project; member: ProjectMember }>(`/invitations/${token}/accept`),
+    appApi.post<{ project: Project; member: ProjectMember }>(`/invitations/${token}/accept`),
   declineInvitation: (token: string) =>
-    api.post<{ declined: boolean }>(`/invitations/${token}/decline`),
+    appApi.post<{ declined: boolean }>(`/invitations/${token}/decline`),
 }
 
 export interface RolePayload {

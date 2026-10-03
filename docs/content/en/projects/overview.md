@@ -216,8 +216,8 @@ These routes address the project by **path id**, so they do not use the
 | `GET`    | `/api/v1/projects/{id}/invitations`         | `members:write`                                  |
 | `POST`   | `/api/v1/projects/{id}/invitations`         | `members:write`                                  |
 | `DELETE` | `/api/v1/projects/{id}/invitations/{invId}` | `members:delete`                                 |
-| `POST`   | `/api/v1/invitations/{token}/accept`        | any signed-in account                            |
-| `POST`   | `/api/v1/invitations/{token}/decline`       | any signed-in account                            |
+| `POST`   | `/app/api/invitations/{token}/accept`       | a signed-in session, the invited address         |
+| `POST`   | `/app/api/invitations/{token}/decline`      | a signed-in session, the invited address         |
 
 The active project's plan and usage (`GET /api/v1/usage`, `analytics:read`) and its audit trail
 (`GET /api/v1/audit-log`, `audit:read`) are ordinary header-addressed routes. Platform settings live under

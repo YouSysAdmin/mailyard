@@ -162,8 +162,8 @@ The recipient redeems an invitation with the **token** from the invitation mail.
 and no project header - the invitee is not a member of anything yet.
 
 ```
-POST /api/v1/invitations/{token}/accept
-POST /api/v1/invitations/{token}/decline
+POST /app/api/invitations/{token}/accept
+POST /app/api/invitations/{token}/decline
 ```
 
 Neither takes a body: the token in the path is the whole claim.

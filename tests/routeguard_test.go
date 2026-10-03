@@ -61,9 +61,7 @@ var handlerEnforcedGroups = map[string]string{
 // handlerEnforcedRoutes are individual routes on the v1 group with the
 // same excuse.
 var handlerEnforcedRoutes = map[string]string{
-	"GET /permissions":                 "the static catalogue - no project, and every authenticated caller may read it",
-	"POST /invitations/:token/accept":  "the token names the project, and the caller is not a member yet",
-	"POST /invitations/:token/decline": "same",
+	"GET /permissions": "the static catalogue - no project, and every authenticated caller may read it",
 }
 
 func TestEveryProjectRouteDeclaresAPermission(t *testing.T) {
