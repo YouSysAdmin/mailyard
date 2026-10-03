@@ -85,6 +85,11 @@ const statsRollupDays = 15
 // dropped request.
 const shutdownTimeout = 15 * time.Second
 
+// drainTimeouts bounds each stage of a shutdown.
+type drainTimeouts struct {
+	server, smtp, runner, worker, cron, dispatch, audit time.Duration
+}
+
 // role selects which halves of the process a node runs.
 //
 // A subcommand rather than a config key, deliberately. The whole
@@ -986,35 +991,30 @@ func runServe(cmd *cobra.Command, r role) error {
 		go func() { errCh <- metricsSrv.Start() }()
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
-
-	select {
-	case s := <-sigCh:
-		log.Info("shutdown requested", "signal", s.String())
-
-		// Order: stop the scheduling, end the event streams (or the
-		// drain runs to its full timeout on every open console tab),
-		// drain the requests, then stop the SMTP listeners, the runner,
-		// the worker and the jobs, and only then close the consumers
-		// they all write into - a closed recorder drops what handlers
-		// still record. db.Close is deferred and runs last.
-		//
-		// stopWorker runs here and not only in the defer, which cannot
-		// fire until this function returns - and it is about to block
-		// on shutdown, so scheduled jobs kept firing for the whole
-		// drain.
-		stopWorker(fmt.Errorf("signal %s", s))
+	// drain is the one shutdown sequence, whatever started it. Order:
+	// stop the scheduling, end the event streams (or the drain runs to
+	// its full timeout on every open console tab), drain the requests,
+	// then stop the SMTP listeners, the runner, the worker and the jobs,
+	// and only then close the consumers they all write into - a closed
+	// recorder drops what handlers still record. db.Close is deferred
+	// and runs last.
+	//
+	// stopWorker runs here and not only in the defer, which cannot fire
+	// until runServe returns - and it is about to block on shutdown, so
+	// scheduled jobs kept firing for the whole drain.
+	//
+	// It answers the HTTP drain's error and nothing else.
+	drain := func(cause error, t drainTimeouts) error {
+		stopWorker(cause)
 		rt.Events.Close()
 
-		shutdownErr := srv.Shutdown(shutdownTimeout)
-		stopSMTPListeners(10 * time.Second)
-		runner.Stop(10 * time.Second)
-		worker.Stop(30 * time.Second)
-		rt.Cron.Wait(30 * time.Second)
-		dispatcher.Close(10 * time.Second)
-		rt.Audit.Close(5 * time.Second)
+		shutdownErr := srv.Shutdown(t.server)
+		stopSMTPListeners(t.smtp)
+		runner.Stop(t.runner)
+		worker.Stop(t.worker)
+		rt.Cron.Wait(t.cron)
+		dispatcher.Close(t.dispatch)
+		rt.Audit.Close(t.audit)
 
 		// Logged rather than returned: a scrape must not decide the
 		// exit status of a clean shutdown.
@@ -1023,27 +1023,31 @@ func runServe(cmd *cobra.Command, r role) error {
 		}
 
 		return shutdownErr
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	select {
+	case s := <-sigCh:
+		log.Info("shutdown requested", "signal", s.String())
+
+		return drain(fmt.Errorf("signal %s", s), drainTimeouts{
+			server: shutdownTimeout, smtp: 10 * time.Second, runner: 10 * time.Second,
+			worker: 30 * time.Second, cron: 30 * time.Second, dispatch: 10 * time.Second,
+			audit: 5 * time.Second,
+		})
 
 	case err := <-errCh:
-		stopWorker(fmt.Errorf("listener failed: %w", err))
-		rt.Events.Close()
-
 		// One listener failing takes the OTHER down with it, rather than
 		// leaving a survivor serving under a config just reported
 		// broken. Both are no-ops on the one that already stopped.
-		// Same order as the clean path.
-		if serr := srv.Shutdown(5 * time.Second); serr != nil {
+		const quick = 5 * time.Second
+		if serr := drain(fmt.Errorf("listener failed: %w", err), drainTimeouts{
+			server: quick, smtp: quick, runner: quick, worker: quick, cron: quick, dispatch: quick, audit: quick,
+		}); serr != nil {
 			log.Warn("server shutdown", "err", serr)
-		}
-
-		stopSMTPListeners(5 * time.Second)
-		runner.Stop(5 * time.Second)
-		worker.Stop(5 * time.Second)
-		rt.Cron.Wait(5 * time.Second)
-		dispatcher.Close(5 * time.Second)
-		rt.Audit.Close(5 * time.Second)
-		if merr := metricsSrv.Shutdown(5 * time.Second); merr != nil {
-			log.Warn("metrics shutdown", "err", merr)
 		}
 
 		return err
