@@ -10,6 +10,7 @@ import { formatDate } from '../../composables/formatDate'
 import MessageViewer, { type ViewerAttachment } from '../../components/MessageViewer.vue'
 import RefreshControl from '../../components/RefreshControl.vue'
 import { useAutoRefresh } from '../../composables/useAutoRefresh'
+import { useConfirm } from '../../composables/useConfirm'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
@@ -19,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const notify = useNotificationStore()
 const projStore = useProjectStore()
+const { confirm } = useConfirm()
 
 const loading = ref(true)
 const retrying = ref(false)
@@ -154,6 +156,15 @@ const cancellable = computed(
 
 async function cancelEmail() {
   if (!email.value || cancelling.value) return
+  const ok = await confirm({
+    title: 'Cancel sending',
+    message:
+      'Withdraw this message? It will not be delivered, and a cancelled message cannot be queued again.',
+    confirmText: 'Cancel sending',
+    cancelText: 'Keep it',
+    variant: 'danger',
+  })
+  if (!ok || !email.value) return
   cancelling.value = true
   try {
     const res = await emailsApi.cancel(email.value.id)
@@ -207,7 +218,7 @@ async function retryEmail() {
           :disabled="cancelling"
           @click="cancelEmail"
         >
-          {{ cancelling ? 'Cancelling...' : 'Cancel' }}
+          {{ cancelling ? 'Cancelling...' : 'Cancel sending' }}
         </button>
         <a v-if="email" class="btn btn-secondary" :href="browserURL(`/emails/${email.id}/eml`)">
           Download .eml
