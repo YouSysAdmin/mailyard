@@ -26,7 +26,7 @@ func ConsoleDocs() []apidoc.Route {
 			Path:        "/plans/",
 			Summary:     "Create",
 			Description: "Platform admin.",
-			Request:     upsertInput{},
+			Request:     createPlanInput{},
 			Responses:   []apidoc.Response{apidoc.Created("The result.", PlanResponse{})},
 		},
 		{
@@ -43,7 +43,7 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "Update",
 			Description: "Platform admin.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
-			Request:     upsertInput{},
+			Request:     updatePlanInput{},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", PlanResponse{})},
 		},
 		{

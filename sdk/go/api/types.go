@@ -370,6 +370,21 @@ type CreateInput struct {
 	Admin    bool   `json:"admin"`
 }
 
+// CreatePlanInput is the request body.
+type CreatePlanInput struct {
+	Name                    string `json:"name"`
+	Description             string `json:"description"`
+	IsDefault               *bool  `json:"is_default"`
+	HourlyEmailLimit        *int64 `json:"hourly_email_limit"`
+	DailyEmailLimit         *int64 `json:"daily_email_limit"`
+	MaxAPIKeys              *int64 `json:"max_api_keys"`
+	MaxSMTPServers          *int64 `json:"max_smtp_servers"`
+	MaxDomains              *int64 `json:"max_domains"`
+	MaxSubscribers          *int64 `json:"max_subscribers"`
+	MaxSandboxMessages      *int64 `json:"max_sandbox_messages"`
+	MaxSandboxRetentionDays *int64 `json:"max_sandbox_retention_days"`
+}
+
 // CreateResponse is the response body.
 type CreateResponse struct {
 	Suppression *Suppression `json:"suppression"`
@@ -1361,21 +1376,6 @@ type PlanListResponse struct {
 // PlanResponse is the response body.
 type PlanResponse struct {
 	Plan *Plan `json:"plan"`
-}
-
-// PlanUpsertInput is the request body.
-type PlanUpsertInput struct {
-	Name                    string `json:"name"`
-	Description             string `json:"description"`
-	IsDefault               *bool  `json:"is_default"`
-	HourlyEmailLimit        *int64 `json:"hourly_email_limit"`
-	DailyEmailLimit         *int64 `json:"daily_email_limit"`
-	MaxAPIKeys              *int64 `json:"max_api_keys"`
-	MaxSMTPServers          *int64 `json:"max_smtp_servers"`
-	MaxDomains              *int64 `json:"max_domains"`
-	MaxSubscribers          *int64 `json:"max_subscribers"`
-	MaxSandboxMessages      *int64 `json:"max_sandbox_messages"`
-	MaxSandboxRetentionDays *int64 `json:"max_sandbox_retention_days"`
 }
 
 // PreviewInput is the request body.
@@ -2444,6 +2444,21 @@ type UnsubscribelistUpdateInput struct {
 // UpdateInput is the request body.
 type UpdateInput struct {
 	Settings []SettingInput `json:"settings"`
+}
+
+// UpdatePlanInput is the request body.
+type UpdatePlanInput struct {
+	Name                    *string `json:"name"`
+	Description             *string `json:"description"`
+	IsDefault               *bool   `json:"is_default"`
+	HourlyEmailLimit        *int64  `json:"hourly_email_limit"`
+	DailyEmailLimit         *int64  `json:"daily_email_limit"`
+	MaxAPIKeys              *int64  `json:"max_api_keys"`
+	MaxSMTPServers          *int64  `json:"max_smtp_servers"`
+	MaxDomains              *int64  `json:"max_domains"`
+	MaxSubscribers          *int64  `json:"max_subscribers"`
+	MaxSandboxMessages      *int64  `json:"max_sandbox_messages"`
+	MaxSandboxRetentionDays *int64  `json:"max_sandbox_retention_days"`
 }
 
 // UploadInput is the request body.

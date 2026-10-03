@@ -66,8 +66,9 @@ Returns `{"plans": [...]}`. There is no fetch-one route - the list is short and 
 PATCH /api/v1/admin/plans/{id}
 ```
 
-Takes the same body as create. Setting `is_default` here is how a plan becomes the default, and the previous default is
-unset in the same write.
+Takes the same fields as create, all optional: a field left out keeps what the plan has, so
+`{"hourly_email_limit": 500}` changes that limit and nothing else. A limit sent as `0` means unlimited, not unchanged.
+Setting `is_default` here is how a plan becomes the default, and the previous default is unset in the same write.
 
 ## Deleting a Plan
 

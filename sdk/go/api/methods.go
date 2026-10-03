@@ -175,7 +175,7 @@ func (c *Client) ListAdminPlans(ctx context.Context, opts ...RequestOption) (Pla
 // CreateAdminPlan Create.
 //
 // POST /admin/plans/
-func (c *Client) CreateAdminPlan(ctx context.Context, body PlanUpsertInput, opts ...RequestOption) (PlanResponse, error) {
+func (c *Client) CreateAdminPlan(ctx context.Context, body CreatePlanInput, opts ...RequestOption) (PlanResponse, error) {
 	return do[PlanResponse](ctx, c, "POST", "/admin/plans", body, opts)
 }
 
@@ -190,7 +190,7 @@ func (c *Client) DeleteAdminPlan(ctx context.Context, id string, opts ...Request
 // UpdateAdminPlan Update.
 //
 // PATCH /admin/plans/:id
-func (c *Client) UpdateAdminPlan(ctx context.Context, id string, body PlanUpsertInput, opts ...RequestOption) (PlanResponse, error) {
+func (c *Client) UpdateAdminPlan(ctx context.Context, id string, body UpdatePlanInput, opts ...RequestOption) (PlanResponse, error) {
 	return do[PlanResponse](ctx, c, "PATCH", fmt.Sprintf("/admin/plans/%s", escape(id)), body, opts)
 }
 

@@ -41,7 +41,7 @@ func TestEveryLimitSurvivesTheRoundTrip(t *testing.T) {
 	// and sets the pointee. It found zero fields the moment they became
 	// pointers and refused to pass, which is the anti-vacuity guard below
 	// doing its job.
-	in := upsertInput{Name: "round trip"}
+	in := limitsInput{}
 	v := reflect.ValueOf(&in).Elem()
 	next := 11
 	numeric := 0
@@ -60,7 +60,7 @@ func TestEveryLimitSurvivesTheRoundTrip(t *testing.T) {
 		t.Fatalf("only found %d numeric limits on the request - this test would prove little", numeric)
 	}
 
-	p := &pmodel.Plan{ID: ids.New(), CreatedAt: time.Now().UTC()}
+	p := &pmodel.Plan{ID: ids.New(), Name: "round trip", CreatedAt: time.Now().UTC()}
 	apply(p, in)
 	if err := store.Put(ctx, p); err != nil {
 		t.Fatalf("put: %v", err)
@@ -125,12 +125,8 @@ func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {
 		MaxSandboxRetentionDays: 7,
 	}
 
-	// The body an operator sends to fix a typo in the name.
-	apply(stored, upsertInput{Name: "Starter plan"})
-
-	if stored.Name != "Starter plan" {
-		t.Errorf("name = %q, want the edit applied", stored.Name)
-	}
+	// The limits of a body that only fixes a typo in the name.
+	apply(stored, limitsInput{})
 
 	for _, tc := range []struct {
 		what string
@@ -160,7 +156,7 @@ func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {
 	// And a field that IS named still changes, or leaving fields alone
 	// would be a no-op.
 	zero, hundred := 0, 100
-	apply(stored, upsertInput{Name: "Starter plan", HourlyEmailLimit: &zero, MaxAPIKeys: &hundred})
+	apply(stored, limitsInput{HourlyEmailLimit: &zero, MaxAPIKeys: &hundred})
 	if stored.HourlyEmailLimit != 0 || stored.MaxAPIKeys != 100 {
 		t.Errorf("named fields did not apply: hourly=%d api_keys=%d",
 			stored.HourlyEmailLimit, stored.MaxAPIKeys)

@@ -20,7 +20,23 @@ import (
 // Requests
 // ----------------------------------------------------------------------------
 
-// upsertInput is the create and update body.
+// createPlanInput is the create body.
+type createPlanInput struct {
+	Name        string `json:"name"        validate:"required,min=1,max=100" normalize:"trim"`
+	Description string `json:"description" validate:"max=500" normalize:"trim"`
+	limitsInput
+}
+
+// updatePlanInput is the PATCH body: every field optional, an absent one
+// keeps what the plan has. Name and Description are pointers for the
+// same reason the limits are - an absent description is not a blank one.
+type updatePlanInput struct {
+	Name        *string `json:"name"        validate:"omitzero,min=1,max=100"`
+	Description *string `json:"description" validate:"omitzero,max=500"`
+	limitsInput
+}
+
+// limitsInput is what both bodies may set beyond the name.
 //
 // Every LIMIT is a pointer, and that is load-bearing on the update route.
 // Pointers, because the route is a PATCH and 0 does not mean "no change"
@@ -30,10 +46,7 @@ import (
 // return nil at 0.
 //
 // Same shape and same reason as oauthprovider's admission lists.
-type upsertInput struct {
-	Name        string `json:"name"        validate:"required,min=1,max=100" normalize:"trim"`
-	Description string `json:"description" validate:"max=500" normalize:"trim"`
-
+type limitsInput struct {
 	IsDefault        *bool `json:"is_default"`
 	HourlyEmailLimit *int  `json:"hourly_email_limit" validate:"omitzero,min=0"`
 	DailyEmailLimit  *int  `json:"daily_email_limit"  validate:"omitzero,min=0"`

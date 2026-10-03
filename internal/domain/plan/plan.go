@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -211,13 +212,13 @@ func (h *Handler) List(c fiber.Ctx) error {
 
 // Create serves POST /api/v1/admin/plans.
 func (h *Handler) Create(c fiber.Ctx) error {
-	in, resp, ok := validation.Bind[upsertInput](c)
+	in, resp, ok := validation.Bind[createPlanInput](c)
 	if !ok {
 		return resp
 	}
 
-	p := &pmodel.Plan{ID: ids.New()}
-	apply(p, in)
+	p := &pmodel.Plan{ID: ids.New(), Name: in.Name, Description: in.Description}
+	apply(p, in.limitsInput)
 	if err := h.Runtime.Store.Plan.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
 	}
@@ -236,12 +237,27 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.NotFound(c, "plan not found")
 	}
 
-	in, resp, ok := validation.Bind[upsertInput](c)
+	in, resp, ok := validation.Bind[updatePlanInput](c)
 	if !ok {
 		return resp
 	}
 
-	apply(p, in)
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		if name == "" {
+			fes := []validation.FieldError{{Field: "name", Rule: "required", Message: "Name is required"}}
+
+			return response.BadRequestFields(c, validation.Summary(fes), fes)
+		}
+
+		p.Name = name
+	}
+
+	if in.Description != nil {
+		p.Description = strings.TrimSpace(*in.Description)
+	}
+
+	apply(p, in.limitsInput)
 	p.UpdatedAt = new(time.Now().UTC())
 	if err := h.Runtime.Store.Plan.Put(c.Context(), p); err != nil {
 		return response.Internal(c, err)
@@ -316,15 +332,12 @@ func (h *Handler) Usage(c fiber.Ctx) error {
 	return response.Success(c, UsageResponse{Usage: counts, Plan: p})
 }
 
-// apply folds the body onto the record, leaving absent fields alone.
+// apply folds the limits onto the record, leaving absent ones alone.
 //
-// An absent limit keeps what the plan already sells. See upsertInput for
+// An absent limit keeps what the plan already sells. See limitsInput for
 // why that cannot be expressed with a plain int: 0 is a MEANING here
 // (unlimited), not a blank.
-func apply(p *pmodel.Plan, in upsertInput) {
-	p.Name = in.Name
-	p.Description = in.Description
-
+func apply(p *pmodel.Plan, in limitsInput) {
 	if in.IsDefault != nil {
 		p.IsDefault = *in.IsDefault
 	}
