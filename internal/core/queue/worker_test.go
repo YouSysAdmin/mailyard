@@ -212,6 +212,13 @@ func TestWorkerPermanentFailureSkipsRetry(t *testing.T) {
 	}
 }
 
+// A zero Outcome is not a verdict and must never mark a message sent.
+func TestAZeroOutcomeIsNotSent(t *testing.T) {
+	src := newMemSource(queuedEmail("x"))
+	proc := funcProcessor(func(*emailmodel.Email) Outcome { return Outcome{} })
+	run(t, src, proc, func() bool { return src.statusOf("x") == emailmodel.StatusFailed })
+}
+
 func TestWorkerSuppressedOutcome(t *testing.T) {
 	src := newMemSource(queuedEmail("x"))
 	proc := funcProcessor(func(*emailmodel.Email) Outcome { return Suppressed(errors.New("all recipients suppressed")) })

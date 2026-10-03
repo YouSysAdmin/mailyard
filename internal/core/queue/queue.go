@@ -24,8 +24,12 @@ import (
 type OutcomeKind int
 
 const (
+	// KindInvalid is the zero value, so an Outcome nobody filled in is
+	// never read as a verdict. The worker finalizes it as failed.
+	KindInvalid OutcomeKind = iota
+
 	// KindDone - delivered, finalize as sent.
-	KindDone OutcomeKind = iota
+	KindDone
 
 	// KindRetry - transient failure, re-queue with backoff (or fail
 	// when attempts are exhausted).

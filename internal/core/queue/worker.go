@@ -369,13 +369,13 @@ func (w *Worker) finish(ctx context.Context, job *emailmodel.Email, out Outcome)
 		}
 
 		w.notify(job, emailmodel.StatusSuppressed, errMsg)
-	default: // KindFail
+	default: // KindFail, and a zero Outcome
 		ok, err := w.src.Finalize(ctx, job.ID, job.CreatedAt, job.ClaimedAt, emailmodel.StatusFailed, errMsg, "", nil)
 		if !w.write(job, "finalize failed", ok, err) {
 			return
 		}
 
-		w.log.Warn("queue: permanent failure", "email_id", job.ID, "err", errMsg)
+		w.log.Warn("queue: permanent failure", "email_id", job.ID, "kind", int(out.Kind), "err", errMsg)
 		w.notify(job, emailmodel.StatusFailed, errMsg)
 	}
 }
