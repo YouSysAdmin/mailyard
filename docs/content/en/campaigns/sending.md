@@ -55,14 +55,19 @@ while the send fails its way through the audience.
 
 The runner works in batches (`campaign.batch_size`, 100 by default), resolving the list, rendering the template per
 subscriber and queueing the results. Recipients who are suppressed, or who hold a per-list opt-out, are marked
-`skipped` rather than mailed.
+`skipped` rather than mailed, including an opt-out made while the campaign is already running.
 
 **`send_rate`** caps throughput in emails per minute, applied between batches. Zero is unthrottled. It is the control
 for staying inside a provider's rate limit, and for not putting a cold IP through a step change in volume.
 
 **`send_at_local_time`**, together with `scheduled_at`, delivers at that wall-clock time in each subscriber's own
-timezone — 09:00 in Lagos and 09:00 in Lisbon, two hours apart. Subscribers with no timezone recorded get the scheduled
-instant as it stands.
+timezone — 09:00 in Lagos and 09:00 in Tokyo, eight hours apart. The wall clock is the time **as written**, and the offset
+it carries is ignored: `2026-11-02T09:00:00+01:00` delivers at 09:00 in every subscriber's timezone, not at 08:00.
+Subscribers with no timezone recorded get the scheduled instant as it stands.
+
+To reach the earliest timezones in time, such a campaign starts running once its wall clock has arrived at UTC+14, up
+to fourteen hours before `scheduled_at`. It shows as `sending` from then on, and each message waits for its own
+delivery time.
 
 ## Pause and resume
 
@@ -71,7 +76,7 @@ POST /api/v1/campaigns/{id}/pause
 POST /api/v1/campaigns/{id}/resume
 ```
 
-Pausing stops the runner **between batches**. Messages already handed to the delivery queue still go out — there is no
+Pausing stops the runner **between batches**. Resuming does not skip the wait `send_rate` put before the next batch. Messages already handed to the delivery queue still go out — there is no
 recall — so expect a short tail after the pause takes effect. Resuming picks up at the next unsent recipient rather than
 starting over.
 
@@ -86,6 +91,12 @@ POST /api/v1/campaigns/{id}/cancel
 
 Works from `sending`, `paused` or `scheduled`, and is final — there is no resume from `cancelled`. Recipients who had
 not been reached are marked `skipped`, which is how the message counts still add up to the audience size afterwards.
+
+Cancelling one campaign email that is still queued (`POST /api/v1/emails/{id}/cancel`) marks its recipient `skipped`
+too, and the campaign still completes once the rest of its messages settle.
+
+A campaign whose subscriber list was deleted is refused at send. One whose list goes while it waits on its schedule is
+cancelled when it would have started, since there is nobody left to send to.
 
 ## Duplicate
 

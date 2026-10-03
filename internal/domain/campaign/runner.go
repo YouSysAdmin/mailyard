@@ -28,11 +28,15 @@ import (
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
 	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 	submodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
+	tmodel "github.com/yousysadmin/mailyard/internal/models/template"
 	whmodel "github.com/yousysadmin/mailyard/internal/models/webhook"
 )
 
 // claimLease bounds how long a crashed batch blocks its campaign.
 const claimLease = 2 * time.Minute
+
+// msgOptedOut is the reason a message to a per-list opt-out carries.
+const msgOptedOut = "opted out of the list"
 
 // Runner drains sending campaigns: fan-out on first claim, then
 // throttled batches of pending messages rendered per subscriber and
@@ -208,6 +212,12 @@ func (r *Runner) processBatch(ctx context.Context, c *cmodel.Campaign) {
 
 	if !fanned {
 		if err := r.fanOut(ctx, c); err != nil {
+			if errors.Is(err, errListGone) {
+				r.abandon(ctx, c)
+
+				return
+			}
+
 			r.Log.Error("campaign: fan out", "campaign_id", c.ID, "err", err)
 
 			// Leave the lease in place: the next claim retries after
@@ -295,15 +305,15 @@ func (r *Runner) fanOut(ctx context.Context, c *cmodel.Campaign) error {
 	}
 
 	if list == nil {
-		return fmt.Errorf("subscriber list %s not found", c.ListID)
+		return errListGone
 	}
 
-	recipients, err := r.Store.SubscriberList.ResolveRecipients(ctx, r.Store.Subscriber, c.ProjectID, list)
+	recipients, optedOut, err := r.Store.SubscriberList.ResolveAudience(ctx, r.Store.Subscriber, c.ProjectID, list)
 	if err != nil {
 		return err
 	}
 
-	msgs := make([]*cmodel.Message, 0, len(recipients))
+	msgs := make([]*cmodel.Message, 0, len(recipients)+len(optedOut))
 	for _, sub := range recipients {
 		m := &cmodel.Message{
 			CampaignID:   c.ID,
@@ -318,6 +328,15 @@ func (r *Runner) fanOut(ctx context.Context, c *cmodel.Campaign) error {
 	}
 
 	assignVariants(c, msgs)
+
+	// An opt-out is part of the audience the campaign was addressed to,
+	// recorded as skipped so the counts add up to it.
+	for _, sub := range optedOut {
+		msgs = append(msgs, &cmodel.Message{
+			CampaignID: c.ID, SubscriberID: sub.ID,
+			Status: cmodel.MsgSkipped, ErrorMessage: msgOptedOut,
+		})
+	}
 
 	if len(msgs) > 0 {
 		if err := r.Store.Campaign.BulkCreateMessages(ctx, msgs); err != nil {
@@ -422,7 +441,18 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		return r.Store.Campaign.UpdateMessage(ctx, m.ID, cmodel.MsgSkipped, "subscriber missing or no longer subscribed", "")
 	}
 
-	out, templateID, err := renderForSubscriber(ctx, r.EmailService, c, m.Variant, sub)
+	// An opt-out from this list made after the fan-out counts as much
+	// as one made before it.
+	optedOut, err := r.Store.SubscriberList.IsOptedOut(ctx, c.ProjectID, c.ListID, sub.ID)
+	if err != nil {
+		return err
+	}
+
+	if optedOut {
+		return r.Store.Campaign.UpdateMessage(ctx, m.ID, cmodel.MsgSkipped, msgOptedOut, "")
+	}
+
+	out, t, err := renderForSubscriber(ctx, r.EmailService, c, m.Variant, sub)
 	if err != nil {
 		return err
 	}
@@ -448,8 +478,9 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		// campaign was created. Empty means the project's default.
 		Route:          email.Route{GroupID: c.SMTPGroupID},
 		DisableSigning: c.DisableSigning,
+		TemplateName:   t.Name,
 	}
-	if err := r.EmailService.AttachTemplateFiles(ctx, c.ProjectID, templateID, req); err != nil {
+	if err := r.EmailService.AttachTemplateFiles(ctx, c.ProjectID, t.ID, req); err != nil {
 		return err
 	}
 
@@ -469,7 +500,23 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		return r.Store.Campaign.UpdateMessage(fctx, m.ID, cmodel.MsgSkipped, "recipient suppressed", e.ID)
 	}
 
-	return r.Store.Campaign.UpdateMessage(fctx, m.ID, cmodel.MsgQueued, "", e.ID)
+	queued, err := r.Store.Campaign.QueueMessage(fctx, m.ID, e.ID)
+	if err != nil || queued {
+		return err
+	}
+
+	// The campaign was cancelled while this message was being sent, and
+	// the cancel already marked it skipped. The email is withdrawn to
+	// match. When a worker took it first it is going out, and the
+	// message is linked so the worker's outcome lands on it.
+	if _, cerr := r.EmailService.Cancel(fctx, c.ProjectID, e.ID); cerr != nil {
+		r.Log.Info("campaign: email of a cancelled message already claimed",
+			"campaign_id", c.ID, "email_id", e.ID, "reason", cerr.Error())
+
+		return r.Store.Campaign.UpdateMessage(fctx, m.ID, cmodel.MsgQueued, "", e.ID)
+	}
+
+	return nil
 }
 
 // resolveVariant answers which template and subject override a
@@ -506,7 +553,7 @@ func resolveVariant(c *cmodel.Campaign, variant string) (templateID, subject str
 // consulted, because a send never reads it and a preview that filled
 // the blanks from it looked right until the mail went out.
 func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Campaign,
-	variant string, sub *submodel.Subscriber) (*render.Output, string, error) {
+	variant string, sub *submodel.Subscriber) (*render.Output, *tmodel.Template, error) {
 	templateID, variantSubject := resolveVariant(c, variant)
 
 	data := map[string]any{}
@@ -525,14 +572,14 @@ func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Camp
 	// reserved name the body accepts.
 	data = tracking.WithSystemVars(data)
 
-	out, _, err := svc.RenderTemplate(ctx, c.ProjectID, &email.TemplateRef{
+	out, t, err := svc.RenderTemplate(ctx, c.ProjectID, &email.TemplateRef{
 		ID:       templateID,
 		Language: language,
 		Data:     data,
 		Lenient:  true,
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	if variantSubject != "" {
@@ -548,7 +595,7 @@ func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Camp
 		out.Subject = c.Subject
 	}
 
-	return out, templateID, nil
+	return out, t, nil
 }
 
 // applyTracking substitutes the system-link sentinels, rewrites links
@@ -642,6 +689,26 @@ func (r *Runner) complete(ctx context.Context, c *cmodel.Campaign) {
 	}
 }
 
+// errListGone is a campaign whose list was deleted before it ran.
+var errListGone = errors.New("subscriber list not found")
+
+// abandon cancels a campaign whose list no longer exists. Nothing was
+// fanned out, so there is nobody to send to and nothing to retry.
+func (r *Runner) abandon(ctx context.Context, c *cmodel.Campaign) {
+	moved, err := r.Store.Campaign.SetRunState(ctx, c.ID, cmodel.StatusCancelled, nil, nil, nil, cmodel.StatusSending)
+	if err != nil {
+		r.Log.Error("campaign: cancel, list is gone", "campaign_id", c.ID, "err", err)
+
+		return
+	}
+
+	if !moved {
+		return
+	}
+
+	r.Log.Warn("campaign: cancelled, its subscriber list was deleted", "campaign_id", c.ID, "list_id", c.ListID)
+}
+
 // raiseHeld reports a campaign the plan limit is holding back, once an
 // hour while it lasts.
 func (r *Runner) raiseHeld(ctx context.Context, c *cmodel.Campaign) {
@@ -695,15 +762,17 @@ func assignVariants(c *cmodel.Campaign, msgs []*cmodel.Message) {
 	}
 }
 
-// localDeliverAt maps the campaign's scheduled instant to the same
-// wall-clock time in the subscriber's timezone. Subscribers without a
-// usable timezone keep the plain instant, and times already past are
-// delivered immediately (nil).
+// localDeliverAt maps the campaign's scheduled wall clock, as written
+// with whatever offset it carried, to the same wall clock in the
+// subscriber's timezone. Subscribers without a usable timezone keep the
+// plain instant, and a time already past is delivered at once by the
+// next batch.
 func localDeliverAt(c *cmodel.Campaign, sub *submodel.Subscriber) *time.Time {
 	ref := c.ScheduledAt
 	if ref == nil {
 		ref = c.StartedAt
 	}
+
 	if ref == nil {
 		return nil
 	}
@@ -717,9 +786,14 @@ func localDeliverAt(c *cmodel.Campaign, sub *submodel.Subscriber) *time.Time {
 		return ref
 	}
 
-	utc := ref.UTC()
-	y, mo, d := utc.Date()
-	h, mi, _ := utc.Clock()
+	wall := ref.UTC()
+	if c.ScheduledAt != nil && c.ScheduledOffset != nil {
+		wall = ref.In(time.FixedZone("", *c.ScheduledOffset))
+	}
+
+	y, mo, d := wall.Date()
+	h, mi, _ := wall.Clock()
+
 	return new(time.Date(y, mo, d, h, mi, 0, 0, loc).UTC())
 }
 

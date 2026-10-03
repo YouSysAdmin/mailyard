@@ -907,11 +907,14 @@ type SubscriberStore interface {
 }
 
 // SubscriberListStore persists campaign audiences: static membership,
-// dynamic rules, and per-list opt-outs. ResolveRecipients returns the
-// send-ready audience (subscribed, not opted out).
+// dynamic rules, and per-list opt-outs. ResolveAudience returns the
+// send-ready audience (subscribed) with the list's opt-outs apart.
 type SubscriberListStore interface {
 	Get(ctx context.Context, projID, id string) (*subscriberlist.List, error)
 	List(ctx context.Context, projID string) ([]*subscriberlist.List, error)
+
+	// Find is List windowed when limit is positive, with the total.
+	Find(ctx context.Context, projID string, limit, offset int) ([]*subscriberlist.List, int, error)
 	Put(ctx context.Context, l *subscriberlist.List) error
 	Delete(ctx context.Context, projID, id string) error
 
@@ -937,8 +940,9 @@ type SubscriberListStore interface {
 	Unsubscribe(ctx context.Context, projID, listID, subscriberID, reason string) error
 	Resubscribe(ctx context.Context, projID, listID, subscriberID string) error
 	UnsubscribedIDs(ctx context.Context, projID, listID string) (map[string]struct{}, error)
+	IsOptedOut(ctx context.Context, projID, listID, subscriberID string) (bool, error)
 
-	ResolveRecipients(ctx context.Context, subs SubscriberStore, projID string, l *subscriberlist.List) ([]*subscriber.Subscriber, error)
+	ResolveAudience(ctx context.Context, subs SubscriberStore, projID string, l *subscriberlist.List) (recipients, optedOut []*subscriber.Subscriber, err error)
 }
 
 // CampaignStore persists campaigns and their per-recipient messages.
@@ -959,7 +963,7 @@ type CampaignStore interface {
 	// Launch stamps the launch columns and leaves draft or scheduled in
 	// one guarded statement. Put deliberately cannot touch the
 	// lifecycle columns - see the store method.
-	Launch(ctx context.Context, projID, id, status string, scheduledAt, startedAt, nextBatchAt *time.Time) (bool, error)
+	Launch(ctx context.Context, projID, id, status string, scheduledAt *time.Time, scheduledOffset *int, startedAt, nextBatchAt *time.Time) (bool, error)
 
 	// from is required on both of these. An unguarded status write from
 	// the runner is what let a batch already in flight put a paused
@@ -975,6 +979,10 @@ type CampaignStore interface {
 	CountPending(ctx context.Context, campaignID string) (int, error)
 	NextDeliverAt(ctx context.Context, campaignID string) (*time.Time, error)
 	UpdateMessage(ctx context.Context, id, status, errMsg, emailID string) error
+
+	// QueueMessage links a pending message to its email, false when the
+	// message stopped being pending first.
+	QueueMessage(ctx context.Context, id, emailID string) (bool, error)
 	MarkMessageByEmail(ctx context.Context, emailID, status, errMsg string) (string, error)
 
 	// ClaimSettled stamps a completed campaign with nothing left in

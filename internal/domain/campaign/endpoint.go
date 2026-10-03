@@ -106,6 +106,10 @@ func (h *Handler) validateCampaignRefs(c fiber.Ctx, projID string, in *upsertInp
 				if vt == nil {
 					return false, response.NotFound(c, "variant template not found: "+v.Name)
 				}
+
+				if vt.ActiveVersionID == nil {
+					return false, response.BadRequest(c, "variant template has no active version: "+v.Name)
+				}
 			}
 		}
 
@@ -257,9 +261,9 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	return response.Created(c, CampaignResponse{Campaign: cam})
 }
 
-// Update replaces the definition. Only draft campaigns are editable
-// (a scheduled campaign must be cancelled back to draft first, sends
-// in flight are immutable).
+// Update edits the definition, keeping every field the body does not
+// name. Only draft campaigns are editable (a scheduled campaign must be
+// cancelled back to draft first, sends in flight are immutable).
 func (h *Handler) Update(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
@@ -275,7 +279,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.Conflict(c, "only draft campaigns can be edited")
 	}
 
-	in, resp, ok := validation.Bind[upsertInput](c)
+	in, resp, ok := validation.BindOnto(c, inputOf(cam))
 	if !ok {
 		return resp
 	}
@@ -367,7 +371,18 @@ func (h *Handler) Send(c fiber.Ctx) error {
 		return response.BadRequest(c, err.Error())
 	}
 
-	in, resp, ok := validation.Bind[sendInput](c)
+	// A list deleted after the campaign was written leaves nobody to
+	// send to, and a run that cannot fan out never finishes.
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, cam.ListID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if l == nil {
+		return response.BadRequest(c, "the campaign's subscriber list no longer exists")
+	}
+
+	in, resp, ok := validation.BindOptional[sendInput](c)
 	if !ok {
 		return resp
 	}
@@ -384,8 +399,10 @@ func (h *Handler) Send(c fiber.Ctx) error {
 			return response.BadRequest(c, "scheduled_at is in the past")
 		}
 
+		_, offset := at.Zone()
 		cam.Status = cmodel.StatusScheduled
 		cam.ScheduledAt = &utc
+		cam.ScheduledOffset = &offset
 	} else {
 		cam.Status = cmodel.StatusSending
 		cam.StartedAt = &now
@@ -398,7 +415,7 @@ func (h *Handler) Send(c fiber.Ctx) error {
 	// wrote the stale status back and resurrected the cancelled
 	// campaign. Launch re-checks draft/scheduled inside the UPDATE.
 	moved, err := h.Runtime.Store.Campaign.Launch(c.Context(), rc.Project.ID, cam.ID,
-		cam.Status, cam.ScheduledAt, cam.StartedAt, cam.NextBatchAt)
+		cam.Status, cam.ScheduledAt, cam.ScheduledOffset, cam.StartedAt, cam.NextBatchAt)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -423,8 +440,17 @@ func (h *Handler) Pause(c fiber.Ctx) error {
 // Resume serves POST /api/v1/campaigns/:id/resume.
 func (h *Handler) Resume(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cam == nil {
+		return response.NotFound(c, "campaign not found")
+	}
+
 	ok, err := h.Runtime.Store.Campaign.TransitionStatus(c.Context(),
-		rc.Project.ID, c.Params("id"), cmodel.StatusSending, cmodel.StatusPaused)
+		rc.Project.ID, cam.ID, cmodel.StatusSending, cmodel.StatusPaused)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -433,12 +459,18 @@ func (h *Handler) Resume(c fiber.Ctx) error {
 		return response.Conflict(c, "campaign is not paused")
 	}
 
-	// Clear the lease so the runner picks it up immediately. Guarded on
-	// sending, which the transition above just established - so a
-	// concurrent cancel between the two statements wins rather than
-	// being overwritten here.
+	// Due now, so the runner picks it up at once, unless send_rate had
+	// spaced the next batch later. Resuming must not be a way past the
+	// rate. Guarded on sending, which the transition above just
+	// established - so a concurrent cancel between the two statements
+	// wins rather than being overwritten here.
+	next := time.Now().UTC()
+	if cam.SendRate > 0 && cam.NextBatchAt != nil && cam.NextBatchAt.After(next) {
+		next = *cam.NextBatchAt
+	}
+
 	if _, err := h.Runtime.Store.Campaign.SetRunState(c.Context(),
-		c.Params("id"), cmodel.StatusSending, nil, nil, new(time.Now().UTC()), cmodel.StatusSending); err != nil {
+		cam.ID, cmodel.StatusSending, nil, nil, &next, cmodel.StatusSending); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -460,7 +492,7 @@ func (h *Handler) Cancel(c fiber.Ctx) error {
 	}
 
 	if !ok {
-		return response.Conflict(c, "campaign cannot be cancelled from its current state")
+		return h.refuseTransition(c, "campaign cannot be cancelled from its current state")
 	}
 
 	if _, err := h.Runtime.Store.Campaign.SkipPending(c.Context(),
@@ -488,6 +520,7 @@ func (h *Handler) Duplicate(c fiber.Ctx) error {
 	dup.Name = cam.Name + " (copy)"
 	dup.Status = cmodel.StatusDraft
 	dup.ScheduledAt = nil
+	dup.ScheduledOffset = nil
 	dup.StartedAt = nil
 	dup.CompletedAt = nil
 	dup.NextBatchAt = nil
@@ -522,7 +555,7 @@ func (h *Handler) Preview(c fiber.Ctx) error {
 		return response.NotFound(c, "campaign not found")
 	}
 
-	in, resp, ok := validation.Bind[previewInput](c)
+	in, resp, ok := validation.BindOptional[previewInput](c)
 	if !ok {
 		return resp
 	}
@@ -620,10 +653,27 @@ func (h *Handler) transition(c fiber.Ctx, to, conflictMsg string, from ...string
 	}
 
 	if !ok {
-		return response.Conflict(c, conflictMsg)
+		return h.refuseTransition(c, conflictMsg)
 	}
 
 	return h.respondWith(c, c.Params("id"))
+}
+
+// refuseTransition answers a lifecycle move whose guard did not match:
+// 404 when the campaign is not this project's, 409 when its state is
+// wrong.
+func (h *Handler) refuseTransition(c fiber.Ctx, conflictMsg string) error {
+	rc := domain.GetRequestContext(c)
+	cam, err := h.Runtime.Store.Campaign.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cam == nil {
+		return response.NotFound(c, "campaign not found")
+	}
+
+	return response.Conflict(c, conflictMsg)
 }
 
 func (h *Handler) respondWith(c fiber.Ctx, id string) error {
@@ -649,6 +699,30 @@ func (h *Handler) reread(c fiber.Ctx, cam *cmodel.Campaign) (*cmodel.Campaign, e
 	}
 
 	return fresh, nil
+}
+
+// inputOf is the stored campaign as a write body, the base a partial
+// update is decoded over.
+func inputOf(cam *cmodel.Campaign) upsertInput {
+	return upsertInput{
+		Name:                cam.Name,
+		Subject:             cam.Subject,
+		FromEmail:           cam.FromEmail,
+		FromName:            cam.FromName,
+		ReplyTo:             cam.ReplyTo,
+		TemplateID:          cam.TemplateID,
+		Language:            cam.Language,
+		TemplateData:        cam.TemplateData,
+		ListID:              cam.ListID,
+		Headers:             cam.Headers,
+		SMTPGroup:           cam.SMTPGroup,
+		SendRate:            cam.SendRate,
+		SendAtLocalTime:     cam.SendAtLocalTime,
+		ABTestEnabled:       cam.ABTestEnabled,
+		ABVariants:          cam.ABVariants,
+		UnsubscribeDisabled: cam.UnsubscribeDisabled,
+		DisableSigning:      cam.DisableSigning,
+	}
 }
 
 func (in *upsertInput) toModel(projID string) *cmodel.Campaign {

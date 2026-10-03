@@ -42,7 +42,7 @@ type subscribeInput struct {
 	Email        string         `json:"email"         validate:"required,email,max=320" normalize:"normalize"`
 	Name         string         `json:"name"          validate:"omitempty,max=200"      normalize:"trim"`
 	CustomFields map[string]any `json:"custom_fields" validate:"omitempty,max=50"`
-	Timezone     string         `json:"timezone"      validate:"omitempty,max=64"       normalize:"trim"`
+	Timezone     string         `json:"timezone"      validate:"omitempty,max=64,timezone" normalize:"trim"`
 	Language     string         `json:"language"      validate:"omitempty,min=2,max=10" normalize:"normalize"`
 }
 
@@ -79,6 +79,10 @@ type MembershipChange struct {
 // ListResponse is the project's subscriber lists.
 type ListResponse struct {
 	SubscriberLists []*slmodel.List `json:"subscriber_lists"`
+
+	// Total counts every list of the project, whether or not a page was
+	// asked for.
+	Total int `json:"total"`
 }
 
 // ListDetailResponse is one list.

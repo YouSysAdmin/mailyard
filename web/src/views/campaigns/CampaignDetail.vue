@@ -288,8 +288,8 @@ void start()
               <StatusBadge :status="campaign.status" scope="campaign" />
             </div>
             <div>
-              <div class="summary-label">Subject</div>
-              <div class="fw-medium">{{ campaign.subject || '-' }}</div>
+              <div class="summary-label">Fallback subject</div>
+              <div class="fw-medium">{{ campaign.subject || 'None, the template sets it' }}</div>
             </div>
             <div>
               <div class="summary-label">From</div>

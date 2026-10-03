@@ -433,13 +433,9 @@ func runServe(cmd *cobra.Command, r role) error {
 			emailmodel.StatusSuppressed: campaignmodel.MsgSkipped,
 		}[status]
 		if msgStatus != "" {
-			campaignID, err := st.Campaign.MarkMessageByEmail(context.Background(), job.ID, msgStatus, errMsg)
-			if err != nil {
-				log.Error("campaign: sync message status", "email_id", job.ID, "err", err)
-			}
-
-			if err := campaign.Finish(context.Background(), st, dispatcher.Emit, rt.Notify, job.ProjectID, campaignID); err != nil {
-				log.Error("campaign: finish", "campaign_id", campaignID, "err", err)
+			if err := campaign.Settle(context.Background(), st, dispatcher.Emit, rt.Notify,
+				job.ProjectID, job.ID, msgStatus, errMsg); err != nil {
+				log.Error("campaign: settle message", "email_id", job.ID, "err", err)
 			}
 		}
 
@@ -535,6 +531,12 @@ func runServe(cmd *cobra.Command, r role) error {
 		dispatcher.Emit, rt.Tracking, cfg.Campaign.BatchSize, cfg.Campaign.PollInterval)
 	runner.Notify = func() *notify.Raiser { return rt.Notify }
 	rt.CampaignWake = runner.Wake
+	rt.CampaignEmailCancelled = func(ctx context.Context, projID, emailID string) {
+		if err := campaign.Settle(ctx, st, dispatcher.Emit, rt.Notify,
+			projID, emailID, campaignmodel.MsgSkipped, "email cancelled"); err != nil {
+			log.Error("campaign: settle cancelled message", "email_id", emailID, "err", err)
+		}
+	}
 
 	// Platform mail goes in through the same door as a tenant's, which
 	// is why this waits for the queue: a service built before rt.Queue

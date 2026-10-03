@@ -170,7 +170,7 @@ aggregated as the send runs, so they survive the tracking-event retention sweep.
 
 | Route                                   | Does                                                                      |
 |-----------------------------------------|---------------------------------------------------------------------------|
-| `PATCH /api/v1/campaigns/{id}`          | Edit — `draft` only                                                       |
+| `PATCH /api/v1/campaigns/{id}`          | Edit — `draft` only. Fields the body leaves out keep their value          |
 | `POST /api/v1/campaigns/{id}/duplicate` | Copy the definition as a fresh `draft`                                    |
 | `POST /api/v1/campaigns/{id}/send`      | Start, or schedule — see [Sending](/docs/campaigns/sending)               |
 | `POST /api/v1/campaigns/{id}/pause`     | Stop between batches                                                      |

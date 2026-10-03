@@ -38,7 +38,7 @@ const campaignSelect = `
 SELECT id, project_id, created_by, name, subject, from_email, from_name, reply_to,
        template_id, language, template_data, headers_json, status, list_id, smtp_group_id, send_rate,
        send_at_local_time, ab_test_enabled, ab_variants, unsubscribe_disabled, disable_signing,
-       scheduled_at, started_at, completed_at, next_batch_at, created_at, updated_at,
+       scheduled_at, scheduled_offset, started_at, completed_at, next_batch_at, created_at, updated_at,
        COALESCE((SELECT u.email FROM users u WHERE u.id = NULLIF(campaigns.created_by, '')::uuid), ''),
        COALESCE((SELECT t.name FROM templates t WHERE t.id = campaigns.template_id), ''),
        COALESCE((SELECT l.name FROM subscriber_lists l WHERE l.id = campaigns.list_id), ''),
@@ -207,12 +207,21 @@ func (s *Store) Delete(ctx context.Context, projID, id string) error {
 // False means an operator moved the campaign first - the unguarded
 // Put this replaces overwrote a concurrent Cancel with the stale
 // status, resurrecting a cancelled campaign.
-func (s *Store) Launch(ctx context.Context, projID, id, status string, scheduledAt, startedAt, nextBatchAt *time.Time) (bool, error) {
+//
+// scheduledOffset is the UTC offset scheduled_at was written with, in
+// seconds, which a local-time campaign reads its wall clock from.
+func (s *Store) Launch(ctx context.Context, projID, id, status string, scheduledAt *time.Time, scheduledOffset *int,
+	startedAt, nextBatchAt *time.Time) (bool, error) {
+	var offset any
+	if scheduledOffset != nil {
+		offset = *scheduledOffset
+	}
+
 	res, err := s.Exec(ctx, `
         UPDATE campaigns
-        SET status = ?, scheduled_at = ?, started_at = ?, next_batch_at = ?, updated_at = ?
+        SET status = ?, scheduled_at = ?, scheduled_offset = ?, started_at = ?, next_batch_at = ?, updated_at = ?
         WHERE project_id = ? AND id = ? AND status IN (?, ?)`,
-		status, database.NullTime(scheduledAt), database.NullTime(startedAt),
+		status, database.NullTime(scheduledAt), offset, database.NullTime(startedAt),
 		database.NullTime(nextBatchAt), time.Now().UTC(),
 		projID, id, cmodel.StatusDraft, cmodel.StatusScheduled)
 	if err != nil {
@@ -327,12 +336,20 @@ func (s *Store) Status(ctx context.Context, projID, id string) (string, error) {
 
 // PromoteScheduled flips due scheduled campaigns to sending so the
 // claim loop picks them up. Returns how many were promoted.
+//
+// A local-time campaign is due once its wall clock has arrived in the
+// earliest timezone there is, UTC+14, so the fan-out can park every
+// subscriber's message until that wall clock arrives in their own.
 func (s *Store) PromoteScheduled(ctx context.Context, now time.Time) (int, error) {
 	res, err := s.Exec(ctx, `
         UPDATE campaigns
         SET status = ?, started_at = ?, next_batch_at = ?, updated_at = ?
-        WHERE status = ? AND scheduled_at <= ?
-    `, cmodel.StatusSending, now, now, now, cmodel.StatusScheduled, now)
+        WHERE status = ? AND (
+            scheduled_at <= ?
+            OR (send_at_local_time
+                AND scheduled_at + make_interval(secs => COALESCE(scheduled_offset, 0)) - interval '14 hours' <= ?)
+        )
+    `, cmodel.StatusSending, now, now, now, cmodel.StatusScheduled, now, now)
 	if err != nil {
 		return 0, err
 	}
@@ -399,8 +416,8 @@ func (s *Store) BulkCreateMessages(ctx context.Context, msgs []*cmodel.Message) 
 		}
 	}()
 	stmt, err := tx.PrepareContext(ctx, s.Q(`
-        INSERT INTO campaign_messages (id, campaign_id, subscriber_id, status, variant, deliver_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO campaign_messages (id, campaign_id, subscriber_id, status, error_message, variant, deliver_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(campaign_id, subscriber_id) DO NOTHING
     `))
 	if err != nil {
@@ -422,7 +439,7 @@ func (s *Store) BulkCreateMessages(ctx context.Context, msgs []*cmodel.Message) 
 		// statement text was checked at PrepareContext above.
 		//sqlconst:allow bind values on a prepared statement, not a query
 		if _, err := stmt.ExecContext(ctx, m.ID, m.CampaignID, m.SubscriberID,
-			m.Status, m.Variant, database.NullTime(m.DeliverAt), m.CreatedAt); err != nil {
+			m.Status, m.ErrorMessage, m.Variant, database.NullTime(m.DeliverAt), m.CreatedAt); err != nil {
 			return err
 		}
 	}
@@ -518,6 +535,23 @@ func (s *Store) UpdateMessage(ctx context.Context, id, status, errMsg, emailID s
     `, status, errMsg, database.NullStr(emailID), id)
 
 	return err
+}
+
+// QueueMessage records that a pending message's email is in the queue.
+// Fenced on pending, so a cancel that skipped the message meanwhile is
+// not overwritten. Reports whether it did.
+func (s *Store) QueueMessage(ctx context.Context, id, emailID string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE campaign_messages SET status = ?, error_message = '', email_id = ?
+        WHERE id = ? AND status = ?
+    `, cmodel.MsgQueued, emailID, id, cmodel.MsgPending)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // MarkMessageByEmail syncs the message with its email's terminal
@@ -676,10 +710,12 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	var c cmodel.Campaign
 	var data, headers, variants string
 	var scheduledAt, startedAt, completedAt, nextBatchAt, updatedAt sql.NullTime
+	var scheduledOffset sql.NullInt32
 	if err := r.Scan(&c.ID, &c.ProjectID, &c.CreatedBy, &c.Name, &c.Subject,
 		&c.FromEmail, &c.FromName, &c.ReplyTo, &c.TemplateID, &c.Language, &data, &headers, &c.Status,
 		&c.ListID, database.Str(&c.SMTPGroupID), &c.SendRate, &c.SendAtLocalTime, &c.ABTestEnabled, &variants,
-		&c.UnsubscribeDisabled, &c.DisableSigning, &scheduledAt, &startedAt, &completedAt, &nextBatchAt, &c.CreatedAt, &updatedAt,
+		&c.UnsubscribeDisabled, &c.DisableSigning, &scheduledAt, &scheduledOffset, &startedAt, &completedAt, &nextBatchAt,
+		&c.CreatedAt, &updatedAt,
 		&c.CreatedByEmail, &c.TemplateName, &c.ListName, &c.SMTPGroup, &c.SMTPGroupName); err != nil {
 		return nil, err
 	}
@@ -690,6 +726,10 @@ func scanCampaign(r interface{ Scan(...any) error }) (*cmodel.Campaign, error) {
 	database.MustUnmarshalJSON(variants, &c.ABVariants)
 	if scheduledAt.Valid {
 		c.ScheduledAt = new(scheduledAt.Time)
+	}
+
+	if scheduledOffset.Valid {
+		c.ScheduledOffset = new(int(scheduledOffset.Int32))
 	}
 
 	if startedAt.Valid {

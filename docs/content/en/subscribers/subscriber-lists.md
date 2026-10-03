@@ -118,6 +118,9 @@ GET /api/v1/subscriber-lists?limit=20
 GET /api/v1/subscriber-lists/{id}
 ```
 
+The list answers every list of the project, by name, unless `limit` (with `offset`) asks for a page, and carries
+`total` either way.
+
 `member_count` comes back on the **single-list** route, and only for a static list. A dynamic list has no membership to
 count without resolving the segment, and reporting `0` there would be a wrong answer rather than an empty one — so the
 field is absent instead. `opted_out_count` comes back for both types: an opt-out is a stored row whichever way the
@@ -130,7 +133,8 @@ PATCH  /api/v1/subscriber-lists/{id}
 DELETE /api/v1/subscriber-lists/{id}
 ```
 
-`name` is required on the update. Deleting takes the membership rows and per-list opt-outs with it — including the
+The update keeps every field the body leaves out: send only what changes. A `name` that is sent may not be blank, and
+`type` cannot change after creation. Deleting takes the membership rows and per-list opt-outs with it — including the
 opt-outs, so recreating a list under the same name does not restore who had left it.
 
 ## Members of a static list
@@ -156,7 +160,8 @@ The add call takes either identifier — whichever your caller has to hand:
 { "email": "jane@example.com" }
 ```
 
-Adding somebody twice is not an error. A dynamic list refuses membership calls: its members are a query result, and
+A body naming neither is refused with `400`. Adding somebody twice is not an error. A dynamic list refuses membership
+calls: its members are a query result, and
 there is nothing to insert into.
 
 In the console, **Add member** on a list searches the audience as you type rather than offering the whole of it,
@@ -236,4 +241,4 @@ POST /api/v1/subscriber-lists/{id}/resubscribe
 
 Lifts the opt-out. Note what this does **not** do: it does not add the subscriber to a static list they were never a
 member of. On a static list, resubscribing somebody who was removed as well as opted out needs the members call too.
-Idempotent either way.
+Idempotent either way. A list that does not exist in the project answers `404`, like the unsubscribe call.

@@ -18,8 +18,12 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "GET",
 			Path:        "/subscriber-lists/",
 			Summary:     "List",
-			Description: "Needs the `subscribers:read` permission.",
-			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
+			Description: "Needs the `subscribers:read` permission. By name, the whole list unless `limit` asks for a page.",
+			Query: []apidoc.Param{
+				{Name: "limit", Type: "integer", Description: "Page size, at most 200. Without it the whole list is answered."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
 		{
 			Method:      "POST",

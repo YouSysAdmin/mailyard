@@ -62,6 +62,21 @@ func Finish(ctx context.Context, st *store.Store, emit Emitter, raiser *notify.R
 	return nil
 }
 
+// Settle records an email's terminal outcome on its campaign message
+// and finishes the campaign when that was the last one. A no-op for an
+// email no campaign sent. The worker calls it as each email settles,
+// and a cancelled email takes the same path, since it never reaches a
+// worker.
+func Settle(ctx context.Context, st *store.Store, emit Emitter, raiser *notify.Raiser,
+	projID, emailID, msgStatus, errMsg string) error {
+	campaignID, err := st.Campaign.MarkMessageByEmail(ctx, emailID, msgStatus, errMsg)
+	if err != nil {
+		return err
+	}
+
+	return Finish(ctx, st, emit, raiser, projID, campaignID)
+}
+
 // doneSummary words the final totals.
 func doneSummary(totals map[string]int) string {
 	return fmt.Sprintf("%d sent, %d failed, %d skipped.",

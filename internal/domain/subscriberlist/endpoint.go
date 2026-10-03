@@ -34,19 +34,17 @@ func validateRules(rules []slmodel.FilterRule) string {
 	return ""
 }
 
-// List serves GET /api/v1/subscriber-lists.
+// List serves GET /api/v1/subscriber-lists: the whole list, or a page
+// when limit asks for one.
 func (h *Handler) List(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	lists, err := h.Runtime.Store.SubscriberList.List(c.Context(), rc.Project.ID)
+	pg := paging.Optional(c)
+	lists, total, err := h.Runtime.Store.SubscriberList.Find(c.Context(), rc.Project.ID, pg.Limit, pg.Offset)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if lists == nil {
-		lists = []*slmodel.List{}
-	}
-
-	return response.Success(c, ListResponse{SubscriberLists: lists})
+	return response.Success(c, ListResponse{SubscriberLists: lists, Total: total})
 }
 
 // Get serves GET /api/v1/subscriber-lists/:id.
@@ -137,7 +135,9 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.NotFound(c, "subscriber list not found")
 	}
 
-	in, resp, ok := validation.Bind[upsertInput](c)
+	in, resp, ok := validation.BindOnto(c, upsertInput{
+		Name: l.Name, Description: l.Description, Type: l.Type, FilterRules: l.FilterRules,
+	})
 	if !ok {
 		return resp
 	}
@@ -257,6 +257,12 @@ func (h *Handler) AddMember(c fiber.Ctx) error {
 	in, resp, ok := validation.Bind[memberInput](c)
 	if !ok {
 		return resp
+	}
+
+	if in.SubscriberID == "" && in.Email == "" {
+		fes := []validation.FieldError{{Field: "email", Rule: "required", Message: "Email or subscriber ID is required"}}
+
+		return response.BadRequestFields(c, validation.Summary(fes), fes)
 	}
 
 	sub, err := h.resolveSubscriber(c, rc.Project.ID, in.SubscriberID, in.Email)
@@ -447,6 +453,15 @@ func (h *Handler) ResubscribeByEmail(c fiber.Ctx) error {
 
 	if sub == nil {
 		return response.NotFound(c, "subscriber not found")
+	}
+
+	l, err := h.Runtime.Store.SubscriberList.Get(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if l == nil {
+		return response.NotFound(c, "subscriber list not found")
 	}
 
 	if err := h.Runtime.Store.SubscriberList.Resubscribe(c.Context(),

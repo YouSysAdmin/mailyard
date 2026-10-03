@@ -54,6 +54,11 @@ type Runtime struct {
 	// it.
 	CampaignWake func()
 
+	// CampaignEmailCancelled settles the campaign message of an email
+	// cancelled before a worker claimed it, which the worker's own hook
+	// never sees. Nil until serve.go wires it.
+	CampaignEmailCancelled func(ctx context.Context, projID, emailID string)
+
 	// RelayNodeTLS builds the transport for dialling one relay node:
 	// our client certificate, the relay authority as the root, and
 	// ServerName set to the host. A plain func for the same reason as

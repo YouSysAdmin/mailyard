@@ -69,6 +69,40 @@ func (s *Store) List(ctx context.Context, projID string) ([]*slmodel.List, error
 	return out, rows.Err()
 }
 
+// Find returns the lists of projID by name, a window of them when limit
+// is positive, with the count of all of them.
+func (s *Store) Find(ctx context.Context, projID string, limit, offset int) ([]*slmodel.List, int, error) {
+	var total int
+	if err := s.QueryRow(ctx, `SELECT COUNT(*) FROM subscriber_lists WHERE project_id = ?`, projID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	q := listSelect + ` WHERE project_id = ? ORDER BY name ASC, id ASC`
+	args := []any{projID}
+	if limit > 0 {
+		q += ` LIMIT ? OFFSET ?`
+		args = append(args, limit, max(offset, 0))
+	}
+
+	rows, err := s.Query(ctx, q, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*slmodel.List{}
+	for rows.Next() {
+		l, err := scanList(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		out = append(out, l)
+	}
+
+	return out, total, rows.Err()
+}
+
 // Put inserts the subscriber list, or updates the row when its id
 // already exists.
 func (s *Store) Put(ctx context.Context, l *slmodel.List) error {
@@ -283,15 +317,17 @@ func (s *Store) ListsOf(ctx context.Context, projID, subscriberID string) ([]*sl
 }
 
 // Unsubscribe records a per-list opt-out (the subscriber's global
-// status is untouched).
+// status is untouched). sql.ErrNoRows when the list or the subscriber
+// is not in projID, a deleted subscriber included.
 func (s *Store) Unsubscribe(ctx context.Context, projID, listID, subscriberID, reason string) error {
 	res, err := s.Exec(ctx, `
         INSERT INTO subscriber_list_unsubscribes (id, list_id, subscriber_id, reason, unsubscribed_at)
-        SELECT ?, l.id, ?, ?, ?
+        SELECT ?, l.id, sub.id, ?, ?
         FROM subscriber_lists l
+        JOIN subscribers sub ON sub.project_id = l.project_id AND sub.id = ?
         WHERE l.project_id = ? AND l.id = ?
         ON CONFLICT(list_id, subscriber_id) DO UPDATE SET reason = excluded.reason
-    `, ids.New(), subscriberID, reason, time.Now().UTC(), projID, listID)
+    `, ids.New(), reason, time.Now().UTC(), subscriberID, projID, listID)
 	if err != nil {
 		return err
 	}
@@ -344,34 +380,49 @@ func (s *Store) UnsubscribedIDs(ctx context.Context, projID, listID string) (map
 // loads per page.
 const resolvePageSize = 500
 
-// ResolveRecipients returns the list's current audience: static
-// members, or every project subscriber matching the dynamic rules.
-// Only subscribed members are returned, and per-list unsubscribes are
-// already removed.
-func (s *Store) ResolveRecipients(ctx context.Context, subs store.SubscriberStore, projID string, l *slmodel.List) ([]*submodel.Subscriber, error) {
-	optedOut, err := s.UnsubscribedIDs(ctx, projID, l.ID)
+// IsOptedOut reports whether the subscriber opted out of the list.
+func (s *Store) IsOptedOut(ctx context.Context, projID, listID, subscriberID string) (bool, error) {
+	var found bool
+	err := s.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1 FROM subscriber_list_unsubscribes u
+            JOIN subscriber_lists l ON l.id = u.list_id
+            WHERE l.project_id = ? AND u.list_id = ? AND u.subscriber_id = ?
+        )
+    `, projID, listID, subscriberID).Scan(&found)
+
+	return found, err
+}
+
+// ResolveAudience returns the list's current audience: static members,
+// or every project subscriber matching the dynamic rules. Only
+// subscribed members are in it. Those of them who opted out of this
+// list come back apart, in optedOut.
+func (s *Store) ResolveAudience(ctx context.Context, subs store.SubscriberStore, projID string, l *slmodel.List) (recipients, optedOut []*submodel.Subscriber, err error) {
+	opted, err := s.UnsubscribedIDs(ctx, projID, l.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	var out []*submodel.Subscriber
 	keep := func(sub *submodel.Subscriber) {
 		if sub.Status != submodel.StatusSubscribed {
 			return
 		}
 
-		if _, opted := optedOut[sub.ID]; opted {
+		if _, ok := opted[sub.ID]; ok {
+			optedOut = append(optedOut, sub)
+
 			return
 		}
 
-		out = append(out, sub)
+		recipients = append(recipients, sub)
 	}
 
 	if l.Type == slmodel.TypeDynamic {
 		for offset := 0; ; offset += resolvePageSize {
 			page, err := subs.ListPage(ctx, projID, resolvePageSize, offset)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			for _, sub := range page {
@@ -385,13 +436,13 @@ func (s *Store) ResolveRecipients(ctx context.Context, subs store.SubscriberStor
 			}
 		}
 
-		return out, nil
+		return recipients, optedOut, nil
 	}
 
 	for offset := 0; ; offset += resolvePageSize {
 		page, err := s.ListMembers(ctx, projID, l.ID, resolvePageSize, offset)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for _, m := range page {
@@ -403,7 +454,7 @@ func (s *Store) ResolveRecipients(ctx context.Context, subs store.SubscriberStor
 		}
 	}
 
-	return out, nil
+	return recipients, optedOut, nil
 }
 
 func scanList(r interface{ Scan(...any) error }) (*slmodel.List, error) {

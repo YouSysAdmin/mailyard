@@ -125,6 +125,10 @@ type Service struct {
 	// check just answers, which is how this worked while
 	// notification.TypeQuota was declared and raised by nothing.
 	Quota func(projID string) quota.Observer
+
+	// Cancelled is told about every email Cancel withdrew, so a campaign
+	// message waiting on it settles. Nil does nothing.
+	Cancelled func(ctx context.Context, projID, emailID string)
 }
 
 // NewService builds the Service from the Runtime. Safe before the
@@ -152,6 +156,13 @@ func NewService(rt *env.Runtime) *Service {
 		Log:         rt.Log,
 		Blob:        rt.Blob,
 		Tracking:    rt.Tracking,
+
+		// Read lazily, for the reason Quota below is.
+		Cancelled: func(ctx context.Context, projID, emailID string) {
+			if rt.CampaignEmailCancelled != nil {
+				rt.CampaignEmailCancelled(ctx, projID, emailID)
+			}
+		},
 
 		// Read from the runtime LAZILY: the campaign runner builds a
 		// service before serve.go has a Raiser, and capturing the field
@@ -799,6 +810,9 @@ func (s *Service) Cancel(ctx context.Context, projID, id string) (*emailmodel.Em
 	}
 
 	s.Emit(ctx, whmodel.EventEmailCancelled, e)
+	if s.Cancelled != nil {
+		s.Cancelled(ctx, projID, id)
+	}
 
 	return e, nil
 }

@@ -32,8 +32,8 @@ func ValidStatus(s string) bool {
 // Variant is one A/B test arm: an alternative subject and optionally
 // a different template, delivered to SplitPercentage of the audience.
 type Variant struct {
-	Name            string `json:"name"             validate:"required,min=1,max=50"`
-	Subject         string `json:"subject"          validate:"omitempty,max=1000"`
+	Name            string `json:"name"             validate:"required,min=1,max=50" normalize:"trim"`
+	Subject         string `json:"subject"          validate:"omitempty,max=1000"    normalize:"trim"`
 	TemplateID      string `json:"template_id"      validate:"omitempty,uuid"`
 	SplitPercentage int    `json:"split_percentage" validate:"required,min=1,max=100"`
 }
@@ -89,9 +89,10 @@ type Campaign struct {
 	// SendRate caps throughput in emails per minute. 0 = unthrottled.
 	SendRate int `json:"send_rate"`
 
-	// SendAtLocalTime delivers at the scheduled wall-clock time in
-	// each subscriber's timezone (subscribers without a timezone get
-	// the scheduled instant as-is).
+	// SendAtLocalTime delivers at the scheduled wall-clock time, as
+	// written in scheduled_at with its offset ignored, in each
+	// subscriber's timezone (subscribers without a timezone get the
+	// scheduled instant as-is).
 	SendAtLocalTime bool      `json:"send_at_local_time"`
 	ABTestEnabled   bool      `json:"ab_test_enabled"`
 	ABVariants      []Variant `json:"ab_variants,omitempty"`
@@ -108,8 +109,13 @@ type Campaign struct {
 	DisableSigning bool `json:"disable_signing"`
 
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
-	StartedAt   *time.Time `json:"started_at,omitempty"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
+
+	// ScheduledOffset is the UTC offset in seconds scheduled_at was
+	// written with. A local-time campaign delivers at that wall clock,
+	// and the stored instant alone has lost it.
+	ScheduledOffset *int       `json:"-"`
+	StartedAt       *time.Time `json:"started_at,omitempty"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
 
 	// NextBatchAt is runner state: when the next batch is due
 	// (throttling and the claim lease live here).

@@ -381,12 +381,14 @@ func (h *Handler) UnsubscribeConfirm(c fiber.Ctx) error {
 	}
 
 	// The per-list opt-out, for the record and for the list page. A
-	// list that has since been deleted answers ErrNoRows, and that is
-	// not a reason to refuse: the global step below still applies.
+	// list or a subscriber that has since been deleted answers
+	// ErrNoRows, and that is not a reason to refuse: the global step
+	// below still applies, and a mail client retries anything else.
 	err = h.Runtime.Store.SubscriberList.Unsubscribe(ctx, cam.ProjectID, cam.ListID, m.SubscriberID, reason)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		slog.Warn("tracking: unsubscribe list is gone", "message_id", messageID, "list_id", cam.ListID)
+		slog.Warn("tracking: unsubscribe list or subscriber is gone", "message_id", messageID,
+			"list_id", cam.ListID, "subscriber_id", m.SubscriberID)
 	case err != nil:
 		slog.Error("tracking: unsubscribe", "message_id", messageID, "err", err)
 

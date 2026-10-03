@@ -159,9 +159,9 @@ void loadSenders()
     </FormField>
 
     <FormField
-      label="Subject"
+      label="Fallback subject"
       field="subject"
-      hint="Overridden per variant when the list is split."
+      hint="Sent only when the template renders no subject of its own. A variant subject takes its place for that variant."
     >
       <input v-model="draft.subject" class="form-input" />
     </FormField>
