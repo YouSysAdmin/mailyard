@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -503,8 +504,7 @@ func (s *Service) ValidateShape(req *SendRequest) error {
 	}
 
 	if len(req.Attachments) > 0 {
-		if err := smtpclient.ValidateAttachments(toClientAttachments(req.Attachments),
-			s.Sending.MaxAttachmentSize, s.Sending.MaxTotalAttachmentSize); err != nil {
+		if err := s.validateAttachments(req.Attachments); err != nil {
 			return &RequestError{msg: err.Error()}
 		}
 	}
@@ -953,7 +953,7 @@ func (s *Service) offloadAttachments(ctx context.Context, e *emailmodel.Email) e
 
 	for i := range e.Attachments {
 		a := &e.Attachments[i]
-		if a.Content == "" || a.StorageKey != "" {
+		if a.Content == "" || a.StorageKey != "" || a.TemplateAttachmentID != "" {
 			continue
 		}
 
@@ -977,10 +977,75 @@ func (s *Service) offloadAttachments(ctx context.Context, e *emailmodel.Email) e
 	return nil
 }
 
-// LoadAttachment returns the decoded bytes of one attachment,
-// reading inline content or the blob store as appropriate.
-func LoadAttachment(ctx context.Context, bs blob.Store, a *emailmodel.Attachment) ([]byte, error) {
-	return blob.Load(ctx, bs, a.StorageKey, a.Content, a.Filename)
+// validateAttachments checks the caller's own attachments, and counts
+// the template's references, which carry a size and no content, toward
+// the total.
+func (s *Service) validateAttachments(atts []emailmodel.Attachment) error {
+	var own []emailmodel.Attachment
+	var total int64
+	for _, a := range atts {
+		if a.TemplateAttachmentID == "" {
+			own = append(own, a)
+			total += decodedLen(a.Content)
+			continue
+		}
+
+		total += a.Size
+	}
+
+	maxTotal := s.Sending.MaxTotalAttachmentSize
+	if err := smtpclient.ValidateAttachments(toClientAttachments(own), s.Sending.MaxAttachmentSize, maxTotal); err != nil {
+		return err
+	}
+
+	if total > maxTotal {
+		return fmt.Errorf("total attachment size exceeds maximum of %d bytes", maxTotal)
+	}
+
+	return nil
+}
+
+// decodedLen is the decoded size of valid padded base64.
+func decodedLen(b64 string) int64 {
+	n := base64.StdEncoding.DecodedLen(len(b64))
+	if strings.HasSuffix(b64, "==") {
+		n -= 2
+	} else if strings.HasSuffix(b64, "=") {
+		n--
+	}
+
+	return int64(n)
+}
+
+// ErrAttachmentGone reports a message attachment whose referenced
+// template attachment is no longer stored.
+var ErrAttachmentGone = errors.New("attachment is no longer stored")
+
+// LoadAttachment returns the decoded bytes of one attachment of a
+// message in projID: its own inline content or blob object, or the
+// template attachment it references, deleted or not. Every reader of
+// message attachment bytes goes through here.
+func LoadAttachment(ctx context.Context, ts store.TemplateStore, bs blob.Store, projID string, a *emailmodel.Attachment) ([]byte, error) {
+	if a.TemplateAttachmentID == "" || a.Content != "" {
+		return blob.Load(ctx, bs, a.StorageKey, a.Content, a.Filename)
+	}
+
+	ta, err := ts.GetAttachmentAny(ctx, projID, a.TemplateAttachmentID)
+	if err != nil {
+		return nil, err
+	}
+
+	if ta == nil {
+		return nil, fmt.Errorf("attachment %q: %w", a.Filename, ErrAttachmentGone)
+	}
+
+	return blob.Load(ctx, bs, ta.StorageKey, ta.Content, a.Filename)
+}
+
+// hasBytesElsewhere reports whether an attachment's bytes are not in
+// its own Content and have to be loaded.
+func hasBytesElsewhere(a *emailmodel.Attachment) bool {
+	return a.Content == "" && (a.StorageKey != "" || a.TemplateAttachmentID != "")
 }
 
 // toClientAttachments converts the model attachments to the transport

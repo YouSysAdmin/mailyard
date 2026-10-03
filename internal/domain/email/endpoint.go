@@ -450,7 +450,11 @@ func (h *Handler) Attachment(c fiber.Ctx) error {
 	}
 
 	a := e.Attachments[idx]
-	raw, err := LoadAttachment(c.Context(), h.Runtime.Blob, &a)
+	raw, err := LoadAttachment(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, rc.Project.ID, &a)
+	if errors.Is(err, ErrAttachmentGone) {
+		return response.NotFound(c, "attachment content is no longer stored")
+	}
+
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -476,7 +480,11 @@ func (h *Handler) EML(c fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	attachments, err := rehydrate(c.Context(), h.Runtime.Blob, e)
+	attachments, err := rehydrate(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, e)
+	if errors.Is(err, ErrAttachmentGone) {
+		return response.NotFound(c, "attachment content is no longer stored")
+	}
+
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -570,6 +578,24 @@ func (h *Handler) Cancel(c fiber.Ctx) error {
 	})
 }
 
+// callerAttachments keeps what a caller may say about an attachment.
+// A storage key or a template attachment id names stored bytes, which
+// only the server decides.
+func callerAttachments(in []emailmodel.Attachment) []emailmodel.Attachment {
+	if len(in) == 0 {
+		return in
+	}
+
+	out := make([]emailmodel.Attachment, len(in))
+	for i, a := range in {
+		a.StorageKey = ""
+		a.TemplateAttachmentID = ""
+		out[i] = a
+	}
+
+	return out
+}
+
 // toRequest converts the bound input into the service request, parsing send_at.
 func (in *sendInput) toRequest() (*SendRequest, error) {
 	req := &SendRequest{
@@ -581,7 +607,7 @@ func (in *sendInput) toRequest() (*SendRequest, error) {
 		Headers:     in.Headers,
 		Tags:        in.Tags,
 		Metadata:    in.Metadata,
-		Attachments: in.Attachments,
+		Attachments: callerAttachments(in.Attachments),
 
 		UnsubscribeListID:     in.UnsubscribeListID,
 		ListUnsubscribeURL:    in.ListUnsubscribeURL,

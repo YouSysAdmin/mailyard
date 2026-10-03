@@ -38,8 +38,9 @@ func ValidStatus(s string) bool {
 	return ok
 }
 
-// Attachment is a file carried inline (base64 content) in the stored
-// email. Blob storage is a roadmap item.
+// Attachment is a file of a stored email: inline base64 content, an
+// object of its own in the blob store, or a reference to a template
+// attachment stored once for every message that uses it.
 type Attachment struct {
 	Filename    string `json:"filename"`
 	Content     string `json:"content,omitempty"`
@@ -52,6 +53,10 @@ type Attachment struct {
 	// Size in bytes of the decoded content, recorded on offload so
 	// listings stay meaningful without the bytes.
 	Size int64 `json:"size,omitzero"`
+
+	// TemplateAttachmentID names the template attachment whose bytes
+	// this entry carries. Set by the server only, never by a caller.
+	TemplateAttachmentID string `json:"template_attachment_id,omitempty"`
 }
 
 // Email is one outbound message and its delivery state.

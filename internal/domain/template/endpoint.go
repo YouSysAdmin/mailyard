@@ -243,26 +243,9 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 			"campaign %q still uses this template, finish or cancel it, or point it at another template first", using))
 	}
 
-	// Offloaded attachment objects first, because template_attachments
-	// cascades off templates and the storage key lives only in the row
-	// going away. Nothing else would ever find them: retention does not
-	// look at this table, so a stranded object here is permanent.
-	// DeleteAttachment already does this for the one-attachment path.
-	ctx := c.Context()
-	keys, err := h.Runtime.Store.Template.StorageKeysForTemplate(ctx, rc.Project.ID, t.ID)
-	if err != nil {
-		return response.Internal(c, err)
-	}
-
-	if h.Runtime.Blob != nil {
-		for _, k := range keys {
-			if derr := h.Runtime.Blob.Delete(ctx, k); derr != nil {
-				return response.Internal(c, fmt.Errorf("delete attachment %s: %w", k, derr))
-			}
-		}
-	}
-
-	if err := h.Runtime.Store.Template.Delete(ctx, rc.Project.ID, t.ID); err != nil {
+	// The attachments are marked deleted and kept with their bytes, for
+	// messages still referencing them. Retention removes them later.
+	if err := h.Runtime.Store.Template.Delete(c.Context(), rc.Project.ID, t.ID); err != nil {
 		return response.Internal(c, err)
 	}
 

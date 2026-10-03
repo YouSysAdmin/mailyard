@@ -119,6 +119,9 @@ visits this page never loses data - and never reclaims space either. Set the win
   so a body window longer than the metadata window is silently reduced to it.
 - Attachment blobs are deleted from object storage **before** the database rows that hold their keys. A blob that will
   not delete is logged and skipped rather than blocking the sweep - the result is an orphaned object, not a stuck job.
+- A template attachment deleted from its template keeps its bytes while any message references it. The sweep removes it,
+  blob first, once it was deleted longer ago than the attachment window (or an hour ago when that window is `0`) and no
+  message references it any more - a message scheduled past the window still holds it.
 - Emails still in flight (`queued`, `scheduled`, `processing`) are **never** purged, however old. Deleting one would
   strand work the delivery queue is about to claim.
 - A `failed` email is not in flight, so its content is cleared like any other. Once it is older than the body or

@@ -994,13 +994,41 @@ func storageKeys(rows *sql.Rows) ([]string, error) {
 		var atts []emailmodel.Attachment
 		database.MustUnmarshalJSON(raw, &atts)
 		for _, a := range atts {
-			if a.StorageKey != "" {
+			if ownsKey(a.StorageKey) {
 				keys = append(keys, a.StorageKey)
 			}
 		}
 	}
 
 	return keys, rows.Err()
+}
+
+// ownsKey reports whether a message's storage key is the message's own
+// object. A template attachment key may sit on a row written when
+// messages shared the template's object, and purging that message must
+// not take the template's file.
+func ownsKey(key string) bool {
+	return key != "" && !strings.HasPrefix(key, templateKeyPrefix)
+}
+
+// templateKeyPrefix starts every template attachment object key.
+const templateKeyPrefix = "templates/"
+
+// ReferencesTemplateAttachment reports whether any message of the
+// project created before the bound still references the template
+// attachment, whatever its status - a sent message's download reads it
+// too. The bound prunes partitions: a reference is written when the
+// message is accepted, never later.
+func (s *Store) ReferencesTemplateAttachment(ctx context.Context, projID, attachmentID string, createdBefore time.Time) (bool, error) {
+	needle := `%"template_attachment_id":"` + database.EscapeLike(attachmentID) + `"%`
+	var found bool
+	err := s.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1 FROM emails
+            WHERE project_id = ? AND created_at < ? AND attachments_json LIKE ?
+        )`, projID, createdBefore, needle).Scan(&found)
+
+	return found, err
 }
 
 // StorageKeysForProject collects every offloaded blob key the project

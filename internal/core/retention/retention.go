@@ -46,6 +46,7 @@ type Result struct {
 	PartitionsDropped   int
 	EmailBodiesCleared  int64
 	EmailAttsCleared    int64
+	TemplateAttsPurged  int64
 	InboundPurged       int64
 	SandboxPurged       int64
 	InboundCleared      int64
@@ -191,6 +192,16 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		}
 	}
 
+	// After the email sections, so references on rows they just
+	// cleared or purged no longer hold a template attachment back.
+	{
+		n, d, e, err := s.purgeTemplateAttachments(ctx, now, attDays)
+		note("template attachments", err)
+		res.TemplateAttsPurged = n
+		res.BlobsDeleted += d
+		res.BlobErrors += e
+	}
+
 	if inboundDays > 0 {
 		cutoff := now.AddDate(0, 0, -inboundDays)
 		keys, err := s.Store.Inbound.StorageKeysOlderThan(ctx, cutoff)
@@ -309,6 +320,7 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		"partitions_dropped", res.PartitionsDropped,
 		"bodies_cleared", res.EmailBodiesCleared,
 		"attachments_cleared", res.EmailAttsCleared,
+		"template_attachments_purged", res.TemplateAttsPurged,
 		"inbound_purged", res.InboundPurged,
 		"inbound_cleared", res.InboundCleared,
 		"sandbox_purged", res.SandboxPurged,
@@ -322,6 +334,61 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		"blob_errors", res.BlobErrors)
 
 	return errors.Join(errs...)
+}
+
+// deletedAttachmentGrace keeps a just-deleted template attachment for a
+// send that listed it a moment before the delete and is still writing
+// its message.
+const deletedAttachmentGrace = time.Hour
+
+// purgeTemplateAttachments removes template attachments deleted from
+// their template once no message can still need them. A candidate is
+// past the attachment window, by which every message not in flight has
+// had its references cleared, and goes only when no message references
+// it at all - a message scheduled past the window still does. With the
+// window off, a deleted attachment stays exactly as long as a message
+// references it. Blob first, then the row that names it.
+func (s *Sweeper) purgeTemplateAttachments(ctx context.Context, now time.Time, attDays int) (purged int64, blobsDeleted, blobErrors int, err error) {
+	cutoff := now.Add(-deletedAttachmentGrace)
+	if attDays > 0 {
+		if c := now.AddDate(0, 0, -attDays); c.Before(cutoff) {
+			cutoff = c
+		}
+	}
+
+	atts, err := s.Store.Template.DeletedAttachmentsBefore(ctx, cutoff)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	for _, a := range atts {
+		used, err := s.Store.Email.ReferencesTemplateAttachment(ctx, a.ProjectID, a.ID, a.DeletedAt.Add(deletedAttachmentGrace))
+		if err != nil {
+			return purged, blobsDeleted, blobErrors, err
+		}
+
+		if used {
+			continue
+		}
+
+		if a.StorageKey != "" && s.Blob != nil {
+			if err := s.Blob.Delete(ctx, a.StorageKey); err != nil {
+				s.Log.Warn("retention: template attachment blob delete failed", "key", a.StorageKey, "err", err)
+				blobErrors++
+				continue
+			}
+
+			blobsDeleted++
+		}
+
+		if err := s.Store.Template.PurgeAttachment(ctx, a.ProjectID, a.ID); err != nil {
+			return purged, blobsDeleted, blobErrors, err
+		}
+
+		purged++
+	}
+
+	return purged, blobsDeleted, blobErrors, nil
 }
 
 // deleteBlobs removes objects, tolerating individual failures - a

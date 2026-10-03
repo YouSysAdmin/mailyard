@@ -13,6 +13,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/settings"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
+	tmodel "github.com/yousysadmin/mailyard/internal/models/template"
 )
 
 // The blob store and the row that names its key are two systems, and
@@ -33,6 +34,7 @@ type fakeEmailStore struct {
 	keys             []string
 	keysErr          error
 	purged           bool
+	referenced       map[string]bool
 	log              *[]string
 }
 
@@ -77,6 +79,36 @@ func (f *fakeEmailStore) ClearAttachmentsOlderThan(context.Context, time.Time) (
 	f.keys = nil
 
 	return 0, nil
+}
+
+// referenced reports every template attachment id in it as still used.
+func (f *fakeEmailStore) ReferencesTemplateAttachment(_ context.Context, _, id string, _ time.Time) (bool, error) {
+	return f.referenced[id], nil
+}
+
+// fakeTemplateStore holds deleted template attachments for the sweep.
+type fakeTemplateStore struct {
+	store.TemplateStore
+	deleted []*tmodel.Attachment
+	cutoff  time.Time
+	purged  []string
+	log     *[]string
+}
+
+func (f *fakeTemplateStore) DeletedAttachmentsBefore(_ context.Context, before time.Time) ([]*tmodel.Attachment, error) {
+	f.cutoff = before
+
+	return f.deleted, nil
+}
+
+func (f *fakeTemplateStore) PurgeAttachment(_ context.Context, _, id string) error {
+	if f.log != nil {
+		*f.log = append(*f.log, "template:purge")
+	}
+
+	f.purged = append(f.purged, id)
+
+	return nil
 }
 
 type fakeInboundStore struct {
@@ -161,6 +193,7 @@ func newSweeper(t *testing.T, email *fakeEmailStore, inbound *fakeInboundStore, 
 		Store: &store.Store{
 			Email:         email,
 			Inbound:       inbound,
+			Template:      &fakeTemplateStore{},
 			Session:       fakeSessionStore{},
 			Sandbox:       fakeSandboxStore{},
 			PasswordReset: fakeResetStore{},
@@ -287,6 +320,7 @@ func TestAnOutOfRangeWindowNeverReachesTheFuture(t *testing.T) {
 		Store: &store.Store{
 			Email:         &fakeEmailStore{log: &calls},
 			Inbound:       &fakeInboundStore{},
+			Template:      &fakeTemplateStore{},
 			Audit:         audit,
 			Session:       fakeSessionStore{},
 			Sandbox:       fakeSandboxStore{},
@@ -304,5 +338,91 @@ func TestAnOutOfRangeWindowNeverReachesTheFuture(t *testing.T) {
 	limit := time.Now().AddDate(0, 0, -(smodel.MaxDays - 1))
 	if audit.cutoff.IsZero() || audit.cutoff.After(limit) {
 		t.Errorf("audit cutoff = %v, want at least %d days back", audit.cutoff, smodel.MaxDays)
+	}
+}
+
+// A deleted template attachment goes only once no message references
+// it, blob before row, and a referenced one stays with its blob.
+func TestADeletedTemplateAttachmentGoesOnlyWhenUnreferenced(t *testing.T) {
+	var calls []string
+	gone := time.Now().AddDate(0, 0, -60)
+	email := &fakeEmailStore{log: &calls, referenced: map[string]bool{"held": true}}
+	tpl := &fakeTemplateStore{log: &calls, deleted: []*tmodel.Attachment{
+		{ID: "held", ProjectID: "p", StorageKey: "templates/t/held.pdf", DeletedAt: &gone},
+		{ID: "free", ProjectID: "p", StorageKey: "templates/t/free.pdf", DeletedAt: &gone},
+	}}
+	bl := &fakeBlob{log: &calls}
+	sw := newSweeper(t, email, &fakeInboundStore{}, bl)
+	sw.Store.Template = tpl
+
+	if err := sw.Run(t.Context()); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	if len(tpl.purged) != 1 || tpl.purged[0] != "free" {
+		t.Fatalf("purged %v, want only the unreferenced attachment", tpl.purged)
+	}
+
+	if len(bl.deleted) != 1 || bl.deleted[0] != "templates/t/free.pdf" {
+		t.Fatalf("deleted blobs %v, want only the unreferenced one", bl.deleted)
+	}
+
+	blobAt, purgeAt := -1, -1
+	for i, c := range calls {
+		switch c {
+		case "blob:delete":
+			blobAt = i
+		case "template:purge":
+			purgeAt = i
+		}
+	}
+
+	if blobAt > purgeAt {
+		t.Errorf("the row went before its blob: %v", calls)
+	}
+
+	// The candidates are past the 30 day attachment window, which the
+	// metadata window sets here.
+	if want := time.Now().AddDate(0, 0, -30); tpl.cutoff.After(want.Add(time.Minute)) {
+		t.Errorf("cutoff %v, want the attachment window %v", tpl.cutoff, want)
+	}
+}
+
+// With the attachment window off, a deleted attachment is considered
+// once the grace hour has passed, and kept only while referenced.
+func TestWithoutAWindowTheGraceHourIsTheCutoff(t *testing.T) {
+	set := settings.New(loader{
+		smodel.KeyRetentionDays:                "0",
+		smodel.KeyWebhookDeliveryRetentionDays: "0",
+		smodel.KeyAuditLogRetentionDays:        "0",
+		smodel.KeyNotificationRetentionDays:    "0",
+		smodel.KeyTrackingEventRetentionDays:   "0",
+	})
+	if err := set.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	tpl := &fakeTemplateStore{}
+	sw := &Sweeper{
+		Store: &store.Store{
+			Email:         &fakeEmailStore{log: &calls},
+			Inbound:       &fakeInboundStore{},
+			Template:      tpl,
+			Session:       fakeSessionStore{},
+			Sandbox:       fakeSandboxStore{},
+			PasswordReset: fakeResetStore{},
+			SignupVerify:  fakeVerifyStore{},
+		},
+		Settings: set,
+		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	if err := sw.Run(t.Context()); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	want := time.Now().Add(-deletedAttachmentGrace)
+	if d := tpl.cutoff.Sub(want); d > time.Minute || d < -time.Minute {
+		t.Errorf("cutoff %v, want about %v", tpl.cutoff, want)
 	}
 }

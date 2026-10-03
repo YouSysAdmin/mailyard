@@ -40,7 +40,8 @@ type Processor struct {
 	Log          *slog.Logger
 	AutoSuppress bool
 
-	// Blob rehydrates offloaded attachment content at send time.
+	// Blob rehydrates offloaded and referenced attachment content at
+	// send time.
 	Blob blob.Store
 
 	// BounceAddress is sending.bounce_address, the return path for
@@ -146,18 +147,18 @@ func (p *Processor) deliver(ctx context.Context, spec transport.Spec, msg *smtpc
 	return t.Send(ctx, msg)
 }
 
-// rehydrate returns the attachments with offloaded content loaded, so
-// the builder sees every one inline.
-func rehydrate(ctx context.Context, bs blob.Store, e *emailmodel.Email) ([]emailmodel.Attachment, error) {
+// rehydrate returns the attachments with offloaded or referenced
+// content loaded, so the builder sees every one inline.
+func rehydrate(ctx context.Context, ts store.TemplateStore, bs blob.Store, e *emailmodel.Email) ([]emailmodel.Attachment, error) {
 	attachments := make([]emailmodel.Attachment, len(e.Attachments))
 	copy(attachments, e.Attachments)
 	for i := range attachments {
 		a := &attachments[i]
-		if a.Content != "" || a.StorageKey == "" {
+		if !hasBytesElsewhere(a) {
 			continue
 		}
 
-		raw, err := LoadAttachment(ctx, bs, a)
+		raw, err := LoadAttachment(ctx, ts, bs, e.ProjectID, a)
 		if err != nil {
 			return nil, fmt.Errorf("load attachment %q: %w", a.Filename, err)
 		}
@@ -235,7 +236,7 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 
 	// A blob outage is transient - retry rather than fail the email
 	// permanently.
-	attachments, err := rehydrate(ctx, p.Blob, e)
+	attachments, err := rehydrate(ctx, p.Store.Template, p.Blob, e)
 	if err != nil {
 		return queue.Retry(err)
 	}

@@ -126,11 +126,12 @@ type AssignResponse struct {
 
 // Attachment is the wire body.
 type Attachment struct {
-	Filename    string `json:"filename"`
-	Content     string `json:"content,omitempty"`
-	ContentType string `json:"content_type,omitempty"`
-	StorageKey  string `json:"storage_key,omitempty"`
-	Size        int64  `json:"size,omitzero"`
+	Filename             string `json:"filename"`
+	Content              string `json:"content,omitempty"`
+	ContentType          string `json:"content_type,omitempty"`
+	StorageKey           string `json:"storage_key,omitempty"`
+	Size                 int64  `json:"size,omitzero"`
+	TemplateAttachmentID string `json:"template_attachment_id,omitempty"`
 }
 
 // AttachmentInput is the request body.

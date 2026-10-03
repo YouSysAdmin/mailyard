@@ -693,11 +693,21 @@ type TemplateStore interface {
 	PutAttachment(ctx context.Context, a *template.Attachment) error
 	ListAttachments(ctx context.Context, projID, templateID string) ([]*template.Attachment, error)
 
-	// Offloaded attachment keys, read before the rows cascade away with their template or their project.
+	// Offloaded attachment keys, read before the rows cascade away with their project.
 	StorageKeysForProject(ctx context.Context, projID string) ([]string, error)
-	StorageKeysForTemplate(ctx context.Context, projID, templateID string) ([]string, error)
 	GetAttachment(ctx context.Context, projID, templateID, id string) (*template.Attachment, error)
+
+	// DeleteAttachment only marks the row deleted, messages may still reference it.
 	DeleteAttachment(ctx context.Context, projID, templateID, id string) error
+
+	// GetAttachmentAny finds an attachment by id even after it was deleted,
+	// for the messages that reference it.
+	GetAttachmentAny(ctx context.Context, projID, id string) (*template.Attachment, error)
+
+	// Deleted attachments for the retention sweep, which purges one only
+	// once no message can still need it.
+	DeletedAttachmentsBefore(ctx context.Context, before time.Time) ([]*template.Attachment, error)
+	PurgeAttachment(ctx context.Context, projID, id string) error
 }
 
 // StylesheetStore persists reusable CSS blocks.
@@ -826,6 +836,10 @@ type EmailStore interface {
 	PurgeOlderThan(ctx context.Context, before time.Time) (int64, error)
 	ClearBodiesOlderThan(ctx context.Context, before time.Time) (int64, error)
 	ClearAttachmentsOlderThan(ctx context.Context, before time.Time) (int64, error)
+
+	// ReferencesTemplateAttachment reports whether a message created
+	// before the bound still references the template attachment.
+	ReferencesTemplateAttachment(ctx context.Context, projID, attachmentID string, createdBefore time.Time) (bool, error)
 
 	// Erasure, project scoped. Each purge has a key query beside it
 	// whose WHERE clause matches it exactly, because a blob is named

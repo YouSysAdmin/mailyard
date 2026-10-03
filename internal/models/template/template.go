@@ -69,6 +69,10 @@ type Attachment struct {
 	StorageKey  string    `json:"storage_key,omitempty"`
 	Content     string    `json:"-"`
 	CreatedAt   time.Time `json:"created_at"`
+
+	// DeletedAt marks an attachment removed from its template. The row
+	// and its bytes stay for the messages that reference it.
+	DeletedAt *time.Time `json:"-"`
 }
 
 // Draft is a version written together with the template that holds

@@ -4,9 +4,7 @@ package email
 
 import (
 	"context"
-	"encoding/base64"
 
-	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/render"
 	coretracking "github.com/yousysadmin/mailyard/internal/core/tracking"
 	templatedomain "github.com/yousysadmin/mailyard/internal/domain/template"
@@ -149,12 +147,11 @@ func (s *Service) SendWithTemplate(ctx context.Context, projID, createdBy, apiKe
 	return s.Send(ctx, projID, createdBy, apiKeyID, req)
 }
 
-// AttachTemplateFiles appends the template's stored attachments to
-// the request as COPIES of their bytes. A message must not share the
-// template's blob: the object would go when the attachment or the
-// template is deleted, failing mail still queued, and retention or an
-// erasure removing the message would delete the template's file. The
-// send offloads the copy under the message's own key.
+// AttachTemplateFiles appends the template's attachments to the
+// request as REFERENCES. The bytes are stored once on the template
+// attachment row, whatever the number of messages using them, and that
+// row outlives deletion until no message can still need it (see the
+// retention sweep). LoadAttachment reads them back.
 func (s *Service) AttachTemplateFiles(ctx context.Context, projID, templateID string, req *SendRequest) error {
 	atts, err := s.Store.Template.ListAttachments(ctx, projID, templateID)
 	if err != nil {
@@ -162,21 +159,11 @@ func (s *Service) AttachTemplateFiles(ctx context.Context, projID, templateID st
 	}
 
 	for _, a := range atts {
-		content := a.Content
-		if a.StorageKey != "" {
-			raw, err := blob.Load(ctx, s.Blob, a.StorageKey, a.Content, a.Filename)
-			if err != nil {
-				return err
-			}
-
-			content = base64.StdEncoding.EncodeToString(raw)
-		}
-
 		req.Attachments = append(req.Attachments, emailmodel.Attachment{
-			Filename:    a.Filename,
-			ContentType: a.ContentType,
-			Size:        a.Size,
-			Content:     content,
+			Filename:             a.Filename,
+			ContentType:          a.ContentType,
+			Size:                 a.Size,
+			TemplateAttachmentID: a.ID,
 		})
 	}
 

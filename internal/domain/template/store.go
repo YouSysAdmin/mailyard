@@ -316,8 +316,16 @@ func (s *Store) CampaignUsing(ctx context.Context, projID, templateID string) (s
 }
 
 // Delete removes one template from projID.
+//
+// Its attachments are marked deleted in the same statement and kept,
+// detached by the foreign key, for the messages that reference them.
 func (s *Store) Delete(ctx context.Context, projID, id string) error {
-	_, err := s.Exec(ctx, `DELETE FROM templates WHERE project_id = ? AND id = ?`, projID, id)
+	_, err := s.Exec(ctx, `
+        WITH detached AS (
+            UPDATE template_attachments SET deleted_at = now()
+            WHERE project_id = ? AND template_id = ? AND deleted_at IS NULL
+        )
+        DELETE FROM templates WHERE project_id = ? AND id = ?`, projID, id, projID, id)
 
 	return err
 }
@@ -681,46 +689,18 @@ func nullPtr(s *string) any {
 }
 
 const attachmentSelect = `
-SELECT id, project_id, template_id, filename, content_type, size, storage_key, content, created_at
+SELECT id, project_id, template_id, filename, content_type, size, storage_key, content, created_at, deleted_at
 FROM template_attachments`
 
 // StorageKeysForProject collects every offloaded attachment key the
-// project's templates own.
+// project's templates own, deleted ones included.
 //
-// For project DELETION and template deletion alike, where the rows go by
-// cascade (template_attachments cascades off templates, which cascades
-// off projects). Neither path collected them, so every offloaded template
-// attachment became an object with nothing naming it - and unlike email
-// attachments, retention never looks at this table at all, so no later
-// pass could ever find them.
+// For project DELETION, where the rows go by cascade off projects and
+// nothing would name their objects afterwards.
 func (s *Store) StorageKeysForProject(ctx context.Context, projID string) ([]string, error) {
 	rows, err := s.Query(ctx, `
         SELECT storage_key FROM template_attachments
         WHERE project_id = ? AND storage_key <> ''`, projID)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() { _ = rows.Close() }()
-	var keys []string
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-
-		keys = append(keys, k)
-	}
-
-	return keys, rows.Err()
-}
-
-// StorageKeysForTemplate is the same for one template, for the delete
-// that takes its attachments with it by cascade.
-func (s *Store) StorageKeysForTemplate(ctx context.Context, projID, templateID string) ([]string, error) {
-	rows, err := s.Query(ctx, `
-        SELECT storage_key FROM template_attachments
-        WHERE project_id = ? AND template_id = ? AND storage_key <> ''`, projID, templateID)
 	if err != nil {
 		return nil, err
 	}
@@ -756,9 +736,61 @@ func (s *Store) PutAttachment(ctx context.Context, a *tmodel.Attachment) error {
 	return err
 }
 
-// ListAttachments returns the attachments in projID.
+// GetAttachmentAny returns one attachment within projID by id alone,
+// deleted or not, or nil when the row is gone. It is how a message
+// reads the bytes it references.
+func (s *Store) GetAttachmentAny(ctx context.Context, projID, id string) (*tmodel.Attachment, error) {
+	a, err := scanAttachment(s.QueryRow(ctx, attachmentSelect+` WHERE project_id = ? AND id = ?`, projID, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return a, err
+}
+
+// DeletedAttachmentsBefore lists attachments marked deleted before the
+// cutoff, across every project, for the retention sweep. Content is not
+// read, the sweep needs only the key, and the list is bounded by what
+// people uploaded.
+func (s *Store) DeletedAttachmentsBefore(ctx context.Context, before time.Time) ([]*tmodel.Attachment, error) {
+	rows, err := s.Query(ctx, `
+        SELECT id, project_id, template_id, filename, content_type, size, storage_key, '', created_at, deleted_at
+        FROM template_attachments
+        WHERE deleted_at IS NOT NULL AND deleted_at < ?
+        ORDER BY deleted_at ASC`, before)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	var out []*tmodel.Attachment
+	for rows.Next() {
+		a, err := scanAttachment(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, a)
+	}
+
+	return out, rows.Err()
+}
+
+// PurgeAttachment removes a deleted attachment row for good. A row
+// that is not marked deleted is left alone.
+func (s *Store) PurgeAttachment(ctx context.Context, projID, id string) error {
+	_, err := s.Exec(ctx, `
+        DELETE FROM template_attachments
+        WHERE project_id = ? AND id = ? AND deleted_at IS NOT NULL`, projID, id)
+
+	return err
+}
+
+// ListAttachments returns the template's attachments that are not
+// deleted.
 func (s *Store) ListAttachments(ctx context.Context, projID, templateID string) ([]*tmodel.Attachment, error) {
-	rows, err := s.Query(ctx, attachmentSelect+` WHERE project_id = ? AND template_id = ? ORDER BY created_at ASC`,
+	rows, err := s.Query(ctx, attachmentSelect+`
+        WHERE project_id = ? AND template_id = ? AND deleted_at IS NULL ORDER BY created_at ASC`,
 		projID, templateID)
 	if err != nil {
 		return nil, err
@@ -778,10 +810,11 @@ func (s *Store) ListAttachments(ctx context.Context, projID, templateID string) 
 	return out, rows.Err()
 }
 
-// GetAttachment returns one attachment within projID, or nil when
-// there is no such row.
+// GetAttachment returns one attachment of the template that is not
+// deleted, or nil when there is no such row.
 func (s *Store) GetAttachment(ctx context.Context, projID, templateID, id string) (*tmodel.Attachment, error) {
-	row := s.QueryRow(ctx, attachmentSelect+` WHERE project_id = ? AND template_id = ? AND id = ?`,
+	row := s.QueryRow(ctx, attachmentSelect+`
+        WHERE project_id = ? AND template_id = ? AND id = ? AND deleted_at IS NULL`,
 		projID, templateID, id)
 	a, err := scanAttachment(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -791,9 +824,12 @@ func (s *Store) GetAttachment(ctx context.Context, projID, templateID, id string
 	return a, err
 }
 
-// DeleteAttachment removes one attachment from projID.
+// DeleteAttachment marks one attachment deleted. The row and its bytes
+// stay until retention finds no message referencing them.
 func (s *Store) DeleteAttachment(ctx context.Context, projID, templateID, id string) error {
-	_, err := s.Exec(ctx, `DELETE FROM template_attachments WHERE project_id = ? AND template_id = ? AND id = ?`,
+	_, err := s.Exec(ctx, `
+        UPDATE template_attachments SET deleted_at = now()
+        WHERE project_id = ? AND template_id = ? AND id = ? AND deleted_at IS NULL`,
 		projID, templateID, id)
 
 	return err
@@ -801,8 +837,8 @@ func (s *Store) DeleteAttachment(ctx context.Context, projID, templateID, id str
 
 func scanAttachment(r interface{ Scan(...any) error }) (*tmodel.Attachment, error) {
 	var a tmodel.Attachment
-	if err := r.Scan(&a.ID, &a.ProjectID, &a.TemplateID, &a.Filename,
-		&a.ContentType, &a.Size, &a.StorageKey, &a.Content, &a.CreatedAt); err != nil {
+	if err := r.Scan(&a.ID, &a.ProjectID, database.Str(&a.TemplateID), &a.Filename,
+		&a.ContentType, &a.Size, &a.StorageKey, &a.Content, &a.CreatedAt, &a.DeletedAt); err != nil {
 		return nil, err
 	}
 

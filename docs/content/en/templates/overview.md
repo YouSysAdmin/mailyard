@@ -90,6 +90,12 @@ Files uploaded to a template ride along on **every** send that renders it — th
 calendar invite on a booking confirmation. They are bound to the template rather than to a version, so changing the copy
 does not mean re-uploading the file.
 
+Each file is **stored once**, however many messages carry it. A message keeps a reference to the template's file
+instead of a copy of the bytes, so a campaign with a 1 MB file to a thousand subscribers stores the file one time, not a
+thousand times - in the database and in object storage alike. Deleting the file, or the whole template, hides it from
+the template and from new sends but keeps the bytes for messages that still reference them. The
+[retention sweep](/docs/admin/platform-settings) removes it once no message can still need it.
+
 ## What ships out and back
 
 `GET /api/v1/templates/{id}/export` produces one self-contained JSON document: the template, every version, every

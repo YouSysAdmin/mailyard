@@ -154,8 +154,9 @@ Returns `204`, and takes the versions, localizations and attachments with it. A 
 one in `draft`, `scheduled`, `sending` or `paused`, directly or as an A/B variant - is refused with `409` naming the
 campaign. Finish or cancel the campaign, or point it at another template, first.
 
-Mail already queued from the template is not affected: every message carries its own copy of the template's
-attachments, so deleting an attachment or the whole template never removes a file a queued message still needs.
+Mail already queued from the template is not affected. Messages reference the template's attachments, and deleting an
+attachment or the whole template keeps the stored file until no message references it, so a queued message still
+delivers it and a sent one can still be downloaded.
 
 ## Sending one
 

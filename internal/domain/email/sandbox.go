@@ -64,19 +64,17 @@ func optInRefusal(rc *domain.RequestContext) string {
 // with the headers we would have put on the wire, rather than a
 // pretty-printed copy of our internal struct.
 func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *SendRequest, retentionDays int) (*sbmodel.Email, error) {
-	// Blob-backed attachments carry a storage key and no content, and
-	// only the delivery processor rehydrates them - which a capture
-	// never reaches. Without this, a template send with a configured
-	// blob store was captured with every attachment at zero bytes, and
-	// the raw view's whole promise is "exactly what would have been
-	// sent".
+	// Template attachments arrive as references with no content, and
+	// only the delivery processor rehydrates a stored message - which a
+	// capture never reaches. Loaded here, or the raw view would show
+	// them at zero bytes while it promises what would have been sent.
 	for i := range req.Attachments {
 		a := &req.Attachments[i]
-		if a.Content != "" || a.StorageKey == "" {
+		if !hasBytesElsewhere(a) {
 			continue
 		}
 
-		raw, err := LoadAttachment(c.Context(), h.Runtime.Blob, a)
+		raw, err := LoadAttachment(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, rc.Project.ID, a)
 		if err != nil {
 			return nil, err
 		}

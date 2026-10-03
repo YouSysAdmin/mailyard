@@ -357,11 +357,8 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	// cascading away, so the cascade would strand every object the
 	// project ever offloaded with nothing left to find it from.
 	//
-	// Three tables own blobs, not one. This collected email keys only,
-	// and the comment claimed emails was the only table that mattered -
-	// inbound mail and template attachments were stranded silently, and
-	// retention never looks at template_attachments at all, so nothing
-	// could ever reclaim those.
+	// Three tables own blobs, not one: emails, inbound mail and
+	// template attachments, deleted ones included.
 	//
 	// A failed drop refuses the deletion instead of continuing. The
 	// project is still there, so the keys are still findable and a
