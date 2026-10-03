@@ -4,6 +4,7 @@ package email
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -217,7 +218,9 @@ func (h *Handler) captureOnce(c fiber.Ctx, rc *domain.RequestContext, req *SendR
 // wait while the first request runs, else what it produced.
 func (h *Handler) replay(c fiber.Ctx, rc *domain.RequestContext, held emailmodel.KeyHolder) error {
 	if held.Pending() {
-		return response.Conflict(c, "a request with this Idempotency-Key is still being processed")
+		key := strings.TrimSpace(c.Get("Idempotency-Key"))
+
+		return response.Conflict(c, fmt.Sprintf("a request with Idempotency-Key %q is still being processed", key))
 	}
 
 	if held.SandboxEmailID != "" {

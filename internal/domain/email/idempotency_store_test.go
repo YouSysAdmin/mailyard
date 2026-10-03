@@ -99,3 +99,50 @@ func TestAnIdempotencyKeyIsReservedOnce(t *testing.T) {
 		t.Errorf("pruned %d keys, want 4 (%v)", n, err)
 	}
 }
+
+// A reservation that never produced a message - the request died before
+// completing or releasing it - is taken over once it is stale, and a
+// completed key never is.
+func TestAStaleReservationIsTakenOver(t *testing.T) {
+	db := dbtest.Open(t)
+	dbtest.Migrate(t, db)
+	s := &Store{Base: database.NewBase(db)}
+	ctx := t.Context()
+
+	proj := ids.New()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO projects (id, name, slug, owner_id, created_at)
+		VALUES ($1, 'acme', $2, NULL, now())`, proj, proj); err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+
+	if _, reserved, _ := s.ReserveKey(ctx, proj, "stuck"); !reserved {
+		t.Fatal("reserve")
+	}
+
+	if _, reserved, _ := s.ReserveKey(ctx, proj, "stuck"); reserved {
+		t.Fatal("a fresh reservation was taken over")
+	}
+
+	age := time.Now().UTC().Add(-KeyReservationTTL - time.Minute)
+	if _, err := db.ExecContext(ctx, `UPDATE email_idempotency SET created_at = $1 WHERE project_id = $2`, age, proj); err != nil {
+		t.Fatalf("age the row: %v", err)
+	}
+
+	if _, reserved, err := s.ReserveKey(ctx, proj, "stuck"); err != nil || !reserved {
+		t.Fatalf("a stale reservation: reserved=%v err=%v, want it taken over", reserved, err)
+	}
+
+	emailID := ids.New()
+	if err := s.CompleteKey(ctx, proj, "stuck", emailID); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+
+	if _, err := db.ExecContext(ctx, `UPDATE email_idempotency SET created_at = $1 WHERE project_id = $2`, age, proj); err != nil {
+		t.Fatalf("age the row: %v", err)
+	}
+
+	if held, reserved, _ := s.ReserveKey(ctx, proj, "stuck"); reserved || held.EmailID != emailID {
+		t.Errorf("an old completed key: held=%q reserved=%v, want the replay", held.EmailID, reserved)
+	}
+}

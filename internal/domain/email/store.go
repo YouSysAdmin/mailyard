@@ -811,36 +811,52 @@ func (s *Store) AcceptedSince(ctx context.Context, projID string, since time.Tim
 	return n, err
 }
 
+// KeyReservationTTL is how long a key stays reserved without a message.
+// A send takes seconds, so a reservation this old belongs to a request
+// that stopped before it could complete or release the key, and the
+// next request carrying the key takes it over.
+const KeyReservationTTL = 5 * time.Minute
+
 // ReserveKey claims key for the request about to send. The insert
 // carries nothing produced yet, so a duplicate arriving while the first
 // request runs sees a pending holder and is told to wait rather than
-// handed a message that does not exist yet.
+// handed a message that does not exist yet. A reservation older than
+// KeyReservationTTL that never produced anything is taken over.
 func (s *Store) ReserveKey(ctx context.Context, projID, key string) (emailmodel.KeyHolder, bool, error) {
-	var held emailmodel.KeyHolder
-	res, err := s.Exec(ctx, `
-        INSERT INTO email_idempotency (project_id, key, email_id, created_at)
-        VALUES (?, ?, NULL, ?)
-        ON CONFLICT (project_id, key) DO NOTHING`, projID, key, time.Now().UTC())
-	if err != nil {
+	// Twice at most: a row released between the insert and the read
+	// means the earlier request failed, and the key is free again.
+	for range 2 {
+		now := time.Now().UTC()
+		res, err := s.Exec(ctx, `
+            INSERT INTO email_idempotency (project_id, key, email_id, created_at)
+            VALUES (?, ?, NULL, ?)
+            ON CONFLICT (project_id, key) DO UPDATE SET created_at = excluded.created_at
+            WHERE email_idempotency.email_id IS NULL
+              AND email_idempotency.sandbox_email_id IS NULL
+              AND email_idempotency.created_at < ?`,
+			projID, key, now, now.Add(-KeyReservationTTL))
+		if err != nil {
+			return emailmodel.KeyHolder{}, false, err
+		}
+
+		if n, err := res.RowsAffected(); err != nil {
+			return emailmodel.KeyHolder{}, false, err
+		} else if n > 0 {
+			return emailmodel.KeyHolder{}, true, nil
+		}
+
+		var held emailmodel.KeyHolder
+		err = s.QueryRow(ctx, `
+            SELECT email_id, sandbox_email_id FROM email_idempotency WHERE project_id = ? AND key = ?`,
+			projID, key).Scan(database.Str(&held.EmailID), database.Str(&held.SandboxEmailID))
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+
 		return held, false, err
 	}
 
-	if n, err := res.RowsAffected(); err != nil {
-		return held, false, err
-	} else if n > 0 {
-		return held, true, nil
-	}
-
-	err = s.QueryRow(ctx, `
-        SELECT email_id, sandbox_email_id FROM email_idempotency WHERE project_id = ? AND key = ?`,
-		projID, key).Scan(database.Str(&held.EmailID), database.Str(&held.SandboxEmailID))
-	if errors.Is(err, sql.ErrNoRows) {
-		// Released between the insert and the read: the earlier
-		// request failed. The caller tries again from the top.
-		return emailmodel.KeyHolder{}, false, nil
-	}
-
-	return held, false, err
+	return emailmodel.KeyHolder{}, false, nil
 }
 
 // CompleteKey records the message a reserved key produced.

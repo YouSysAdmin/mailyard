@@ -163,7 +163,9 @@ curl -X POST https://mail.example.com/api/v1/emails/send \
 | A duplicate while the first is still running | `409`                                | An error naming the key                                                      |
 | A retry after the first was refused          | Whatever the corrected request earns | The key is released by a failure                                             |
 
-The key is scoped to the project and forgotten after a day. It applies to `/emails/send` and `/emails/send-template`.
+A key whose first request never finished - the process stopped mid-send - is held for five minutes at most, after
+which the next request carrying it is treated as the first. The key is scoped to the project and forgotten after a
+day. It applies to `/emails/send` and `/emails/send-template`.
 A batch is its own unit and does not take one.
 
 ## What comes back
