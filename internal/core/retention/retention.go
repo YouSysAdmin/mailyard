@@ -60,6 +60,22 @@ type Result struct {
 	BlobErrors          int
 }
 
+// inboundAttachmentDays is the window after which received mail loses
+// its content, or 0 when the inbound purge already covers it. The
+// attachment setting applies to received mail as well, and the shorter
+// of it and the inbound window wins.
+func inboundAttachmentDays(attSetting, inboundDays int) int {
+	if attSetting <= 0 {
+		return 0
+	}
+
+	if inboundDays > 0 && attSetting >= inboundDays {
+		return 0
+	}
+
+	return attSetting
+}
+
 // Run executes a full sweep. It keeps going after a per-section
 // error: one failing table must not stop the rest from being
 // trimmed. Every section error is joined and returned, so the job is
@@ -99,6 +115,8 @@ func (s *Sweeper) Run(ctx context.Context) error {
 	if inboundDays <= 0 {
 		inboundDays = metaDays
 	}
+
+	inboundAttDays := inboundAttachmentDays(s.Settings.Int(smodel.KeyEmailAttachmentRetentionDays), inboundDays)
 
 	deliveryDays := s.Settings.Int(smodel.KeyWebhookDeliveryRetentionDays)
 	trackingDays := s.Settings.Int(smodel.KeyTrackingEventRetentionDays)
@@ -185,10 +203,12 @@ func (s *Sweeper) Run(ctx context.Context) error {
 			note("inbound purge", perr)
 			res.InboundPurged = n
 		}
-	} else if attDays > 0 {
-		// No inbound window, but attachments still expire: strip the
-		// content and keep the envelope.
-		cutoff := now.AddDate(0, 0, -attDays)
+	}
+
+	if inboundAttDays > 0 {
+		// Attachments expire before the received message does: strip
+		// the content and keep the envelope.
+		cutoff := now.AddDate(0, 0, -inboundAttDays)
 		keys, err := s.Store.Inbound.StorageKeysOlderThan(ctx, cutoff)
 		note("inbound content keys", err)
 		if err == nil {

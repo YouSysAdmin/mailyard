@@ -235,3 +235,22 @@ func TestBlobsGoBeforeTheRowsThatNameThem(t *testing.T) {
 		t.Errorf("a blob was deleted after the rows naming it were purged: %v", calls)
 	}
 }
+
+// The attachment window applies to received mail whether or not an
+// inbound window exists, and the shorter of the two wins.
+func TestTheAttachmentWindowReachesReceivedMail(t *testing.T) {
+	cases := []struct {
+		att, inbound, want int
+	}{
+		{att: 7, inbound: 30, want: 7},
+		{att: 7, inbound: 0, want: 7},
+		{att: 30, inbound: 30, want: 0},
+		{att: 60, inbound: 30, want: 0},
+		{att: 0, inbound: 30, want: 0},
+	}
+	for _, tc := range cases {
+		if got := inboundAttachmentDays(tc.att, tc.inbound); got != tc.want {
+			t.Errorf("att %d inbound %d: got %d, want %d", tc.att, tc.inbound, got, tc.want)
+		}
+	}
+}
