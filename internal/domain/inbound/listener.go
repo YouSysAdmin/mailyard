@@ -16,6 +16,7 @@ import (
 	"github.com/emersion/go-smtp"
 
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
 
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
@@ -176,7 +177,7 @@ func (s *session) Data(r io.Reader) (err error) {
 	lr := &io.LimitedReader{R: r, N: limit + 1}
 	raw, err := io.ReadAll(lr)
 	if err != nil {
-		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "read error"}
+		return smtpdata.ReadError(err)
 	}
 
 	if int64(len(raw)) > limit {

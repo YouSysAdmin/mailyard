@@ -864,6 +864,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			Log:            log,
 			MaxMessageSize: cfg.Submission.MaxMessageSize,
 			Limiter:        iplimit.New(cfg.Submission.RatePerMinute, time.Minute),
+			Maintenance:    func() bool { return rt.Settings.Bool(smodel.KeyMaintenanceMode) },
 		}
 
 		submissionTLS, terr := tlsBuilder.Build(certificate.ListenerSubmission, cfg.Submission.TLS.Enabled)

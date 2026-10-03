@@ -18,6 +18,7 @@ import (
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 )
@@ -162,7 +163,7 @@ func (s *session) Data(r io.Reader) error {
 
 	body, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
-		return &smtp.SMTPError{Code: 451, Message: "could not read message"}
+		return smtpdata.ReadError(err)
 	}
 
 	if int64(len(body)) > limit {

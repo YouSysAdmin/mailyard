@@ -23,6 +23,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 )
 
 // Meta keys for the cached accept list. In the spool with the rest of
@@ -355,7 +356,7 @@ func (s *receiveSession) Data(r io.Reader) (err error) {
 	}
 	raw, rerr := io.ReadAll(io.LimitReader(r, limit+1))
 	if rerr != nil {
-		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "read error"}
+		return smtpdata.ReadError(rerr)
 	}
 
 	if int64(len(raw)) > limit {

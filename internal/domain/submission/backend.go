@@ -21,6 +21,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
 	"github.com/yousysadmin/mailyard/internal/domain/sandbox"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
@@ -63,6 +64,23 @@ type Backend struct {
 	// not want forwarded. Narrower than store.ProjectStore so a test
 	// can stand in one method.
 	Projects ProjectReader
+
+	// Maintenance reports whether the platform is parked. New mail is
+	// then deferred with a 4xx, which a client retries once the switch
+	// is off. Nil means never.
+	Maintenance func() bool
+}
+
+// errMaintenance defers a message while the platform is parked.
+var errMaintenance = &smtp.SMTPError{
+	Code:         451,
+	EnhancedCode: smtp.EnhancedCode{4, 3, 2},
+	Message:      "the platform is in maintenance mode, try again later",
+}
+
+// parked reports whether new mail is refused for maintenance.
+func (b *Backend) parked() bool {
+	return b.Maintenance != nil && b.Maintenance()
 }
 
 // ProjectReader is the one project read the listener makes, per
@@ -380,6 +398,10 @@ func (s *session) Mail(from string, _ *smtp.MailOptions) error {
 		return smtp.ErrAuthRequired
 	}
 
+	if s.backend.parked() {
+		return errMaintenance
+	}
+
 	if from != "" {
 		if addr, err := mail.ParseAddress(from); err == nil {
 			s.from = addr.Address
@@ -430,6 +452,11 @@ func (s *session) Data(r io.Reader) (err error) {
 		return smtp.ErrAuthRequired
 	}
 
+	// Asked again here, for a transaction that began before the switch.
+	if s.backend.parked() {
+		return errMaintenance
+	}
+
 	limit := s.backend.MaxMessageSize
 	if limit <= 0 {
 		limit = 26214400
@@ -439,7 +466,7 @@ func (s *session) Data(r io.Reader) (err error) {
 	lr := &io.LimitedReader{R: r, N: limit + 1}
 	raw, err := io.ReadAll(lr)
 	if err != nil {
-		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "read error"}
+		return smtpdata.ReadError(err)
 	}
 
 	if int64(len(raw)) > limit {

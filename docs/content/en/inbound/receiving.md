@@ -37,7 +37,8 @@ The listener does not authenticate its clients — that is what an MX is. What p
 - **The envelope sender is checked against the project suppression list.** A suppressed `MAIL FROM` address (the
   `bounce_address` on the stored message) is refused.
 - **`MAILYARD_INBOUND_MAX_MESSAGE_SIZE`** is advertised in the `SIZE` extension and enforced, so an oversized message is
-  rejected rather than buffered.
+  rejected rather than buffered. The refusal is a permanent `552 5.3.4` even when the sender did not declare a size, and
+  a line longer than the listener accepts is a permanent `554 5.6.0`, so neither is retried.
 - **`MAILYARD_INBOUND_RATE_PER_MINUTE`** caps sessions per client IP.
 
 ## Authentication results
