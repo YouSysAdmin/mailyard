@@ -218,9 +218,9 @@ func fallbackOf(cfg *tls.Config) func(*tls.ClientHelloInfo) (*tls.Certificate, e
 	}
 }
 
-type certErr string
+type certError string
 
 // Error renders the failure for a log or a caller.
-func (e certErr) Error() string { return string(e) }
+func (e certError) Error() string { return string(e) }
 
-const errNoCertificate = certErr("certificates: nothing to serve")
+const errNoCertificate = certError("certificates: nothing to serve")

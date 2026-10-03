@@ -55,16 +55,16 @@ var blocked = []netip.Prefix{
 	netip.MustParsePrefix("2001::/32"),       // Teredo
 }
 
-// ErrBlocked is returned when a dial targets a disallowed address. It
+// BlockedError is returned when a dial targets a disallowed address. It
 // is deliberately vague about which rule matched: the caller is the
 // person who chose the URL, and enumerating the internal network back
 // to them defeats the purpose.
-type ErrBlocked struct {
+type BlockedError struct {
 	Addr string
 }
 
 // Error renders the failure for a log or a caller.
-func (e *ErrBlocked) Error() string {
+func (e *BlockedError) Error() string {
 	return fmt.Sprintf("connection to %s refused: the address is inside a private or reserved range", e.Addr)
 }
 
@@ -145,12 +145,12 @@ func Control(_, address string, _ syscall.RawConn) error {
 	// literal, which is why this check cannot be rebound.
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
-		return &ErrBlocked{Addr: address}
+		return &BlockedError{Addr: address}
 	}
 
 	ip, err := netip.ParseAddr(host)
 	if err != nil || !AddrAllowed(ip) {
-		return &ErrBlocked{Addr: host}
+		return &BlockedError{Addr: host}
 	}
 
 	return nil

@@ -301,7 +301,7 @@ func NewServer(b *Backend, addr, hostname string, tlsCfg *tls.Config) *smtp.Serv
 	// handshake on this listener is a worker with the wrong
 	// certificate, which is exactly the thing somebody will be
 	// looking for here.
-	srv.ErrorLog = NewSMTPLogger(b.Log, "worker")
+	srv.ErrorLog = newSMTPLogger(b.Log, "worker")
 
 	return srv
 }

@@ -17,8 +17,8 @@ func TestAGuardedServerRefusesAPrivateHost(t *testing.T) {
 	for _, enc := range []string{EncryptionNone, EncryptionSTARTTLS, EncryptionSSL} {
 		cfg := ServerConfig{Host: "127.0.0.1", Port: 25, Encryption: enc, GuardPrivate: true}
 		err := TestConnection(t.Context(), cfg)
-		if _, ok := errors.AsType[*safedial.ErrBlocked](err); !ok {
-			t.Errorf("%s: got %v, want ErrBlocked", enc, err)
+		if _, ok := errors.AsType[*safedial.BlockedError](err); !ok {
+			t.Errorf("%s: got %v, want BlockedError", enc, err)
 		}
 	}
 }
@@ -29,7 +29,7 @@ func TestAGuardedServerRefusesAPrivateHost(t *testing.T) {
 func TestAGuardedDirectDialRefusesAPrivateHost(t *testing.T) {
 	cfg := DirectConfig{GuardPrivate: true, Timeout: time.Second}
 	_, err := cfg.dial(t.Context(), "127.0.0.1:25")
-	if _, ok := errors.AsType[*safedial.ErrBlocked](err); !ok {
-		t.Fatalf("got %v, want ErrBlocked", err)
+	if _, ok := errors.AsType[*safedial.BlockedError](err); !ok {
+		t.Fatalf("got %v, want BlockedError", err)
 	}
 }

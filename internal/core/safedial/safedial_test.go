@@ -105,14 +105,14 @@ func TestClientDoesNotFollowRedirects(t *testing.T) {
 // not anything answers on it.
 func TestDialerRefusesLoopback(t *testing.T) {
 	_, err := Dialer(time.Second, false).Dial("tcp", "127.0.0.1:25")
-	if _, ok := errors.AsType[*ErrBlocked](err); !ok {
-		t.Fatalf("guarded dial to loopback: got %v, want ErrBlocked", err)
+	if _, ok := errors.AsType[*BlockedError](err); !ok {
+		t.Fatalf("guarded dial to loopback: got %v, want BlockedError", err)
 	}
 
 	// The escape hatch is a plain dialer: whatever happens, it is not
 	// the guard refusing.
 	_, err = Dialer(200*time.Millisecond, true).Dial("tcp", "127.0.0.1:1")
-	if _, ok := errors.AsType[*ErrBlocked](err); ok {
+	if _, ok := errors.AsType[*BlockedError](err); ok {
 		t.Fatal("allowPrivate dialer still refused loopback")
 	}
 }

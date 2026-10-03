@@ -29,10 +29,10 @@ type smtpLogger struct {
 	listener string
 }
 
-// NewSMTPLogger builds the ErrorLog for one listener. The listener
+// newSMTPLogger builds the ErrorLog for one listener. The listener
 // name is on every line because a node runs up to two of these and
 // "error handling 1.2.3.4" answers half the question.
-func NewSMTPLogger(log *slog.Logger, listener string) *smtpLogger {
+func newSMTPLogger(log *slog.Logger, listener string) *smtpLogger {
 	return &smtpLogger{log: log, listener: listener}
 }
 

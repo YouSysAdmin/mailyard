@@ -408,7 +408,7 @@ func NewReceiveServer(b *ReceiveBackend, addr, hostname string, tlsCfg *tls.Conf
 	srv.MaxRecipients = maxSessionRecipients
 	srv.EnableSMTPUTF8 = true
 	srv.TLSConfig = tlsCfg
-	srv.ErrorLog = NewSMTPLogger(b.Log, "inbound")
+	srv.ErrorLog = newSMTPLogger(b.Log, "inbound")
 
 	return srv
 }

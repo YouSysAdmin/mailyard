@@ -377,12 +377,12 @@ func (h *Handler) loadIssuer(c fiber.Ctx, name string) (*certgen.Issuer, error, 
 	return issuer, nil, nil
 }
 
-const errNoIssuer = certErr("no such issuer")
+const errNoIssuer = certError("no such issuer")
 
-type certErr string
+type certError string
 
 // Error renders the failure for a log or a caller.
-func (e certErr) Error() string { return string(e) }
+func (e certError) Error() string { return string(e) }
 
 // daysOr turns a day count into a duration, falling back when zero.
 func daysOr(days int, fallback time.Duration) time.Duration {

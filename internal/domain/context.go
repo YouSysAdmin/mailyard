@@ -83,27 +83,27 @@ type RequestContext struct {
 // maintenance-mode exemption, and project access - and a fourth that
 // forgot the key branch would let an admin credential be refused by
 // something it plainly should pass.
-func (ctx *RequestContext) IsPlatformAdmin() bool {
-	if ctx == nil {
+func (rc *RequestContext) IsPlatformAdmin() bool {
+	if rc == nil {
 		return false
 	}
 
-	return ctx.AdminAPIKey != nil || (ctx.User != nil && ctx.User.IsAdmin())
+	return rc.AdminAPIKey != nil || (rc.User != nil && rc.User.IsAdmin())
 }
 
 // Actor names whoever made the request, for a record of who changed
 // something: the user's id and address, or the credential's name when a
 // key made the call. id is empty for a key, which has no account.
-func (ctx *RequestContext) Actor() (id, label string) {
+func (rc *RequestContext) Actor() (id, label string) {
 	switch {
-	case ctx == nil:
+	case rc == nil:
 		return "", ""
-	case ctx.AdminAPIKey != nil:
-		return "", "admin api key " + ctx.AdminAPIKey.Name
-	case ctx.APIKey != nil:
-		return "", "api key " + ctx.APIKey.Name
-	case ctx.User != nil:
-		return ctx.User.ID, ctx.User.Email
+	case rc.AdminAPIKey != nil:
+		return "", "admin api key " + rc.AdminAPIKey.Name
+	case rc.APIKey != nil:
+		return "", "api key " + rc.APIKey.Name
+	case rc.User != nil:
+		return rc.User.ID, rc.User.Email
 	}
 
 	return "", ""
@@ -117,8 +117,8 @@ func (ctx *RequestContext) Actor() (id, label string) {
 // left true on a production deploy. A browser session is never one -
 // the sandbox is for an application under test, not for a person
 // clicking Send in the console.
-func (ctx *RequestContext) IsSandboxCredential() bool {
-	return ctx != nil && ctx.APIKey != nil && ctx.APIKey.Sandbox
+func (rc *RequestContext) IsSandboxCredential() bool {
+	return rc != nil && rc.APIKey != nil && rc.APIKey.Sandbox
 }
 
 // LogValue makes RequestContext a slog.LogValuer so
@@ -126,36 +126,36 @@ func (ctx *RequestContext) IsSandboxCredential() bool {
 // slog.Any) emits one structured group. Evaluated lazily at log
 // time, so a User resolved after the attribute was attached still
 // shows up in the access log.
-func (ctx *RequestContext) LogValue() slog.Value {
+func (rc *RequestContext) LogValue() slog.Value {
 	attrs := []slog.Attr{
-		slog.String("app_name", ctx.AppName),
-		slog.String("app_version", ctx.AppVersion),
-		slog.String("client_ip", ctx.ClientIP),
-		slog.String("path", ctx.Path),
-		slog.String("request_id", ctx.RequestID),
-		slog.Bool("ssl", ctx.SSL),
+		slog.String("app_name", rc.AppName),
+		slog.String("app_version", rc.AppVersion),
+		slog.String("client_ip", rc.ClientIP),
+		slog.String("path", rc.Path),
+		slog.String("request_id", rc.RequestID),
+		slog.Bool("ssl", rc.SSL),
 	}
-	if ctx.User != nil {
+	if rc.User != nil {
 		attrs = append(attrs,
-			slog.String("user_email", ctx.User.Email),
-			slog.Bool("admin", ctx.User.IsAdmin()),
+			slog.String("user_email", rc.User.Email),
+			slog.Bool("admin", rc.User.IsAdmin()),
 		)
 	}
 
-	if ctx.Project != nil {
+	if rc.Project != nil {
 		attrs = append(attrs,
-			slog.String("project_id", ctx.Project.ID),
-			slog.String("project_slug", ctx.Project.Slug),
-			slog.Bool("project_owner", ctx.ProjectOwner),
+			slog.String("project_id", rc.Project.ID),
+			slog.String("project_slug", rc.Project.Slug),
+			slog.Bool("project_owner", rc.ProjectOwner),
 		)
 	}
 
-	if ctx.AdminAPIKey != nil {
-		attrs = append(attrs, slog.String("admin_api_key_id", ctx.AdminAPIKey.ID))
+	if rc.AdminAPIKey != nil {
+		attrs = append(attrs, slog.String("admin_api_key_id", rc.AdminAPIKey.ID))
 	}
 
-	if ctx.APIKey != nil {
-		attrs = append(attrs, slog.String("api_key_id", ctx.APIKey.ID))
+	if rc.APIKey != nil {
+		attrs = append(attrs, slog.String("api_key_id", rc.APIKey.ID))
 	}
 
 	return slog.GroupValue(attrs...)
