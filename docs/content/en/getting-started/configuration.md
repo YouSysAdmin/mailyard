@@ -370,6 +370,14 @@ See [Domain Verification](/docs/smtp-domains/domain-verification).
 Where attachment bytes live. The default keeps them inline as base64 in the database, which needs no configuration at
 all. The `fs` and `s3` backends move the bytes out and store only metadata plus a storage key.
 
+{{< callout type="danger" title="Inline storage is for testing, not production" >}}
+Inline attachments are written into PostgreSQL as base64, a third larger than the files themselves. On a production
+installation that grows the database, its backups and its replicas with every message that carries a file. Set
+`MAILYARD_STORAGE_BACKEND=fs` with `MAILYARD_STORAGE_FS_PATH` on a persistent volume shared by every node, or `s3`. The
+backend applies to mail accepted after it is set - attachments already stored inline are not moved and stay in the
+database until the attachment retention window clears them.
+{{< /callout >}}
+
 | Variable                             | Default            | Description                                          |
 |--------------------------------------|--------------------|------------------------------------------------------|
 | `MAILYARD_STORAGE_BACKEND`           | —                  | Empty for inline, or `fs` or `s3`                    |

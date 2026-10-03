@@ -79,6 +79,15 @@ time race each other and it comes out as a duplicate key.
 unsubscribe pages and invitation mail are all absolute URLs built from it, and
 [campaigns refuse to start](/docs/campaigns/sending) without it.
 
+{{< callout type="danger" title="Attachments are stored in the database by default" >}}
+With `MAILYARD_STORAGE_BACKEND` unset, every attachment is kept inline, base64 encoded, in PostgreSQL - a third larger
+than the file, in the same tables the delivery queue works on. That needs no setup and is meant for trying Mailyard out
+and for testing. For production set `MAILYARD_STORAGE_BACKEND` to `fs` (on a persistent volume) or `s3`, so the
+database holds only a reference. Decide before real traffic: the setting applies to mail accepted after it changes, and
+attachments already stored inline stay in the database until retention clears them. See
+[Attachment Storage](/docs/getting-started/configuration#attachment-storage).
+{{< /callout >}}
+
 On the first start the bootstrap admin password is printed to stderr **once** — read it out of the container log before
 doing anything else:
 
