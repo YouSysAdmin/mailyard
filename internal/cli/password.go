@@ -65,17 +65,9 @@ func newSetPasswordCmd() *cobra.Command {
 				return err
 			}
 
-			// The same floor the API sets, counted the same way, so the
-			// offline path cannot leave a weaker password behind.
-			if utf8.RuneCountInString(password) < 12 {
-				return usage("password must be at least 12 characters")
-			}
-
-			// bcrypt refuses anything longer outright. Say so here
-			// rather than letting HashPassword fail with a library
-			// error after the operator has typed it twice.
-			if len(password) > 72 {
-				return usage("password must be at most 72 bytes (bcrypt's limit)")
+			password, err = newPassword(password)
+			if err != nil {
+				return err
 			}
 
 			// A one-shot command against a database somebody else
@@ -101,6 +93,29 @@ func newSetPasswordCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&stdin, "stdin", false, "read the password from stdin")
 
 	return cmd
+}
+
+// newPassword is the password set-password stores, or why it refuses.
+//
+// Trimmed because sign-in trims what it is given: a stored password
+// carrying an edge space is one nobody can ever sign in with.
+func newPassword(raw string) (string, error) {
+	password := strings.TrimSpace(raw)
+
+	// The same floor the API sets, counted the same way, so the
+	// offline path cannot leave a weaker password behind.
+	if utf8.RuneCountInString(password) < 12 {
+		return "", usage("password must be at least 12 characters")
+	}
+
+	// bcrypt refuses anything longer outright. Say so here rather than
+	// letting HashPassword fail with a library error after the operator
+	// has typed it twice.
+	if len(password) > 72 {
+		return "", usage("password must be at most 72 bytes (bcrypt's limit)")
+	}
+
+	return password, nil
 }
 
 // applyPassword writes hash as the account's password, enables the
