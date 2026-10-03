@@ -456,7 +456,7 @@ func (p *Processor) takeOutOfRotation(ctx context.Context, srv *ssmodel.Server, 
 func (p *Processor) recordRefusals(ctx context.Context, e *emailmodel.Email, r transport.Refusals) []string {
 	var refused []string
 	for _, err := range r.Refused() {
-		f, ok := err.(transport.Failure)
+		f, ok := errors.AsType[transport.Failure](err)
 		if !ok || f.RejectedRecipient() == "" {
 			continue
 		}

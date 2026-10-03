@@ -127,6 +127,16 @@ type Transport interface {
 	Test(ctx context.Context) error
 }
 
+// The delivery errors are found with errors.As, so a broken method set
+// would silently classify them as transient. These make it a build error.
+var (
+	_ Failure     = (*smtpclient.SendError)(nil)
+	_ Refusals    = (*smtpclient.RecipientRefusals)(nil)
+	_ ServerFault = (*smtpclient.ConfigError)(nil)
+	_ Failure     = (*sesFailure)(nil)
+	_ ServerFault = (*sesFailure)(nil)
+)
+
 // Failure is a delivery error that knows whether it is worth retrying.
 //
 // An interface rather than a concrete type, because the two things that
