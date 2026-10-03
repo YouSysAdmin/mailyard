@@ -139,9 +139,8 @@ func (h *Handler) DeleteAttachment(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	// Best effort blob cleanup. Emails sent earlier reference the
-	// same key, so their attachment downloads stop working - the
-	// delivered mail itself already carried the bytes.
+	// Best effort blob cleanup. Messages hold copies under keys of
+	// their own (AttachTemplateFiles), so nothing queued reads this one.
 	if a.StorageKey != "" && h.Runtime.Blob != nil {
 		if derr := h.Runtime.Blob.Delete(c.Context(), a.StorageKey); derr != nil {
 			h.Runtime.Log.Warn("template: blob cleanup failed", "key", a.StorageKey, "err", derr)
