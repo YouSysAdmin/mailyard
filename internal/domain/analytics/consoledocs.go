@@ -18,14 +18,14 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "GET",
 			Path:        "/analytics",
 			Summary:     "Analytics",
-			Description: "Any signed-in member.",
+			Description: "Needs the `analytics:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", TrendResponse{})},
 		},
 		{
 			Method:      "GET",
 			Path:        "/dashboard/stats",
 			Summary:     "Dashboard stats",
-			Description: "Any signed-in member.",
+			Description: "Needs the `analytics:read` permission.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatsResponse{})},
 		},
 	}

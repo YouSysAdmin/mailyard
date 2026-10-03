@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/yousysadmin/mailyard/internal/core/apidoc"
+	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/models/permission"
 	"github.com/yousysadmin/mailyard/internal/openapi"
 )
@@ -157,8 +158,11 @@ func routePermissions(t *testing.T) map[string]string {
 				return true
 			}
 
+			// Both surfaces: the console api gates its few project
+			// routes with the same tokens, and documents them under
+			// their full path.
 			base, known := prefix[recv.Name]
-			if !known || !strings.HasPrefix(base, "/api/v1") {
+			if !known || (!strings.HasPrefix(base, "/api/v1") && !strings.HasPrefix(base, env.ConsolePath+"/api")) {
 				return true
 			}
 

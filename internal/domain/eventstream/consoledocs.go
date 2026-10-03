@@ -25,7 +25,7 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "GET",
 			Path:        "/events/stream",
 			Summary:     "Stream",
-			Description: "Any signed-in member.",
+			Description: "Needs the `notifications:read` permission in the project the X-Mailyard-Project-Id header names.",
 			Responses:   []apidoc.Response{apidoc.EventStream("An open stream of project events.")},
 		},
 	}

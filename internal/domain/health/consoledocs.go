@@ -18,7 +18,7 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "GET",
 			Path:        "/health",
 			Summary:     "Status",
-			Description: "Any signed-in member.",
+			Description: "Any signed-in account.",
 			Responses:   []apidoc.Response{apidoc.OK("The result.", StatusResponse{})},
 		},
 	}

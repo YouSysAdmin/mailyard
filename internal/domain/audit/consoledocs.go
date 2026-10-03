@@ -46,7 +46,7 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "GET",
 			Path:        "/security-log",
 			Summary:     "Security log",
-			Description: "Any signed-in member, for their own account.",
+			Description: "Any signed-in account, for its own sign-ins.",
 			Query:       []apidoc.Param{{Name: "all", Type: "boolean", Description: "Every account's events rather than the caller's own. Honored only for a platform admin."}, {Name: "type", Description: "One event type exactly, such as apikey.created."}, {Name: "actor", Description: "An account id or its address. Read only with all=true."}, {Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}, {Name: "limit", Type: "integer", Description: "Page size. Over-asking is clamped, never refused."}, {Name: "offset", Type: "integer", Description: "Rows to skip."}},
 			Responses:   []apidoc.Response{apidoc.OK("The result.", ListResponse{})},
 		},
@@ -54,7 +54,7 @@ func ConsoleDocs() []apidoc.Route {
 			Method:  "GET",
 			Path:    "/security-log/export",
 			Summary: "Export the security log",
-			Description: "Any signed-in member, for their own account - `all=true` is " +
+			Description: "Any signed-in account, for its own sign-ins - `all=true` is " +
 				"honored only for a platform admin. Same optional `from` and `to` as " +
 				"the project export.",
 			Query:     []apidoc.Param{{Name: "all", Type: "boolean", Description: "Every account's events rather than the caller's own. Honored only for a platform admin."}, {Name: "from", Description: "A date (2026-08-01) or an RFC 3339 timestamp, inclusive."}, {Name: "to", Description: "A date, which includes that whole day, or an RFC 3339 timestamp, exclusive."}},
