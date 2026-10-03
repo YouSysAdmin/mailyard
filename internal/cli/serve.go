@@ -355,6 +355,17 @@ func runServe(cmd *cobra.Command, r role) error {
 		}
 	}
 
+	// SSO-only mints nobody. With no account at all nobody could ever
+	// configure a provider, so that refuses the boot.
+	if r.api && !cfg.Auth.Disabled && !cfg.Auth.Local.Enabled {
+		if err := requireAnAccount(context.Background(), rt); err != nil {
+			return err
+		}
+
+		log.Info("local sign-in is off, accounts sign in through identity providers only. " +
+			"To get back in without one, set auth.local.enabled true and use set-password")
+	}
+
 	// Tenancy bootstrap: the auth-disabled mode has no users, so
 	// tenant-scoped routes fall back to a shared default project.
 	// Mint it up front so the first request does not race to create it.
@@ -1056,6 +1067,22 @@ func openDatabase(cfg *env.DatabaseConfig, cr *crypto.Service, migrate bool) (da
 // Generates a 16-char random password, hashes it, and
 // LOGS THE PLAINTEXT ONCE so the operator can copy it.
 // Subsequent starts find the user and no-op.
+// requireAnAccount refuses an SSO-only boot against an empty users
+// table, where nobody could sign in to configure an identity provider.
+func requireAnAccount(ctx context.Context, rt *env.Runtime) error {
+	count, err := rt.Store.User.Count(ctx)
+	if err != nil {
+		return fmt.Errorf("count users: %w", err)
+	}
+
+	if count == 0 {
+		return errors.New("no account exists and local sign-in is off - set auth.local.enabled true " +
+			"and auth.local.email to create the first administrator, then configure an identity provider")
+	}
+
+	return nil
+}
+
 func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 	count, err := rt.Store.User.Count(ctx)
 	if err != nil {

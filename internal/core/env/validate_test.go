@@ -76,3 +76,27 @@ auth:
 		t.Fatalf("got %v, want the length floor", err)
 	}
 }
+
+// SSO-only is a documented setting and has to boot. The bootstrap
+// email is required only while local sign-in is on.
+func TestLocalSignInOffBoots(t *testing.T) {
+	if _, err := load(t, minimalConfig+`
+auth:
+  jwt_secret: 0123456789abcdef0123456789abcdef
+  local:
+    enabled: false
+`); err != nil {
+		t.Fatalf("auth.local.enabled false must load: %v", err)
+	}
+
+	_, err := load(t, minimalConfig+`
+auth:
+  jwt_secret: 0123456789abcdef0123456789abcdef
+  local:
+    enabled: true
+    email: ""
+`)
+	if err == nil || !strings.Contains(err.Error(), "auth.local.email required") {
+		t.Fatalf("local on without an email: got %v", err)
+	}
+}

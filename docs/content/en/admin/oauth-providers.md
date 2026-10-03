@@ -176,5 +176,10 @@ outright and the form disappears from the login page. That is deliberately insta
 authentication belongs to the platform, so one install cannot have one project mandate a provider while another accepts
 passwords.
 
+Local sign-in is still how an installation starts: the first administrator is created by it, and that account configures
+the providers. A server with local sign-in off refuses to start against an empty users table, since nobody could ever
+sign in to it. The way back in when a provider breaks is the same switch - set `auth.local.enabled: true` again, and
+`mailyard set-password` if the password is lost.
+
 Group claims are an admission check and nothing more. A group never maps to a role - satisfying an allowlist is not a
 privilege grant, and roles come from a person deciding, which is what the invitation is.

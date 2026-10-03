@@ -1329,16 +1329,11 @@ func (c *Config) Validate() error {
 			}
 		}
 
-		// Local login is the only YAML-configured method, because
-		// identity providers live in the database. It is also the
-		// bootstrap path: an operator needs an account before there is
-		// an admin API to configure SSO with, and a break-glass way back
-		// in if a provider breaks.
-		if !c.Auth.Local.Enabled {
-			return fmt.Errorf("auth enabled but no method configured: enable auth.local (identity providers are configured at runtime under /api/oauth-providers)")
-		}
-
-		if c.Auth.Local.Email == "" {
+		// Local login is the bootstrap path: it mints the first account,
+		// which configures identity providers. Turned off it is SSO-only,
+		// and the way back in is turning it on again, with set-password
+		// when the password is lost.
+		if c.Auth.Local.Enabled && c.Auth.Local.Email == "" {
 			return fmt.Errorf("auth.local.email required (bootstrap user email)")
 		}
 
