@@ -84,7 +84,9 @@ literally the same function.
    of the session to the credential's project. `MAIL FROM`, `RCPT TO`, and `DATA` are all rejected until AUTH succeeds.
 3. On `DATA`, Mailyard reads the raw message (bounded by `submission.max_message_size`), parses subject, HTML/text
    bodies, and attachments from the MIME body, and builds a send request using the SMTP envelope addresses
-   (`MAIL FROM` / `RCPT TO`) rather than the parsed header addresses — the same behavior a normal MTA would have.
+   (`MAIL FROM` / `RCPT TO`) rather than the parsed header addresses — the same behavior a normal MTA would have. When
+   the `From` header names the envelope sender, its display name is kept, so `From: Ann <ann@example.com>` arrives
+   with the name. An address given twice at `RCPT TO`, in any case, is one recipient and one delivery.
 4. That request is handed to the same `email.Service.Send` used by the HTTP API, scoped to the credential's project and
    owning user. It goes through the identical checks: sender domain verification, suppression-list filtering, rate
    limits, plan quota, and attachment-size validation, and a normal `Email` record is created and queued for delivery.
@@ -99,7 +101,7 @@ with three exceptions:
 - **Structural headers the builder writes itself** are dropped, not refused: `From`, `To`, `Cc`, `Date`, `Message-ID`,
   `Content-Type`, `MIME-Version` and the rest of the [reserved set](/docs/email-sending/single-email#reserved-headers),
   `Sender` and the read-receipt headers among them. The recipients come from the envelope, the To and Cc
-  headers are kept as the client wrote them, and `Reply-To` and `List-Unsubscribe` are lifted into their own fields.
+  headers are kept as the client wrote them, display names included, and `Reply-To` and `List-Unsubscribe` are lifted into their own fields.
 - **Mailyard's control headers** - anything under `X-Mailyard-` - are instructions to the listener
   (`X-Mailyard-Sandbox`, `X-Mailyard-Disable-Tracking`, `X-Mailyard-Sandbox-Retention`) and never leave with the
   message.
@@ -112,7 +114,7 @@ What survives is judged exactly as an API caller's `headers` are, so a message c
 a value with a control character in it, or one over 4096 characters, is refused with a 550 rather than trimmed. An
 RFC 2047 encoded word is decoded before that check, so a line break smuggled inside one is refused too. Header values
 are forwarded as the
-decoded text of their first occurrence. The project's default headers are laid underneath, as for every other send.
+decoded text of their first occurrence, and written out again as RFC 2047 encoded words where they are not ASCII. The project's default headers are laid underneath, as for every other send.
 
 {{< callout type="info" title="A sandbox credential never reaches step 3" >}}
 Capture happens **before the MIME body is parsed**, so a message submitted on a

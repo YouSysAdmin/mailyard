@@ -46,10 +46,20 @@ type Attachment struct {
 // gets stored: this struct is an interpretation, and the bytes are the
 // record.
 type Email struct {
-	MessageID   string
-	From        string
-	To          []string
-	Cc          []string
+	MessageID string
+	From      string
+
+	// FromName is the display name on the From header, decoded, empty
+	// when there is none.
+	FromName string
+	To       []string
+	Cc       []string
+
+	// ToHeader and CcHeader are the To and Cc headers with their
+	// display names kept, re-encoded as one mailbox list each. Empty
+	// when the header is absent or is not an address list.
+	ToHeader    string
+	CcHeader    string
 	Subject     string
 	Date        time.Time
 	TextBody    string
@@ -120,8 +130,14 @@ func (e *Email) describe(msg *mail.Message) {
 	e.Subject = e.Headers["Subject"]
 
 	e.From = oneAddress(msg.Header.Get("From"))
+	if addr, err := mail.ParseAddress(msg.Header.Get("From")); err == nil {
+		e.FromName = addr.Name
+	}
+
 	e.To = addressList(msg.Header.Get("To"))
 	e.Cc = addressList(msg.Header.Get("Cc"))
+	e.ToHeader = mailboxList(msg.Header.Get("To"))
+	e.CcHeader = mailboxList(msg.Header.Get("Cc"))
 
 	// An absent or unreadable Date becomes the time it was read. A zero
 	// time would sort to the beginning of every list and read as 1 Jan
@@ -172,6 +188,27 @@ func oneAddress(v string) string {
 	}
 
 	return v
+}
+
+// mailboxList renders To or Cc back as a header value, display names
+// kept. Through mail.Address.String, so a name needing quotes or
+// RFC 2047 encoding gets it and the result is safe to write again.
+func mailboxList(v string) string {
+	if v == "" {
+		return ""
+	}
+
+	addrs, err := mail.ParseAddressList(v)
+	if err != nil {
+		return ""
+	}
+
+	out := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		out = append(out, a.String())
+	}
+
+	return strings.Join(out, ", ")
 }
 
 // addressList reduces To or Cc to bare addresses.

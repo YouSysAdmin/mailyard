@@ -21,6 +21,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
 	"github.com/yousysadmin/mailyard/internal/domain/sandbox"
@@ -431,6 +432,14 @@ func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 		addr = parsed.Address
 	}
 
+	// One recipient named twice is one delivery, accepted again
+	// without a second copy.
+	for _, seen := range s.to {
+		if strings.EqualFold(seen, addr) {
+			return nil
+		}
+	}
+
 	s.to = append(s.to, addr)
 
 	return nil
@@ -524,10 +533,10 @@ func (s *session) Data(r io.Reader) (err error) {
 	// it, so the To header is the CLIENT's, never rebuilt from the
 	// envelope - that printed every Bcc address to every recipient.
 	req := &email.SendRequest{
-		From:        s.from,
+		From:        headerFrom(s.from, parsed),
 		To:          s.to,
-		HeaderTo:    strings.Join(parsed.To, ", "),
-		Cc:          strings.Join(parsed.Cc, ", "),
+		HeaderTo:    parsed.ToHeader,
+		Cc:          parsed.CcHeader,
 		Subject:     parsed.Subject,
 		HTML:        parsed.HTMLBody,
 		Text:        parsed.TextBody,
@@ -587,6 +596,18 @@ func (s *session) Data(r io.Reader) (err error) {
 		"recipients", len(e.Recipients), "suppressed", len(blocked))
 
 	return nil
+}
+
+// headerFrom is the envelope sender with the display name the client
+// wrote on its From header, when that header names the same address.
+// A From naming somebody else keeps the envelope bare, since the
+// envelope is what the sender checks are asked about.
+func headerFrom(envelope string, parsed *mailparse.Email) string {
+	if parsed.FromName == "" || !strings.EqualFold(parsed.From, envelope) {
+		return envelope
+	}
+
+	return smtpclient.FormatAddress(parsed.FromName, envelope)
 }
 
 // capture stores the message in the project sandbox and answers 250.

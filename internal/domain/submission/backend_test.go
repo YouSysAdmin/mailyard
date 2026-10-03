@@ -206,8 +206,9 @@ func TestRelayAcceptsValidKey(t *testing.T) {
 		t.Fatal("sender never called")
 	}
 
-	// Envelope wins over headers: two RCPT TO but one To header.
-	if req.From != "ann@example.com" || len(req.To) != 2 {
+	// Envelope wins over headers: two RCPT TO but one To header. The
+	// From header names the envelope sender, so its display name stays.
+	if req.From != `"Ann" <ann@example.com>` || len(req.To) != 2 {
 		t.Errorf("envelope = from %q to %v", req.From, req.To)
 	}
 
@@ -219,6 +220,47 @@ func TestRelayAcceptsValidKey(t *testing.T) {
 	// it from, not as a header it would refuse.
 	if req.ReplyTo != "Support <help@example.com>" {
 		t.Errorf("reply_to = %q, want the client's Reply-To header", req.ReplyTo)
+	}
+}
+
+// The To and Cc headers keep the names the client wrote, a From for
+// another address keeps the envelope bare, and an address named twice
+// at RCPT TO is one recipient.
+func TestRelayKeepsDisplayNamesAndDedupesRecipients(t *testing.T) {
+	sender := &fakeSender{}
+	addr, token := startServer(t, sender, canSend, false)
+
+	msg := "From: Someone Else <other@example.com>\r\n" +
+		"To: Bob Jones <bob@example.com>, =?utf-8?q?Zo=C3=AB?= <zoe@example.com>\r\n" +
+		"Cc: \"Ops, Team\" <ops@example.com>\r\n" +
+		"Subject: names\r\n" +
+		"\r\n" +
+		"body\r\n"
+	err := submit(addr, token, "ann@example.com",
+		[]string{"bob@example.com", "BOB@example.com", "zoe@example.com", "ops@example.com"}, msg)
+	if err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	req := sender.lastReq
+	if req == nil {
+		t.Fatal("sender never called")
+	}
+
+	if req.From != "ann@example.com" {
+		t.Errorf("from = %q, want the bare envelope for a From naming another address", req.From)
+	}
+
+	if len(req.To) != 3 {
+		t.Errorf("recipients = %v, want bob once", req.To)
+	}
+
+	if want := `"Bob Jones" <bob@example.com>, =?utf-8?q?Zo=C3=AB?= <zoe@example.com>`; req.HeaderTo != want {
+		t.Errorf("To header = %q, want %q", req.HeaderTo, want)
+	}
+
+	if want := `"Ops, Team" <ops@example.com>`; req.Cc != want {
+		t.Errorf("Cc header = %q, want %q", req.Cc, want)
 	}
 }
 
