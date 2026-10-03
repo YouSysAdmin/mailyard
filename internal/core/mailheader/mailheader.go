@@ -23,12 +23,11 @@ import (
 // campaign's, a message's - not to the merged result.
 const MaxCustom = 20
 
-// MaxNameLen and MaxValueLen bound one header. A name has no natural
-// limit and a value's is the 998-octet line, which the builder does
-// not fold - so these bound what a project's default replicates onto
-// every row it sends rather than promising RFC 5322 line lengths. The
-// value cap leaves room for a References chain, which is the longest
-// header anybody forwards on purpose.
+// MaxNameLen and MaxValueLen bound one header. The builder folds long
+// lines, so these bound what a project's default replicates onto every
+// row it sends rather than a line length. The value cap leaves room for
+// a References chain, which is the longest header anybody forwards on
+// purpose.
 const (
 	MaxNameLen  = 128
 	MaxValueLen = 4096
@@ -40,34 +39,41 @@ const (
 // one and a forwarded message never carries one out.
 const ControlPrefix = "x-mailyard-"
 
+// ResentPrefix covers the Resent-* trace block of RFC 5322 section
+// 3.6.6, which says a message was re-sent by somebody - a claim about
+// who handled it that the builder never makes on a caller's behalf.
+const ResentPrefix = "resent-"
+
 // MIMEPrefix covers every Content-* header. The builder owns the MIME
 // structure - type, encoding, and the top-level Content-Location that
 // would rebase every relative URL in the HTML - so a caller sets none
 // of it.
 const MIMEPrefix = "content-"
 
-// reserved are the headers the builder owns, plus the three a sender
-// could use to speak for somebody else: Sender names who sent it on
-// the author's behalf, and the two receipt headers ask the recipient's
-// client to mail an address of the caller's choosing.
+// reserved are the headers the builder owns, plus the ones a sender
+// could use to speak for somebody else or redirect mail: Sender names
+// who sent it on the author's behalf, the two receipt headers ask the
+// recipient's client to mail an address of the caller's choosing, and
+// Errors-To asks an old MTA to send bounces there.
 var reserved = map[string]struct{}{
 	"from": {}, "to": {}, "cc": {}, "bcc": {}, "subject": {}, "date": {},
 	"mime-version": {}, "list-unsubscribe": {}, "list-unsubscribe-post": {},
 	"return-path": {}, "message-id": {}, "received": {}, "dkim-signature": {},
 	"reply-to": {}, "sender": {}, "disposition-notification-to": {},
-	"return-receipt-to": {},
+	"return-receipt-to": {}, "errors-to": {},
 }
 
 // Reserved reports whether name belongs to the builder, either by
-// being in the fixed set or by sitting under ControlPrefix or
-// MIMEPrefix. Case insensitive.
+// being in the fixed set or by sitting under ControlPrefix, MIMEPrefix
+// or ResentPrefix. Case insensitive.
 func Reserved(name string) bool {
 	lower := strings.ToLower(name)
 	if _, ok := reserved[lower]; ok {
 		return true
 	}
 
-	return strings.HasPrefix(lower, ControlPrefix) || strings.HasPrefix(lower, MIMEPrefix)
+	return strings.HasPrefix(lower, ControlPrefix) || strings.HasPrefix(lower, MIMEPrefix) ||
+		strings.HasPrefix(lower, ResentPrefix)
 }
 
 // ValidName reports whether name is an RFC 5322 field name: one or
@@ -104,6 +110,8 @@ const (
 	KindTooMany
 	// KindTooLong is a name or value past its cap.
 	KindTooLong
+	// KindDuplicate is a name given twice in one set, in any case.
+	KindDuplicate
 )
 
 // Error is one refused header. Name is empty for KindTooMany.
@@ -121,6 +129,8 @@ func (e *Error) Error() string {
 		return fmt.Sprintf("header %q is reserved and cannot be overridden", e.Name)
 	case KindInvalidValue:
 		return fmt.Sprintf("header %q contains invalid characters", e.Name)
+	case KindDuplicate:
+		return fmt.Sprintf("header %q is given more than once, header names are compared without regard to case", e.Name)
 	case KindTooLong:
 		return fmt.Sprintf("header %q is too long: a name is at most %d characters, a value %d", e.Name, MaxNameLen, MaxValueLen)
 	default:
@@ -138,10 +148,18 @@ func Validate(headers map[string]string) *Error {
 		return &Error{Kind: KindTooMany}
 	}
 
+	seen := make(map[string]struct{}, len(headers))
 	for name, value := range headers {
 		if !ValidName(name) {
 			return &Error{Name: name, Kind: KindInvalidName}
 		}
+
+		lower := strings.ToLower(name)
+		if _, dup := seen[lower]; dup {
+			return &Error{Name: name, Kind: KindDuplicate}
+		}
+
+		seen[lower] = struct{}{}
 
 		if Reserved(name) {
 			return &Error{Name: name, Kind: KindReserved}

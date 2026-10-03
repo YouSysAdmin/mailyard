@@ -38,6 +38,10 @@ func TestReservedCoversTheSetAndThePrefix(t *testing.T) {
 		"X-Mailyard-Email-Id":          true,
 		"x-mailyard-sandbox-retention": true,
 		"X-Mailyard":                   false,
+		"Resent-From":                  true,
+		"resent-sender":                true,
+		"Errors-To":                    true,
+		"X-Resent":                     false,
 		"X-Ticket":                     false,
 		"In-Reply-To":                  false,
 	} {
@@ -125,5 +129,22 @@ func TestForwardableDropsReservedAndListed(t *testing.T) {
 
 	if Forwardable(map[string]string{"From": "a"}, nil) != nil {
 		t.Error("nothing forwardable should be nil, not an empty map")
+	}
+}
+
+// Two spellings of one name in one set are one header given twice, and
+// would both be written.
+func TestValidateRefusesANameGivenTwice(t *testing.T) {
+	err := Validate(map[string]string{"X-Dup": "a", "x-dup": "b"})
+	if err == nil || err.Kind != KindDuplicate {
+		t.Fatalf("Validate = %v, want a duplicate refusal", err)
+	}
+
+	if !strings.Contains(err.Error(), "more than once") {
+		t.Errorf("message = %q", err.Error())
+	}
+
+	if err := Validate(map[string]string{"X-One": "a", "X-Two": "b"}); err != nil {
+		t.Errorf("two different names refused: %v", err)
 	}
 }

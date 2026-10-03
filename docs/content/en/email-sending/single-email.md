@@ -106,21 +106,27 @@ with no text alternative scores worse with spam filters than one that has it.
 | `sandbox`, `sandbox_retention_days`                                        | Capture instead of delivering — see [Sandbox](/docs/email-sending/sandbox)                                                                                                          |
 
 `dry_run` is the cheapest way to check an integration: it validates the sender, the recipients, the headers, the
-attachment sizes and the routing, then returns without writing a row or spending quota.
+attachment sizes and the routing, checks the plan's hourly and daily limits and the suppression list, then returns
+without writing a row or spending quota. A send the real request would refuse is refused by the dry run too, with the
+same status - `429` when the plan's limit is reached.
 
 {{< callout type="warning" title="Reserved headers" >}}
 Anything the message builder owns is refused rather than merged, so a caller cannot forge the envelope or break the
 MIME structure: `From`, `To`, `Cc`, `Bcc`, `Reply-To`, `Subject`, `Date`, `MIME-Version`, `List-Unsubscribe`,
 `List-Unsubscribe-Post`, `Return-Path`, `Message-ID`, `Received`, `DKIM-Signature`, every `Content-*` header, and
-everything under the `X-Mailyard-` prefix, which is Mailyard's own control namespace. Three more are refused because
-they let a sender speak for somebody else: `Sender`, and the two read-receipt requests `Disposition-Notification-To`
-and `Return-Receipt-To`, which ask the recipient's client to mail an address of the caller's choosing.
+everything under the `X-Mailyard-` prefix, which is Mailyard's own control namespace. More are refused because they
+let a sender speak for somebody else or redirect mail: `Sender`, every `Resent-*` header, `Errors-To`, and the two
+read-receipt requests `Disposition-Notification-To` and `Return-Receipt-To`, which ask the recipient's client to mail
+an address of the caller's choosing.
 
 The refusal names the header and, where there is one, the field to use instead — `List-Unsubscribe` points you at
 `list_unsubscribe_url`, `Reply-To` at `reply_to`, `Cc` and `Bcc` at `cc` and `bcc`. Matching is case-insensitive. A
 name has to be a plain RFC 5322 field name (printable ASCII, no spaces, no colon, at most 128 characters), and a value
 carrying a line break or any other control character is refused outright, which is what stops header injection through
-a value you interpolated. A value is capped at 4096 characters, room enough for a `References` chain.
+a value you interpolated. A value is capped at 4096 characters, room enough for a `References` chain. The same name
+twice in one set, in two spellings such as `X-Tag` and `x-tag`, is refused too. A long value is folded onto
+continuation lines and a non-ASCII one is written as RFC 2047 encoded words, so what leaves is a valid RFC 5322
+header.
 {{< /callout >}}
 
 ### Three layers of headers

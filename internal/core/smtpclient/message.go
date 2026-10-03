@@ -188,7 +188,10 @@ func (m *Message) Build() ([]byte, error) {
 	// is the last writer, so it also refuses to emit one: a value that
 	// somehow arrives with CR or LF loses them rather than becoming a
 	// second header in a message the platform then DKIM-signs.
-	fmt.Fprintf(&b, "From: %s\r\n", headerSafe(m.From))
+	//
+	// Every field goes through writeHeader, which folds a long one, and
+	// an address list with a non-ASCII name is encoded on the way.
+	writeHeader(&b, "From", addressHeader(m.From))
 	headerTo := m.HeaderTo
 	if headerTo == "" {
 		to := make([]string, len(m.To))
@@ -199,15 +202,16 @@ func (m *Message) Build() ([]byte, error) {
 		headerTo = strings.Join(to, ", ")
 	}
 
-	fmt.Fprintf(&b, "To: %s\r\n", headerSafe(headerTo))
+	writeHeader(&b, "To", addressHeader(headerTo))
 	if m.Cc != "" {
-		fmt.Fprintf(&b, "Cc: %s\r\n", headerSafe(m.Cc))
-	}
-	if m.ReplyTo != "" {
-		fmt.Fprintf(&b, "Reply-To: %s\r\n", headerSafe(m.ReplyTo))
+		writeHeader(&b, "Cc", addressHeader(m.Cc))
 	}
 
-	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", m.Subject))
+	if m.ReplyTo != "" {
+		writeHeader(&b, "Reply-To", addressHeader(m.ReplyTo))
+	}
+
+	writeHeader(&b, "Subject", mime.QEncoding.Encode("UTF-8", m.Subject))
 	// Date and Message-ID are mandatory originator fields (RFC 5322
 	// section 3.6). We emitted neither, and relied on whatever the
 	// relay chose to add. That was already a spam signal on its own,
@@ -238,14 +242,14 @@ func (m *Message) Build() ([]byte, error) {
 	}
 
 	if len(luParts) > 0 {
-		fmt.Fprintf(&b, "List-Unsubscribe: %s\r\n", strings.Join(luParts, ", "))
+		writeHeader(&b, "List-Unsubscribe", strings.Join(luParts, ", "))
 		if m.ListUnsubscribePost && m.ListUnsubscribeURL != "" {
 			b.WriteString("List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n")
 		}
 	}
 
 	for key, value := range m.Headers {
-		fmt.Fprintf(&b, "%s: %s\r\n", headerSafe(key), headerSafe(value))
+		writeHeader(&b, key, unstructured(value))
 	}
 
 	if m.Signing != nil && m.Signing.AutocryptKey != "" {
