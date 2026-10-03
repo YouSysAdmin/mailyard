@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/mail"
 	"os"
 	"os/signal"
@@ -16,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/emersion/go-smtp"
 	"github.com/spf13/cobra"
 	"github.com/yousysadmin/mailyard/internal/server"
 
@@ -33,12 +31,10 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/eventbus"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
-	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
 	"github.com/yousysadmin/mailyard/internal/core/notify"
 	coreoidc "github.com/yousysadmin/mailyard/internal/core/oidc"
 	"github.com/yousysadmin/mailyard/internal/core/partition"
-	"github.com/yousysadmin/mailyard/internal/core/proxylisten"
 	"github.com/yousysadmin/mailyard/internal/core/queue"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/core/sessioncache"
@@ -54,11 +50,8 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain/campaign"
 	"github.com/yousysadmin/mailyard/internal/domain/certificate"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
-	"github.com/yousysadmin/mailyard/internal/domain/inbound"
 	"github.com/yousysadmin/mailyard/internal/domain/relaynode"
-	"github.com/yousysadmin/mailyard/internal/domain/sandbox"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
-	"github.com/yousysadmin/mailyard/internal/domain/submission"
 	"github.com/yousysadmin/mailyard/internal/domain/webhook"
 	campaignmodel "github.com/yousysadmin/mailyard/internal/models/campaign"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
@@ -666,120 +659,9 @@ func runServe(cmd *cobra.Command, r role) error {
 
 	safego.Go(log, "cron: scheduler loop", func() { rt.Cron.Start(workerCtx) })
 
-	// serveSMTP binds the port before returning and only then hands the listener to a goroutine.
-	//
-	// Binding inside the goroutine surfaced a refused bind as one log
-	// line while boot carried on reporting success - and the defaults
-	// are privileged ports, so "permission denied" is ordinary. A port
-	// we cannot take is a failure to start, not a warning.
-	serveSMTP := func(srv *smtp.Server, kind, addr string, secure bool, proxy env.ProxyProtocolConfig) error {
-		ln, lerr := net.Listen("tcp", addr)
-		if lerr != nil {
-			return fmt.Errorf("%s listener on %s: %w", kind, addr, lerr)
-		}
-
-		bound := ln.Addr().String()
-
-		// The PROXY wrap goes outside, because the header is the first
-		// thing on the wire - before EHLO, and before STARTTLS upgrades
-		// the same connection. A wrap on the inside would be reading it
-		// out of the middle of a session.
-		//
-		// A malformed trusted list fails here, at the bind, which is
-		// where a port we cannot take fails too. Validate has already
-		// refused an empty list.
-		if proxy.Enabled {
-			if ln, lerr = proxylisten.Wrap(ln, proxy.Trusted); lerr != nil {
-				return fmt.Errorf("%s proxy protocol: %w", kind, lerr)
-			}
-		}
-
-		log.Info(kind+" listening", "addr", bound, "starttls", secure, "proxy_protocol", proxy.Enabled)
-
-		safego.Go(log, kind+": accept loop", func() {
-			if serr := srv.Serve(ln); serr != nil && !errors.Is(serr, smtp.ErrServerClosed) {
-				log.Error(kind+" stopped", "err", serr)
-			}
-		})
-
-		return nil
-	}
-
-	// SMTP submission: optional listener that feeds the same send
-	// pipeline. Authenticated by submission credentials or API keys,
-	// so it needs nothing beyond the store and the email service.
-	// The SMTP listeners are ingress, so they follow the api role
-	// rather than the worker one: they accept messages and queue
-	// them, exactly like POST /api/v1/emails/send does.
-	var submissionSrv *smtp.Server
-
-	if r.api && cfg.Submission.Enabled {
-		backend := &submission.Backend{
-			Credentials:    st.SMTPCredential,
-			Keys:           st.APIKey,
-			Projects:       st.Project,
-			Sender:         email.NewService(rt),
-			Sandbox:        &sandbox.Service{Store: st.Sandbox, Settings: rt.Settings, Log: log, All: st},
-			Log:            log,
-			MaxMessageSize: cfg.Submission.MaxMessageSize,
-			Limiter:        iplimit.New(cfg.Submission.RatePerMinute, time.Minute),
-			Maintenance:    func() bool { return rt.Settings.Bool(smodel.KeyMaintenanceMode) },
-		}
-
-		submissionTLS, terr := tlsBuilder.Build(certificate.ListenerSubmission, cfg.Submission.TLS.Enabled)
-		if terr != nil {
-			return fmt.Errorf("submission tls: %w", terr)
-		}
-
-		submissionSrv = submission.NewServer(backend, cfg.Submission.Addr, cfg.Submission.Hostname, submissionTLS)
-		if lerr := serveSMTP(submissionSrv, "smtp submission", cfg.Submission.Addr, submissionTLS != nil,
-			cfg.Submission.ProxyProtocol); lerr != nil {
-			return lerr
-		}
-	}
-
-	// Inbound MX listener: receives mail for verified domains and
-	// stores it per project, emitting inbound.received webhooks.
-	var inboundSrv *smtp.Server
-
-	if r.api && cfg.Inbound.Enabled {
-		// The same pipeline the relay-node forwarding endpoint builds.
-		// One constructor, because the two transports differ in how
-		// bytes arrive and in nothing else.
-		svc := inbound.NewService(rt)
-		backend := &inbound.Backend{
-			Service:        svc,
-			MaxMessageSize: cfg.Inbound.MaxMessageSize,
-			Limiter:        iplimit.New(cfg.Inbound.RatePerMinute, time.Minute),
-		}
-
-		inboundTLS, terr := tlsBuilder.Build(certificate.ListenerInbound, cfg.Inbound.TLS.Enabled)
-		if terr != nil {
-			return fmt.Errorf("inbound tls: %w", terr)
-		}
-
-		inboundSrv = inbound.NewServer(backend, cfg.Inbound.Addr, cfg.Inbound.Hostname, inboundTLS)
-		if lerr := serveSMTP(inboundSrv, "inbound smtp", cfg.Inbound.Addr, inboundTLS != nil,
-			cfg.Inbound.ProxyProtocol); lerr != nil {
-			return lerr
-		}
-	}
-
-	stopSMTP := func(srv *smtp.Server, timeout time.Duration) {
-		if srv == nil {
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-
-		if serr := srv.Shutdown(ctx); serr != nil {
-			_ = srv.Close()
-		}
-	}
-	stopSMTPListeners := func(timeout time.Duration) {
-		stopSMTP(submissionSrv, timeout)
-		stopSMTP(inboundSrv, timeout)
+	listeners, err := startSMTP(r, cfg, rt, st, &tlsBuilder, log)
+	if err != nil {
+		return err
 	}
 
 	if cfg.Metrics.Enabled {
@@ -845,7 +727,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		rt.Events.Close()
 
 		shutdownErr := srv.Shutdown(t.server)
-		stopSMTPListeners(t.smtp)
+		listeners.stop(t.smtp)
 		runner.Stop(t.runner)
 		worker.Stop(t.worker)
 		rt.Cron.Wait(t.cron)
