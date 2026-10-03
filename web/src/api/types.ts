@@ -280,6 +280,8 @@ export interface Template {
   last_edited_by?: string
   created_at: string
   updated_at?: string
+  // Builder images travel inside every message as inline parts.
+  embed_images: boolean
 }
 
 export interface TemplateVersion {
@@ -327,6 +329,9 @@ export interface EmailAttachment {
   filename: string
   content?: string
   content_type?: string
+  size?: number
+  // content_id is what the HTML body names in a cid: URL.
+  content_id?: string
 }
 
 export interface Email {

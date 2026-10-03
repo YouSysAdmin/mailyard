@@ -74,6 +74,8 @@ const viewerAttachments = computed<ViewerAttachment[]>(() => {
   return (e.attachments ?? []).map((a, i) => ({
     filename: a.filename,
     content_type: a.content_type,
+    content_id: a.content_id,
+    size: a.size,
     url: browserURL(`/emails/${e.id}/attachments/${i}`),
   }))
 })

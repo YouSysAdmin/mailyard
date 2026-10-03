@@ -6,6 +6,7 @@ export interface TemplatePayload {
   description?: string
   default_language?: string
   sample_data?: string
+  embed_images?: boolean
 }
 
 export interface LocalizationPayload {

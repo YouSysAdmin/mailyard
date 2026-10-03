@@ -27,6 +27,7 @@ const form = ref({
   description: props.template.description || '',
   default_language: props.template.default_language || 'en',
   sample_data: props.template.sample_data || '',
+  embed_images: props.template.embed_images ?? false,
 })
 const saving = ref(false)
 
@@ -100,6 +101,15 @@ async function save() {
         rows="5"
         placeholder='{"name": "John"}'
       ></textarea>
+    </FormField>
+
+    <FormField
+      hint="Images from the visual builder travel inside every message, so recipients see them without loading anything. Each message is larger by the size of its images."
+    >
+      <label class="checkbox-label">
+        <input v-model="form.embed_images" type="checkbox" />
+        <span>Embed images in the message</span>
+      </label>
     </FormField>
 
     <template #footer>

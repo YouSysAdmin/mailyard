@@ -42,7 +42,7 @@ const { pageable, pageItems, goToPage } = useClientPager(filtered, 20)
 const showModal = ref(false)
 const editing = ref<Template | null>(null)
 const saving = ref(false)
-const form = ref<Required<TemplatePayload>>({
+const form = ref<Required<Omit<TemplatePayload, 'embed_images'>>>({
   name: '',
   description: '',
   default_language: 'en',
