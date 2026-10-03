@@ -42,7 +42,7 @@ const showAddModal = ref(false)
 const adding = ref(false)
 const addForm = ref({ email: '', kind: 'manual', reason: '' })
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function load() {
   try {
@@ -241,7 +241,7 @@ onMounted(load)
       @submit="addSuppression"
       @close="showAddModal = false"
     >
-      <FormField label="Email" :error="fieldErrors.email">
+      <FormField label="Email" field="email">
         <input
           v-model="addForm.email"
           type="email"
@@ -250,14 +250,14 @@ onMounted(load)
           required
         />
       </FormField>
-      <FormField label="Kind" :error="fieldErrors.kind">
+      <FormField label="Kind" field="kind">
         <select v-model="addForm.kind" class="form-select">
           <option value="manual">Manual</option>
           <option value="bounce">Bounce</option>
           <option value="complaint">Complaint</option>
         </select>
       </FormField>
-      <FormField :error="fieldErrors.reason">
+      <FormField field="reason">
         <template #label>Reason <span class="text-muted">(optional)</span></template>
         <input
           v-model="addForm.reason"

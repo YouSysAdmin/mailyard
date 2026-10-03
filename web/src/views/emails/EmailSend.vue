@@ -112,7 +112,7 @@ const limits = ref<SendLimits>({
   max_total_attachment_size: 25 * 1024 * 1024,
 })
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 // Strip the local-only size field before the payload goes out.
 function attachmentPayload(): EmailAttachment[] | undefined {
@@ -401,7 +401,7 @@ function handleSubmit() {
         </div>
 
         <form @submit.prevent="handleSubmit">
-          <FormField label="From" for="send-from" :error="fieldErrors.from">
+          <FormField label="From" for="send-from" field="from">
             <SenderSelect id="send-from" v-model="from" :senders="senders" />
           </FormField>
 
@@ -420,7 +420,7 @@ function handleSubmit() {
           <FormField
             label="Reply-To"
             for="send-reply-to"
-            :error="fieldErrors.reply_to"
+            field="reply_to"
             hint="Where a reply lands when it should not go back to the From address."
           >
             <input
@@ -432,7 +432,7 @@ function handleSubmit() {
             />
           </FormField>
 
-          <FormField label="To" for="send-to">
+          <FormField field="to" label="To" for="send-to">
             <textarea
               id="send-to"
               v-model="recipientsText"
@@ -453,7 +453,13 @@ function handleSubmit() {
             </template>
           </FormField>
 
-          <FormField v-if="copiesOpen" label="Cc" for="send-cc" hint="Shown to every recipient.">
+          <FormField
+            field="cc"
+            v-if="copiesOpen"
+            label="Cc"
+            for="send-cc"
+            hint="Shown to every recipient."
+          >
             <textarea
               id="send-cc"
               v-model="ccText"
@@ -464,6 +470,7 @@ function handleSubmit() {
           </FormField>
 
           <FormField
+            field="bcc"
             v-if="copiesOpen"
             label="Bcc"
             for="send-bcc"
@@ -480,23 +487,23 @@ function handleSubmit() {
 
           <FormField
             label="Custom headers"
-            :error="fieldErrors.headers"
+            field="headers"
             hint="Written into the message as given. Up to 20. From, To, Subject, Date, Message-ID and the other headers Mailyard writes itself cannot be set here, and the project's default headers are added underneath - a header named here wins."
           >
             <HeaderEditor v-model="headerRows" :disabled="!projStore.can('emails:write')" />
           </FormField>
 
           <template v-if="mode === 'raw'">
-            <FormField label="Subject" for="send-subject" :error="fieldErrors.subject">
+            <FormField label="Subject" for="send-subject" field="subject">
               <input id="send-subject" v-model="subject" type="text" class="form-input" />
             </FormField>
-            <FormField label="Text Body" for="send-text" :error="fieldErrors.text">
+            <FormField label="Text Body" for="send-text" field="text">
               <textarea id="send-text" v-model="text" class="form-textarea" rows="6"></textarea>
             </FormField>
             <FormField
               label="HTML Body"
               for="send-html"
-              :error="fieldErrors.html"
+              field="html"
               hint="At least one of HTML or text body is required."
             >
               <textarea
@@ -510,13 +517,13 @@ function handleSubmit() {
           </template>
 
           <template v-else>
-            <FormField label="Template" for="send-template" :error="fieldErrors.template_id">
+            <FormField label="Template" for="send-template" field="template_id">
               <select id="send-template" v-model="templateId" class="form-select">
                 <option value="" disabled>Select a template</option>
                 <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
               </select>
             </FormField>
-            <FormField label="Language" for="send-language" :error="fieldErrors.language">
+            <FormField label="Language" for="send-language" field="language">
               <select id="send-language" v-model="language" class="form-select">
                 <option value="">Template default</option>
                 <option v-for="l in languages" :key="l.id" :value="l.code">
@@ -551,7 +558,7 @@ function handleSubmit() {
             v-if="smtpGroups.length > 1"
             label="Server Group (optional)"
             for="smtp-group"
-            :error="fieldErrors.smtp_group"
+            field="smtp_group"
             hint="Which SMTP pool this send goes through."
           >
             <select id="smtp-group" v-model="smtpGroup" class="form-select">
@@ -565,7 +572,7 @@ function handleSubmit() {
           <FormField
             label="Unsubscribe list (optional)"
             for="send-unsub-list"
-            :error="fieldErrors.unsubscribe_list_id"
+            field="unsubscribe_list_id"
             :hint="
               unsubscribeLists.length > 0
                 ? 'Mailyard mints a one-click opt-out link scoped to this list, adds the List-Unsubscribe headers and skips recipients who opted out of it. One recipient only.'
@@ -581,7 +588,7 @@ function handleSubmit() {
           <FormField
             label="Send At (optional)"
             for="send-at"
-            :error="fieldErrors.send_at"
+            field="send_at"
             hint="Leave empty to send immediately."
           >
             <input id="send-at" v-model="sendAt" type="datetime-local" class="form-input" />

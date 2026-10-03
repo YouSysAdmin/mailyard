@@ -22,7 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const url = ref('')
 const events = ref<string[]>([])
@@ -67,7 +67,7 @@ async function create() {
 
 <template>
   <BaseModal title="Add Webhook" form @submit="create" @close="emit('close')">
-    <FormField label="URL" :error="errors.url">
+    <FormField label="URL" field="url">
       <input
         v-model="url"
         type="url"
@@ -77,7 +77,7 @@ async function create() {
       />
     </FormField>
 
-    <FormField label="Events">
+    <FormField label="Events" field="events">
       <div class="event-list">
         <label v-for="event in WEBHOOK_EVENTS" :key="event" class="checkbox-label">
           <input type="checkbox" :checked="events.includes(event)" @change="toggle(event)" />
@@ -87,6 +87,7 @@ async function create() {
     </FormField>
 
     <FormField
+      field="filters"
       hint="One per line. Exact addresses or *@domain wildcards. Leave empty to fire for all senders."
     >
       <template #label>Sender Filters <span class="text-muted">(optional)</span></template>

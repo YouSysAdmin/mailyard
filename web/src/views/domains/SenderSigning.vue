@@ -28,7 +28,7 @@ const emit = defineEmits<{
 const notify = useNotificationStore()
 const projStore = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 // The sender as the last answer described it, so the face follows a
 // write without waiting for the list to reload.
@@ -245,7 +245,7 @@ async function remove(replace: boolean) {
         Thunderbird and GPG users and the key can be made here.
       </p>
 
-      <FormField label="Kind" :error="errors.kind">
+      <FormField label="Kind" field="kind">
         <div class="kind-switch">
           <label class="checkbox-label">
             <input v-model="kind" type="radio" value="smime" />
@@ -276,12 +276,12 @@ async function remove(replace: boolean) {
           <FormField
             label="File"
             for="signing-p12"
-            :error="errors.pkcs12"
+            field="pkcs12"
             hint="What a certificate authority hands over for a mail address. The certificate must name this address and be issued for email protection."
           >
             <input id="signing-p12" type="file" accept=".p12,.pfx" @change="onPkcs12File" />
           </FormField>
-          <FormField label="Password" for="signing-p12-pass" :error="errors.passphrase">
+          <FormField label="Password" for="signing-p12-pass" field="passphrase">
             <input
               id="signing-p12-pass"
               v-model="passphrase"
@@ -296,7 +296,7 @@ async function remove(replace: boolean) {
           <FormField
             label="Certificate"
             for="signing-cert"
-            :error="errors.certificate"
+            field="certificate"
             hint="The full chain, leaf first, if you have one."
           >
             <textarea
@@ -310,7 +310,7 @@ async function remove(replace: boolean) {
           <FormField
             label="Private key"
             for="signing-key"
-            :error="errors.private_key"
+            field="private_key"
             hint="Unencrypted PEM. A password-protected key goes in as a .p12 file instead. Checked against the certificate before anything is stored, and encrypted at rest."
           >
             <textarea
@@ -338,7 +338,7 @@ async function remove(replace: boolean) {
           <FormField
             label="Private key"
             for="signing-pgp-key"
-            :error="errors.private_key"
+            field="private_key"
             hint="The armored private key block. One of its user ids must be this address."
           >
             <textarea
@@ -352,7 +352,7 @@ async function remove(replace: boolean) {
           <FormField
             label="Passphrase"
             for="signing-pgp-pass"
-            :error="errors.passphrase"
+            field="passphrase"
             hint="Removed on import. The key is stored encrypted at rest instead."
           >
             <input

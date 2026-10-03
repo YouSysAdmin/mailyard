@@ -40,7 +40,7 @@ const canEdit = computed(() => projStore.can('smtp:write'))
 // may configure a pool without dismantling it is a real one.
 const canDelete = computed(() => projStore.can('smtp:delete'))
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function load() {
   loading.value = true
@@ -205,17 +205,17 @@ onMounted(load)
       @submit="save"
       @close="showForm = false"
     >
-      <FormField label="Name" :error="fieldErrors.name">
+      <FormField label="Name" field="name">
         <input v-model="form.name" class="form-input" placeholder="Bulk" />
       </FormField>
       <FormField
         label="Slug"
-        :error="fieldErrors.slug"
+        field="slug"
         hint="What a send names. Derived from the name when left empty. Changing it breaks any integration already using the old one."
       >
         <input v-model="form.slug" class="form-input" placeholder="bulk" />
       </FormField>
-      <FormField :error="fieldErrors.description">
+      <FormField field="description">
         <template #label>Description <span class="text-muted">(optional)</span></template>
         <input v-model="form.description" class="form-input" />
       </FormField>

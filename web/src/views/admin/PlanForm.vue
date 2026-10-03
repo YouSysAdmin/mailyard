@@ -20,7 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'saved'): void; (e: 'close'): void }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 /** The numeric limits, in the order they are asked for. */
 type LimitKey = Exclude<keyof PlanPayload, 'name' | 'description' | 'is_default'>
@@ -84,7 +84,7 @@ async function save() {
 
 <template>
   <BaseModal :title="plan ? 'Edit Plan' : 'Create Plan'" form @submit="save" @close="emit('close')">
-    <FormField label="Name" :error="errors.name">
+    <FormField label="Name" field="name">
       <input
         v-model="form.name"
         class="form-input"
@@ -94,7 +94,7 @@ async function save() {
       />
     </FormField>
 
-    <FormField label="Description" :error="errors.description">
+    <FormField label="Description" field="description">
       <input
         v-model="form.description"
         class="form-input"
@@ -111,7 +111,7 @@ async function save() {
     </FormField>
 
     <div class="form-row">
-      <FormField v-for="f in limits" :key="f.key" :error="errors[f.key]">
+      <FormField v-for="f in limits" :key="f.key" :field="f.key">
         <template #label>{{ f.label }}</template>
         <input v-model.number="form[f.key]" type="number" min="0" class="form-input" />
       </FormField>

@@ -69,7 +69,7 @@ const ready = ref(false)
 const formVariants = ref<CampaignVariant[]>([])
 
 // Pickers
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const scheduleTarget = ref<Campaign | null>(null)
 
@@ -310,7 +310,6 @@ onMounted(() => {
       <CampaignFields
         v-model="form"
         v-model:variants="formVariants"
-        :errors="fieldErrors"
         @update:ready="ready = $event"
       />
 

@@ -42,7 +42,7 @@ const router = useRouter()
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const rows = ref<TemplateLocalization[]>([])
 const loading = ref(true)
@@ -223,7 +223,7 @@ watch(() => props.version.id, load, { immediate: true })
       <FormField
         v-if="!editor.existing"
         label="Language"
-        :error="errors.language"
+        field="language"
         hint="From the languages configured for this project."
       >
         <select v-if="languages.length" v-model="editor.form.language" class="form-select">
@@ -235,11 +235,15 @@ watch(() => props.version.id, load, { immediate: true })
         <input v-else v-model="editor.form.language" class="form-input" placeholder="en" />
       </FormField>
 
-      <FormField label="Subject" :error="errors.subject">
-        <input v-model="editor.form.subject" class="form-input" placeholder="Welcome {{name}}!" />
+      <FormField label="Subject" field="subject">
+        <input
+          v-model="editor.form.subject"
+          class="form-input"
+          placeholder="Welcome {{name}}!"
+        />
       </FormField>
 
-      <FormField label="HTML" :error="errors.html">
+      <FormField label="HTML" field="html">
         <textarea
           v-model="editor.form.html"
           class="form-textarea code-font"
@@ -248,7 +252,7 @@ watch(() => props.version.id, load, { immediate: true })
         ></textarea>
       </FormField>
 
-      <FormField label="Plain text" :error="errors.text">
+      <FormField label="Plain text" field="text">
         <textarea
           v-model="editor.form.text"
           class="form-textarea code-font"

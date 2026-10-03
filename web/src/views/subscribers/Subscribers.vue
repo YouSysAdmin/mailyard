@@ -34,7 +34,7 @@ const router = useRouter()
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const rows = ref<Subscriber[]>([])
 const total = ref(0)
@@ -288,7 +288,7 @@ void load().then(openFromQuery)
     </div>
 
     <BaseModal v-if="draft" title="Add subscriber" @close="draft = null">
-      <FormField label="Email" :error="errors.email">
+      <FormField label="Email" field="email">
         <input
           v-model="draft.email"
           type="email"
@@ -297,21 +297,21 @@ void load().then(openFromQuery)
         />
       </FormField>
 
-      <FormField label="Name" :error="errors.name">
+      <FormField label="Name" field="name">
         <input v-model="draft.name" class="form-input" placeholder="Optional" />
       </FormField>
 
-      <FormField label="Timezone" :error="errors.timezone">
+      <FormField label="Timezone" field="timezone">
         <input v-model="draft.timezone" class="form-input" placeholder="Europe/Berlin" />
       </FormField>
 
-      <FormField label="Language" :error="errors.language">
+      <FormField label="Language" field="language">
         <input v-model="draft.language" class="form-input" placeholder="en" />
       </FormField>
 
       <FormField
         label="Custom fields (JSON)"
-        :error="errors.custom_fields"
+        field="custom_fields"
         hint="Anything a template or a segment rule should be able to read."
       >
         <textarea

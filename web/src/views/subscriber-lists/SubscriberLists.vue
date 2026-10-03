@@ -27,7 +27,7 @@ const router = useRouter()
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const lists = ref<SubscriberList[]>([])
 const loading = ref(true)
@@ -175,19 +175,15 @@ void load()
     </div>
 
     <BaseModal v-if="draft" title="New list" size="modal-w720" @close="draft = null">
-      <FormField label="Name" :error="errors.name">
+      <FormField label="Name" field="name">
         <input v-model="draft.name" class="form-input" placeholder="Active customers" />
       </FormField>
 
-      <FormField label="Description" :error="errors.description">
+      <FormField label="Description" field="description">
         <input v-model="draft.description" class="form-input" placeholder="Optional" />
       </FormField>
 
-      <FormField
-        label="Type"
-        :error="errors.type"
-        hint="This cannot be changed once the list exists."
-      >
+      <FormField label="Type" field="type" hint="This cannot be changed once the list exists.">
         <select v-model="draft.type" class="form-select">
           <option value="static">Static - members you choose</option>
           <option value="dynamic">Dynamic - whoever matches the rules</option>

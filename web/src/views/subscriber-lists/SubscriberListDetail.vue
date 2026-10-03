@@ -31,7 +31,7 @@ const router = useRouter()
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const id = String(route.params.id)
 
@@ -252,11 +252,11 @@ void start()
         </div>
 
         <div class="card-body">
-          <FormField label="Name" :error="errors.name">
+          <FormField label="Name" field="name">
             <input v-model="form.name" class="form-input" :disabled="!mayWrite" />
           </FormField>
 
-          <FormField label="Description" :error="errors.description">
+          <FormField label="Description" field="description">
             <input v-model="form.description" class="form-input" :disabled="!mayWrite" />
           </FormField>
 
@@ -424,7 +424,7 @@ void start()
         label="Subscriber"
         for="add-member-email"
         class="member-field"
-        :error="errors.email"
+        field="email"
         hint="Type part of an address to search. The address has to belong to a subscriber already."
       >
         <SubscriberPicker id="add-member-email" v-model="adding.email" @pick="onPick" />

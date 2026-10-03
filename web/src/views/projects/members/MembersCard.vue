@@ -42,7 +42,7 @@ const emit = defineEmits<{
 
 const notify = useNotificationStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const showAdd = ref(false)
 const email = ref('')
@@ -212,7 +212,7 @@ async function remove(member: ProjectMember) {
     <BaseModal v-if="showAdd" title="Add Member" form @submit="add" @close="showAdd = false">
       <FormField
         label="Email Address"
-        :error="errors.email"
+        field="email"
         hint="The user must already have an account. Create an invitation otherwise."
       >
         <input
@@ -225,6 +225,7 @@ async function remove(member: ProjectMember) {
       </FormField>
 
       <FormField
+        field="role_id"
         label="Role"
         :hint="
           !defaultRole && roles.length === 0

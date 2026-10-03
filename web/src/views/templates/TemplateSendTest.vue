@@ -29,7 +29,7 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 
 const notify = useNotificationStore()
 const projects = useProjectStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const FALLBACK_DATA = '{\n  "name": "John",\n  "company": "Acme"\n}'
 
@@ -105,15 +105,15 @@ void loadSenders()
 
 <template>
   <BaseModal title="Send a test" size="modal-w560" @close="$emit('close')">
-    <FormField label="To" :error="errors.to" hint="Comma separated, up to five addresses.">
+    <FormField label="To" field="to" hint="Comma separated, up to five addresses.">
       <input v-model="to" class="form-input" placeholder="you@example.com" />
     </FormField>
 
-    <FormField label="From" :error="errors.from">
+    <FormField label="From" field="from">
       <SenderSelect v-model="from" :senders="senders" placeholder="noreply@example.com" />
     </FormField>
 
-    <FormField label="Language" :error="errors.language">
+    <FormField label="Language" field="language">
       <select v-model="language" class="form-select">
         <option value="">Template default ({{ defaultLanguage }})</option>
         <option v-for="code in languages" :key="code" :value="code">{{ code }}</option>

@@ -28,7 +28,7 @@ const router = useRouter()
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const id = String(route.params.id)
 
@@ -169,17 +169,17 @@ void load()
         </div>
 
         <div class="card-body">
-          <FormField label="Email" :error="errors.email">
+          <FormField label="Email" field="email">
             <input v-model="form.email" type="email" class="form-input" />
           </FormField>
 
-          <FormField label="Name" :error="errors.name">
+          <FormField label="Name" field="name">
             <input v-model="form.name" class="form-input" />
           </FormField>
 
           <FormField
             label="Status"
-            :error="errors.status"
+            field="status"
             hint="Only a subscribed address is sent to. The other three are records of why not."
           >
             <select v-model="form.status" class="form-select">
@@ -189,17 +189,17 @@ void load()
             </select>
           </FormField>
 
-          <FormField label="Timezone" :error="errors.timezone">
+          <FormField label="Timezone" field="timezone">
             <input v-model="form.timezone" class="form-input" placeholder="Europe/Berlin" />
           </FormField>
 
-          <FormField label="Language" :error="errors.language">
+          <FormField label="Language" field="language">
             <input v-model="form.language" class="form-input" placeholder="en" />
           </FormField>
 
           <FormField
             label="Custom fields (JSON)"
-            :error="errors.custom_fields"
+            field="custom_fields"
             hint="What a template fills in, and what a dynamic list can be filtered on."
           >
             <textarea v-model="form.custom" class="form-textarea code-font" rows="8"></textarea>

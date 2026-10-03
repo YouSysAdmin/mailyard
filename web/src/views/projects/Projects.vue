@@ -27,7 +27,7 @@ const newDescription = ref('')
 const newLanguage = ref('en')
 const creating = ref(false)
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function fetchData() {
   loading.value = true
@@ -191,10 +191,10 @@ watch(
       @submit="createProject"
       @close="showCreateModal = false"
     >
-      <FormField label="Name" :error="fieldErrors.name">
+      <FormField label="Name" field="name">
         <input v-model="newName" class="form-input" placeholder="My Team" required />
       </FormField>
-      <FormField label="Description (optional)" :error="fieldErrors.description">
+      <FormField label="Description (optional)" field="description">
         <input
           v-model="newDescription"
           class="form-input"
@@ -203,7 +203,7 @@ watch(
       </FormField>
       <FormField
         label="Default Language"
-        :error="fieldErrors.default_language"
+        field="default_language"
         hint="Language code such as en, de, or fr."
       >
         <input v-model="newLanguage" class="form-input" placeholder="en" maxlength="10" />

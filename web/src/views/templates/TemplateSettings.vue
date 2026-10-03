@@ -20,7 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const form = ref({
   name: props.template.name,
@@ -63,15 +63,15 @@ async function save() {
 
 <template>
   <BaseModal title="Template settings" size="modal-w560" @close="$emit('close')">
-    <FormField label="Name" :error="errors.name">
+    <FormField label="Name" field="name">
       <input v-model="form.name" class="form-input" />
     </FormField>
 
-    <FormField label="Description" :error="errors.description">
+    <FormField label="Description" field="description">
       <input v-model="form.description" class="form-input" />
     </FormField>
 
-    <FormField label="Default language" :error="errors.default_language">
+    <FormField label="Default language" field="default_language">
       <select v-if="languages.length" v-model="form.default_language" class="form-select">
         <option v-for="lang in languages" :key="lang.id" :value="lang.code">
           {{ lang.name }} ({{ lang.code }})
@@ -91,7 +91,7 @@ async function save() {
 
     <FormField
       label="Sample data (JSON)"
-      :error="errors.sample_data"
+      field="sample_data"
       hint="What a new version starts from."
     >
       <textarea

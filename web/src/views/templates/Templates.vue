@@ -57,7 +57,7 @@ async function onImported() {
   await loadTemplates()
 }
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function loadTemplates() {
   loading.value = true
@@ -114,6 +114,7 @@ function closeModal() {
   showModal.value = false
   showImportModal.value = false
   resetForm()
+  clear()
 }
 
 function validSampleData(): boolean {
@@ -132,6 +133,7 @@ async function saveTemplate() {
     notify.error('Sample data must be valid JSON')
     return
   }
+  clear()
   saving.value = true
   try {
     if (editing.value) {
@@ -144,9 +146,14 @@ async function saveTemplate() {
     closeModal()
     await loadTemplates()
   } catch (e) {
-    notify.error(
-      apiErrorMessage(e, editing.value ? 'Failed to update template' : 'Failed to create template'),
-    )
+    if (!capture(e)) {
+      notify.error(
+        apiErrorMessage(
+          e,
+          editing.value ? 'Failed to update template' : 'Failed to create template',
+        ),
+      )
+    }
   } finally {
     saving.value = false
   }
@@ -327,17 +334,21 @@ onMounted(() => {
       size="modal-w560"
       @close="closeModal"
     >
-      <FormField label="Name" :error="fieldErrors.name">
+      <FormField label="Name" field="name">
         <input v-model="form.name" class="form-input" placeholder="e.g. welcome-email" />
       </FormField>
-      <FormField label="Description" :error="fieldErrors.description">
+      <FormField label="Description" field="description">
         <input
           v-model="form.description"
           class="form-input"
           placeholder="Optional short description"
         />
       </FormField>
-      <FormField label="Default Language" hint="Used as the fallback for template sends">
+      <FormField
+        field="default_language"
+        label="Default Language"
+        hint="Used as the fallback for template sends"
+      >
         <select v-if="languages.length" v-model="form.default_language" class="form-select">
           <option v-for="lang in languages" :key="lang.id" :value="lang.code">
             {{ lang.name }} ({{ lang.code }})
@@ -353,7 +364,7 @@ onMounted(() => {
       </FormField>
       <FormField
         label="Sample Data (JSON)"
-        :error="fieldErrors.sample_data"
+        field="sample_data"
         hint="Default data used by editors and previews"
       >
         <textarea

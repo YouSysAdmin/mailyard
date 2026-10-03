@@ -29,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 const allowedEmailsText = ref('')
@@ -167,7 +167,7 @@ async function save() {
     @submit="save"
     @close="emit('close')"
   >
-    <FormField label="Name" :error="errors.name">
+    <FormField label="Name" field="name">
       <input
         v-model="form.name"
         type="text"
@@ -178,7 +178,7 @@ async function save() {
     </FormField>
     <FormField
       label="Provider"
-      :error="errors.provider"
+      field="provider"
       :hint="
         server
           ? 'Not changeable on an existing server. The credentials mean something different to each provider, so switching would leave the wrong ones in place. Delete and recreate instead.'
@@ -190,7 +190,7 @@ async function save() {
       </select>
     </FormField>
     <template v-if="dials">
-      <FormField label="Host" :error="errors.host">
+      <FormField label="Host" field="host">
         <input
           v-model="form.host"
           type="text"
@@ -199,7 +199,7 @@ async function save() {
           required
         />
       </FormField>
-      <FormField label="Port" :error="errors.port">
+      <FormField label="Port" field="port">
         <input
           v-model.number="form.port"
           type="number"
@@ -224,11 +224,11 @@ async function save() {
         :required="opt.required"
       />
     </FormField>
-    <FormField :error="errors.username" :hint="provider?.credential_hint">
+    <FormField field="username" :hint="provider?.credential_hint">
       <template #label>Username <span class="text-muted">(optional)</span></template>
       <input v-model="form.username" type="text" class="form-input" autocomplete="off" />
     </FormField>
-    <FormField :error="errors.password">
+    <FormField field="password">
       <template #label>Password <span class="text-muted">(optional)</span></template>
       <input
         v-model="form.password"
@@ -238,11 +238,7 @@ async function save() {
         :placeholder="server ? 'Leave blank to keep current' : ''"
       />
     </FormField>
-    <FormField
-      label="Server group"
-      :error="errors.group_id"
-      hint="Which pool this server belongs to."
-    >
+    <FormField label="Server group" field="group_id" hint="Which pool this server belongs to.">
       <select v-model="form.group_id" class="form-select">
         <option value="">Default group</option>
         <option v-for="g in groups" :key="g.id" :value="g.id">
@@ -252,12 +248,12 @@ async function save() {
     </FormField>
     <FormField
       label="Priority"
-      :error="errors.priority"
+      field="priority"
       hint="Order within the group, lowest first. Failover walks it in this order."
     >
       <input v-model.number="form.priority" type="number" class="form-input" min="0" />
     </FormField>
-    <FormField v-if="dials" label="Encryption" :error="errors.encryption">
+    <FormField v-if="dials" label="Encryption" field="encryption">
       <select v-model="form.encryption" class="form-select">
         <option value="none">None</option>
         <option value="starttls">STARTTLS (port 587)</option>
@@ -284,7 +280,7 @@ async function save() {
       always omitted for this provider - there is nothing to choose.
     </p>
     <FormField
-      :error="errors.ses_topic_arn"
+      field="ses_topic_arn"
       hint="Only for Amazon SES. SES replaces the envelope sender, so its bounces can never come back as a delivery report - they arrive over SNS instead. Paste the topic here and notifications from it will be accepted for mail this server sent. Leave empty for anything else."
     >
       <template #label>SES topic ARN <span class="text-muted">(optional)</span></template>
@@ -296,6 +292,7 @@ async function save() {
       />
     </FormField>
     <FormField
+      field="allowed_emails"
       hint="One per line. Exact addresses or *@domain wildcards. Leave empty to allow any sender."
     >
       <template #label>Allowed Sender Emails <span class="text-muted">(optional)</span></template>
@@ -307,6 +304,7 @@ async function save() {
       ></textarea>
     </FormField>
     <FormField
+      field="allowed_domains"
       hint="One per line. Matched exactly, so a subdomain needs its own line - SPF is written per name. Leave empty to carry any domain."
     >
       <template #label>Allowed Sender Domains <span class="text-muted">(optional)</span></template>

@@ -36,7 +36,7 @@ const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const notify = useNotificationStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const showCreate = ref(false)
 const email = ref('')
@@ -170,7 +170,7 @@ async function revoke(inv: ProjectInvitation) {
            dialog two steps later reports what actually happened. -->
       <FormField
         label="Email Address"
-        :error="errors.email"
+        field="email"
         hint="You get a link to share. On an installation with platform mail configured, it is emailed as well."
       >
         <input
@@ -183,6 +183,7 @@ async function revoke(inv: ProjectInvitation) {
       </FormField>
 
       <FormField
+        field="role_id"
         label="Role"
         hint="Ownership is not offered here - it is granted afterwards, by an owner."
       >

@@ -29,7 +29,7 @@ const editing = ref<UnsubscribeList | null>(null)
 
 const form = ref<UnsubscribeListPayload>({ name: '', public_name: '', description: '' })
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function load() {
   loading.value = true
@@ -205,11 +205,7 @@ onMounted(load)
       @submit="save"
       @close="showModal = false"
     >
-      <FormField
-        label="Name"
-        :error="fieldErrors.name"
-        hint="Internal label, unique in this project."
-      >
+      <FormField label="Name" field="name" hint="Internal label, unique in this project.">
         <input
           v-model="form.name"
           type="text"
@@ -219,7 +215,7 @@ onMounted(load)
         />
       </FormField>
       <FormField
-        :error="fieldErrors.public_name"
+        field="public_name"
         hint="Shown on the unsubscribe page. Falls back to the name above."
       >
         <template #label>Public name <span class="text-muted">(optional)</span></template>
@@ -230,7 +226,7 @@ onMounted(load)
           placeholder="e.g. Product updates"
         />
       </FormField>
-      <FormField :error="fieldErrors.description">
+      <FormField field="description">
         <template #label>Description <span class="text-muted">(optional)</span></template>
         <textarea v-model="form.description" class="form-textarea" rows="2"></textarea>
       </FormField>

@@ -24,7 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'saved'): void; (e: 'close'): void }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 
@@ -126,13 +126,13 @@ async function save() {
     @submit="save"
     @close="emit('close')"
   >
-    <FormField label="Name" :error="errors.name">
+    <FormField label="Name" field="name">
       <input v-model="form.name" class="form-input" placeholder="Company Outbound" />
     </FormField>
 
     <FormField
       label="Provider"
-      :error="errors.provider"
+      field="provider"
       :hint="
         server
           ? 'Not changeable on an existing server - the credentials mean something different to each provider. Delete and recreate.'
@@ -145,10 +145,10 @@ async function save() {
     </FormField>
 
     <template v-if="dials">
-      <FormField label="Host" :error="errors.host">
+      <FormField label="Host" field="host">
         <input v-model="form.host" class="form-input" placeholder="smtp.example.com" />
       </FormField>
-      <FormField label="Port" :error="errors.port">
+      <FormField label="Port" field="port">
         <input v-model.number="form.port" type="number" class="form-input" min="1" max="65535" />
       </FormField>
     </template>
@@ -160,12 +160,12 @@ async function save() {
       <input v-model="form.providerConfig[opt.key]" class="form-input" :required="opt.required" />
     </FormField>
 
-    <FormField :error="errors.username" :hint="provider?.credential_hint">
+    <FormField field="username" :hint="provider?.credential_hint">
       <template #label>Username <span class="text-muted">(optional)</span></template>
       <input v-model="form.username" class="form-input" autocomplete="off" />
     </FormField>
 
-    <FormField :error="errors.password">
+    <FormField field="password">
       <template #label>Password <span class="text-muted">(optional)</span></template>
       <input
         v-model="form.password"
@@ -176,7 +176,7 @@ async function save() {
       />
     </FormField>
 
-    <FormField v-if="dials" label="Encryption" :error="errors.encryption">
+    <FormField v-if="dials" label="Encryption" field="encryption">
       <select v-model="form.encryption" class="form-select">
         <option value="none">None</option>
         <option value="starttls">STARTTLS</option>
@@ -184,11 +184,12 @@ async function save() {
       </select>
     </FormField>
 
-    <FormField label="Priority" :error="errors.priority" hint="Lowest first. Ties broken by age.">
+    <FormField label="Priority" field="priority" hint="Lowest first. Ties broken by age.">
       <input v-model.number="form.priority" type="number" class="form-input" min="0" />
     </FormField>
 
     <FormField
+      field="allowed_domains"
       label="Allowed sender domains"
       hint="Comma separated. Empty allows any sender domain."
     >
@@ -201,7 +202,7 @@ async function save() {
 
     <FormField
       label="Security mode"
-      :error="errors.security_mode"
+      field="security_mode"
       hint="Strict also requires the sending project to have verified the sender's domain, so one project cannot send as another's through these credentials."
     >
       <select v-model="form.security_mode" class="form-select">
@@ -224,7 +225,7 @@ async function save() {
 
     <FormField
       label="SES topic ARN"
-      :error="errors.ses_topic_arn"
+      field="ses_topic_arn"
       hint="Only for Amazon SES. SES replaces the envelope sender, so its bounces can never come back as a delivery report - they arrive over SNS instead. Paste the topic here and Mailyard will accept notifications from it about mail this server sent. Leave empty for anything else."
     >
       <input

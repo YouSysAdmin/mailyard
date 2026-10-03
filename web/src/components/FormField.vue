@@ -4,10 +4,13 @@
 //
 // Errors come from two places and they answer different questions.
 //
-// `error` is the server's. Every handler behind validation.Bind replies
-// with `fields: [{field, rule, message}]` naming the json field it
-// refused, and useFieldErrors turns that array back into per-field
-// messages instead of one run-on toast.
+// `field` names the server's. Every handler behind validation.Bind
+// replies with `fields: [{field, rule, message}]` naming the json field
+// it refused, and useFieldErrors turns that array back into per-field
+// messages instead of one run-on toast. The field registers its key with
+// the nearest useFieldErrors while mounted, which is how capture() knows
+// the message has a place on screen. `error` is a message the view
+// decides itself.
 //
 // The other source is the browser, handled here rather than in the views
 // because the constraint is already on the control - `type=number`,
@@ -24,7 +27,8 @@
 // The control stays in the slot rather than becoming props. These are
 // inputs, selects, textareas, checkbox rows and two custom pickers, and
 // a component taking a `type` would grow a branch for each.
-import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { injectFieldErrors } from '../composables/fieldErrors'
 
 const props = withDefaults(
   defineProps<{
@@ -37,7 +41,9 @@ const props = withDefaults(
     // Guidance under the control. Plain text - use the hint slot when it
     // carries markup, which three of them do.
     hint?: string
-    // The server's message for this field.
+    // The json name the server refuses this field under.
+    field?: string
+    // A message the view decides itself.
     error?: string
     // Marks the plain-text label. A label given through the slot writes
     // its own, since it is markup by then.
@@ -46,7 +52,7 @@ const props = withDefaults(
     // are not what the reader is being asked about.
     native?: boolean
   }>(),
-  { label: '', for: '', hint: '', error: '', required: false, native: true },
+  { label: '', for: '', hint: '', field: '', error: '', required: false, native: true },
 )
 
 const root = ref<HTMLElement | null>(null)
@@ -133,20 +139,36 @@ function tieLabelToControl() {
   label.htmlFor = el.id
 }
 
+const form = injectFieldErrors()
+
+// Registered only while mounted, so a field hidden behind v-if does not
+// claim a message nobody can see.
+watch(
+  () => props.field,
+  (next, prev) => {
+    if (!form) return
+    if (prev) form.unregister(prev)
+    if (next) form.register(next)
+  },
+)
+
 onMounted(() => {
+  if (form && props.field) form.register(props.field)
   root.value?.addEventListener('focusout', onBlur)
   root.value?.addEventListener('input', onInput)
   tieLabelToControl()
 })
 
 onBeforeUnmount(() => {
+  if (form && props.field) form.unregister(props.field)
   root.value?.removeEventListener('focusout', onBlur)
   root.value?.removeEventListener('input', onInput)
 })
 
 // The server's answer wins: it saw the whole request, and it is the one
 // that refused to store anything.
-const shown = computed(() => props.error || nativeError.value)
+const serverError = computed(() => (form && props.field ? form.errors.value[props.field] : ''))
+const shown = computed(() => serverError.value || props.error || nativeError.value)
 </script>
 
 <template>

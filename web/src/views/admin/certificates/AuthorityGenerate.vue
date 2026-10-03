@@ -22,7 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 
@@ -61,7 +61,7 @@ async function generate() {
       wherever that is.
     </p>
 
-    <FormField label="Name" for="ca-name" :error="errors.name">
+    <FormField label="Name" for="ca-name" field="name">
       <input
         id="ca-name"
         v-model="form.name"
@@ -75,7 +75,7 @@ async function generate() {
       <FormField
         label="Algorithm"
         for="ca-alg"
-        :error="errors.algorithm"
+        field="algorithm"
         hint="No Ed25519 - trust stores refuse such a root."
       >
         <select id="ca-alg" v-model="form.algorithm" class="form-select">
@@ -86,7 +86,7 @@ async function generate() {
       <FormField
         label="Valid for"
         for="ca-days"
-        :error="errors.validity_days"
+        field="validity_days"
         hint="Days. Nothing serves this, so it can be long."
       >
         <input
@@ -103,7 +103,6 @@ async function generate() {
     <SubjectFields
       v-model="form.subject"
       id-prefix="ca"
-      :errors="errors"
       :common-name-placeholder="form.name || 'Acme Internal CA'"
       common-name-hint="The common name is what you will recognise it by in a trust store listing, and defaults to the name."
     />

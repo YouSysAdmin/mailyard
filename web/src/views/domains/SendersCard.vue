@@ -12,6 +12,7 @@ import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useProjectStore } from '../../stores/project'
 import { useConfirm } from '../../composables/useConfirm'
+import FormField from '../../components/FormField.vue'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import { formatDate } from '../../composables/formatDate'
 import { daysLeft, expiryClass } from '../../composables/certExpiry'
@@ -22,7 +23,7 @@ import SenderSigning from './SenderSigning.vue'
 const notify = useNotificationStore()
 const projStore = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const senders = ref<Sender[]>([])
 const loading = ref(true)
@@ -191,30 +192,30 @@ defineExpose({ reload: load })
       </div>
 
       <div v-if="projStore.can('senders:write')" class="card-body">
-        <form class="sender-add-form" @submit.prevent="add">
-          <input
-            v-model="email"
-            type="email"
-            class="form-input"
-            placeholder="billing@example.com"
-            autocomplete="off"
-          />
-          <input
-            v-model="name"
-            type="text"
-            class="form-input"
-            placeholder="Display name (optional)"
-            autocomplete="off"
-          />
-          <button type="submit" class="btn btn-primary" :disabled="adding || !email.trim()">
-            {{ adding ? 'Adding...' : 'Add' }}
-          </button>
-        </form>
-        <p v-if="errors.email" class="form-error">{{ errors.email }}</p>
-        <p v-else class="form-hint sender-hint">
-          Addresses can only be added for domains verified above. They appear in every From
-          selector.
-        </p>
+        <FormField
+          field="email"
+          hint="Addresses can only be added for domains verified above. They appear in every From selector."
+        >
+          <form class="sender-add-form" @submit.prevent="add">
+            <input
+              v-model="email"
+              type="email"
+              class="form-input"
+              placeholder="billing@example.com"
+              autocomplete="off"
+            />
+            <input
+              v-model="name"
+              type="text"
+              class="form-input"
+              placeholder="Display name (optional)"
+              autocomplete="off"
+            />
+            <button type="submit" class="btn btn-primary" :disabled="adding || !email.trim()">
+              {{ adding ? 'Adding...' : 'Add' }}
+            </button>
+          </form>
+        </FormField>
       </div>
     </template>
 
@@ -239,10 +240,6 @@ defineExpose({ reload: load })
 .sender-add-form .form-input {
   flex: 1;
   min-width: 180px;
-}
-
-.sender-hint {
-  margin-top: 8px;
 }
 
 .col-actions {

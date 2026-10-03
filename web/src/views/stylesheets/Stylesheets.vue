@@ -25,7 +25,7 @@ import FormField from '../../components/FormField.vue'
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const sheets = ref<Stylesheet[]>([])
 const loading = ref(true)
@@ -160,7 +160,7 @@ void load()
       size="modal-w640"
       @close="draft = null"
     >
-      <FormField label="Name" :error="errors.name">
+      <FormField label="Name" field="name">
         <input v-model="draft.name" class="form-input" placeholder="Brand styles" />
       </FormField>
 
@@ -168,7 +168,7 @@ void load()
            and a submit-on-Enter would save a half-written rule. -->
       <FormField
         label="CSS"
-        :error="errors.css"
+        field="css"
         hint="Inlined onto the elements at render time, because that is what a mail client honours."
       >
         <textarea

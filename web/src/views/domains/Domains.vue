@@ -59,7 +59,7 @@ const deletingId = ref<string | null>(null)
 // fqdn validation runs.
 const DOMAIN_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function load() {
   loading.value = true
@@ -84,6 +84,7 @@ watch(() => projStore.currentProjectId, load)
 function openAddModal() {
   newDomain.value = ''
   domainError.value = ''
+  clear()
   createdRecords.value = []
   createdDomain.value = null
   showAddModal.value = true
@@ -98,6 +99,7 @@ function closeAddModal() {
 async function createDomain() {
   const name = newDomain.value.trim().toLowerCase()
   domainError.value = ''
+  clear()
   if (!name) {
     domainError.value = 'Domain is required'
     return
@@ -115,7 +117,7 @@ async function createDomain() {
     createdRecords.value = res.data.dns_records ?? []
     notify.success('Domain added - publish the DNS records to verify it')
   } catch (e) {
-    domainError.value = apiErrorMessage(e, 'Failed to add domain')
+    if (!capture(e)) domainError.value = apiErrorMessage(e, 'Failed to add domain')
   } finally {
     creating.value = false
   }
@@ -372,7 +374,8 @@ async function deleteDomain(d: InboundDomain) {
         v-if="!createdRecords.length"
         label="Domain"
         for="new-domain"
-        :error="fieldErrors.domain || domainError"
+        field="domain"
+        :error="domainError"
         hint="The bare recipient domain. You will prove ownership with a DNS TXT record."
       >
         <input

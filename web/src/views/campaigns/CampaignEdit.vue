@@ -26,7 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const draft = ref(fromCampaign(props.campaign))
 const variants = ref<CampaignVariant[]>((props.campaign.ab_variants ?? []).map((v) => ({ ...v })))
@@ -58,12 +58,7 @@ async function save() {
     </div>
 
     <div class="card-body">
-      <CampaignFields
-        v-model="draft"
-        v-model:variants="variants"
-        :errors="errors"
-        @update:ready="ready = $event"
-      />
+      <CampaignFields v-model="draft" v-model:variants="variants" @update:ready="ready = $event" />
 
       <div class="actions">
         <button class="btn btn-primary" :disabled="saving || !ready" @click="save">

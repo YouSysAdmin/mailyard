@@ -23,11 +23,6 @@ import HeaderEditor from '../../components/HeaderEditor.vue'
 import Notice from '../../components/Notice.vue'
 import SenderSelect from '../../components/SenderSelect.vue'
 
-defineProps<{
-  /** Field errors from the last refused save, keyed by json name. */
-  errors: Record<string, string>
-}>()
-
 const draft = defineModel<CampaignDraft>({ required: true })
 const variants = defineModel<CampaignVariant[]>('variants', { required: true })
 
@@ -159,19 +154,19 @@ void loadSenders()
 
 <template>
   <div>
-    <FormField label="Name" required :error="errors.name">
+    <FormField label="Name" required field="name">
       <input v-model="draft.name" class="form-input" />
     </FormField>
 
     <FormField
       label="Subject"
-      :error="errors.subject"
+      field="subject"
       hint="Overridden per variant when the list is split."
     >
       <input v-model="draft.subject" class="form-input" />
     </FormField>
 
-    <FormField label="From address" required :error="errors.from_email">
+    <FormField label="From address" required field="from_email">
       <SenderSelect v-model="draft.from_email" :senders="senders" @sender="onSenderPicked" />
     </FormField>
 
@@ -187,13 +182,13 @@ void loadSenders()
       </label>
     </FormField>
 
-    <FormField label="From name" :error="errors.from_name">
+    <FormField label="From name" field="from_name">
       <input v-model="draft.from_name" class="form-input" />
     </FormField>
 
     <FormField
       label="Reply-To"
-      :error="errors.reply_to"
+      field="reply_to"
       hint="Where a reader's answer lands when the From address is a no-reply mailbox."
     >
       <input
@@ -204,7 +199,7 @@ void loadSenders()
       />
     </FormField>
 
-    <FormField label="Template" required :error="errors.template_id">
+    <FormField label="Template" required field="template_id">
       <select v-model="draft.template_id" class="form-select">
         <option value="" disabled>Pick a template</option>
         <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
@@ -235,7 +230,7 @@ void loadSenders()
       <input v-else v-model="draft.language" class="form-input" placeholder="en" />
     </FormField>
 
-    <FormField label="Subscriber list" required :error="errors.list_id">
+    <FormField label="Subscriber list" required field="list_id">
       <select v-model="draft.list_id" class="form-select">
         <option value="" disabled>Pick a list</option>
         <option v-for="l in lists" :key="l.id" :value="l.id">{{ l.name }} ({{ l.type }})</option>
@@ -246,7 +241,7 @@ void loadSenders()
     <FormField
       v-if="groups.length > 1"
       label="Server group"
-      :error="errors.smtp_group"
+      field="smtp_group"
       hint="Which SMTP pool this campaign sends through. Bulk on its own pool keeps a bad campaign from taking transactional mail with it."
     >
       <select v-model="draft.smtp_group" class="form-select">
@@ -259,7 +254,7 @@ void loadSenders()
 
     <FormField
       label="Send rate"
-      :error="errors.send_rate"
+      field="send_rate"
       hint="Emails per minute. 0 sends as fast as the queue allows."
     >
       <input v-model.number="draft.send_rate" type="number" class="form-input" min="0" />
@@ -290,7 +285,7 @@ void loadSenders()
 
     <FormField
       label="Template data (JSON)"
-      :error="errors.template_data"
+      field="template_data"
       hint="Merged under each subscriber's own fields."
     >
       <textarea v-model="draft.template_data" class="form-textarea code-font" rows="4"></textarea>
@@ -298,7 +293,7 @@ void loadSenders()
 
     <FormField
       label="Custom headers"
-      :error="errors.headers"
+      field="headers"
       hint="On every message of the campaign, over the project's default headers. Up to 20. The headers Mailyard writes itself cannot be set here."
     >
       <HeaderEditor v-model="draft.headers" />

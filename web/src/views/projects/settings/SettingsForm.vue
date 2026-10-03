@@ -38,7 +38,7 @@ const emit = defineEmits<{ (e: 'saved', project: Project): void }>()
 
 const notify = useNotificationStore()
 const projStore = useProjectStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const form = ref(blank())
 const saving = ref(false)
@@ -190,17 +190,17 @@ async function save() {
     </div>
 
     <div v-else class="card-body">
-      <FormField label="Name" :error="errors.name">
+      <FormField label="Name" field="name">
         <input v-model="form.name" class="form-input" required />
       </FormField>
 
-      <FormField label="Description" :error="errors.description">
+      <FormField label="Description" field="description">
         <input v-model="form.description" class="form-input" placeholder="Optional description" />
       </FormField>
 
       <FormField
         label="Default Language"
-        :error="errors.default_language"
+        field="default_language"
         hint="Language code such as en, de, or fr."
       >
         <input v-model="form.default_language" class="form-input" placeholder="en" maxlength="10" />
@@ -241,7 +241,7 @@ async function save() {
            rendered at all. The SES caveat here and the paragraph about
            owners below are both text somebody wrote deliberately and
            nobody has ever seen. Merged rather than dropped. -->
-      <FormField label="Bounce Address" :error="errors.bounce_address">
+      <FormField label="Bounce Address" field="bounce_address">
         <input
           v-model="form.bounce_address"
           type="email"
@@ -259,7 +259,7 @@ async function save() {
         >
       </FormField>
 
-      <FormField label="Alert Address" :error="errors.alert_email">
+      <FormField label="Alert Address" field="alert_email">
         <input
           v-model="form.alert_email"
           type="email"
@@ -279,7 +279,7 @@ async function save() {
 
       <FormField
         label="Default headers"
-        :error="errors.default_headers"
+        field="default_headers"
         hint="Custom headers added to every message this project sends, from the API, the console, SMTP submission and campaigns alike. A message or campaign that names the same header wins. Up to 20, and the headers Mailyard writes itself cannot be set."
       >
         <HeaderEditor v-model="form.default_headers" />
@@ -287,7 +287,7 @@ async function save() {
 
       <FormField
         label="Headers dropped on SMTP submission"
-        :error="errors.submission_drop_headers"
+        field="submission_drop_headers"
         hint="Header names the SMTP submission listener removes from a client's message before forwarding the rest, one per line. Mail clients and libraries add X-Mailer and X-Priority on their own, and this is where a project says it does not want them delivered. Applies to submission only: an API caller who named a header meant it."
       >
         <textarea
@@ -301,7 +301,8 @@ async function save() {
 
       <FormField
         label="Sandbox retention"
-        :error="errors.sandbox_retention_days || sandboxError"
+        field="sandbox_retention_days"
+        :error="sandboxError"
         :hint="
           sandboxCeiling > 0
             ? `Days a captured message is kept before it is swept. 0 uses the installation default. Your plan allows at most ${sandboxCeiling}.`

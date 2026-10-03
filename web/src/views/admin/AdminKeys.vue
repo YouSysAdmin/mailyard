@@ -45,7 +45,7 @@ const showTokenModal = ref(false)
 
 // The token is dropped with the dialog: it is shown exactly once and
 // keeping it in memory afterwards serves nobody.
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 function closeTokenModal() {
   showTokenModal.value = false
@@ -226,7 +226,7 @@ onMounted(load)
       @submit="createKey"
       @close="showCreateModal = false"
     >
-      <FormField label="Name" :error="fieldErrors.name">
+      <FormField label="Name" field="name">
         <input
           v-model="newName"
           type="text"
@@ -236,6 +236,7 @@ onMounted(load)
         />
       </FormField>
       <FormField
+        field="allowed_ips"
         hint="One per line or comma separated. Empty means any address, which for this credential is worth thinking about."
       >
         <template #label>Allowed IPs <span class="text-muted">(optional)</span></template>
@@ -246,7 +247,7 @@ onMounted(load)
           placeholder="203.0.113.5&#10;198.51.100.0/24"
         ></textarea>
       </FormField>
-      <FormField label="Expires">
+      <FormField label="Expires" field="expires_at">
         <label class="checkbox-label">
           <input v-model="expiresNever" type="checkbox" />
           <span>Never expires</span>

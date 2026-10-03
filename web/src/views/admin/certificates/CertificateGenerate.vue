@@ -26,7 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 
@@ -71,7 +71,7 @@ async function generate() {
 
 <template>
   <BaseModal title="Generate a certificate" @close="emit('close')">
-    <FormField label="Name" for="gen-name" :error="errors.name">
+    <FormField label="Name" for="gen-name" field="name">
       <input
         id="gen-name"
         v-model="form.name"
@@ -84,7 +84,7 @@ async function generate() {
     <FormField
       label="Hosts"
       for="gen-hosts"
-      :error="errors.hosts"
+      field="hosts"
       hint="Comma separated. They go in the SAN list, and at least one is needed."
     >
       <input
@@ -97,7 +97,7 @@ async function generate() {
     </FormField>
 
     <div class="form-row">
-      <FormField label="Algorithm" for="gen-alg" :error="errors.algorithm">
+      <FormField label="Algorithm" for="gen-alg" field="algorithm">
         <select id="gen-alg" v-model="form.algorithm" class="form-select">
           <option value="ecdsa">ECDSA</option>
           <option value="rsa">RSA</option>
@@ -107,7 +107,7 @@ async function generate() {
       <FormField
         label="Valid for"
         for="gen-days"
-        :error="errors.validity_days"
+        field="validity_days"
         hint="Days, at most 398 - browsers refuse a longer one."
       >
         <input
@@ -124,7 +124,7 @@ async function generate() {
     <FormField
       label="Signed by"
       for="gen-issuer"
-      :error="errors.issuer"
+      field="issuer"
       :hint="
         authorities.length
           ? 'A certificate signed by your own authority is trusted by anything that trusts it.'
@@ -140,7 +140,6 @@ async function generate() {
     <SubjectFields
       v-model="form.subject"
       id-prefix="gen"
-      :errors="errors"
       :common-name-placeholder="firstHost"
       common-name-hint="The common name defaults to the first host."
     />

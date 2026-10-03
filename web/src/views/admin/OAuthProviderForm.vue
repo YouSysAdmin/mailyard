@@ -31,7 +31,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 const showAdvanced = ref(false)
@@ -203,7 +203,7 @@ async function save() {
     @submit="save"
     @close="emit('close')"
   >
-    <FormField label="Name" :error="errors.name" hint="Shown on the sign-in button.">
+    <FormField label="Name" field="name" hint="Shown on the sign-in button.">
       <input
         v-model="form.name"
         class="form-input"
@@ -215,7 +215,7 @@ async function save() {
 
     <FormField
       label="Type"
-      :error="errors.type"
+      field="type"
       hint="Google already knows its own endpoints, so it needs only a client id and secret."
     >
       <select v-model="form.type" class="form-select">
@@ -227,7 +227,7 @@ async function save() {
     <FormField
       v-if="form.type !== 'google'"
       label="Issuer"
-      :error="errors.issuer"
+      field="issuer"
       hint="Endpoints are discovered from this URL. It is the provider's address, not Mailyard's."
     >
       <input
@@ -238,10 +238,10 @@ async function save() {
       />
     </FormField>
 
-    <FormField label="Client ID" :error="errors.client_id">
+    <FormField label="Client ID" field="client_id">
       <input v-model="form.client_id" class="form-input" maxlength="400" />
     </FormField>
-    <FormField label="Client Secret">
+    <FormField field="client_secret" label="Client Secret">
       <input
         v-model="secretInput"
         class="form-input"
@@ -283,7 +283,7 @@ async function save() {
 
     <FormField
       label="Restrict to email domains"
-      :error="errors.allowed_domains"
+      field="allowed_domains"
       hint="Comma separated, no @. Leave blank to admit anyone the provider authenticates."
     >
       <input
@@ -294,14 +294,14 @@ async function save() {
     </FormField>
     <FormField
       label="Restrict to specific addresses"
-      :error="errors.allowed_emails"
+      field="allowed_emails"
       hint="When set, only these addresses may sign in and the domain list is ignored."
     >
       <input v-model="form.allowed_emails" class="form-input" placeholder="someone@example.com" />
     </FormField>
     <FormField
       label="Groups claim"
-      :error="errors.groups_claim"
+      field="groups_claim"
       hint="Which claim in the token carries group membership. Providers spell it differently."
     >
       <input
@@ -312,7 +312,7 @@ async function save() {
     </FormField>
     <FormField
       label="Restrict to groups"
-      :error="errors.allowed_groups"
+      field="allowed_groups"
       hint="Needs a groups claim to be set."
     >
       <input v-model="form.allowed_groups" class="form-input" placeholder="mailyard-admins" />
@@ -325,7 +325,7 @@ async function save() {
     <template v-if="showAdvanced">
       <FormField
         label="Slug"
-        :error="errors.slug"
+        field="slug"
         hint="Appears in the sign-in URL. Changing it changes the redirect URI, which then has to be updated at the provider too."
       >
         <input
@@ -335,20 +335,20 @@ async function save() {
           placeholder="derived from the name"
         />
       </FormField>
-      <FormField label="Scopes" :error="errors.scopes">
+      <FormField label="Scopes" field="scopes">
         <input v-model="form.scopes" class="form-input" placeholder="openid, email, profile" />
       </FormField>
       <FormField
         label="Authorization URL"
-        :error="errors.auth_url"
+        field="auth_url"
         hint="Only needed for a provider that publishes no discovery document."
       >
         <input v-model="form.auth_url" class="form-input" maxlength="400" />
       </FormField>
-      <FormField label="Token URL" :error="errors.token_url">
+      <FormField label="Token URL" field="token_url">
         <input v-model="form.token_url" class="form-input" maxlength="400" />
       </FormField>
-      <FormField label="UserInfo URL" :error="errors.userinfo_url">
+      <FormField label="UserInfo URL" field="userinfo_url">
         <input v-model="form.userinfo_url" class="form-input" maxlength="400" />
       </FormField>
     </template>

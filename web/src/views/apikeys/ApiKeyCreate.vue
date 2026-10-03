@@ -29,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 const { never, at, reset, invalid: expiryInvalid, payload: expiryPayload } = useExpiry()
 
 const name = ref('')
@@ -92,7 +92,7 @@ async function submit() {
   <BaseModal title="New API key" form @submit="submit" @close="emit('close')">
     <FormField
       label="Name"
-      :error="errors.name"
+      field="name"
       hint="Only ever shown here, so name it after what will hold it."
     >
       <input v-model="name" class="form-input" placeholder="Production" required />
@@ -115,7 +115,7 @@ async function submit() {
     <FormField
       v-if="!sandbox"
       label="Permissions"
-      :error="errors.permissions"
+      field="permissions"
       hint="Fixed at creation. A key with nothing selected can do nothing - the same catalogue governs people and machines."
     >
       <PermissionGrid
@@ -127,7 +127,7 @@ async function submit() {
     </FormField>
 
     <FormField
-      :error="errors.allowed_ips"
+      field="allowed_ips"
       hint="One address or CIDR per line. Empty means the key works from anywhere."
     >
       <template #label>Allowed addresses <span class="text-muted">(optional)</span></template>
@@ -139,7 +139,7 @@ async function submit() {
       ></textarea>
     </FormField>
 
-    <FormField label="Expiry" :error="errors.expires_at">
+    <FormField label="Expiry" field="expires_at">
       <label class="checkbox-label">
         <input v-model="never" type="checkbox" />
         <span>Never expires</span>

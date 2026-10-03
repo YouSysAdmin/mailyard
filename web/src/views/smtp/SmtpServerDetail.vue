@@ -39,7 +39,7 @@ const form = ref({
 const allowedEmailsText = ref('')
 const allowedDomainsText = ref('')
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 function fillForm(s: SMTPServer) {
   form.value = {
@@ -278,7 +278,7 @@ onMounted(fetchServer)
         </div>
         <div class="card-body">
           <form @submit.prevent="save">
-            <FormField label="Name" :error="fieldErrors.name">
+            <FormField label="Name" field="name">
               <input
                 v-model="form.name"
                 type="text"
@@ -288,7 +288,7 @@ onMounted(fetchServer)
               />
             </FormField>
             <div class="host-port">
-              <FormField class="flex-2" label="Host" :error="fieldErrors.host">
+              <FormField class="flex-2" label="Host" field="host">
                 <input
                   v-model="form.host"
                   type="text"
@@ -297,7 +297,7 @@ onMounted(fetchServer)
                   required
                 />
               </FormField>
-              <FormField class="flex-1" label="Port" :error="fieldErrors.port">
+              <FormField class="flex-1" label="Port" field="port">
                 <input
                   v-model.number="form.port"
                   type="number"
@@ -309,7 +309,7 @@ onMounted(fetchServer)
                 />
               </FormField>
             </div>
-            <FormField :error="fieldErrors.username">
+            <FormField field="username">
               <template #label>Username <span class="text-muted">(optional)</span></template>
               <input
                 v-model="form.username"
@@ -319,7 +319,7 @@ onMounted(fetchServer)
                 :disabled="!projStore.can('smtp:write')"
               />
             </FormField>
-            <FormField label="Password" :error="fieldErrors.password">
+            <FormField label="Password" field="password">
               <input
                 v-model="form.password"
                 type="password"
@@ -329,7 +329,7 @@ onMounted(fetchServer)
                 :disabled="!projStore.can('smtp:write')"
               />
             </FormField>
-            <FormField label="Encryption" :error="fieldErrors.encryption">
+            <FormField label="Encryption" field="encryption">
               <select
                 v-model="form.encryption"
                 class="form-select"
@@ -353,6 +353,7 @@ onMounted(fetchServer)
               </label>
             </FormField>
             <FormField
+              field="allowed_emails"
               hint="One per line. Exact addresses or *@domain wildcards. Leave empty to allow any sender."
             >
               <template #label
@@ -367,6 +368,7 @@ onMounted(fetchServer)
               ></textarea>
             </FormField>
             <FormField
+              field="allowed_domains"
               hint="One per line. Matched exactly, so a subdomain needs its own line - SPF is written per name. Leave empty to carry any domain."
             >
               <template #label

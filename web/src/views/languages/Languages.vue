@@ -24,7 +24,7 @@ import FormField from '../../components/FormField.vue'
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const languages = ref<Language[]>([])
 const loading = ref(true)
@@ -207,15 +207,11 @@ void load()
       @submit="save"
       @close="draft = null"
     >
-      <FormField
-        label="Code"
-        :error="errors.code"
-        hint="An ISO 639-1 code - what a send asks for by name."
-      >
+      <FormField label="Code" field="code" hint="An ISO 639-1 code - what a send asks for by name.">
         <input v-model="draft.code" class="form-input" placeholder="en" maxlength="10" required />
       </FormField>
 
-      <FormField label="Name" :error="errors.name" hint="What this console shows in a picker.">
+      <FormField label="Name" field="name" hint="What this console shows in a picker.">
         <input v-model="draft.name" class="form-input" placeholder="English" required />
       </FormField>
 

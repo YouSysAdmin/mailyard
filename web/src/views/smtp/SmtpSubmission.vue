@@ -43,7 +43,7 @@ const createdCred = ref<SMTPCredential | null>(null)
 const createdPassword = ref('')
 const showPasswordModal = ref(false)
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 async function load() {
   loading.value = true
@@ -288,7 +288,7 @@ onMounted(load)
       @submit="createCredential"
       @close="showCreateModal = false"
     >
-      <FormField label="Name" :error="fieldErrors.name">
+      <FormField label="Name" field="name">
         <input
           v-model="newName"
           type="text"
@@ -297,7 +297,10 @@ onMounted(load)
           required
         />
       </FormField>
-      <FormField hint="One IP address or CIDR per line. Leave empty to allow any address.">
+      <FormField
+        field="allowed_ips"
+        hint="One IP address or CIDR per line. Leave empty to allow any address."
+      >
         <template #label>Allowed IPs <span class="text-muted">(optional)</span></template>
         <textarea
           v-model="newIPs"

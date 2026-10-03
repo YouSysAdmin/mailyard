@@ -13,18 +13,9 @@ import (
 )
 
 var (
-	// `fieldErrors.alert_email` in a view, or `errors.alert_email` - the
-	// composable is destructured under both names and half the console
-	// uses each, so checking one name checked half the bindings.
-	consoleFieldRef = regexp.MustCompile(`(?:^|[^a-zA-Z.])(?:fieldErrors|errors)\.([a-z][a-z0-9_]*)`)
-
-	// Anything that puts a captured message on screen: a keyed read in
-	// this file's own markup, or the whole map handed to a child that
-	// renders it.
-	consoleFieldSink = regexp.MustCompile(`(?:fieldErrors|errors)[.\[]|:errors="`)
-
-	// The composable being asked to place a refusal on a field.
-	consoleFieldCapture = regexp.MustCompile(`\bcapture\(`)
+	// `field="alert_email"` on a FormField, the key it shows the server's
+	// refusal for.
+	consoleFieldRef = regexp.MustCompile(`(?:^|\s)field="([a-z][a-z0-9_]*)"`)
 
 	// A struct tag the server validates: only those can come back in the
 	// `fields` array, because Humanize builds it from validator errors.
@@ -33,7 +24,7 @@ var (
 
 // A FIELD ERROR IS KEYED BY THE NAME THE SERVER REFUSES IT UNDER.
 //
-// The console binds `:error="fieldErrors.x"` and the server answers with
+// The console binds `<FormField field="x">` and the server answers with
 // `fields: [{field: "x", ...}]` built from the json tag - so the two
 // halves agree by convention and nothing connects them. A view that
 // binds `hostname` where the request sends `host` renders no error at
@@ -78,6 +69,7 @@ func TestEveryFieldErrorKeyIsOneTheServerRefuses(t *testing.T) {
 	}
 
 	var findings []string
+	bound := 0
 	console := consoleSrc(t)
 	err = filepath.Walk(console, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".vue") {
@@ -92,9 +84,10 @@ func TestEveryFieldErrorKeyIsOneTheServerRefuses(t *testing.T) {
 		rel, _ := filepath.Rel(console, path)
 		for i, line := range strings.Split(string(body), "\n") {
 			for _, m := range consoleFieldRef.FindAllStringSubmatch(line, -1) {
+				bound++
 				if !known[m[1]] {
 					findings = append(findings, filepath.ToSlash(rel)+":"+strconv.Itoa(i+1)+
-						" binds fieldErrors."+m[1]+", which no handler validates")
+						" binds field="+m[1]+", which no handler validates")
 				}
 			}
 		}
@@ -103,6 +96,11 @@ func TestEveryFieldErrorKeyIsOneTheServerRefuses(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("walk %s: %v", console, err)
+	}
+
+	if bound < 100 {
+		t.Fatalf("found %d bound field keys in the console, expected at least 100 - "+
+			"the binding has changed shape and this check is reading nothing", bound)
 	}
 
 	slices.Sort(findings)
@@ -177,10 +175,11 @@ func TestEveryFieldErrorKeyIsOneTheFormSends(t *testing.T) {
 		}
 
 		text := string(body)
-		// Only where the map is MADE. A child that takes `errors` as a
-		// prop renders keys its parent sends, and the request it belongs
-		// to is not visible from here at all - CampaignFields binds six
-		// of them and imports no api module, which is not a finding.
+		// Only where the map is MADE. A child rendering fields inside a
+		// parent's form shows keys its parent sends, and the request it
+		// belongs to is not visible from here at all - CampaignFields
+		// binds six of them and imports no api module, which is not a
+		// finding.
 		if !strings.Contains(text, "useFieldErrors(") || !consoleFieldRef.MatchString(text) {
 			return nil
 		}
@@ -214,7 +213,7 @@ func TestEveryFieldErrorKeyIsOneTheFormSends(t *testing.T) {
 			for _, m := range consoleFieldRef.FindAllStringSubmatch(line, -1) {
 				if !local[m[1]] {
 					findings = append(findings, filepath.ToSlash(rel)+":"+strconv.Itoa(i+1)+
-						" binds fieldErrors."+m[1]+", which nothing here sends")
+						" binds field="+m[1]+", which nothing here sends")
 				}
 			}
 		}
@@ -233,25 +232,17 @@ func TestEveryFieldErrorKeyIsOneTheFormSends(t *testing.T) {
 	}
 }
 
-// A CAPTURED REFUSAL MUST HAVE SOMEWHERE TO GO.
+// A FORM THAT RENDERS FIELD ERRORS MUST BE HANDED SOME.
 //
-// `capture(err)` files the server's messages by field and answers whether
-// it filed any - and every call site reads that answer as "the message is
-// on screen, so do not toast as well". In a component that renders no
-// field errors it is not: the map is written, nothing reads it, the toast
-// is suppressed, and the request fails in complete silence.
-//
-// An upload or an import is the usual case: the refusal names a leaf
-// field of a pasted document and there is no input on screen for it.
-// capture is the wrong tool wherever the form has no field to put the
-// answer under, and the server's summary line already reads well.
-//
-// Passing the map to a child counts, since that is how the campaign forms
-// render theirs.
-func TestACapturedFieldErrorHasSomewhereToGo(t *testing.T) {
+// useFieldErrors only fills its map through capture(err). A view that
+// sets the composable up, binds `field=` on its inputs and then reports
+// the failure with a toast alone puts the server's refusal at the top
+// right of the screen while the field it names stays quiet.
+func TestEveryFieldErrorMapIsFilled(t *testing.T) {
 	console := consoleSrc(t)
 
 	var findings []string
+	forms := 0
 	err := filepath.Walk(console, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".vue") {
 			return err
@@ -263,12 +254,15 @@ func TestACapturedFieldErrorHasSomewhereToGo(t *testing.T) {
 		}
 
 		text := string(body)
-		if !consoleFieldCapture.MatchString(text) || consoleFieldSink.MatchString(text) {
+		if !strings.Contains(text, "useFieldErrors(") {
 			return nil
 		}
 
-		rel, _ := filepath.Rel(console, path)
-		findings = append(findings, filepath.ToSlash(rel))
+		forms++
+		if !strings.Contains(text, "capture(") {
+			rel, _ := filepath.Rel(console, path)
+			findings = append(findings, filepath.ToSlash(rel))
+		}
 
 		return nil
 	})
@@ -276,13 +270,15 @@ func TestACapturedFieldErrorHasSomewhereToGo(t *testing.T) {
 		t.Fatalf("walk %s: %v", console, err)
 	}
 
+	if forms < 20 {
+		t.Fatalf("found %d views using useFieldErrors, expected at least 20 - "+
+			"the composable has moved and this check reads nothing", forms)
+	}
+
 	slices.Sort(findings)
 
 	if len(findings) > 0 {
-		t.Errorf("%d component(s) call capture() with nowhere to render what it captures:\n  %s\n"+
-			"a captured refusal that nothing displays suppresses the toast as well, so the "+
-			"request fails silently - either bind the key on a FormField, pass :errors to the "+
-			"child that renders it, or drop capture and report apiErrorMessage plainly",
+		t.Errorf("%d view(s) set up useFieldErrors and never call capture():\n  %s",
 			len(findings), strings.Join(findings, "\n  "))
 	}
 }

@@ -25,7 +25,7 @@ const proj = ref<Project | null>(null)
 const perms = ref<string[]>([])
 const loading = ref(true)
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 function can(p: string): boolean {
   return perms.value.includes('*') || perms.value.includes(p)
@@ -246,10 +246,10 @@ onMounted(async () => {
       @submit="save"
       @close="showEditor = false"
     >
-      <FormField label="Name" :error="fieldErrors.name">
+      <FormField label="Name" field="name">
         <input v-model="formName" class="form-input" maxlength="100" required />
       </FormField>
-      <FormField label="Description" :error="fieldErrors.description">
+      <FormField label="Description" field="description">
         <input
           v-model="formDescription"
           class="form-input"

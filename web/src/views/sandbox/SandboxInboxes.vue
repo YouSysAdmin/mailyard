@@ -33,7 +33,7 @@ const emit = defineEmits<{
 const notify = useNotificationStore()
 const projStore = useProjectStore()
 const { confirm } = useConfirm()
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const showForm = ref(false)
 const editing = ref<SandboxInbox | null>(null)
@@ -190,7 +190,7 @@ async function remove(box: SandboxInbox) {
       @submit="save"
       @close="showForm = false"
     >
-      <FormField label="Name" :error="fieldErrors.name" hint="Unique in this project.">
+      <FormField label="Name" field="name" hint="Unique in this project.">
         <input
           v-model="name"
           type="text"
@@ -199,13 +199,13 @@ async function remove(box: SandboxInbox) {
           required
         />
       </FormField>
-      <FormField :error="fieldErrors.description">
+      <FormField field="description">
         <template #label>Description <span class="text-muted">(optional)</span></template>
         <input v-model="description" type="text" class="form-input" />
       </FormField>
       <FormField
         label="Sender addresses"
-        :error="fieldErrors.addresses"
+        field="addresses"
         hint="One per line. A capture belongs to this inbox when its envelope sender is one of these, whatever the case. Up to 50."
       >
         <textarea

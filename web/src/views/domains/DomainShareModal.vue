@@ -22,7 +22,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const notify = useNotificationStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const grants = ref<DomainGrant[]>([])
 const loading = ref(true)
@@ -132,7 +132,7 @@ onMounted(load)
     <FormField
       label="Project slug"
       for="share-slug"
-      :error="errors.project_slug"
+      field="project_slug"
       hint="The slug of the project to share with, as shown in its settings."
     >
       <input

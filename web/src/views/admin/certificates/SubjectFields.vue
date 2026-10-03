@@ -18,8 +18,6 @@ defineProps<{
    * of them is how that stops being true.
    */
   idPrefix: string
-  /** Field errors from the last refused save, keyed by json name. */
-  errors: Record<string, string>
   /** What the common name falls back to, shown as its placeholder. */
   commonNamePlaceholder: string
   commonNameHint?: string
@@ -33,7 +31,7 @@ const subject = defineModel<CertificateSubject>({ required: true })
     <h4 class="subject-heading">Subject</h4>
     <p class="form-hint">All optional. {{ commonNameHint || 'It can be left entirely empty.' }}</p>
 
-    <FormField label="Common name" :for="idPrefix + '-cn'" :error="errors.common_name">
+    <FormField label="Common name" :for="idPrefix + '-cn'" field="common_name">
       <input
         :id="idPrefix + '-cn'"
         v-model="subject.common_name"
@@ -44,7 +42,7 @@ const subject = defineModel<CertificateSubject>({ required: true })
     </FormField>
 
     <div class="form-row">
-      <FormField label="Organization" :for="idPrefix + '-org'" :error="errors.organization">
+      <FormField label="Organization" :for="idPrefix + '-org'" field="organization">
         <input
           :id="idPrefix + '-org'"
           v-model="subject.organization"
@@ -52,10 +50,10 @@ const subject = defineModel<CertificateSubject>({ required: true })
           type="text"
         />
       </FormField>
-      <FormField label="Unit" :for="idPrefix + '-unit'" :error="errors.unit">
+      <FormField label="Unit" :for="idPrefix + '-unit'" field="unit">
         <input :id="idPrefix + '-unit'" v-model="subject.unit" class="form-input" type="text" />
       </FormField>
-      <FormField label="Country" :for="idPrefix + '-country'" :error="errors.country">
+      <FormField label="Country" :for="idPrefix + '-country'" field="country">
         <input
           :id="idPrefix + '-country'"
           v-model="subject.country"
@@ -65,10 +63,10 @@ const subject = defineModel<CertificateSubject>({ required: true })
           placeholder="UA"
         />
       </FormField>
-      <FormField label="State" :for="idPrefix + '-state'" :error="errors.state">
+      <FormField label="State" :for="idPrefix + '-state'" field="state">
         <input :id="idPrefix + '-state'" v-model="subject.state" class="form-input" type="text" />
       </FormField>
-      <FormField label="City" :for="idPrefix + '-city'" :error="errors.locality">
+      <FormField label="City" :for="idPrefix + '-city'" field="locality">
         <input :id="idPrefix + '-city'" v-model="subject.locality" class="form-input" type="text" />
       </FormField>
     </div>

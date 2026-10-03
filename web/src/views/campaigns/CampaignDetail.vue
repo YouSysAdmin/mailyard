@@ -18,7 +18,6 @@ import CampaignMessages from './CampaignMessages.vue'
 import CampaignStats from './CampaignStats.vue'
 import CampaignSchedule from './CampaignSchedule.vue'
 import CampaignPreview from './CampaignPreview.vue'
-import { useFieldErrors } from '../../composables/fieldErrors'
 import { formatMailbox } from '../../composables/mailbox'
 
 const route = useRoute()
@@ -39,8 +38,6 @@ const engagement = ref({
   click_rate: 0,
   unsubscribe_rate: 0,
 })
-
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
 
 const loading = ref(true)
 

@@ -35,7 +35,7 @@ const emit = defineEmits<{
 const auth = useAuthStore()
 const notify = useNotificationStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 const resettingTOTP = ref(false)
@@ -187,7 +187,7 @@ async function revokeSessions(u: User) {
     <FormField label="Email">
       <input :value="user.email" class="form-input" disabled />
     </FormField>
-    <FormField label="New Password (optional)" :error="errors.password">
+    <FormField label="New Password (optional)" field="password">
       <input
         v-model="form.password"
         type="password"

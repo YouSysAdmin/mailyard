@@ -54,7 +54,7 @@ async function onUserChanged() {
 
 // Memberships shown in the edit modal, loaded when it opens.
 
-const { errors: fieldErrors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 function isSelf(u: User): boolean {
   return auth.user?.id === u.id
@@ -224,7 +224,7 @@ onMounted(fetchUsers)
       @submit="createUser"
       @close="showCreateModal = false"
     >
-      <FormField label="Email" :error="fieldErrors.email">
+      <FormField label="Email" field="email">
         <input
           v-model="newUser.email"
           type="email"
@@ -235,7 +235,7 @@ onMounted(fetchUsers)
       </FormField>
       <FormField
         label="Password"
-        :error="fieldErrors.password"
+        field="password"
         hint="Leave empty for an OIDC-only account that signs in through the identity provider."
       >
         <input

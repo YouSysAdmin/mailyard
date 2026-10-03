@@ -38,7 +38,7 @@ const emit = defineEmits<{
 const notify = useNotificationStore()
 const projects = useProjectStore()
 const { confirm } = useConfirm()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const versions = ref<TemplateVersion[]>([])
 const loading = ref(true)
@@ -298,7 +298,7 @@ watch(() => props.templateId, load, { immediate: true })
 
       <FormField
         label="Stylesheet"
-        :error="errors.stylesheet_id"
+        field="stylesheet_id"
         hint="Its CSS is inlined into the rendered HTML."
       >
         <select v-model="form.stylesheet_id" class="form-select">
@@ -309,7 +309,7 @@ watch(() => props.templateId, load, { immediate: true })
 
       <FormField
         label="Sample data (JSON)"
-        :error="errors.sample_data"
+        field="sample_data"
         hint="What the preview and the test send fill the template with."
       >
         <textarea

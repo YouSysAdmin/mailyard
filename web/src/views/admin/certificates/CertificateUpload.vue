@@ -17,7 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const saving = ref(false)
 const form = ref({ name: '', certificate: '', private_key: '' })
@@ -39,7 +39,7 @@ async function upload() {
 
 <template>
   <BaseModal title="Upload a certificate" size="modal-w900" @close="emit('close')">
-    <FormField label="Name" for="cert-name" :error="errors.name">
+    <FormField label="Name" for="cert-name" field="name">
       <input
         id="cert-name"
         v-model="form.name"
@@ -52,7 +52,7 @@ async function upload() {
     <FormField
       label="Certificate"
       for="cert-pem"
-      :error="errors.certificate"
+      field="certificate"
       hint="The full chain, leaf first, if you have one."
     >
       <textarea
@@ -67,7 +67,7 @@ async function upload() {
     <FormField
       label="Private key"
       for="cert-key"
-      :error="errors.private_key"
+      field="private_key"
       hint="Checked against the certificate before anything is stored, and encrypted at rest."
     >
       <textarea

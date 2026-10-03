@@ -24,7 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
-const { errors, capture, clear } = useFieldErrors()
+const { capture, clear } = useFieldErrors()
 
 const form = ref<{ current: string; next: string } | null>(null)
 const busy = ref(false)
@@ -69,7 +69,7 @@ async function submit() {
     <BaseModal v-if="form" title="Change password" form @submit="submit" @close="form = null">
       <PasswordManagerHint :email="email" />
 
-      <FormField label="Current password" for="current-password" :error="errors.current_password">
+      <FormField label="Current password" for="current-password" field="current_password">
         <input
           id="current-password"
           v-model="form.current"
@@ -83,7 +83,7 @@ async function submit() {
       <FormField
         label="New password"
         for="new-password"
-        :error="errors.password"
+        field="password"
         hint="At least {{ MIN_LENGTH }} characters."
       >
         <input
