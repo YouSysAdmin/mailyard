@@ -92,3 +92,49 @@ func TestSanitizeFilename(t *testing.T) {
 		}
 	}
 }
+
+// A message whose last file is deleted leaves no directory behind, a
+// directory still holding a file is kept, and the top-level prefix is
+// never removed.
+func TestFSStoreDeleteLeavesNoEmptyDirectory(t *testing.T) {
+	dir := t.TempDir()
+	s, err := New(Config{Backend: "fs", FSPath: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	for _, key := range []string{"inbound/one/0_a.txt", "inbound/one/1_b.txt", "inbound/two/0_c.txt"} {
+		if err := s.Put(ctx, key, strings.NewReader("x"), "text/plain"); err != nil {
+			t.Fatalf("put %s: %v", key, err)
+		}
+	}
+
+	if err := s.Delete(ctx, "inbound/one/0_a.txt"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "inbound", "one")); err != nil {
+		t.Errorf("a directory still holding a file was removed: %v", err)
+	}
+
+	if err := s.Delete(ctx, "inbound/one/1_b.txt"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "inbound", "one")); !os.IsNotExist(err) {
+		t.Errorf("the emptied message directory is still there (err %v)", err)
+	}
+
+	if err := s.Delete(ctx, "inbound/two/0_c.txt"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "inbound")); err != nil {
+		t.Errorf("the top-level prefix was removed: %v", err)
+	}
+
+	if err := s.Put(ctx, "inbound/three/0_d.txt", strings.NewReader("x"), "text/plain"); err != nil {
+		t.Errorf("put after pruning: %v", err)
+	}
+}

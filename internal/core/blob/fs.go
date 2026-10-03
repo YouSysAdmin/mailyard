@@ -84,15 +84,15 @@ func (f *fsStore) Put(_ context.Context, key string, r io.Reader, _ string) erro
 		return err
 	}
 
-	if dir := path.Dir(name); dir != "." {
-		if err := f.root.MkdirAll(dir, dirPerm); err != nil {
-			return fmt.Errorf("blob fs mkdir %q: %w", dir, err)
-		}
+	file, err := f.create(name)
+	if os.IsNotExist(err) {
+		// A Delete emptied and removed the directory between the mkdir
+		// and the create. Once more is enough: the directory is made again.
+		file, err = f.create(name)
 	}
 
-	file, err := f.root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, filePerm)
 	if err != nil {
-		return fmt.Errorf("blob fs create %q: %w", name, err)
+		return err
 	}
 
 	if _, err := io.Copy(file, r); err != nil {
@@ -109,6 +109,22 @@ func (f *fsStore) Put(_ context.Context, key string, r io.Reader, _ string) erro
 	}
 
 	return nil
+}
+
+// create makes the blob's directory and opens the file for writing.
+func (f *fsStore) create(name string) (*os.File, error) {
+	if dir := path.Dir(name); dir != "." {
+		if err := f.root.MkdirAll(dir, dirPerm); err != nil {
+			return nil, fmt.Errorf("blob fs mkdir %q: %w", dir, err)
+		}
+	}
+
+	file, err := f.root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, filePerm)
+	if err != nil {
+		return nil, fmt.Errorf("blob fs create %q: %w", name, err)
+	}
+
+	return file, nil
 }
 
 // Get returns one blob by id, or nil when there is no such row.
@@ -137,5 +153,21 @@ func (f *fsStore) Delete(_ context.Context, key string) error {
 		return fmt.Errorf("blob fs delete %q: %w", name, err)
 	}
 
+	f.pruneDirs(name)
+
 	return nil
+}
+
+// pruneDirs removes the directories above name that the delete left
+// empty, so a message whose files are gone leaves no directory behind.
+// It stops at the first one that is not empty, and never removes the
+// top-level prefix (inbound, emails, ...), which every Put shares.
+// Removing a directory only succeeds when it is empty, so a sibling
+// written meanwhile keeps it.
+func (f *fsStore) pruneDirs(name string) {
+	for dir := path.Dir(name); strings.Contains(dir, "/"); dir = path.Dir(dir) {
+		if err := f.root.Remove(dir); err != nil {
+			return
+		}
+	}
 }
