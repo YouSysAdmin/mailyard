@@ -71,7 +71,7 @@ for autoscaling groups and is off by default.
 An enrolled node also appears as a server row, in the shared pool or in its project's SMTP servers. Its name, priority
 and allow lists can be edited there, but its host, port, credentials, encryption, provider options and status cannot:
 the node reports its own address, and approving or suspending it happens on the relay nodes page. A server `PATCH`
-naming any of those on a node's row answers `400`.
+naming any of those on a node's row answers `400`, and so do the enable and disable actions on that row.
 
 ## A node for one project
 

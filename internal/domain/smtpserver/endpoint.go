@@ -382,6 +382,13 @@ func (h *Handler) setStatus(c fiber.Ctx, status string) error {
 		return response.NotFound(c, "smtp server not found")
 	}
 
+	// A node is approved and suspended on the relay nodes page, which
+	// asks for relay:write. Flipping its row here would take a pending
+	// or suspended node into rotation on smtp:write alone.
+	if srv.IsNode() {
+		return response.BadRequest(c, errNodeDial)
+	}
+
 	if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
 		rc.Project.ID, srv.ID, status, "", srv.ValidatedAt); err != nil {
 		return response.Internal(c, err)
