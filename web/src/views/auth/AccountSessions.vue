@@ -11,11 +11,13 @@ import { apiErrorMessage } from '../../api/client'
 import { useNotificationStore } from '../../stores/notification'
 import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../composables/formatDate'
-import { beginLeaving, leaveConsole } from '../../composables/session'
+import { beginLeaving, cancelLeaving, leaveConsole } from '../../composables/session'
+import { useAuthStore } from '../../stores/auth'
 import LoadingBlock from '../../components/LoadingBlock.vue'
 import EmptyState from '../../components/EmptyState.vue'
 
 const notify = useNotificationStore()
+const auth = useAuthStore()
 const { confirm } = useConfirm()
 
 const sessions = ref<UserSession[]>([])
@@ -49,14 +51,16 @@ async function revoke(s: UserSession) {
   if (!ok) return
 
   busy.value = s.id
+  // Our own session is a sign-out and goes the way the account menu's
+  // does. beginLeaving before the request, or the interceptor reports the
+  // interrupted requests as an expired session. The cached profile is
+  // dropped, or the login page sees a signed-in user and sends the tab
+  // straight back into the console.
+  if (s.current) beginLeaving()
   try {
     await sessionsApi.revoke(s.id)
     if (s.current) {
-      // Our own session: the cookie is already gone server side, so
-      // this IS a sign-out and goes the same way - beginLeaving first,
-      // or the interceptor reports the interrupted requests as an
-      // expired session.
-      beginLeaving()
+      auth.clearSession()
       leaveConsole()
 
       return
@@ -65,6 +69,7 @@ async function revoke(s: UserSession) {
     notify.success('Session revoked')
     await load()
   } catch (e) {
+    if (s.current) cancelLeaving()
     notify.error(apiErrorMessage(e, 'Failed to revoke the session'))
   } finally {
     busy.value = ''

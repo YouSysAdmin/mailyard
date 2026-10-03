@@ -68,6 +68,12 @@ export function beginLeaving() {
   leaving = true
 }
 
+// cancelLeaving undoes beginLeaving when the request that would have
+// ended the session was refused, so a later 401 is reported again.
+export function cancelLeaving() {
+  leaving = false
+}
+
 // sessionExpired is the other way a session ends: the cookie was gone
 // before the request, so the reader is told why. Separate from
 // leaveConsole because the message is the whole point - and it is here so
