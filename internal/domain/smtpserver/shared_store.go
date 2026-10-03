@@ -116,7 +116,8 @@ func (s *SharedStore) ListEnabled(ctx context.Context) ([]*ssmodel.Shared, error
 }
 
 // Put inserts the SMTP server, or updates the row when its id already
-// exists.
+// exists. The status columns are written on insert only, as in the
+// project store.
 func (s *SharedStore) Put(ctx context.Context, srv *ssmodel.Shared) error {
 	if srv.CreatedAt.IsZero() {
 		srv.CreatedAt = time.Now().UTC()
@@ -152,9 +153,6 @@ func (s *SharedStore) Put(ctx context.Context, srv *ssmodel.Shared) error {
             allowed_domains  = excluded.allowed_domains,
             security_mode    = excluded.security_mode,
             priority         = excluded.priority,
-            status           = excluded.status,
-            validation_error = excluded.validation_error,
-            validated_at     = excluded.validated_at,
             ses_topic_arn    = excluded.ses_topic_arn,
             provider         = excluded.provider,
             provider_config  = excluded.provider_config
@@ -184,6 +182,35 @@ func (s *SharedStore) SetStatus(ctx context.Context, id, status, validationErr s
         SET status = ?, validation_error = ?, validated_at = ?
         WHERE id = ?
     `, status, validationErr, database.NullTime(validatedAt), id)
+
+	return err
+}
+
+// RecordTest is Store.RecordTest for the pool.
+func (s *SharedStore) RecordTest(ctx context.Context, id, testErr string) (string, error) {
+	var status string
+	err := s.QueryRow(ctx, `
+        UPDATE shared_smtp_servers
+        SET status = CASE WHEN status IN ('enabled', 'invalid')
+                          THEN CASE WHEN ?::boolean THEN 'enabled' ELSE 'invalid' END
+                          ELSE status END,
+            validation_error = ?, validated_at = now()
+        WHERE id = ?
+        RETURNING status
+    `, testErr == "", testErr, id).Scan(&status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+
+	return status, err
+}
+
+// NoteSettingsChanged is Store.NoteSettingsChanged for the pool.
+func (s *SharedStore) NoteSettingsChanged(ctx context.Context, id string) error {
+	_, err := s.Exec(ctx, `
+        UPDATE shared_smtp_servers SET validation_error = ?
+        WHERE id = ? AND status = 'invalid'
+    `, ssmodel.SettingsChangedNote, id)
 
 	return err
 }

@@ -36,6 +36,9 @@ curl -X POST http://localhost:3000/api/v1/smtp-servers \
 `username` and `password` are both optional — a relay authenticated by IP address, or an internal one that requires
 nothing, is a legitimate configuration. The password is sealed at rest and never returned by any read.
 
+On `PATCH /api/v1/smtp-servers/{id}` an empty `password` leaves the stored one in place, so a form can send the field
+blank without erasing it. An empty `username` clears the login.
+
 ### Encryption Options
 
 | Value      | Port | Description                     |
@@ -49,12 +52,19 @@ nothing, is a legitimate configuration. The password is sealed at rest and never
 Verify SMTP credentials and connectivity before sending via `POST /api/v1/smtp-servers/{id}/test`. This validates the
 hostname, port, credentials, and encryption.
 
+A passing test puts an `invalid` server back to `enabled`, a failing one marks an `enabled` server `invalid`. A
+`disabled` server stays disabled either way - the result is recorded, and only Enable puts it back.
+
 ### Taken out of rotation
 
 A server that refuses its login (SMTP 535, 534 or 538, or SES rejecting the access key) or presents a certificate
 that does not verify is marked `invalid` by the delivery worker. The message moves on to the next server in the group
 and the project gets a notification. An invalid server is not tried again until a test succeeds, which puts it back to
 `enabled`. A temporary refusal such as 454, a timeout or a refused connection does not take a server out.
+
+Editing a server never changes its status. When the edit touches what the dial uses - host, port, encryption,
+username, password or a provider option - an invalid server's reason becomes "settings changed", and it stays out of
+rotation until the next test passes.
 
 The shared pool and relay nodes are never marked this way - they are not the project's to fix.
 
@@ -71,7 +81,9 @@ relay nodes are never subject to it - an operator placed those.
 ## Sender Restrictions
 
 Use `allowed_emails` to restrict which sender addresses can use a specific SMTP server. This is useful when different
-servers are configured for different brands or departments.
+servers are configured for different brands or departments. Each entry is an exact address or `*@domain`, and
+`allowed_domains` takes bare domain names. Anything else is refused when the server is saved, since an entry that
+matches no sender would only show up as a send with no server to carry it.
 
 {{< callout type="note" >}}
 Passwords are never returned in API responses.

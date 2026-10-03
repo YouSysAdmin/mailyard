@@ -125,7 +125,9 @@ func (s *Store) ListInGroup(ctx context.Context, projID, groupID string) ([]*ssm
 
 // Put upserts the server keyed by id, encrypting the password. The
 // caller passes the plaintext password (or the value a previous read
-// returned, which is also plaintext).
+// returned, which is also plaintext). The status columns are written
+// on insert only - an edit never moves a server in or out of rotation,
+// SetStatus, RecordTest and MarkInvalid do.
 func (s *Store) Put(ctx context.Context, srv *ssmodel.Server) error {
 	if srv.CreatedAt.IsZero() {
 		srv.CreatedAt = time.Now().UTC()
@@ -160,9 +162,6 @@ func (s *Store) Put(ctx context.Context, srv *ssmodel.Server) error {
             allowed_domains  = excluded.allowed_domains,
             group_id         = excluded.group_id,
             priority         = excluded.priority,
-            status           = excluded.status,
-            validation_error = excluded.validation_error,
-            validated_at     = excluded.validated_at,
             ses_topic_arn    = excluded.ses_topic_arn,
             provider         = excluded.provider,
             provider_config  = excluded.provider_config
@@ -193,6 +192,41 @@ func (s *Store) SetStatus(ctx context.Context, projID, id, status, validationErr
         SET status = ?, validation_error = ?, validated_at = ?
         WHERE project_id = ? AND id = ?
     `, status, validationErr, database.NullTime(validatedAt), projID, id)
+
+	return err
+}
+
+// RecordTest files a connection test and returns the status it left.
+// A passing test puts an invalid server back to enabled and a failing
+// one marks an enabled server invalid. A disabled server stays
+// disabled either way - the operator switched it off, a test does not
+// switch it on.
+func (s *Store) RecordTest(ctx context.Context, projID, id, testErr string) (string, error) {
+	var status string
+	err := s.QueryRow(ctx, `
+        UPDATE smtp_servers
+        SET status = CASE WHEN status IN ('enabled', 'invalid')
+                          THEN CASE WHEN ?::boolean THEN 'enabled' ELSE 'invalid' END
+                          ELSE status END,
+            validation_error = ?, validated_at = now()
+        WHERE project_id = ? AND id = ?
+        RETURNING status
+    `, testErr == "", testErr, projID, id).Scan(&status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+
+	return status, err
+}
+
+// NoteSettingsChanged replaces the verdict on an invalid server whose
+// dial settings or credentials were edited. It stays invalid: only a
+// passing test puts it back into rotation.
+func (s *Store) NoteSettingsChanged(ctx context.Context, projID, id string) error {
+	_, err := s.Exec(ctx, `
+        UPDATE smtp_servers SET validation_error = ?
+        WHERE project_id = ? AND id = ? AND status = 'invalid'
+    `, ssmodel.SettingsChangedNote, projID, id)
 
 	return err
 }

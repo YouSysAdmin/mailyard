@@ -27,6 +27,28 @@ const (
 	StatusPending = "pending"
 )
 
+// SettingsChangedNote is the verdict an invalid server carries once its
+// dial settings or credentials were edited after the failure.
+const SettingsChangedNote = "settings changed since the last failure - run a connection test to put the server back into rotation"
+
+// DialChanged reports whether b reaches its peer differently from a:
+// another host, port, encryption, login or provider option. Only such
+// an edit can make an invalid verdict stale.
+func DialChanged(a, b *Server) bool {
+	if a.Host != b.Host || a.Port != b.Port || a.Encryption != b.Encryption ||
+		a.Username != b.Username || a.Password != b.Password || len(a.ProviderConfig) != len(b.ProviderConfig) {
+		return true
+	}
+
+	for k, v := range a.ProviderConfig {
+		if b.ProviderConfig[k] != v {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Server is one outbound SMTP endpoint owned by a project. Password
 // is stored encrypted (core/crypto) and never serialized to JSON.
 // AllowedEmails restricts which sender addresses may use this server:

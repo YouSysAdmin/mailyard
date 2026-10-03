@@ -3,6 +3,7 @@
 package smtpserver
 
 import (
+	"strings"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/transport"
@@ -50,13 +51,13 @@ type createInput struct {
 	// SESTopicARN is where Amazon SES publishes this server's bounce
 	// and complaint notifications. Only meaningful for SES.
 	SESTopicARN   string   `json:"ses_topic_arn" validate:"omitempty,max=512" normalize:"trim"`
-	AllowedEmails []string `json:"allowed_emails" validate:"omitempty,dive,min=3,max=320"`
+	AllowedEmails []string `json:"allowed_emails" validate:"omitempty,dive,max=320,senderrule" normalize:"trim"`
 
 	// AllowedDomains restricts the sender DOMAINS this server carries.
 	// Empty carries any. The rule a project splits relay nodes by -
 	// allowed_emails is per address and says nothing when addresses
 	// are not enumerated.
-	AllowedDomains []string `json:"allowed_domains" validate:"omitempty,dive,min=1,max=253"`
+	AllowedDomains []string `json:"allowed_domains" validate:"omitempty,dive,max=253,domainname" normalize:"trim"`
 
 	// GroupID places the server in a pool. Empty joins the project's
 	// default group, which is what every server did before groups
@@ -67,7 +68,8 @@ type createInput struct {
 
 // updateInput is the PATCH body. Empty strings leave the field
 // unchanged, so a password can be rotated but never blanked through
-// PATCH (delete and recreate the server for that).
+// PATCH (delete and recreate the server for that). An empty username
+// is the exception and clears the login.
 type updateInput struct {
 	Name          string    `json:"name"           validate:"omitempty,min=1,max=100" normalize:"trim"`
 	Host          string    `json:"host"           validate:"omitempty,hostname_rfc1123"  normalize:"normalize"`
@@ -77,12 +79,12 @@ type updateInput struct {
 	Encryption    string    `json:"encryption"     validate:"omitempty,oneof=none starttls ssl"`
 	SkipDKIM      *bool     `json:"skip_dkim"`
 	SESTopicARN   *string   `json:"ses_topic_arn" validate:"omitzero,max=512" normalize:"trim"`
-	AllowedEmails *[]string `json:"allowed_emails" validate:"omitzero,dive,min=3,max=320"`
+	AllowedEmails *[]string `json:"allowed_emails" validate:"omitzero,dive,max=320,senderrule"`
 
 	// AllowedDomains is patchable to an EMPTY list, which is how a
 	// restriction is lifted - a pointer, so absent and empty are
 	// different things here.
-	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,min=1,max=253"`
+	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,max=253,domainname"`
 
 	GroupID  string `json:"group_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 	Priority *int   `json:"priority" validate:"omitzero,min=0,max=10000"`
@@ -98,17 +100,45 @@ type updateInput struct {
 	ProviderConfig *map[string]string `json:"provider_config" validate:"omitzero,max=20"`
 }
 
+// Normalize trims what the tag pass cannot reach through a pointer.
+func (in *updateInput) Normalize() {
+	normalizePatch(in.Username, in.AllowedEmails, in.AllowedDomains)
+}
+
+// Normalize trims what the tag pass cannot reach through a pointer.
+func (in *sharedUpdateInput) Normalize() {
+	normalizePatch(in.Username, in.AllowedEmails, in.AllowedDomains)
+}
+
+// normalizePatch trims the username and every list entry of a PATCH
+// body, so a stored value compares the way it was meant.
+func normalizePatch(username *string, emails, domains *[]string) {
+	if username != nil {
+		*username = strings.TrimSpace(*username)
+	}
+
+	for _, list := range []*[]string{emails, domains} {
+		if list == nil {
+			continue
+		}
+
+		for i, v := range *list {
+			(*list)[i] = strings.TrimSpace(v)
+		}
+	}
+}
+
 type groupCreateInput struct {
 	Name string `json:"name" validate:"required,min=1,max=100" normalize:"trim"`
 
 	// Slug is what a send names. Derived from the name when omitted.
-	Slug        string `json:"slug"        validate:"omitempty,min=1,max=100" normalize:"normalize"`
+	Slug        string `json:"slug"        validate:"omitempty,min=1,max=100,slug" normalize:"normalize"`
 	Description string `json:"description" validate:"omitempty,max=500"      normalize:"trim"`
 }
 
 type groupUpdateInput struct {
 	Name        string  `json:"name"        validate:"omitempty,min=1,max=100" normalize:"trim"`
-	Slug        string  `json:"slug"        validate:"omitempty,min=1,max=100" normalize:"normalize"`
+	Slug        string  `json:"slug"        validate:"omitempty,min=1,max=100,slug" normalize:"normalize"`
 	Description *string `json:"description" validate:"omitzero,max=500"`
 
 	// MakeDefault promotes this group. There is no way to UNSET the
@@ -132,8 +162,8 @@ type sharedCreateInput struct {
 	// SESTopicARN is where Amazon SES publishes this server's bounce
 	// and complaint notifications. Only meaningful for SES.
 	SESTopicARN    string   `json:"ses_topic_arn" validate:"omitempty,max=512" normalize:"trim"`
-	AllowedEmails  []string `json:"allowed_emails"  validate:"omitempty,dive,min=3,max=320"`
-	AllowedDomains []string `json:"allowed_domains" validate:"omitempty,dive,min=1,max=253"`
+	AllowedEmails  []string `json:"allowed_emails"  validate:"omitempty,dive,max=320,senderrule" normalize:"trim"`
+	AllowedDomains []string `json:"allowed_domains" validate:"omitempty,dive,max=253,domainname" normalize:"trim"`
 	SecurityMode   string   `json:"security_mode"   validate:"omitempty,oneof=permissive strict"`
 	Priority       int      `json:"priority"        validate:"omitempty,min=0,max=10000"`
 
@@ -149,8 +179,8 @@ type sharedUpdateInput struct {
 	Encryption     string    `json:"encryption"      validate:"omitempty,oneof=none starttls ssl"`
 	SkipDKIM       *bool     `json:"skip_dkim"`
 	SESTopicARN    *string   `json:"ses_topic_arn" validate:"omitzero,max=512" normalize:"trim"`
-	AllowedEmails  *[]string `json:"allowed_emails"  validate:"omitzero,dive,min=3,max=320"`
-	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,min=1,max=253"`
+	AllowedEmails  *[]string `json:"allowed_emails"  validate:"omitzero,dive,max=320,senderrule"`
+	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,max=253,domainname"`
 	SecurityMode   string    `json:"security_mode"   validate:"omitempty,oneof=permissive strict"`
 	Priority       *int      `json:"priority"        validate:"omitzero,min=0,max=10000"`
 	Status         string    `json:"status"          validate:"omitempty,oneof=enabled disabled"`

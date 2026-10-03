@@ -97,7 +97,7 @@ func (h *GroupHandler) Create(c fiber.Ctx) error {
 	}
 
 	if taken {
-		return response.BadRequest(c, "a group with slug "+slug+" already exists")
+		return response.Conflict(c, "a group with slug "+slug+" already exists")
 	}
 
 	// Make sure the project has a default before adding a second
@@ -153,7 +153,7 @@ func (h *GroupHandler) Update(c fiber.Ctx) error {
 		}
 
 		if taken {
-			return response.BadRequest(c, "a group with slug "+in.Slug+" already exists")
+			return response.Conflict(c, "a group with slug "+in.Slug+" already exists")
 		}
 
 		g.Slug = in.Slug

@@ -501,6 +501,14 @@ type SMTPServerStore interface {
 	Delete(ctx context.Context, projID, id string) error
 	SetStatus(ctx context.Context, projID, id, status, validationErr string, validatedAt *time.Time) error
 
+	// RecordTest files a connection test, never moving a disabled
+	// server, and returns the status it left ("" for no such row).
+	RecordTest(ctx context.Context, projID, id, testErr string) (string, error)
+
+	// NoteSettingsChanged replaces an invalid server's verdict after
+	// its dial settings were edited, leaving it invalid.
+	NoteSettingsChanged(ctx context.Context, projID, id string) error
+
 	// MarkInvalid is the delivery worker's write: enabled to invalid
 	// only, reporting whether the row moved.
 	MarkInvalid(ctx context.Context, projID, id, reason string) (bool, error)
@@ -558,6 +566,11 @@ type SharedSMTPStore interface {
 	Put(ctx context.Context, s *smtpserver.Shared) error
 	Delete(ctx context.Context, id string) error
 	SetStatus(ctx context.Context, id, status, validationErr string, validatedAt *time.Time) error
+
+	// RecordTest and NoteSettingsChanged are the project store's,
+	// for the pool.
+	RecordTest(ctx context.Context, id, testErr string) (string, error)
+	NoteSettingsChanged(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
 }
 

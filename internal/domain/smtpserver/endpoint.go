@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -151,6 +150,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
+	before := *srv
 	if in.Name != "" {
 		srv.Name = in.Name
 	}
@@ -167,7 +167,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		srv.Username = *in.Username
 	}
 
-	if in.Password != nil {
+	if in.Password != nil && *in.Password != "" {
 		srv.Password = *in.Password
 	}
 
@@ -218,19 +218,34 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		srv.GroupID = groupID
 	}
 
-	// Dial settings changed under an "invalid" verdict: force a fresh
-	// test rather than carrying a stale error forward.
-	if srv.Status == ssmodel.StatusInvalid {
-		srv.Status = ssmodel.StatusEnabled
-		srv.ValidationError = ""
-		srv.ValidatedAt = nil
-	}
-
 	if err := h.Runtime.Store.SMTPServer.Put(c.Context(), srv); err != nil {
 		return response.Internal(c, err)
 	}
 
+	// An edit never changes the status. A dial change under an invalid
+	// verdict only replaces the stale reason, and a test decides.
+	if ssmodel.DialChanged(&before, srv) {
+		if err := h.Runtime.Store.SMTPServer.NoteSettingsChanged(c.Context(), rc.Project.ID, srv.ID); err != nil {
+			return response.Internal(c, err)
+		}
+	}
+
 	h.invalidateSESTopics()
+
+	return h.answerServer(c, rc.Project.ID, srv.ID)
+}
+
+// answerServer reads the row back, so the status in the answer is the
+// stored one and not the copy the handler started from.
+func (h *Handler) answerServer(c fiber.Ctx, projID, id string) error {
+	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), projID, id)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if srv == nil {
+		return response.NotFound(c, "smtp server not found")
+	}
 
 	return response.Success(c, ServerResponse{SMTPServer: srv})
 }
@@ -273,8 +288,9 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 
 // Test dials the server (auth included when credentials are set) and
 // records the verdict on the row: success re-enables an invalid
-// server, failure marks it invalid so the delivery worker skips it.
-// A relay node's row is the exception - see testNode.
+// server, failure marks an enabled one invalid so the delivery worker
+// skips it. A disabled server stays disabled. A relay node's row is
+// the exception - see testNode.
 func (h *Handler) Test(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	srv, err := h.Runtime.Store.SMTPServer.Get(c.Context(), rc.Project.ID, c.Params("id"))
@@ -290,29 +306,24 @@ func (h *Handler) Test(c fiber.Ctx) error {
 		return testNode(c, h.Runtime, srv)
 	}
 
-	now := new(time.Now().UTC())
 	// Through the provider, so "test" means whatever proving reachability
 	// means for it: a dial and an AUTH for SMTP, an account read for an
 	// API. Neither sends anything.
 	testErr := testTransport(c.Context(), srv, h.Runtime.RelayNodeTLS,
 		h.Runtime.Config.Sending.AllowPrivateSMTPTargets)
+	reason := ""
 	if testErr != nil {
-		if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
-			rc.Project.ID, srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {
-			return response.Internal(c, err)
-		}
-
-		return response.Success(c, TestResponse{Ok: false, Error: testErr.Error()})
+		reason = testErr.Error()
 	}
 
-	status := srv.Status
-	if status == ssmodel.StatusInvalid {
-		status = ssmodel.StatusEnabled
-	}
-
-	if err := h.Runtime.Store.SMTPServer.SetStatus(c.Context(),
-		rc.Project.ID, srv.ID, status, "", now); err != nil {
+	// Fenced in the store: a disabled server keeps its status whatever
+	// the outcome.
+	if _, err := h.Runtime.Store.SMTPServer.RecordTest(c.Context(), rc.Project.ID, srv.ID, reason); err != nil {
 		return response.Internal(c, err)
+	}
+
+	if testErr != nil {
+		return response.Success(c, TestResponse{Ok: false, Error: reason})
 	}
 
 	return response.Success(c, TestResponse{Ok: true})

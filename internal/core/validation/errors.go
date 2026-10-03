@@ -127,6 +127,12 @@ func defaultMessage(fe validator.FieldError) string {
 		return field + " must be an IP address"
 	case "alpha":
 		return field + " must be letters only"
+	case "slug":
+		return field + " may contain lowercase letters, digits and single dashes"
+	case "domainname":
+		return field + " must be a domain name"
+	case "senderrule":
+		return field + " must be an email address or *@domain"
 	case "certname":
 		return field + " may contain letters, digits, dot, dash and underscore"
 	case "bcryptlen":

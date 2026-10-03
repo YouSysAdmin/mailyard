@@ -119,6 +119,7 @@ func (h *SharedHandler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
+	before := srv.Server
 	if in.Name != "" {
 		srv.Name = in.Name
 	}
@@ -135,7 +136,7 @@ func (h *SharedHandler) Update(c fiber.Ctx) error {
 		srv.Username = *in.Username
 	}
 
-	if in.Password != nil {
+	if in.Password != nil && *in.Password != "" {
 		srv.Password = *in.Password
 	}
 
@@ -171,26 +172,38 @@ func (h *SharedHandler) Update(c fiber.Ctx) error {
 		srv.Priority = *in.Priority
 	}
 
-	if in.Status != "" {
-		srv.Status = in.Status
-	}
-
-	// Dial settings changed under an invalid verdict: clear it rather
-	// than carry a stale error forward, same as the per-project path.
-	if srv.Status == ssmodel.StatusInvalid {
-		srv.Status = ssmodel.StatusEnabled
-		srv.ValidationError = ""
-		srv.ValidatedAt = nil
-	}
-
 	normalizeShared(srv)
 	if err := h.Runtime.Store.SharedSMTP.Put(c.Context(), srv); err != nil {
 		return response.Internal(c, err)
 	}
 
+	// Status moves only when the admin names one, the same override
+	// Enable is on a project server. Otherwise a dial change under an
+	// invalid verdict replaces the stale reason and a test decides.
+	switch {
+	case in.Status != "":
+		if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
+			srv.ID, in.Status, "", srv.ValidatedAt); err != nil {
+			return response.Internal(c, err)
+		}
+	case ssmodel.DialChanged(&before, &srv.Server):
+		if err := h.Runtime.Store.SharedSMTP.NoteSettingsChanged(c.Context(), srv.ID); err != nil {
+			return response.Internal(c, err)
+		}
+	}
+
 	h.invalidateSESTopics()
 
-	return response.Success(c, SharedResponse{SharedSMTPServer: srv})
+	fresh, err := h.Runtime.Store.SharedSMTP.Get(c.Context(), srv.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if fresh == nil {
+		return response.NotFound(c, "shared smtp server not found")
+	}
+
+	return response.Success(c, SharedResponse{SharedSMTPServer: fresh})
 }
 
 // Delete serves DELETE /api/v1/admin/shared-smtp-servers/:id.
@@ -240,23 +253,19 @@ func (h *SharedHandler) Test(c fiber.Ctx) error {
 	now := new(time.Now().UTC())
 	testErr := testTransport(c.Context(), &srv.Server, h.Runtime.RelayNodeTLS,
 		h.Runtime.Config.Sending.AllowPrivateSMTPTargets)
+	reason := ""
 	if testErr != nil {
-		if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
-			srv.ID, ssmodel.StatusInvalid, testErr.Error(), now); err != nil {
-			return response.Internal(c, err)
-		}
-
-		return response.Success(c, TestResponse{Ok: false, Error: testErr.Error()})
+		reason = testErr.Error()
 	}
 
-	status := srv.Status
-	if status == ssmodel.StatusInvalid {
-		status = ssmodel.StatusEnabled
-	}
-
-	if err := h.Runtime.Store.SharedSMTP.SetStatus(c.Context(),
-		srv.ID, status, "", now); err != nil {
+	// Fenced in the store, as on a project server.
+	status, err := h.Runtime.Store.SharedSMTP.RecordTest(c.Context(), srv.ID, reason)
+	if err != nil {
 		return response.Internal(c, err)
+	}
+
+	if testErr != nil {
+		return response.Success(c, TestResponse{Ok: false, Error: reason})
 	}
 
 	return response.Success(c, SharedTestResponse{Ok: true, Status: status, ValidatedAt: now})

@@ -97,6 +97,8 @@ Notes worth knowing:
 - **A message already queued against a deleted group** follows its servers into the default group rather than failing.
   That is where they went.
 - **Changing a slug breaks callers using the old one.** The id is stable, the slug is the public handle.
+- **A slug is lowercase letters, digits and single dashes**, the shape one derived from the name already has. A slug
+  another group of the project holds answers 409.
 
 ## Assigning servers
 

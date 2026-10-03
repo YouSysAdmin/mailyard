@@ -4,6 +4,7 @@ package validation
 
 import (
 	"mime"
+	"net/mail"
 	"net/netip"
 	"strings"
 
@@ -63,6 +64,26 @@ func registerCustom(v *validator.Validate) {
 	// refuse the value the console had just offered.
 	_ = v.RegisterValidation("provider", func(fl validator.FieldLevel) bool {
 		return transport.Known(fl.Field().String())
+	})
+
+	// domainname is a bare domain name, an optional leading "@"
+	// tolerated because the server lists strip it. A typo here is a
+	// restriction that matches no sender, so it is refused at the write.
+	_ = v.RegisterValidation("domainname", func(fl validator.FieldLevel) bool {
+		return ValidDomainName(strings.TrimPrefix(strings.TrimSpace(fl.Field().String()), "@"))
+	})
+
+	// senderrule is one entry of a server's allowed_emails: an exact
+	// address or "*@domain".
+	_ = v.RegisterValidation("senderrule", func(fl validator.FieldLevel) bool {
+		return validSenderRule(strings.TrimSpace(fl.Field().String()))
+	})
+
+	// slug is lowercase letters and digits in dash separated runs, the
+	// shape a derived slug already has. A send names a group by it in
+	// a header, so a space or a slash would make it unreachable.
+	_ = v.RegisterValidation("slug", func(fl validator.FieldLevel) bool {
+		return ValidSlug(fl.Field().String())
 	})
 
 	// certname is a name that is safe to put in a URL PATH.
@@ -127,4 +148,68 @@ func templateError(kind, src string) error {
 	}
 
 	return render.CheckText(src)
+}
+
+// ValidDomainName reports whether s is a domain name of at least two
+// labels, each 1 to 63 letters, digits or dashes, not starting or
+// ending with a dash. A trailing dot is not accepted.
+func ValidDomainName(s string) bool {
+	if len(s) == 0 || len(s) > 253 {
+		return false
+	}
+
+	labels := strings.Split(s, ".")
+	if len(labels) < 2 {
+		return false
+	}
+
+	for _, l := range labels {
+		if len(l) == 0 || len(l) > 63 || l[0] == '-' || l[len(l)-1] == '-' {
+			return false
+		}
+
+		for _, r := range l {
+			switch {
+			case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-':
+			default:
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// ValidSlug reports whether s is lowercase letters and digits, in runs
+// joined by single dashes.
+func ValidSlug(s string) bool {
+	if s == "" || s[0] == '-' || s[len(s)-1] == '-' || strings.Contains(s, "--") {
+		return false
+	}
+
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+		default:
+			return false
+		}
+	}
+
+	return true
+}
+
+// validSenderRule accepts an exact address or "*@domain".
+func validSenderRule(s string) bool {
+	if dom, ok := strings.CutPrefix(s, "*@"); ok {
+		return ValidDomainName(dom)
+	}
+
+	addr, err := mail.ParseAddress(s)
+	if err != nil || addr.Name != "" || addr.Address != s {
+		return false
+	}
+
+	_, dom, _ := strings.Cut(s, "@")
+
+	return ValidDomainName(dom)
 }
