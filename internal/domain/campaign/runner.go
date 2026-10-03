@@ -170,7 +170,14 @@ func (r *Runner) Stop(timeout time.Duration) {
 // until no campaign is due.
 func (r *Runner) pollOnce(ctx context.Context) {
 	now := time.Now().UTC()
+
+	// A query cut by our own shutdown is not a failure. ctx.Err is asked
+	// rather than the error, which the driver may wrap past errors.Is.
 	if n, err := r.Store.Campaign.PromoteScheduled(ctx, now); err != nil {
+		if ctx.Err() != nil {
+			return
+		}
+
 		r.Log.Error("campaign: promote scheduled", "err", err)
 	} else if n > 0 {
 		r.Log.Info("campaign: scheduled campaigns started", "count", n)
@@ -187,6 +194,10 @@ func (r *Runner) pollOnce(ctx context.Context) {
 
 		c, err := r.Store.Campaign.ClaimDue(ctx, time.Now().UTC(), claimLease)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+
 			r.Log.Error("campaign: claim", "err", err)
 
 			return

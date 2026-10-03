@@ -207,7 +207,13 @@ const abortGrace = 10 * time.Second
 func (w *Worker) pollOnce(ctx context.Context) {
 	now := time.Now().UTC()
 
+	// A query cut by our own shutdown is not a failure. ctx.Err is asked
+	// rather than the error, which the driver may wrap past errors.Is.
 	if n, err := w.src.RecoverStuck(ctx, now.Add(-w.cfg.ClaimTimeout)); err != nil {
+		if ctx.Err() != nil {
+			return
+		}
+
 		w.log.Error("queue: recover stuck", "err", err)
 	} else if n > 0 {
 		w.log.Warn("queue: recovered stuck emails", "count", n)
@@ -220,6 +226,10 @@ func (w *Worker) pollOnce(ctx context.Context) {
 
 	claimed, err := w.src.ClaimDue(ctx, now, free)
 	if err != nil {
+		if ctx.Err() != nil {
+			return
+		}
+
 		w.log.Error("queue: claim due", "err", err)
 
 		return
