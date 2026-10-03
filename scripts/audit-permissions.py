@@ -570,6 +570,9 @@ if APP_SPEC:
         "/app/api/auth/password-reset/request", "/app/api/auth/password-reset/confirm",
         "/app/api/auth/verify-email", "/app/api/auth/verify-email/resend",
         "/app/api/auth/oauth/{slug}/start", "/app/api/auth/oauth/{slug}/callback",
+        # Finishes an identity provider sign-in, authorized by its own
+        # sealed second-factor cookie rather than a session.
+        "/app/api/auth/oauth/2fa",
         "/app/api/auth/passkey/login/begin", "/app/api/auth/passkey/login/finish",
     }
     platform = must(admin("POST", "/api/v1/admin/api-keys", {"name": "audit-platform"}), "platform key")

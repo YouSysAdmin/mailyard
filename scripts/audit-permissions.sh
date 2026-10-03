@@ -41,7 +41,8 @@ echo '{}' >"$WORK/mailyard.yaml"
 
 # The rate limiter buckets per credential and this sends hundreds of
 # requests as a handful of them, so it would answer 429 rather than the
-# authorization the audit is there to read. The login budget also caps
+# authorization the audit is there to read. Sessions have a budget of
+# their own, which the fixtures spend. The login budget also caps
 # failed authentications per address, and every probe without a
 # credential is one.
 export MAILYARD_DATABASE_DSN="postgres://postgres:audit@localhost:$PG_PORT/audit?sslmode=disable"
@@ -51,6 +52,7 @@ export MAILYARD_AUTH_JWT_SECRET="0123456789abcdef0123456789abcdef0123456789abcde
 export MAILYARD_AUTH_LOCAL_ENABLED="true"
 export MAILYARD_AUTH_LOCAL_EMAIL="admin@example.test"
 export MAILYARD_RATELIMIT_API_PER_MINUTE="1000000"
+export MAILYARD_RATELIMIT_SESSION_PER_MINUTE="1000000"
 export MAILYARD_RATELIMIT_LOGIN_PER_MINUTE="1000000"
 export MAILYARD_METRICS_ADDR=":$((APP_PORT + 1))"
 #
