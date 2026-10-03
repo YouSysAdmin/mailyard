@@ -105,7 +105,7 @@ func TestAMessageReferencesTheTemplatesAttachment(t *testing.T) {
 				t.Fatalf("read back: %v", err)
 			}
 
-			atts, err := rehydrate(ctx, ts, bs, stored)
+			atts, err := rehydrate(ctx, ts, bs, nil, stored)
 			if err != nil {
 				t.Fatalf("rehydrate after the template went: %v", err)
 			}
@@ -233,7 +233,7 @@ func TestAReferenceToAPurgedAttachmentIsGone(t *testing.T) {
 	es := newClaimStore(t)
 	ts := templatedomain.NewStore(es.DB())
 	a := &emailmodel.Attachment{Filename: "t.pdf", TemplateAttachmentID: ids.New()}
-	_, err := LoadAttachment(t.Context(), ts, nil, filesProject, a)
+	_, err := LoadAttachment(t.Context(), ts, nil, nil, filesProject, a)
 	if !errors.Is(err, ErrAttachmentGone) {
 		t.Errorf("err = %v, want ErrAttachmentGone", err)
 	}

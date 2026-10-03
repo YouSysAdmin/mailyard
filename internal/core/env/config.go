@@ -410,6 +410,10 @@ type WorkerConfig struct {
 	// AttemptTimeout bounds one delivery attempt end to end, the
 	// failover walk included.
 	AttemptTimeout time.Duration `mapstructure:"attempt_timeout"`
+
+	// AttachmentCacheBytes bounds the memory holding template
+	// attachment content between messages. 0 turns the cache off.
+	AttachmentCacheBytes int64 `mapstructure:"attachment_cache_bytes"`
 }
 
 // SendingConfig bounds what a single send may carry.
@@ -884,6 +888,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("worker.retry_max_delay", "1h")
 	v.SetDefault("worker.claim_timeout", "15m")
 	v.SetDefault("worker.attempt_timeout", "10m")
+	v.SetDefault("worker.attachment_cache_bytes", 64<<20)
 	v.SetDefault("sending.max_recipients", 50)
 	v.SetDefault("sending.max_attachment_size", 10*1024*1024)
 	v.SetDefault("sending.max_total_attachment_size", 25*1024*1024)
@@ -1195,6 +1200,10 @@ func (c *Config) Validate() error {
 
 	if c.Worker.ClaimTimeout <= c.Worker.AttemptTimeout {
 		return fmt.Errorf("worker.claim_timeout must be longer than worker.attempt_timeout, or a running attempt is requeued and sent twice")
+	}
+
+	if c.Worker.AttachmentCacheBytes < 0 {
+		return fmt.Errorf("worker.attachment_cache_bytes must not be negative, 0 turns the cache off")
 	}
 
 	if c.Sending.MaxRecipients < 1 {

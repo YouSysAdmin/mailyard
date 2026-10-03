@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
+	"github.com/yousysadmin/mailyard/internal/core/attachcache"
 	"github.com/yousysadmin/mailyard/internal/core/audit"
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/cron"
@@ -85,6 +86,10 @@ type Runtime struct {
 	// Blob is the attachment object store. Nil means inline storage
 	// (base64 in the database).
 	Blob blob.Store
+
+	// Attachments caches template attachment content for delivery,
+	// sandbox capture and downloads. Nil loads on every read.
+	Attachments *attachcache.Cache
 
 	// SystemMail sends the platform's own mail (invitations, password
 	// resets) as a message of the project platform_mail_project names.

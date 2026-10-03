@@ -3,8 +3,6 @@
 package email
 
 import (
-	"encoding/base64"
-
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
@@ -74,12 +72,12 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 			continue
 		}
 
-		raw, err := LoadAttachment(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, rc.Project.ID, a)
+		content, err := attachmentContent(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, h.Runtime.Attachments, rc.Project.ID, a)
 		if err != nil {
 			return nil, err
 		}
 
-		a.Content = base64.StdEncoding.EncodeToString(raw)
+		a.Content = content
 	}
 
 	// Built here rather than hung off Runtime, the same way the email

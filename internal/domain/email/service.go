@@ -16,6 +16,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 
+	"github.com/yousysadmin/mailyard/internal/core/attachcache"
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/mailheader"
@@ -1024,22 +1025,61 @@ var ErrAttachmentGone = errors.New("attachment is no longer stored")
 // LoadAttachment returns the decoded bytes of one attachment of a
 // message in projID: its own inline content or blob object, or the
 // template attachment it references, deleted or not. Every reader of
-// message attachment bytes goes through here.
-func LoadAttachment(ctx context.Context, ts store.TemplateStore, bs blob.Store, projID string, a *emailmodel.Attachment) ([]byte, error) {
-	if a.TemplateAttachmentID == "" || a.Content != "" {
+// message attachment bytes goes through here or attachmentContent.
+func LoadAttachment(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, projID string, a *emailmodel.Attachment) ([]byte, error) {
+	if !isTemplateReference(a) {
 		return blob.Load(ctx, bs, a.StorageKey, a.Content, a.Filename)
 	}
 
-	ta, err := ts.GetAttachmentAny(ctx, projID, a.TemplateAttachmentID)
+	b64, err := templateAttachmentContent(ctx, ts, bs, cache, projID, a)
 	if err != nil {
 		return nil, err
 	}
 
-	if ta == nil {
-		return nil, fmt.Errorf("attachment %q: %w", a.Filename, ErrAttachmentGone)
+	return base64.StdEncoding.DecodeString(b64)
+}
+
+// attachmentContent is LoadAttachment answering base64, which is what a
+// message carries. A template reference comes from the cache.
+func attachmentContent(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, projID string, a *emailmodel.Attachment) (string, error) {
+	if isTemplateReference(a) {
+		return templateAttachmentContent(ctx, ts, bs, cache, projID, a)
 	}
 
-	return blob.Load(ctx, bs, ta.StorageKey, ta.Content, a.Filename)
+	raw, err := blob.Load(ctx, bs, a.StorageKey, a.Content, a.Filename)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(raw), nil
+}
+
+// isTemplateReference reports an attachment whose bytes are a template
+// attachment's rather than its own.
+func isTemplateReference(a *emailmodel.Attachment) bool {
+	return a.TemplateAttachmentID != "" && a.Content == ""
+}
+
+// templateAttachmentContent returns a referenced template attachment as
+// base64, through the cache. A missing row is an error and never kept.
+func templateAttachmentContent(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, projID string, a *emailmodel.Attachment) (string, error) {
+	return cache.Get(ctx, projID+"/"+a.TemplateAttachmentID, func(ctx context.Context) (string, error) {
+		ta, err := ts.GetAttachmentAny(ctx, projID, a.TemplateAttachmentID)
+		if err != nil {
+			return "", err
+		}
+
+		if ta == nil {
+			return "", fmt.Errorf("attachment %q: %w", a.Filename, ErrAttachmentGone)
+		}
+
+		raw, err := blob.Load(ctx, bs, ta.StorageKey, ta.Content, a.Filename)
+		if err != nil {
+			return "", err
+		}
+
+		return base64.StdEncoding.EncodeToString(raw), nil
+	})
 }
 
 // hasBytesElsewhere reports whether an attachment's bytes are not in

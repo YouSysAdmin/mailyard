@@ -21,6 +21,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/server"
 
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
+	"github.com/yousysadmin/mailyard/internal/core/attachcache"
 	coreaudit "github.com/yousysadmin/mailyard/internal/core/audit"
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/bell"
@@ -263,6 +264,8 @@ func runServe(cmd *cobra.Command, r role) error {
 		log.Info("attachment storage", "backend", cfg.Storage.Backend)
 	}
 
+	rt.Attachments = attachcache.New(cfg.Worker.AttachmentCacheBytes, attachcache.DefaultTTL)
+
 	rt.Sessions = sessioncache.New()
 
 	// Which SNS topics belong to a server. Cached because the SES
@@ -415,6 +418,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		AllowPrivateSMTP: cfg.Sending.AllowPrivateSMTPTargets,
 		PlatformProject:  func() string { return rt.Settings.String(smodel.KeyPlatformMailProject) },
 		Blob:             rt.Blob,
+		Attachments:      rt.Attachments,
 		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
 		RelayClient:      relayClient,
 		Notify:           func() *notify.Raiser { return rt.Notify },

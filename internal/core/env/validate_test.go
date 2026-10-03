@@ -100,3 +100,26 @@ auth:
 		t.Fatalf("local on without an email: got %v", err)
 	}
 }
+
+// The attachment cache defaults to 64 MiB, 0 turns it off, and a
+// negative size is refused.
+func TestTheAttachmentCacheSize(t *testing.T) {
+	const auth = "auth:\n  jwt_secret: 0123456789abcdef0123456789abcdef\n"
+	c, err := load(t, minimalConfig+auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c.Worker.AttachmentCacheBytes != 64<<20 {
+		t.Fatalf("default %d, want 64 MiB", c.Worker.AttachmentCacheBytes)
+	}
+
+	if _, err := load(t, minimalConfig+auth+"worker:\n  attachment_cache_bytes: 0\n"); err != nil {
+		t.Fatalf("0 must load: %v", err)
+	}
+
+	_, err = load(t, minimalConfig+auth+"worker:\n  attachment_cache_bytes: -1\n")
+	if err == nil || !strings.Contains(err.Error(), "worker.attachment_cache_bytes") {
+		t.Fatalf("negative: got %v, want it refused", err)
+	}
+}

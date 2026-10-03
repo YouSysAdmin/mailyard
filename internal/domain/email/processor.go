@@ -5,7 +5,6 @@ package email
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/attachcache"
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/dkim"
 	"github.com/yousysadmin/mailyard/internal/core/notify"
@@ -43,6 +43,10 @@ type Processor struct {
 	// Blob rehydrates offloaded and referenced attachment content at
 	// send time.
 	Blob blob.Store
+
+	// Attachments caches template attachment content, which every
+	// message of a campaign references. Nil loads per message.
+	Attachments *attachcache.Cache
 
 	// BounceAddress is sending.bounce_address, the return path for
 	// mail leaving through the SHARED POOL only - the one case where
@@ -149,7 +153,7 @@ func (p *Processor) deliver(ctx context.Context, spec transport.Spec, msg *smtpc
 
 // rehydrate returns the attachments with offloaded or referenced
 // content loaded, so the builder sees every one inline.
-func rehydrate(ctx context.Context, ts store.TemplateStore, bs blob.Store, e *emailmodel.Email) ([]emailmodel.Attachment, error) {
+func rehydrate(ctx context.Context, ts store.TemplateStore, bs blob.Store, cache *attachcache.Cache, e *emailmodel.Email) ([]emailmodel.Attachment, error) {
 	attachments := make([]emailmodel.Attachment, len(e.Attachments))
 	copy(attachments, e.Attachments)
 	for i := range attachments {
@@ -158,12 +162,12 @@ func rehydrate(ctx context.Context, ts store.TemplateStore, bs blob.Store, e *em
 			continue
 		}
 
-		raw, err := LoadAttachment(ctx, ts, bs, e.ProjectID, a)
+		content, err := attachmentContent(ctx, ts, bs, cache, e.ProjectID, a)
 		if err != nil {
 			return nil, fmt.Errorf("load attachment %q: %w", a.Filename, err)
 		}
 
-		a.Content = base64.StdEncoding.EncodeToString(raw)
+		a.Content = content
 	}
 
 	return attachments, nil
@@ -236,7 +240,7 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 
 	// A blob outage is transient - retry rather than fail the email
 	// permanently.
-	attachments, err := rehydrate(ctx, p.Store.Template, p.Blob, e)
+	attachments, err := rehydrate(ctx, p.Store.Template, p.Blob, p.Attachments, e)
 	if err != nil {
 		return queue.Retry(err)
 	}

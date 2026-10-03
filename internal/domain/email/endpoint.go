@@ -450,7 +450,7 @@ func (h *Handler) Attachment(c fiber.Ctx) error {
 	}
 
 	a := e.Attachments[idx]
-	raw, err := LoadAttachment(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, rc.Project.ID, &a)
+	raw, err := LoadAttachment(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, h.Runtime.Attachments, rc.Project.ID, &a)
 	if errors.Is(err, ErrAttachmentGone) {
 		return response.NotFound(c, "attachment content is no longer stored")
 	}
@@ -480,7 +480,7 @@ func (h *Handler) EML(c fiber.Ctx) error {
 		return response.NotFound(c, "email not found")
 	}
 
-	attachments, err := rehydrate(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, e)
+	attachments, err := rehydrate(c.Context(), h.Runtime.Store.Template, h.Runtime.Blob, h.Runtime.Attachments, e)
 	if errors.Is(err, ErrAttachmentGone) {
 		return response.NotFound(c, "attachment content is no longer stored")
 	}
