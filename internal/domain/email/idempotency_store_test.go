@@ -31,12 +31,12 @@ func TestAnIdempotencyKeyIsReservedOnce(t *testing.T) {
 	}
 
 	existing, reserved, err := s.ReserveKey(ctx, mine, "order-1")
-	if err != nil || !reserved || existing != "" {
+	if err != nil || !reserved || !existing.Pending() {
 		t.Fatalf("first reserve: %q %v %v", existing, reserved, err)
 	}
 
 	existing, reserved, err = s.ReserveKey(ctx, mine, "order-1")
-	if err != nil || reserved || existing != "" {
+	if err != nil || reserved || !existing.Pending() {
 		t.Fatalf("a duplicate while in flight: %q %v %v, want not reserved and no message", existing, reserved, err)
 	}
 
@@ -50,7 +50,7 @@ func TestAnIdempotencyKeyIsReservedOnce(t *testing.T) {
 	}
 
 	existing, reserved, err = s.ReserveKey(ctx, mine, "order-1")
-	if err != nil || reserved || existing != emailID {
+	if err != nil || reserved || existing.EmailID != emailID {
 		t.Fatalf("a replay: %q %v %v, want the message", existing, reserved, err)
 	}
 
@@ -58,7 +58,7 @@ func TestAnIdempotencyKeyIsReservedOnce(t *testing.T) {
 		t.Fatalf("release: %v", err)
 	}
 
-	if existing, _, _ := s.ReserveKey(ctx, mine, "order-1"); existing != emailID {
+	if existing, _, _ := s.ReserveKey(ctx, mine, "order-1"); existing.EmailID != emailID {
 		t.Error("releasing a completed key forgot its message")
 	}
 
@@ -74,8 +74,28 @@ func TestAnIdempotencyKeyIsReservedOnce(t *testing.T) {
 		t.Error("a released key could not be reserved again")
 	}
 
+	// A key that produced a sandbox capture replays that capture, and
+	// releasing it does not forget it.
+	if _, reserved, _ := s.ReserveKey(ctx, mine, "capture-1"); !reserved {
+		t.Fatal("reserve capture-1")
+	}
+
+	captureID := ids.New()
+	if err := s.CompleteSandboxKey(ctx, mine, "capture-1", captureID); err != nil {
+		t.Fatalf("complete sandbox key: %v", err)
+	}
+
+	if err := s.ReleaseKey(ctx, mine, "capture-1"); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+
+	held, reserved, err := s.ReserveKey(ctx, mine, "capture-1")
+	if err != nil || reserved || held.SandboxEmailID != captureID || held.EmailID != "" {
+		t.Fatalf("a sandbox replay: %+v %v %v, want the capture", held, reserved, err)
+	}
+
 	n, err := s.PruneKeysBefore(ctx, time.Now().UTC().Add(time.Hour))
-	if err != nil || n != 3 {
-		t.Errorf("pruned %d keys, want 3 (%v)", n, err)
+	if err != nil || n != 4 {
+		t.Errorf("pruned %d keys, want 4 (%v)", n, err)
 	}
 }

@@ -46,6 +46,10 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 	if want, refusal := sandboxIntent(rc, base); refusal != "" {
 		return response.BadRequest(c, refusal)
 	} else if want {
+		if denied := optInRefusal(rc); denied != "" {
+			return response.Forbidden(c, denied)
+		}
+
 		out, t, rerr := svc.RenderTemplate(c.Context(), rc.Project.ID, ref)
 		if rerr != nil {
 			return sendFailure(c, rerr)
@@ -78,9 +82,7 @@ func (h *Handler) SendTemplate(c fiber.Ctx) error {
 			return response.Internal(c, aerr)
 		}
 
-		_, cerr := h.captureSandbox(c, rc, req, in.SandboxRetentionDays)
-
-		return cerr
+		return h.captureOnce(c, rc, req, in.SandboxRetentionDays)
 	}
 
 	if req.Route, err = svc.ResolveRoute(c.Context(), rc.Project.ID, in.SMTPServerID, in.SMTPGroup); err != nil {

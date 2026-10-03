@@ -145,3 +145,16 @@ type Email struct {
 	ScheduledAt   *time.Time `json:"scheduled_at,omitempty"`
 	SentAt        *time.Time `json:"sent_at,omitempty"`
 }
+
+// KeyHolder is what an Idempotency-Key already produced: a queued
+// message or a sandbox capture. Both are empty while the request that
+// reserved the key is still running.
+type KeyHolder struct {
+	EmailID        string
+	SandboxEmailID string
+}
+
+// Pending reports that the key is reserved and has produced nothing yet.
+func (k KeyHolder) Pending() bool {
+	return k.EmailID == "" && k.SandboxEmailID == ""
+}

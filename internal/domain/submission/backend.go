@@ -207,6 +207,11 @@ type principal struct {
 	// has nowhere to put a flag, and this is one that must not be put
 	// there anyway.
 	sandbox bool
+
+	// maySandbox admits the X-Mailyard-Sandbox opt-in. An api key needs
+	// sandbox:write for it, the same as on HTTP. A submission credential
+	// carries no permission list and always may.
+	maySandbox bool
 }
 
 // session carries one SMTP connection. The principal stays set for
@@ -327,6 +332,7 @@ func (s *session) authCredential(ctx context.Context, username, password string)
 		smtpGroupID:  cred.SMTPGroupID,
 		credentialID: cred.ID,
 		sandbox:      cred.Sandbox,
+		maySandbox:   true,
 	}, nil
 }
 
@@ -374,11 +380,12 @@ func (s *session) authAPIKey(ctx context.Context, password string) (*principal, 
 	}
 
 	return &principal{
-		projectID: k.ProjectID,
-		createdBy: k.CreatedBy,
-		apiKeyID:  k.ID,
-		label:     "api key " + k.ID,
-		sandbox:   k.Sandbox,
+		projectID:  k.ProjectID,
+		createdBy:  k.CreatedBy,
+		apiKeyID:   k.ID,
+		label:      "api key " + k.ID,
+		sandbox:    k.Sandbox,
+		maySandbox: perm.ForKey(k.Permissions, k.Sandbox).Has(perm.ResourceSandbox, perm.ActionWrite),
 	}, nil
 }
 
@@ -495,6 +502,11 @@ func (s *session) Data(r io.Reader) (err error) {
 	// A sandbox opt-IN from an ordinary credential. The other
 	// direction does not exist: see headerSandbox.
 	if takeControlHeader(parsed.Headers, headerSandbox) {
+		if !s.auth.maySandbox {
+			return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 7, 1},
+				Message: "permission sandbox:write required for " + headerSandbox}
+		}
+
 		return s.capture(raw)
 	}
 

@@ -7,10 +7,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/sandbox"
+	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	sbmodel "github.com/yousysadmin/mailyard/internal/models/sandbox"
 )
 
@@ -44,16 +44,26 @@ func sandboxIntent(rc *domain.RequestContext, in *sendInput) (want bool, refusal
 	return in.Sandbox != nil && *in.Sandbox, ""
 }
 
-// captureSandbox stores req in the project sandbox and writes the
-// response. Callers check the bool: true means the request is fully
-// answered and nothing else should touch it.
+// optInRefusal answers why the caller may not capture into the
+// sandbox, or "" when it may. A capture is a sandbox write, so a caller
+// opting in per message needs sandbox:write. A sandbox key always holds
+// it, since the flag carries it.
+func optInRefusal(rc *domain.RequestContext) string {
+	if rc.Permissions.Has(perm.ResourceSandbox, perm.ActionWrite) {
+		return ""
+	}
+
+	return "permission " + string(perm.Of(perm.ResourceSandbox, perm.ActionWrite)) + " required"
+}
+
+// captureSandbox stores req in the project sandbox and returns the row.
 //
 // The message is RENDERED first, through the same builder the SMTP
 // client would have used. That costs one Build and is what makes the
 // raw view worth having - a developer sees an actual RFC 5322 message
 // with the headers we would have put on the wire, rather than a
 // pretty-printed copy of our internal struct.
-func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *SendRequest, retentionDays int) (bool, error) {
+func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *SendRequest, retentionDays int) (*sbmodel.Email, error) {
 	// Blob-backed attachments carry a storage key and no content, and
 	// only the delivery processor rehydrates them - which a capture
 	// never reaches. Without this, a template send with a configured
@@ -68,7 +78,7 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 
 		raw, err := LoadAttachment(c.Context(), h.Runtime.Blob, a)
 		if err != nil {
-			return true, response.Internal(c, err)
+			return nil, err
 		}
 
 		a.Content = base64.StdEncoding.EncodeToString(raw)
@@ -88,7 +98,7 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 	// delivery would have carried.
 	sender := NewService(h.Runtime)
 	if err := sender.withProjectDefaults(c.Context(), rc.Project.ID, req); err != nil {
-		return true, response.Internal(c, err)
+		return nil, err
 	}
 
 	msg := captureMessage(req)
@@ -101,13 +111,13 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 	// multipart/signed shape a recipient's client would see.
 	if reg := NewService(h.Runtime).registeredSender(c.Context(), rc.Project.ID, req.From); signingFor(reg, req.DisableSigning) != "" {
 		if err := signAs(c.Context(), h.Runtime.Store, rc.Project.ID, req.From, msg); err != nil {
-			return true, response.Internal(c, err)
+			return nil, err
 		}
 	}
 
 	raw, err := msg.Build()
 	if err != nil {
-		return true, response.Internal(c, err)
+		return nil, err
 	}
 
 	e, err := svc.Capture(c.Context(), &sandbox.Request{
@@ -120,14 +130,10 @@ func (h *Handler) captureSandbox(c fiber.Ctx, rc *domain.RequestContext, req *Se
 		RetentionDays: retentionDays,
 	})
 	if err != nil {
-		return true, response.Internal(c, err)
+		return nil, err
 	}
 
-	// 201 with the sandbox row, not a fake email row. A caller that
-	// treats this like a send and looks the id up in /emails would get
-	// a 404, and a shape that invited that would be worse than one
-	// that plainly says what happened.
-	return true, response.Created(c, SandboxCaptureResponse{SandboxEmail: e, Sandboxed: true})
+	return e, nil
 }
 
 // captureMessage is the message a capture renders: the same fields the

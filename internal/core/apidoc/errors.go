@@ -79,6 +79,16 @@ func OctetStream(description string) Response {
 	}
 }
 
+// PlainText is a 200 carrying bytes meant to be read as text, such as a
+// raw message shown in a browser. A client handles it like OctetStream.
+func PlainText(description string) Response {
+	return Response{
+		Status:      200,
+		Description: description,
+		ContentType: "text/plain",
+	}
+}
+
 // EventStream is a 200 that stays OPEN, pushing server-sent events.
 //
 // Declared by content type for the same reason OctetStream is: there is

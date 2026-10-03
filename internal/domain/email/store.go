@@ -740,34 +740,35 @@ func (s *Store) AcceptedSince(ctx context.Context, projID string, since time.Tim
 }
 
 // ReserveKey claims key for the request about to send. The insert
-// carries no email id yet, so a duplicate arriving while the first
-// request runs sees the row with none and is told to wait rather than
+// carries nothing produced yet, so a duplicate arriving while the first
+// request runs sees a pending holder and is told to wait rather than
 // handed a message that does not exist yet.
-func (s *Store) ReserveKey(ctx context.Context, projID, key string) (string, bool, error) {
+func (s *Store) ReserveKey(ctx context.Context, projID, key string) (emailmodel.KeyHolder, bool, error) {
+	var held emailmodel.KeyHolder
 	res, err := s.Exec(ctx, `
         INSERT INTO email_idempotency (project_id, key, email_id, created_at)
         VALUES (?, ?, NULL, ?)
         ON CONFLICT (project_id, key) DO NOTHING`, projID, key, time.Now().UTC())
 	if err != nil {
-		return "", false, err
+		return held, false, err
 	}
 
 	if n, err := res.RowsAffected(); err != nil {
-		return "", false, err
+		return held, false, err
 	} else if n > 0 {
-		return "", true, nil
+		return held, true, nil
 	}
 
-	var emailID string
-	err = s.QueryRow(ctx, `SELECT email_id FROM email_idempotency WHERE project_id = ? AND key = ?`,
-		projID, key).Scan(database.Str(&emailID))
+	err = s.QueryRow(ctx, `
+        SELECT email_id, sandbox_email_id FROM email_idempotency WHERE project_id = ? AND key = ?`,
+		projID, key).Scan(database.Str(&held.EmailID), database.Str(&held.SandboxEmailID))
 	if errors.Is(err, sql.ErrNoRows) {
 		// Released between the insert and the read: the earlier
 		// request failed. The caller tries again from the top.
-		return "", false, nil
+		return emailmodel.KeyHolder{}, false, nil
 	}
 
-	return emailID, false, err
+	return held, false, err
 }
 
 // CompleteKey records the message a reserved key produced.
@@ -778,10 +779,20 @@ func (s *Store) CompleteKey(ctx context.Context, projID, key, emailID string) er
 	return err
 }
 
+// CompleteSandboxKey records the sandbox capture a reserved key produced.
+func (s *Store) CompleteSandboxKey(ctx context.Context, projID, key, sandboxEmailID string) error {
+	_, err := s.Exec(ctx, `UPDATE email_idempotency SET sandbox_email_id = ? WHERE project_id = ? AND key = ?`,
+		sandboxEmailID, projID, key)
+
+	return err
+}
+
 // ReleaseKey gives a key back after the send it was reserved for
 // failed, so the retry that follows is not told it is a duplicate.
 func (s *Store) ReleaseKey(ctx context.Context, projID, key string) error {
-	_, err := s.Exec(ctx, `DELETE FROM email_idempotency WHERE project_id = ? AND key = ? AND email_id IS NULL`,
+	_, err := s.Exec(ctx, `
+        DELETE FROM email_idempotency
+        WHERE project_id = ? AND key = ? AND email_id IS NULL AND sandbox_email_id IS NULL`,
 		projID, key)
 
 	return err

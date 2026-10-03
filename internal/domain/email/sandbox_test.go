@@ -8,6 +8,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/domain"
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
+	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 )
 
 func ctxWithKey(sandbox bool) *domain.RequestContext {
@@ -93,5 +94,24 @@ func TestTheRefusalSaysWhatToDo(t *testing.T) {
 		if !strings.Contains(refusal, want) {
 			t.Errorf("refusal %q does not mention %q", refusal, want)
 		}
+	}
+}
+
+// Opting in per message writes to the sandbox, so it needs
+// sandbox:write. emails:write alone does not reach the sandbox.
+func TestOptingInNeedsSandboxWrite(t *testing.T) {
+	sender := &domain.RequestContext{Permissions: perm.NewSet(perm.Of(perm.ResourceEmails, perm.ActionWrite))}
+	if optInRefusal(sender) == "" {
+		t.Error("a caller without sandbox:write was let into the sandbox")
+	}
+
+	both := &domain.RequestContext{Permissions: perm.NewSet(
+		perm.Of(perm.ResourceEmails, perm.ActionWrite), perm.Of(perm.ResourceSandbox, perm.ActionWrite))}
+	if got := optInRefusal(both); got != "" {
+		t.Errorf("a caller holding sandbox:write was refused: %s", got)
+	}
+
+	if got := optInRefusal(sender); !strings.Contains(got, "sandbox:write") {
+		t.Errorf("refusal %q does not name the permission", got)
 	}
 }

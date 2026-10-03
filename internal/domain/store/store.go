@@ -742,12 +742,14 @@ type EmailStore interface {
 
 	// The Idempotency-Key ledger. ReserveKey claims a key for the
 	// request about to send and reports whether it did: when it did
-	// not, emailID is the message an earlier request queued under the
-	// key, or empty while that request is still running. CompleteKey
-	// records the message, ReleaseKey gives the key back after a send
+	// not, the holder names what an earlier request produced under the
+	// key - a message or a sandbox capture - or nothing while that
+	// request is still running. CompleteKey and CompleteSandboxKey
+	// record the result, ReleaseKey gives the key back after a send
 	// that failed, and PruneKeysBefore is the day-old sweep.
-	ReserveKey(ctx context.Context, projID, key string) (emailID string, reserved bool, err error)
+	ReserveKey(ctx context.Context, projID, key string) (held email.KeyHolder, reserved bool, err error)
 	CompleteKey(ctx context.Context, projID, key, emailID string) error
+	CompleteSandboxKey(ctx context.Context, projID, key, sandboxEmailID string) error
 	ReleaseKey(ctx context.Context, projID, key string) error
 	PruneKeysBefore(ctx context.Context, before time.Time) (int64, error)
 	CountAllByStatus(ctx context.Context) (map[string]int, error)

@@ -199,3 +199,27 @@ func TestTheProjectCapIsAppliedOnEveryCapture(t *testing.T) {
 		t.Errorf("trimmed to %d, want the configured cap of 25", st.trimmedTo)
 	}
 }
+
+// The envelope holds bare addresses whatever form the caller used, so
+// the inbox filter and the exact address match find API captures.
+func TestTheEnvelopeIsStoredAsBareAddresses(t *testing.T) {
+	svc, st := testService(t, nil)
+	if _, err := svc.Capture(t.Context(), &Request{
+		ProjectID:    "p1",
+		Source:       sbmodel.SourceAPI,
+		EnvelopeFrom: `"Acme Support" <Support@Acme.test>`,
+		Recipients:   []string{"Jane Doe <jane@example.com>", "bob@example.com"},
+		Raw:          []byte(rawMessage),
+	}); err != nil {
+		t.Fatalf("capture: %v", err)
+	}
+
+	got := st.rows[0]
+	if got.Sender != "Support@Acme.test" {
+		t.Errorf("sender = %q, want the bare address", got.Sender)
+	}
+
+	if len(got.Recipients) != 2 || got.Recipients[0] != "jane@example.com" || got.Recipients[1] != "bob@example.com" {
+		t.Errorf("recipients = %v, want bare addresses", got.Recipients)
+	}
+}

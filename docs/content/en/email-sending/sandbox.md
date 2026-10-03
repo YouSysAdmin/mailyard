@@ -48,6 +48,11 @@ The switch is **one-way**. A sandbox credential cannot ask to send for real:
 Refused rather than quietly ignored, so nobody walks away believing a message went out. An ordinary credential may still
 opt **in** for a single message, which is the direction that cannot leak real mail.
 
+Opting in writes to the sandbox, so it needs the `sandbox:write` permission like any other sandbox write. An API key
+holding only `emails:write` that sets `"sandbox": true` is answered `403 permission sandbox:write required`, and over
+SMTP an API key without it that sets `X-Mailyard-Sandbox` is refused with `550 5.7.1`. A submission credential carries
+no permission list and may always opt in.
+
 ## Creating a sandbox credential
 
 Either kind works, and both are created the same way as their live counterparts:
@@ -113,14 +118,14 @@ Inboxes are sandbox configuration and are gated on the same permissions as the c
 
 ## How long a message is kept
 
-Two limits, and the second is the one that matters in practice.
+Two limits, and the second is the one that matters in practice. A sandbox belongs to a project, so both are decided by
+the project's plan and the project itself. The platform settings are only the default for a project that has not
+chosen and a plan that says nothing.
 
-| Setting                  | Default | Meaning                                        |
-|--------------------------|---------|------------------------------------------------|
-| `sandbox_retention_days` | `7`     | Days before a captured message expires         |
-| `sandbox_max_messages`   | `500`   | How many a project keeps, oldest dropped first |
-
-Both are platform settings, under **Admin -> Settings**.
+| Limit          | Decided by                                                                                                                                                                                               |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Retention      | The project's `sandbox_retention_days` (project settings), never longer than the plan's `max_sandbox_retention_days`. A longer value is clamped to the plan's ceiling on save. Unset, the platform setting `sandbox_retention_days` (default `7`) applies. |
+| Message cap    | The plan's `max_sandbox_messages`, oldest dropped first. Unset, the platform setting `sandbox_max_messages` (default `500`) applies.                                                                     |
 
 The day window alone does not bound anything useful: a test suite can write ten thousand messages in a morning, and a
 seven-day window does nothing about that until day seven. The per-project cap is what actually holds the table down, and
@@ -148,10 +153,10 @@ Over SMTP the same thing rides on a header:
 X-Mailyard-Sandbox-Retention: 1
 ```
 
-A value longer than the platform window is clamped down to it rather than refused, so no application can pin a project's
-sandbox open against the operator's setting.
+A value longer than the project's window is clamped down to it rather than refused, so no application can pin a
+project's sandbox open against its plan.
 
-Changing `sandbox_retention_days` governs **new** messages. What is already captured keeps the expiry it was given, so a
+Changing the retention window governs **new** messages. What is already captured keeps the expiry it was given, so a
 settings change cannot delete a message somebody is in the middle of reading.
 
 ## Sending into the sandbox
@@ -233,11 +238,18 @@ The response is a `201` carrying the sandbox row rather than an email row:
 Deliberately not shaped like a send: the id belongs to the sandbox, and looking it up under `/api/v1/emails` returns
 `404`. A response that invited that mistake would be worse than one that plainly says what happened.
 
+`sender` and `recipients` are the envelope, and hold bare addresses: a `from` of `"Acme" <noreply@example.com>` is
+stored as `noreply@example.com`, exactly as a submission over SMTP would be, so inbox filters and `match=exact` find it.
+The display name is in the `From` header of the raw message.
+
+An `Idempotency-Key` header works as on a real send: a retry carrying the same key answers `200` with the capture the
+first request stored and `replayed: true`, instead of storing a second one.
+
 A template send is **rendered first** and then captured, so what you read is what the template produced for that data -
 placeholders resolved, template attachments included.
 
 {{< callout type="note" title="Batch is not supported" >}}
-`POST /api/v1/emails/batch` refuses a sandbox key with a `400` rather than falling through to a real send. Send the
+`POST /api/v1/emails/batch` refuses a sandbox key with a `403` rather than falling through to a real send. Send the
 items individually.
 {{< /callout >}}
 

@@ -74,7 +74,7 @@ func ConsoleDocs() []apidoc.Route {
 			Summary:     "Raw",
 			Description: "Needs the `sandbox:read` permission.",
 			PathParams:  []apidoc.Param{{Name: "id"}},
-			Responses:   []apidoc.Response{apidoc.OctetStream("The captured wire bytes, exactly as submitted.")},
+			Responses:   []apidoc.Response{apidoc.PlainText("The captured wire bytes, exactly as submitted, as text/plain.")},
 		},
 		{
 			Method:      "POST",

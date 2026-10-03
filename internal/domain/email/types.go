@@ -390,4 +390,9 @@ type VerifyResponse struct {
 type SandboxCaptureResponse struct {
 	SandboxEmail *sandboxmodel.Email `json:"sandbox_email"`
 	Sandboxed    bool                `json:"sandboxed"`
+
+	// Replayed says this is the capture an earlier request with the
+	// same Idempotency-Key produced, answered again rather than stored
+	// again.
+	Replayed bool `json:"replayed,omitzero"`
 }

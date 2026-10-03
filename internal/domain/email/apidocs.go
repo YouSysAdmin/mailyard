@@ -34,10 +34,12 @@ func APIDocs() []apidoc.Route {
 				"`{\"sandbox_email\": {...}, \"sandboxed\": true}` - because the " +
 				"message was captured rather than queued. OpenAPI carries one " +
 				"schema per status, so that shape is named here rather than " +
-				"listed above. " +
+				"listed above. An ordinary credential may set `sandbox: true` to capture one " +
+				"message, which needs the `sandbox:write` permission and answers 403 without it. " +
 				"An `Idempotency-Key` header, up to 255 characters and scoped to the project, " +
 				"makes a retry safe: a second request carrying the same key answers 200 with " +
-				"the message the first one queued and `replayed: true`, a duplicate arriving " +
+				"what the first one produced - the message it queued, or the capture it stored - " +
+				"and `replayed: true`, a duplicate arriving " +
 				"while the first is still running answers 409, and the key is forgotten after " +
 				"a day. A request that fails releases its key.",
 			Request: sendInput{},
@@ -58,7 +60,8 @@ func APIDocs() []apidoc.Route {
 				"`headers` behaves as on /emails/send. " +
 				"A SANDBOX credential answers 201 with " +
 				"`{\"sandbox_email\": {...}, \"sandboxed\": true}` instead, for the " +
-				"reason given on /emails/send.",
+				"reason given on /emails/send. `sandbox: true` and `Idempotency-Key` behave " +
+				"as on /emails/send.",
 			Request: templateSendInput{},
 			Responses: []apidoc.Response{
 				apidoc.Created("Queued.", SendResponse{}),

@@ -5,6 +5,8 @@ package sandbox
 import (
 	"context"
 	"log/slog"
+	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -82,8 +84,8 @@ func (s *Service) Capture(ctx context.Context, req *Request) (*sbmodel.Email, er
 		CredentialID: req.CredentialID,
 		APIKeyID:     req.APIKeyID,
 		ClientIP:     req.ClientIP,
-		Sender:       req.EnvelopeFrom,
-		Recipients:   req.Recipients,
+		Sender:       bareAddress(req.EnvelopeFrom),
+		Recipients:   bareAddresses(req.Recipients),
 		Raw:          req.Raw,
 		Size:         int64(len(req.Raw)),
 		ExpiresAt:    s.expiryFor(ctx, req.ProjectID, now, req.RetentionDays),
@@ -146,6 +148,36 @@ func (s *Service) Capture(ctx context.Context, req *Request) (*sbmodel.Email, er
 	}
 
 	return e, nil
+}
+
+// bareAddress reduces a mailbox ("Name <addr>") to its address, which
+// is what an envelope holds and what the address filters compare. A
+// value that does not parse is kept as given, trimmed.
+func bareAddress(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+
+	if a, err := mail.ParseAddress(v); err == nil {
+		return a.Address
+	}
+
+	return v
+}
+
+// bareAddresses is bareAddress over an envelope recipient list.
+func bareAddresses(list []string) []string {
+	if list == nil {
+		return nil
+	}
+
+	out := make([]string, 0, len(list))
+	for _, v := range list {
+		out = append(out, bareAddress(v))
+	}
+
+	return out
 }
 
 // keepFor is the ring buffer for this project: the plan's cap, falling

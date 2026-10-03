@@ -84,8 +84,8 @@ func (s *Store) Raw(ctx context.Context, projID, id string) ([]byte, error) {
 // and the total beside it cannot disagree about what is in the set.
 //
 // lower() on the column rather than on the parameter: an inbox stores
-// its addresses lowercased already, and the envelope sender was written
-// exactly as the client said it. A text[] parameter, not an IN list, so
+// its addresses lowercased already, and the envelope sender is the bare
+// address in whatever case the client wrote it. A text[] parameter, not an IN list, so
 // the statement text is one constant whatever the list's length.
 const senderIn = ` AND lower(e.sender) = ANY(?::text[])`
 

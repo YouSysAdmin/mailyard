@@ -52,6 +52,10 @@ func (h *Handler) Send(c fiber.Ctx) error {
 	if want, refusal := sandboxIntent(rc, &in); refusal != "" {
 		return response.BadRequest(c, refusal)
 	} else if want {
+		if denied := optInRefusal(rc); denied != "" {
+			return response.Forbidden(c, denied)
+		}
+
 		// The message half of Validate still applies: a capture is a
 		// message the builder is handed, and the sandbox is not a way
 		// around a line break in a header or the attachment ceiling.
@@ -72,9 +76,7 @@ func (h *Handler) Send(c fiber.Ctx) error {
 			})
 		}
 
-		_, err := h.captureSandbox(c, rc, req, in.SandboxRetentionDays)
-
-		return err
+		return h.captureOnce(c, rc, req, in.SandboxRetentionDays)
 	}
 
 	// Resolved before validation so an unknown group is a 400 naming
@@ -119,6 +121,17 @@ func (h *Handler) Send(c fiber.Ctx) error {
 // minted, and anything longer than this is a body in a header.
 const maxIdempotencyKey = 255
 
+// idempotencyKey reads the request's Idempotency-Key, trimmed. The
+// refusal is non-empty when the key is too long.
+func idempotencyKey(c fiber.Ctx) (key, refusal string) {
+	key = strings.TrimSpace(c.Get("Idempotency-Key"))
+	if len(key) > maxIdempotencyKey {
+		return "", "Idempotency-Key must be at most 255 characters"
+	}
+
+	return key, ""
+}
+
 // sendOnce runs send under the request's Idempotency-Key, when it
 // carries one.
 //
@@ -129,9 +142,9 @@ const maxIdempotencyKey = 255
 // a 4xx is a corrected request, not a duplicate. Scoped to the
 // project, the way every send resource is.
 func (h *Handler) sendOnce(c fiber.Ctx, rc *domain.RequestContext, send func() (*emailmodel.Email, []string, error)) error {
-	key := strings.TrimSpace(c.Get("Idempotency-Key"))
-	if len(key) > maxIdempotencyKey {
-		return response.BadRequest(c, "Idempotency-Key must be at most 255 characters")
+	key, refusal := idempotencyKey(c)
+	if refusal != "" {
+		return response.BadRequest(c, refusal)
 	}
 
 	if key == "" {
@@ -144,33 +157,18 @@ func (h *Handler) sendOnce(c fiber.Ctx, rc *domain.RequestContext, send func() (
 	}
 
 	keys := h.Runtime.Store.Email
-	existing, reserved, err := keys.ReserveKey(c.Context(), rc.Project.ID, key)
+	held, reserved, err := keys.ReserveKey(c.Context(), rc.Project.ID, key)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
 	if !reserved {
-		if existing == "" {
-			return response.Conflict(c, "a request with this Idempotency-Key is still being processed")
-		}
-
-		e, err := keys.Get(c.Context(), rc.Project.ID, existing)
-		if err != nil {
-			return response.Internal(c, err)
-		}
-
-		if e == nil {
-			return response.Gone(c, "the message this Idempotency-Key produced is no longer in the log")
-		}
-
-		return response.Success(c, SendResponse{Email: e, Suppressed: emptyIfNil(nil), Replayed: true})
+		return h.replay(c, rc, held)
 	}
 
 	e, blocked, err := send()
 	if err != nil {
-		if rerr := keys.ReleaseKey(c.Context(), rc.Project.ID, key); rerr != nil {
-			h.Runtime.Log.Warn("email: releasing an idempotency key", "error", rerr)
-		}
+		h.releaseKey(c, rc, key)
 
 		return sendFailure(c, err)
 	}
@@ -180,6 +178,86 @@ func (h *Handler) sendOnce(c fiber.Ctx, rc *domain.RequestContext, send func() (
 	}
 
 	return response.Created(c, SendResponse{Email: e, Suppressed: emptyIfNil(blocked)})
+}
+
+// captureOnce is sendOnce for a sandboxed send: the same ledger, with
+// the capture recorded against the key instead of a message.
+func (h *Handler) captureOnce(c fiber.Ctx, rc *domain.RequestContext, req *SendRequest, retentionDays int) error {
+	key, refusal := idempotencyKey(c)
+	if refusal != "" {
+		return response.BadRequest(c, refusal)
+	}
+
+	if key == "" {
+		e, err := h.captureSandbox(c, rc, req, retentionDays)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		return response.Created(c, SandboxCaptureResponse{SandboxEmail: e, Sandboxed: true})
+	}
+
+	keys := h.Runtime.Store.Email
+	held, reserved, err := keys.ReserveKey(c.Context(), rc.Project.ID, key)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !reserved {
+		return h.replay(c, rc, held)
+	}
+
+	e, err := h.captureSandbox(c, rc, req, retentionDays)
+	if err != nil {
+		h.releaseKey(c, rc, key)
+
+		return response.Internal(c, err)
+	}
+
+	if cerr := keys.CompleteSandboxKey(c.Context(), rc.Project.ID, key, e.ID); cerr != nil {
+		h.Runtime.Log.Warn("email: completing an idempotency key", "error", cerr)
+	}
+
+	return response.Created(c, SandboxCaptureResponse{SandboxEmail: e, Sandboxed: true})
+}
+
+// replay answers a request whose Idempotency-Key was already reserved:
+// wait while the first request runs, else what it produced.
+func (h *Handler) replay(c fiber.Ctx, rc *domain.RequestContext, held emailmodel.KeyHolder) error {
+	if held.Pending() {
+		return response.Conflict(c, "a request with this Idempotency-Key is still being processed")
+	}
+
+	if held.SandboxEmailID != "" {
+		sb, err := h.Runtime.Store.Sandbox.Get(c.Context(), rc.Project.ID, held.SandboxEmailID)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if sb == nil {
+			return response.Gone(c, "the capture this Idempotency-Key produced is no longer in the sandbox")
+		}
+
+		return response.Success(c, SandboxCaptureResponse{SandboxEmail: sb, Sandboxed: true, Replayed: true})
+	}
+
+	e, err := h.Runtime.Store.Email.Get(c.Context(), rc.Project.ID, held.EmailID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if e == nil {
+		return response.Gone(c, "the message this Idempotency-Key produced is no longer in the log")
+	}
+
+	return response.Success(c, SendResponse{Email: e, Suppressed: emptyIfNil(nil), Replayed: true})
+}
+
+// releaseKey gives a reserved key back after a failed send.
+func (h *Handler) releaseKey(c fiber.Ctx, rc *domain.RequestContext, key string) {
+	if err := h.Runtime.Store.Email.ReleaseKey(c.Context(), rc.Project.ID, key); err != nil {
+		h.Runtime.Log.Warn("email: releasing an idempotency key", "error", err)
+	}
 }
 
 // maxAttachmentsPerEmail mirrors the max=10 on sendInput.Attachments.
