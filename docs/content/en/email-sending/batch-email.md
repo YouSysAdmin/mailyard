@@ -134,8 +134,8 @@ The whole batch counts against your [sending quota](/docs/analytics/dashboard), 
 100 of the hourly allowance, and an item refused by the quota reports that in its own `error`.
 
 {{< callout type="warning" title="A sandbox key cannot send a batch" >}}
-Batch is refused outright on a [sandbox](/docs/email-sending/sandbox) credential, with a `400` telling you to send the
-items individually.
+Batch is refused outright on a [sandbox](/docs/email-sending/sandbox) credential, with a `403` telling you it reaches
+only `/emails/send` and `/emails/send-template` - send the items individually.
 
 The alternative would be worse: batch does not capture, so falling through would deliver for real on the one credential
 an operator handed out specifically so it could not — and it would look like success while doing it.

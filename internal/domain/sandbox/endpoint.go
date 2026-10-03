@@ -261,15 +261,11 @@ func (h *Handler) Clear(c fiber.Ctx) error {
 func (h *Handler) Info(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	cfg := h.Runtime.Config.Submission
-	host := cfg.Hostname
-	if host == "" {
-		host = "localhost"
-	}
 
 	return response.Success(c, SettingsResponse{
 		Submission: SubmissionInfo{
 			Enabled:  cfg.Enabled,
-			Host:     host,
+			Host:     h.Runtime.Config.SubmissionHost(),
 			Addr:     cfg.Addr,
 			STARTTLS: cfg.TLS.Enabled,
 		},
