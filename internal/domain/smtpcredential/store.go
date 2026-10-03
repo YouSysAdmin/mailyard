@@ -77,7 +77,9 @@ func (s *Store) List(ctx context.Context, projID string) ([]*scmodel.Credential,
 }
 
 // Put inserts the SMTP credential, or updates the row when its id
-// already exists.
+// already exists. An update leaves sandbox and revoked alone: the first
+// is fixed at creation and the second is written by Revoke only, so a
+// concurrent edit cannot undo a revoke.
 func (s *Store) Put(ctx context.Context, c *scmodel.Credential) error {
 	if c.CreatedAt.IsZero() {
 		c.CreatedAt = time.Now().UTC()
@@ -89,11 +91,9 @@ func (s *Store) Put(ctx context.Context, c *scmodel.Credential) error {
             allowed_ips, smtp_group_id, sandbox, revoked, last_used_at, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
-            name        = excluded.name,
+            name          = excluded.name,
             allowed_ips   = excluded.allowed_ips,
-            smtp_group_id = excluded.smtp_group_id,
-            sandbox       = excluded.sandbox,
-            revoked     = excluded.revoked
+            smtp_group_id = excluded.smtp_group_id
     `,
 		c.ID, c.ProjectID, c.CreatedBy, c.Name, c.Username, c.PasswordHash,
 		database.MustJSON(c.AllowedIPs), database.NullStr(c.SMTPGroupID), c.Sandbox, c.Revoked,

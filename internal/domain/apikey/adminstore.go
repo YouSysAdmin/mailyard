@@ -76,7 +76,8 @@ func (s *AdminStore) List(ctx context.Context) ([]*akmodel.Admin, error) {
 }
 
 // Put inserts the API key, or updates the row when its id already
-// exists.
+// exists. An update leaves revoked alone, which Revoke alone writes,
+// so a concurrent edit cannot undo a revoke.
 func (s *AdminStore) Put(ctx context.Context, k *akmodel.Admin) error {
 	if k.CreatedAt.IsZero() {
 		k.CreatedAt = time.Now().UTC()
@@ -90,7 +91,6 @@ func (s *AdminStore) Put(ctx context.Context, k *akmodel.Admin) error {
         ON CONFLICT(id) DO UPDATE SET
             name        = excluded.name,
             allowed_ips = excluded.allowed_ips,
-            revoked     = excluded.revoked,
             expires_at  = excluded.expires_at
     `,
 		k.ID, k.CreatedBy, k.Name, k.KeyHash, k.KeyPrefix,

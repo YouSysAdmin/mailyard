@@ -201,6 +201,16 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	// Read back, so a revoke that landed meanwhile is what the caller sees.
+	cred, err = h.Runtime.Store.SMTPCredential.Get(c.Context(), rc.Project.ID, cred.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if cred == nil {
+		return response.NotFound(c, "smtp credential not found")
+	}
+
 	return response.Success(c, CredentialResponse{SMTPCredential: cred})
 }
 

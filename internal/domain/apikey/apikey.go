@@ -79,7 +79,9 @@ func (s *Store) List(ctx context.Context, projID string) ([]*akmodel.Key, error)
 }
 
 // Put inserts the API key, or updates the row when its id already
-// exists.
+// exists. An update leaves sandbox and revoked alone: the first is
+// fixed at creation and the second is written by Revoke only, so a
+// concurrent edit cannot undo a revoke.
 func (s *Store) Put(ctx context.Context, k *akmodel.Key) error {
 	if k.CreatedAt.IsZero() {
 		k.CreatedAt = time.Now().UTC()
@@ -94,8 +96,6 @@ func (s *Store) Put(ctx context.Context, k *akmodel.Key) error {
             name        = excluded.name,
             permissions = excluded.permissions,
             allowed_ips = excluded.allowed_ips,
-            sandbox     = excluded.sandbox,
-            revoked     = excluded.revoked,
             expires_at  = excluded.expires_at
     `,
 		k.ID, k.ProjectID, k.CreatedBy, k.Name, k.KeyHash, k.KeyPrefix,

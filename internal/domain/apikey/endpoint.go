@@ -209,6 +209,16 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
+	// Read back, so a revoke that landed meanwhile is what the caller sees.
+	k, err = h.Runtime.Store.APIKey.Get(c.Context(), rc.Project.ID, k.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if k == nil {
+		return response.NotFound(c, "api key not found")
+	}
+
 	return response.Success(c, APIKeyResponse{APIKey: k})
 }
 
