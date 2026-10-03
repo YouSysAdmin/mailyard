@@ -617,7 +617,17 @@ type ServerConfig struct {
 	// body is sending.max_total_attachment_size inflated for base64 -
 	// around 34 MB at the default. The default connection ceiling makes
 	// the product of those two numbers unbounded in practice.
+	//
+	// Past it a request is refused with 503 in the JSON envelope, and
+	// the probes are never refused. The HTTP library's own connection
+	// ceiling sits a quarter above it as a backstop.
 	MaxConcurrentRequests int `mapstructure:"max_concurrent_requests"`
+
+	// MaxConcurrentPerIP caps the requests one caller has in progress at
+	// once, refused past it with 429. 0 turns it off. The caller is the
+	// address internal/core/clientip resolves, so behind a proxy it
+	// needs trusted_proxies set or every caller is the proxy.
+	MaxConcurrentPerIP int `mapstructure:"max_concurrent_per_ip"`
 }
 
 // DatabaseConfig is the PostgreSQL connection and the key that seals
@@ -804,6 +814,7 @@ func Load(path string) (*Config, error) {
 	// fasthttp's 262144 - the point is that the worst case is a number
 	// rather than whatever the kernel allows.
 	v.SetDefault("server.max_concurrent_requests", 4096)
+	v.SetDefault("server.max_concurrent_per_ip", 256)
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "json")
 	v.SetDefault("logging.output", "stdout")
@@ -1147,6 +1158,10 @@ func (c *Config) Validate() error {
 
 	if c.Server.MaxConcurrentRequests < 0 {
 		return fmt.Errorf("server.max_concurrent_requests cannot be negative - 0 means the fasthttp default")
+	}
+
+	if c.Server.MaxConcurrentPerIP < 0 {
+		return fmt.Errorf("server.max_concurrent_per_ip cannot be negative - 0 turns the per-caller cap off")
 	}
 
 	if c.Metrics.Enabled {

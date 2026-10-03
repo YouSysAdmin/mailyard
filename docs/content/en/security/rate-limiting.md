@@ -85,6 +85,15 @@ has already answered `250` at the SMTP layer, so a refusal loses a message the s
 filtering belongs on the node, in `relay_node.inbound.rate_per_minute`.
 {{< /callout >}}
 
+## Requests in Progress
+
+Separate from the per-minute budgets above, two settings bound how many requests are being handled at once:
+`server.max_concurrent_requests` (default `4096`) for the whole node, answered `503` past it, and
+`server.max_concurrent_per_ip` (default `256`) for one caller, answered `429`. Both refusals use the JSON error envelope
+and carry `Retry-After: 1`. The probes, `/healthz` and `/readyz`, are never refused, so a node at its ceiling still
+answers its orchestrator. A request naming no credential has 30 seconds to arrive, body included, so a stranger cannot
+hold a slot by sending a body a byte at a time. See [Configuration](/docs/getting-started/configuration#server).
+
 ## SMTP Listener Limits
 
 Separate from the table above and configured where each listener is declared. Both count **new sessions per client IP

@@ -29,8 +29,13 @@ server:
   # request body is read into memory before auth or the rate limiter
   # can refuse it, and the body cap is ~34 MB at the defaults, so an
   # unbounded connection count is an unbounded process. 0 leaves the
-  # HTTP library's own ceiling of 262144.
+  # HTTP library's own ceiling of 262144. Past it a request answers 503
+  # in the JSON envelope, and /healthz and /readyz are never refused.
   max_concurrent_requests: 4096
+  # Requests one caller may have in progress at once, refused with 429
+  # past it. 0 turns it off. Behind a proxy, set trusted_proxies, or
+  # every caller is the proxy and shares this one budget.
+  max_concurrent_per_ip: 256
   # Whether TLS is terminated HERE. WHICH certificate is served is not
   # configured in this file at all - it is assigned in the console,
   # under Administration -> Certificates, and stored in the database so

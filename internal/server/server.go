@@ -134,8 +134,10 @@ func New(opts Options) (*Server, error) {
 		// A request body is read into memory BEFORE the handler chain
 		// runs, so neither auth nor the rate limiter can refuse one
 		// first. This is the only bound on how many of those exist at
-		// once - see env.ServerConfig.MaxConcurrentRequests.
-		Concurrency: concurrencyFor(opts.Runtime.Config),
+		// once - see env.ServerConfig.MaxConcurrentRequests. Set above
+		// the request limit admission enforces, so the plain-text wall
+		// here is the backstop and not what a caller meets first.
+		Concurrency: connectionCeiling(opts.Runtime.Config.Server.MaxConcurrentRequests),
 
 		// 8 KiB rather than fasthttp's 4 KiB. Our own session cookie is
 		// a 369-byte JWT, and it arrives alongside whatever else the
@@ -206,20 +208,12 @@ func New(opts Options) (*Server, error) {
 		streamingPaths...,
 	))
 	app.Use(requestContext(opts.Runtime, resolver))
+	app.Use(newAdmission(opts.Runtime.Config.Server.MaxConcurrentRequests,
+		opts.Runtime.Config.Server.MaxConcurrentPerIP).handler)
 
 	registerRoutes(app, opts.Runtime, opts.HealthOnly)
 
 	return &Server{app: app, rt: opts.Runtime, tlsCfg: opts.TLS}, nil
-}
-
-// concurrencyFor turns the operator's cap into what fasthttp wants,
-// where 0 means "use the library default" in both places.
-func concurrencyFor(cfg *env.Config) int {
-	if cfg.Server.MaxConcurrentRequests <= 0 {
-		return 0
-	}
-
-	return cfg.Server.MaxConcurrentRequests
 }
 
 // streamWriteTimeout is the write deadline for the endpoints that stream.
@@ -280,12 +274,17 @@ func perRequestLimits(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		uri = uri[:i]
 	}
 
+	credential := carriesCredential(h)
 	limit := bodyLimitForPath(uri)
-	if limit == 0 && !carriesCredential(h) {
+	if limit == 0 && !credential {
 		limit = apiBodyLimit
 	}
 
 	cfg := fasthttp.RequestConfig{MaxRequestBodySize: limit}
+	if !credential {
+		cfg.ReadTimeout = uncredentialedReadTimeout
+	}
+
 	if isStreamingPath(uri) {
 		cfg.WriteTimeout = streamWriteTimeout
 	}

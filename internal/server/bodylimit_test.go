@@ -66,9 +66,19 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 		t.Errorf("perRequestLimits with no credential = %d, want apiBodyLimit", got)
 	}
 
+	// A stranger's request may not trickle in for the full server read
+	// timeout.
+	if got := perRequestLimits(&h).ReadTimeout; got != uncredentialedReadTimeout {
+		t.Errorf("read timeout with no credential = %v, want %v", got, uncredentialedReadTimeout)
+	}
+
 	h.SetCookie("mailyard_session", "x")
 	if got := perRequestLimits(&h).MaxRequestBodySize; got != 0 {
 		t.Errorf("perRequestLimits with a session cookie = %d, want the server's limit", got)
+	}
+
+	if got := perRequestLimits(&h).ReadTimeout; got != 0 {
+		t.Errorf("read timeout with a credential = %v, want the server's own", got)
 	}
 }
 
