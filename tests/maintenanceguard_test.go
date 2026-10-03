@@ -146,9 +146,6 @@ func TestSignInCeremoniesIgnoreMaintenanceMode(t *testing.T) {
 		"Post /auth/login":                  true,
 		"Post /auth/logout":                 true,
 		"Post /auth/password-reset/request": true,
-		"Post /auth/password-reset/confirm": true,
-		"Post /auth/register":               true,
-		"Post /auth/verify-email":           true,
 		"Post /auth/verify-email/resend":    true,
 		"Post /auth/passkey/login/begin":    true,
 		"Post /auth/passkey/login/finish":   true,
@@ -168,11 +165,37 @@ func TestSignInCeremoniesIgnoreMaintenanceMode(t *testing.T) {
 		}
 	}
 
-	// Registration is conditional on the operator opting in, so it may be
-	// absent. The rest are unconditional, so a low count means the names
-	// above have drifted from routes.go.
-	if seen < len(open)-1 {
+	if seen < len(open) {
 		t.Errorf("recognised %d of the %d open ceremonies - the path list has drifted from routes.go",
 			seen, len(open))
+	}
+}
+
+// The open routes that write account rows without signing anybody in
+// are parked like any other write. None of them is how an administrator
+// reaches the switch, and each would race a migration on users.
+func TestOpenAccountWritesHonourMaintenanceMode(t *testing.T) {
+	parked := map[string]bool{
+		"Post /auth/password-reset/confirm": true,
+		"Post /auth/register":               true,
+		"Post /auth/verify-email":           true,
+	}
+
+	var seen int
+	for _, r := range consoleMutations(t) {
+		if !parked[r.what] {
+			continue
+		}
+
+		seen++
+
+		if !r.maintenance {
+			t.Errorf("%s writes account rows with no maintenanceMode(rt)", r.what)
+		}
+	}
+
+	if seen != len(parked) {
+		t.Errorf("recognised %d of the %d open account writes - the path list has drifted from routes.go",
+			seen, len(parked))
 	}
 }

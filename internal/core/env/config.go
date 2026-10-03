@@ -186,6 +186,11 @@ type RateLimitConfig struct {
 	// presenting no usable token).
 	APIPerMinute int `mapstructure:"api_per_minute"`
 
+	// SessionPerMinute caps /api/v1 per signed-in console session. The
+	// console makes several calls per page and refreshes on a timer, so
+	// a person browsing it needs more room than an integration does.
+	SessionPerMinute int `mapstructure:"session_per_minute"`
+
 	// The three below govern endpoints whose rate is set by somebody
 	// else's software rather than by a person at a keyboard, which is
 	// why they are an order of magnitude higher than the ones above.
@@ -926,6 +931,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("ratelimit.login_per_minute", 10)
 	v.SetDefault("ratelimit.oidc_per_minute", 30)
 	v.SetDefault("ratelimit.api_per_minute", 120)
+	v.SetDefault("ratelimit.session_per_minute", 600)
 	v.SetDefault("ratelimit.ses_webhook_per_minute", 600)
 	v.SetDefault("ratelimit.relay_node_chatter_per_minute", 600)
 	v.SetDefault("ratelimit.relay_node_inbound_per_minute", 1200)
@@ -1264,7 +1270,7 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	if c.RateLimit.LoginPerMinute < 0 || c.RateLimit.OIDCPerMinute < 0 || c.RateLimit.APIPerMinute < 0 ||
+	if c.RateLimit.LoginPerMinute < 0 || c.RateLimit.OIDCPerMinute < 0 || c.RateLimit.APIPerMinute < 0 || c.RateLimit.SessionPerMinute < 0 ||
 		c.RateLimit.SESWebhookPerMinute < 0 || c.RateLimit.RelayNodeChatterPerMinute < 0 ||
 		c.RateLimit.RelayNodeInboundPerMinute < 0 {
 		return fmt.Errorf("ratelimit values must not be negative (use 0 to disable an individual limit)")

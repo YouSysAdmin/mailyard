@@ -140,24 +140,29 @@ const AuthHeader = "X-Mailyard-Auth"
 //
 // Charged only on 401. A wrong credential costs the IP budget, an
 // internal error does not (a database blip would otherwise lock out
-// every caller), and a working credential is never charged.
+// every caller), and a working credential is never charged and never
+// refused: the budget answers 429 to the rejected attempts past it and
+// to nothing else, so a stranger guessing from a shared address cannot
+// lock out the credentials that work from it.
 func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 	// Charge the budget when the helper answered 401 and nothing else.
 	// The response helpers write the status and return nil, so the
 	// status IS the discriminator - there is no error to inspect.
-	charge := func(c fiber.Ctx) {
-		if c.Response().StatusCode() == fiber.StatusUnauthorized {
-			authFailures.Allow(clientip.From(c))
+	refuse := func(c fiber.Ctx, resp error) error {
+		if c.Response().StatusCode() != fiber.StatusUnauthorized {
+			return resp
 		}
-	}
 
-	return func(c fiber.Ctx) error {
-		if authFailures.Exceeded(clientip.From(c)) {
+		if !authFailures.Allow(clientip.From(c)) {
 			slog.Warn("apikey: authentication budget exhausted", "client_ip", clientip.From(c))
 
 			return response.TooManyRequests(c, "too many failed authentication attempts")
 		}
 
+		return resp
+	}
+
+	return func(c fiber.Ctx) error {
 		// The prefix decides, not the presence of a header. A bearer
 		// that is not a key falls through to the session path and is
 		// parsed as a JWT, which is what a CLI passing its session
@@ -165,9 +170,7 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 		switch raw := bearerToken(c); {
 		case strings.HasPrefix(raw, akmodel.AdminPrefix):
 			if ok, resp := stampAdminKey(c, rt); !ok {
-				charge(c)
-
-				return resp
+				return refuse(c, resp)
 			}
 
 			c.Set(AuthHeader, "admin-key")
@@ -186,9 +189,7 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 			return c.Next()
 		case strings.HasPrefix(raw, akmodel.Prefix):
 			if ok, resp := stampAPIKey(c, rt); !ok {
-				charge(c)
-
-				return resp
+				return refuse(c, resp)
 			}
 
 			c.Set(AuthHeader, "api-key")
@@ -197,9 +198,7 @@ func machineAuth(rt *env.Runtime, authFailures *iplimit.Limiter) fiber.Handler {
 		}
 
 		if ok, resp := stampSession(c, rt); !ok {
-			charge(c)
-
-			return resp
+			return refuse(c, resp)
 		}
 
 		c.Set(AuthHeader, "session")

@@ -175,13 +175,17 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// of signing in, and vice versa. Mail flooding is capped
 	// separately per account inside the handler.
 	appAPI.Post("/auth/password-reset/request", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.PasswordResetRequest)
-	appAPI.Post("/auth/password-reset/confirm", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.PasswordResetConfirm)
+	// Confirming a reset, registering and confirming an address write
+	// account rows, so they are parked with the rest of the writes.
+	// Signing in is not, since that is how an administrator reaches the
+	// switch.
+	appAPI.Post("/auth/password-reset/confirm", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), maintenanceMode(rt), requireJSONBody, ah.PasswordResetConfirm)
 	// Self-signup. Registered only when the operator opted in, so on
 	// the default config the route does not exist at all. Login-tier
 	// rate limit: the endpoint answers whether an address has an
 	// account, and the limiter is what keeps that oracle slow.
 	if rt.Config.Auth.RegistrationEnabled && rt.Config.Auth.Local.Enabled && !rt.Config.Auth.Disabled {
-		appAPI.Post("/auth/register", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.Register)
+		appAPI.Post("/auth/register", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), maintenanceMode(rt), requireJSONBody, ah.Register)
 	}
 
 	// Signup verification. Registered even when signup itself has been
@@ -189,7 +193,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// be able to confirm its link. Both handlers self-check the
 	// feature state and answer uniformly, the limiter keeps the
 	// resend oracle slow.
-	appAPI.Post("/auth/verify-email", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.VerifyEmailConfirm)
+	appAPI.Post("/auth/verify-email", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), maintenanceMode(rt), requireJSONBody, ah.VerifyEmailConfirm)
 	appAPI.Post("/auth/verify-email/resend", perMinute(rt, rt.Config.RateLimit.LoginPerMinute, nil), requireJSONBody, ah.VerifyEmailResend)
 	appAPI.Get("/auth/me", requireAuth(rt), ah.Me)
 	// Changing your own password. Rate limited as well as gated by the
@@ -280,7 +284,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	//
 	// The session cookie gets its own bucket, or every operator behind
 	// one office NAT would share a budget.
-	v1Limiter := perMinute(rt, rt.Config.RateLimit.APIPerMinute, func(c fiber.Ctx) string {
+	v1Key := func(c fiber.Ctx) string {
 		if token := bearerToken(c); token != "" {
 			sum := sha256.Sum256([]byte(token))
 
@@ -294,6 +298,16 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 		}
 
 		return "ip:" + clientip.From(c)
+	}
+	// A console session has a ceiling of its own: one page is several
+	// calls and the auto refresh adds more, which an integration's
+	// budget was never sized for.
+	v1Limiter := perMinuteBy(rt, v1Key, func(c fiber.Ctx) int {
+		if strings.HasPrefix(v1Key(c), "s:") {
+			return rt.Config.RateLimit.SessionPerMinute
+		}
+
+		return rt.Config.RateLimit.APIPerMinute
 	})
 	// Per-IP budget for REJECTED credentials, spent inside machineAuth.
 	//
@@ -1278,7 +1292,17 @@ func mountConsole(app *fiber.App, sub fs.FS) {
 // effective ceiling is max times the node count - see the note on
 // env.RateLimitConfig.
 func perMinute(rt *env.Runtime, max int, keyFn func(fiber.Ctx) string) fiber.Handler {
-	if !rt.Config.RateLimit.Enabled || max <= 0 {
+	if max <= 0 {
+		return func(c fiber.Ctx) error { return c.Next() }
+	}
+
+	return perMinuteBy(rt, keyFn, func(fiber.Ctx) int { return max })
+}
+
+// perMinuteBy is perMinute with the ceiling decided per request. A
+// ceiling of zero lets that request through unlimited.
+func perMinuteBy(rt *env.Runtime, keyFn func(fiber.Ctx) string, maxFn func(fiber.Ctx) int) fiber.Handler {
+	if !rt.Config.RateLimit.Enabled {
 		return func(c fiber.Ctx) error { return c.Next() }
 	}
 
@@ -1286,7 +1310,16 @@ func perMinute(rt *env.Runtime, max int, keyFn func(fiber.Ctx) string) fiber.Han
 		keyFn = clientip.From
 	}
 
-	cfg := limiter.Config{Max: max, Expiration: time.Minute, KeyGenerator: keyFn}
+	cfg := limiter.Config{
+		MaxFunc:      maxFn,
+		Expiration:   time.Minute,
+		KeyGenerator: keyFn,
+		// The same envelope as every other refusal. The limiter has
+		// already set Retry-After by the time this runs.
+		LimitReached: func(c fiber.Ctx) error {
+			return response.TooManyRequests(c, "too many requests, retry after the number of seconds in Retry-After")
+		},
+	}
 
 	return limiter.New(cfg)
 }

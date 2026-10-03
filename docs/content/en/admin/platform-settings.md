@@ -133,5 +133,12 @@ machine API returns:
 Reads stay open so the console remains usable and an incident stays diagnosable, and platform admins are exempt
 entirely - somebody has to be able to switch it back off.
 
+Signing in stays open for the same reason: password, passkey and SSO sign-in all work, as do sign-out, requesting a
+password reset and resending a verification mail. Registering an account, confirming a password reset and confirming
+an email address write account rows and answer the `503` above.
+
+The SMTP submission listener defers new mail with a transient `451 4.3.2`, so a client keeps the message and retries
+once the mode is off.
+
 The delivery worker and campaign runner keep draining whatever is already queued. Maintenance mode stops new work
 arriving, it does not pause the pipeline.

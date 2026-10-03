@@ -40,11 +40,29 @@ Fixed-window counters on the HTTP edge, configured under `ratelimit`:
 | `ratelimit.login_per_minute`              | `MAILYARD_RATELIMIT_LOGIN_PER_MINUTE`              | `10`    | Console sign-in, keyed by client IP.                       |
 | `ratelimit.oidc_per_minute`               | `MAILYARD_RATELIMIT_OIDC_PER_MINUTE`               | `30`    | The OIDC callback, keyed by client IP.                     |
 | `ratelimit.api_per_minute`                | `MAILYARD_RATELIMIT_API_PER_MINUTE`                | `120`   | `/api/v1/*`, keyed by API key (falling back to client IP). |
+| `ratelimit.session_per_minute`            | `MAILYARD_RATELIMIT_SESSION_PER_MINUTE`            | `600`   | `/api/v1/*` from a signed-in console session, per session. |
 | `ratelimit.ses_webhook_per_minute`        | `MAILYARD_RATELIMIT_SES_WEBHOOK_PER_MINUTE`        | `600`   | `POST /webhooks/ses`, keyed by client IP.                  |
 | `ratelimit.relay_node_chatter_per_minute` | `MAILYARD_RATELIMIT_RELAY_NODE_CHATTER_PER_MINUTE` | `600`   | Relay node heartbeats, certificate renewal and status.     |
 | `ratelimit.relay_node_inbound_per_minute` | `MAILYARD_RATELIMIT_RELAY_NODE_INBOUND_PER_MINUTE` | `1200`  | Mail a relay node forwards back to the platform.           |
 
 Setting an individual value to `0` disables that limiter while leaving the others in place.
+
+A refused request answers `429` with the usual error envelope and a `Retry-After` header giving the seconds until the
+window rolls:
+
+```json
+{
+    "error": "too many requests, retry after the number of seconds in Retry-After"
+}
+```
+
+The console has a budget of its own on `/api/v1` because one page is several calls and the lists refresh themselves on
+a timer, which a person browsing would exhaust at the integration ceiling. An API key never draws on it.
+
+`/api/v1` also counts **rejected** credentials per client address, at the `login_per_minute` ceiling. Once an address
+has spent it, further rejected attempts from it answer `429` instead of `401`. A credential that works is never
+charged and never refused, so somebody guessing from a shared office address cannot lock out the integrations and
+people signing in from behind it.
 
 The login limiter is per client address. The account counts its own failures too: ten wrong passwords in a row lock
 sign-in for that account for fifteen minutes, whatever addresses they came from, and the answer during the lockout is

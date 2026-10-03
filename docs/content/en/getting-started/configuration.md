@@ -150,12 +150,13 @@ Fixed-window counters held in process memory, so on a multi-node deployment the 
 times the node count. Size accordingly, or terminate the limit at a shared proxy instead. Zero on an individual limit
 disables just that one.
 
-| Variable                              | Default | Description                                                       |
-|---------------------------------------|---------|-------------------------------------------------------------------|
-| `MAILYARD_RATELIMIT_ENABLED`          | `true`  | Master switch for all three HTTP limiters                         |
-| `MAILYARD_RATELIMIT_LOGIN_PER_MINUTE` | `10`    | `POST /app/api/auth/login` per client IP                          |
-| `MAILYARD_RATELIMIT_OIDC_PER_MINUTE`  | `30`    | OIDC callback per client IP                                       |
-| `MAILYARD_RATELIMIT_API_PER_MINUTE`   | `120`   | `/api/v1` per API key, or per IP for callers with no usable token |
+| Variable                                | Default | Description                                                       |
+|-----------------------------------------|---------|-------------------------------------------------------------------|
+| `MAILYARD_RATELIMIT_ENABLED`            | `true`  | Master switch for every HTTP limiter                              |
+| `MAILYARD_RATELIMIT_LOGIN_PER_MINUTE`   | `10`    | `POST /app/api/auth/login` per client IP                          |
+| `MAILYARD_RATELIMIT_OIDC_PER_MINUTE`    | `30`    | OIDC callback per client IP                                       |
+| `MAILYARD_RATELIMIT_API_PER_MINUTE`     | `120`   | `/api/v1` per API key, or per IP for callers with no usable token |
+| `MAILYARD_RATELIMIT_SESSION_PER_MINUTE` | `600`   | `/api/v1` per signed-in console session                           |
 
 Per-project sending volume is a separate mechanism: it comes from the plan assigned to the project, not from
 configuration. See [Plans](/docs/admin/plans). The SMTP listeners have their own per-IP session limits,

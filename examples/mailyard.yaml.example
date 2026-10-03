@@ -351,6 +351,9 @@ ratelimit:
   oidc_per_minute: 30
   # Per API key, and per IP for a caller presenting no usable token.
   api_per_minute: 120
+  # Per signed-in console session. A page is several calls and the
+  # lists refresh on a timer, so a person needs more than a key does.
+  session_per_minute: 600
 
   # The three below are paced by somebody else's software rather than
   # by a person at a keyboard, which is why they are an order of

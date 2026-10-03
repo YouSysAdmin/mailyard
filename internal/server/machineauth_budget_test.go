@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -15,6 +16,9 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
+	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
+	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 )
 
 // A flood of different random tokens must still be refused.
@@ -97,34 +101,65 @@ func TestAFloodOfDistinctTokensIsRefused(t *testing.T) {
 	}
 }
 
-// The real gate, not a stand-in: an IP over its budget is refused
-// before machineAuth looks at anything.
-//
-// That ordering is what makes this testable with an empty Runtime, and
-// it is also the property worth having - a spent budget must cost no
-// database lookup, or the refusal is as expensive as the attack. The
-// budget is spent by a middleware in front rather than by a hardcoded
-// address, so the test calibrates itself to whatever IP Fiber reports.
-func TestTheGateRefusesAnIPOverItsBudget(t *testing.T) {
+// adminKeys answers one platform key, the least a valid credential
+// needs to get through the real gate without a database.
+type adminKeys struct {
+	store.AdminAPIKeyStore
+	key *akmodel.Admin
+}
+
+func (s adminKeys) GetByPrefix(_ context.Context, prefix string) (*akmodel.Admin, error) {
+	if s.key.KeyPrefix == prefix {
+		return s.key, nil
+	}
+
+	return nil, nil
+}
+
+func (s adminKeys) TouchLastUsed(context.Context, string, time.Time) error { return nil }
+
+// The real gate, not a stand-in: an IP over its budget is refused for
+// a credential that does not work, and a credential that does work is
+// admitted all the same. A stranger guessing from a shared address
+// must not lock out the integrations behind it.
+func TestTheBudgetRefusesOnlyRejectedCredentials(t *testing.T) {
+	token := akmodel.AdminPrefix + "0123456789abcdef0123456789abcdef"
+	key := &akmodel.Admin{ID: "k1", KeyPrefix: akmodel.TokenPrefix(token), KeyHash: akmodel.Hash(token)}
+	rt := &env.Runtime{Config: &env.Config{}, Store: &store.Store{AdminAPIKey: adminKeys{key: key}}}
+
 	failures := iplimit.New(1, time.Minute)
 	app := fiber.New()
 	app.Use(func(c fiber.Ctx) error {
+		c.Locals(domain.ContextKey, &domain.RequestContext{})
 		failures.Allow(clientip.From(c))
 
 		return c.Next()
 	})
-	app.Use(machineAuth(&env.Runtime{}, failures))
-	app.Get("/api/v1/emails", func(c fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+	app.Use(machineAuth(rt, failures))
+	app.Get("/api/v1/admin/users", func(c fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
 
-	res, err := app.Test(httptest.NewRequest("GET", "/api/v1/emails", nil))
-	if err != nil {
-		t.Fatalf("request: %v", err)
-	}
+	for _, tc := range []struct {
+		name, bearer string
+		want         int
+	}{
+		{"no credential", "", fiber.StatusTooManyRequests},
+		{"a wrong platform key", akmodel.AdminPrefix + "ffffffffffffffffffffffffffffffff", fiber.StatusTooManyRequests},
+		{"the right platform key", token, fiber.StatusOK},
+	} {
+		req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
+		if tc.bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+tc.bearer)
+		}
 
-	defer func() { _ = res.Body.Close() }()
+		res, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
 
-	if res.StatusCode != fiber.StatusTooManyRequests {
-		t.Errorf("status %d, want 429 - an over-budget IP reached past the gate", res.StatusCode)
+		_ = res.Body.Close()
+		if res.StatusCode != tc.want {
+			t.Errorf("%s over budget: status %d, want %d", tc.name, res.StatusCode, tc.want)
+		}
 	}
 }
 
