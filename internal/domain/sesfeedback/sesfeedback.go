@@ -82,14 +82,15 @@ const maxBody = 1 << 20
 func (h *Handler) Receive(c fiber.Ctx) error {
 	body := c.Body()
 	if len(body) > maxBody {
-		h.log().Warn("ses: notification too large, ignoring", "bytes", len(body))
+		// Debug like the unlisted topic below: the endpoint is public.
+		h.log().Debug("ses: notification too large, ignoring", "bytes", len(body))
 
 		return c.SendStatus(fiber.StatusOK)
 	}
 
 	msg, err := snsmsg.Parse(body)
 	if err != nil {
-		h.log().Warn("ses: unparseable sns delivery", "err", err, "client_ip", clientip.From(c))
+		h.log().Debug("ses: unparseable sns delivery", "err", err, "client_ip", clientip.From(c))
 
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
