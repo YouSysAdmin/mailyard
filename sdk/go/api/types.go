@@ -24,9 +24,30 @@ type ACMEResponse struct {
 	TLSTerminatedHere bool       `json:"tls_terminated_here"`
 }
 
+// APIKeyCreateInput is the request body.
+type APIKeyCreateInput struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+	AllowedIPs  []string `json:"allowed_ips"`
+	ExpiresAt   string   `json:"expires_at"`
+	Sandbox     bool     `json:"sandbox"`
+}
+
+// APIKeyListResponse is the response body.
+type APIKeyListResponse struct {
+	APIKeys []*Key `json:"api_keys"`
+}
+
 // APIKeyResponse is the response body.
 type APIKeyResponse struct {
 	APIKey *Key `json:"api_key"`
+}
+
+// APIKeyUpdateInput is the request body.
+type APIKeyUpdateInput struct {
+	Name       string   `json:"name"`
+	AllowedIPs []string `json:"allowed_ips"`
+	ExpiresAt  string   `json:"expires_at"`
 }
 
 // ActiveVersionResponse is the response body.
@@ -91,27 +112,6 @@ type AnalyticsResponse struct {
 	Links       any `json:"links"`
 	OpenSeries  any `json:"open_series"`
 	ClickSeries any `json:"click_series"`
-}
-
-// ApikeyCreateInput is the request body.
-type ApikeyCreateInput struct {
-	Name        string   `json:"name"`
-	Permissions []string `json:"permissions"`
-	AllowedIPs  []string `json:"allowed_ips"`
-	ExpiresAt   string   `json:"expires_at"`
-	Sandbox     bool     `json:"sandbox"`
-}
-
-// ApikeyListResponse is the response body.
-type ApikeyListResponse struct {
-	APIKeys []*Key `json:"api_keys"`
-}
-
-// ApikeyUpdateInput is the request body.
-type ApikeyUpdateInput struct {
-	Name       string   `json:"name"`
-	AllowedIPs []string `json:"allowed_ips"`
-	ExpiresAt  string   `json:"expires_at"`
 }
 
 // Asset is the wire body.
@@ -1351,8 +1351,8 @@ type NotificationListResponse struct {
 	Offset        int64           `json:"offset"`
 }
 
-// OauthproviderListResponse is the response body.
-type OauthproviderListResponse struct {
+// OAuthProviderListResponse is the response body.
+type OAuthProviderListResponse struct {
 	Providers []ProviderView `json:"providers"`
 }
 
@@ -1676,6 +1676,86 @@ type RunJobResponse struct {
 	Failed bool     `json:"failed"`
 }
 
+// SMTPCredentialCreateInput is the request body.
+type SMTPCredentialCreateInput struct {
+	Name       string   `json:"name"`
+	AllowedIPs []string `json:"allowed_ips"`
+	SMTPGroup  string   `json:"smtp_group"`
+	Sandbox    bool     `json:"sandbox"`
+}
+
+// SMTPCredentialCreatedResponse is the response body.
+type SMTPCredentialCreatedResponse struct {
+	SMTPCredential *Credential  `json:"smtp_credential"`
+	Password       string       `json:"password"`
+	Submission     ListenerInfo `json:"submission"`
+}
+
+// SMTPCredentialCredentialResponse is the response body.
+type SMTPCredentialCredentialResponse struct {
+	SMTPCredential *Credential `json:"smtp_credential"`
+}
+
+// SMTPCredentialListResponse is the response body.
+type SMTPCredentialListResponse struct {
+	SMTPCredentials []*Credential `json:"smtp_credentials"`
+	Submission      ListenerInfo  `json:"submission"`
+}
+
+// SMTPCredentialUpdateInput is the request body.
+type SMTPCredentialUpdateInput struct {
+	Name       string   `json:"name"`
+	AllowedIPs []string `json:"allowed_ips"`
+	SMTPGroup  string   `json:"smtp_group"`
+}
+
+// SMTPServerCreateInput is the request body.
+type SMTPServerCreateInput struct {
+	Name           string            `json:"name"`
+	Provider       string            `json:"provider"`
+	Host           string            `json:"host"`
+	Port           int64             `json:"port"`
+	Username       string            `json:"username"`
+	Password       string            `json:"password"`
+	Encryption     string            `json:"encryption"`
+	SkipDKIM       bool              `json:"skip_dkim"`
+	ProviderConfig map[string]string `json:"provider_config"`
+	SESTopicARN    string            `json:"ses_topic_arn"`
+	AllowedEmails  []string          `json:"allowed_emails"`
+	AllowedDomains []string          `json:"allowed_domains"`
+	GroupID        string            `json:"group_id"`
+	Priority       int64             `json:"priority"`
+}
+
+// SMTPServerListResponse is the response body.
+type SMTPServerListResponse struct {
+	SMTPServers []*Server    `json:"smtp_servers"`
+	Providers   []Descriptor `json:"providers"`
+}
+
+// SMTPServerTestResponse is the response body.
+type SMTPServerTestResponse struct {
+	Ok    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+}
+
+// SMTPServerUpdateInput is the request body.
+type SMTPServerUpdateInput struct {
+	Name           string             `json:"name"`
+	Host           string             `json:"host"`
+	Port           int64              `json:"port"`
+	Username       *string            `json:"username"`
+	Password       *string            `json:"password"`
+	Encryption     string             `json:"encryption"`
+	SkipDKIM       *bool              `json:"skip_dkim"`
+	SESTopicARN    *string            `json:"ses_topic_arn"`
+	AllowedEmails  *[]string          `json:"allowed_emails"`
+	AllowedDomains *[]string          `json:"allowed_domains"`
+	GroupID        string             `json:"group_id"`
+	Priority       *int64             `json:"priority"`
+	ProviderConfig *map[string]string `json:"provider_config"`
+}
+
 // SandboxAttachment is the wire body.
 type SandboxAttachment struct {
 	Filename    string `json:"filename"`
@@ -1973,86 +2053,6 @@ type SigningKey struct {
 	AttachKey   bool       `json:"attach_key"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
-}
-
-// SmtpcredentialCreateInput is the request body.
-type SmtpcredentialCreateInput struct {
-	Name       string   `json:"name"`
-	AllowedIPs []string `json:"allowed_ips"`
-	SMTPGroup  string   `json:"smtp_group"`
-	Sandbox    bool     `json:"sandbox"`
-}
-
-// SmtpcredentialCreatedResponse is the response body.
-type SmtpcredentialCreatedResponse struct {
-	SMTPCredential *Credential  `json:"smtp_credential"`
-	Password       string       `json:"password"`
-	Submission     ListenerInfo `json:"submission"`
-}
-
-// SmtpcredentialCredentialResponse is the response body.
-type SmtpcredentialCredentialResponse struct {
-	SMTPCredential *Credential `json:"smtp_credential"`
-}
-
-// SmtpcredentialListResponse is the response body.
-type SmtpcredentialListResponse struct {
-	SMTPCredentials []*Credential `json:"smtp_credentials"`
-	Submission      ListenerInfo  `json:"submission"`
-}
-
-// SmtpcredentialUpdateInput is the request body.
-type SmtpcredentialUpdateInput struct {
-	Name       string   `json:"name"`
-	AllowedIPs []string `json:"allowed_ips"`
-	SMTPGroup  string   `json:"smtp_group"`
-}
-
-// SmtpserverCreateInput is the request body.
-type SmtpserverCreateInput struct {
-	Name           string            `json:"name"`
-	Provider       string            `json:"provider"`
-	Host           string            `json:"host"`
-	Port           int64             `json:"port"`
-	Username       string            `json:"username"`
-	Password       string            `json:"password"`
-	Encryption     string            `json:"encryption"`
-	SkipDKIM       bool              `json:"skip_dkim"`
-	ProviderConfig map[string]string `json:"provider_config"`
-	SESTopicARN    string            `json:"ses_topic_arn"`
-	AllowedEmails  []string          `json:"allowed_emails"`
-	AllowedDomains []string          `json:"allowed_domains"`
-	GroupID        string            `json:"group_id"`
-	Priority       int64             `json:"priority"`
-}
-
-// SmtpserverListResponse is the response body.
-type SmtpserverListResponse struct {
-	SMTPServers []*Server    `json:"smtp_servers"`
-	Providers   []Descriptor `json:"providers"`
-}
-
-// SmtpserverTestResponse is the response body.
-type SmtpserverTestResponse struct {
-	Ok    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-}
-
-// SmtpserverUpdateInput is the request body.
-type SmtpserverUpdateInput struct {
-	Name           string             `json:"name"`
-	Host           string             `json:"host"`
-	Port           int64              `json:"port"`
-	Username       *string            `json:"username"`
-	Password       *string            `json:"password"`
-	Encryption     string             `json:"encryption"`
-	SkipDKIM       *bool              `json:"skip_dkim"`
-	SESTopicARN    *string            `json:"ses_topic_arn"`
-	AllowedEmails  *[]string          `json:"allowed_emails"`
-	AllowedDomains *[]string          `json:"allowed_domains"`
-	GroupID        string             `json:"group_id"`
-	Priority       *int64             `json:"priority"`
-	ProviderConfig *map[string]string `json:"provider_config"`
 }
 
 // StatsResponse is the response body.

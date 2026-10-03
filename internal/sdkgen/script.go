@@ -113,11 +113,16 @@ func scriptMethods() []scriptMethod {
 // snake turns an exported Go name into snake_case.
 func snake(s string) string {
 	var b strings.Builder
+	upper := func(i int) bool { return i >= 0 && i < len(s) && s[i] >= 'A' && s[i] <= 'Z' }
+	lower := func(i int) bool {
+		return i >= 0 && i < len(s) && (s[i] >= 'a' && s[i] <= 'z' || s[i] >= '0' && s[i] <= '9')
+	}
+
 	for i, r := range s {
 		if r >= 'A' && r <= 'Z' {
-			// Not before the first letter, and not inside a run of
-			// capitals - APIKeys is api_keys, not a_p_i_keys.
-			if i > 0 && !(s[i-1] >= 'A' && s[i-1] <= 'Z') {
+			// A word starts after a lowercase letter, or at the last
+			// capital of a run - APIKeys is api_keys, not a_p_i_keys.
+			if lower(i-1) || upper(i-1) && lower(i+1) {
 				b.WriteByte('_')
 			}
 
@@ -136,7 +141,7 @@ func snake(s string) string {
 		{"smtpservers", "smtp_servers"}, {"smtpserver", "smtp_server"},
 		{"smtpcredentials", "smtp_credentials"}, {"smtpcredential", "smtp_credential"},
 		{"smtpgroups", "smtp_groups"}, {"smtpgroup", "smtp_group"},
-		{"sesfeedback", "ses_feedback"}, {"gdpr", "data"},
+		{"sesfeedback", "ses_feedback"}, {"gdpr", "data"}, {"o_auth", "oauth"},
 	} {
 		out = strings.ReplaceAll(out, fix[0], fix[1])
 	}

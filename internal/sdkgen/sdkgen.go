@@ -125,7 +125,7 @@ func (g *generator) typeName(t reflect.Type) string {
 func (g *generator) reserve(t reflect.Type) string {
 	name := exported(t.Name())
 	if taken, exists := g.takenBy[name]; (exists && taken != t) || handWritten[name] {
-		name = exported(pkgOf(t)) + name
+		name = apidoc.Qualifier(pkgOf(t)) + name
 	}
 
 	for i := 2; ; i++ {
@@ -455,7 +455,7 @@ func methodName(r apidoc.Route) string {
 		}
 
 		// The whole tail is the verb, so /subscribers/import/csv reads
-		// ImportCsvSubscriber rather than CsvSubscriberImport.
+		// ImportCSVSubscriber rather than CSVSubscriberImport.
 		return tailName + prefix + singular(head)
 	case "PATCH", "PUT":
 		return "Update" + prefix + subject + tailOne
@@ -494,10 +494,27 @@ func camel(s string) string {
 
 	var b strings.Builder
 	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == '-' || r == '_' || r == '/' }) {
-		b.WriteString(exported(part))
+		b.WriteString(word(part))
 	}
 
 	return b.String()
+}
+
+// initialisms are the path words Go spells in capitals.
+var initialisms = map[string]string{
+	"acme": "ACME", "api": "API", "ca": "CA", "csv": "CSV", "dkim": "DKIM",
+	"dns": "DNS", "id": "ID", "mx": "MX", "oauth": "OAuth", "oidc": "OIDC",
+	"pem": "PEM", "ses": "SES", "smtp": "SMTP", "tls": "TLS", "totp": "TOTP",
+	"url": "URL",
+}
+
+// word exports one path word, as an initialism where it is one.
+func word(s string) string {
+	if w, ok := initialisms[strings.ToLower(s)]; ok {
+		return w
+	}
+
+	return exported(s)
 }
 
 // uniquifyMethodNames resolves the collisions the naming rules leave.

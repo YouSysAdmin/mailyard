@@ -29,7 +29,7 @@ var secretish = regexp.MustCompile(`(?i)password|secret|token|hash|private_key|t
 var allowedSecretFields = map[string]bool{
 	"WebhookCreateResponse.secret":           true,
 	"CreatedResponse.token":                  true, // an API key, hashed at rest
-	"SmtpcredentialCreatedResponse.password": true,
+	"SMTPCredentialCreatedResponse.password": true,
 	"CredentialCreatedResponse.password":     true,
 	"InvitationCreatedResponse.token":        true, // needed to build the invite link
 	"AdminCreatedResponse.token":             true, // a platform credential, hashed at rest

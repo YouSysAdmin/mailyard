@@ -152,12 +152,36 @@ func (r *registry) reserve(t reflect.Type) string {
 			pkg = base
 		}
 
-		name = strings.ToUpper(pkg[:1]) + pkg[1:] + name
+		name = Qualifier(pkg) + name
 	}
 
 	r.seen[t] = name
 
 	return name
+}
+
+// qualifiers spell the package names that hold an initialism.
+var qualifiers = map[string]string{
+	"apikey":         "APIKey",
+	"oauthprovider":  "OAuthProvider",
+	"sesfeedback":    "SESFeedback",
+	"smtpcredential": "SMTPCredential",
+	"smtpserver":     "SMTPServer",
+}
+
+// Qualifier is the Go-cased prefix that tells apart two types of the
+// same name from different packages. The SDK generator uses it too, so
+// a schema and its generated type carry one name.
+func Qualifier(pkg string) string {
+	if q, ok := qualifiers[pkg]; ok {
+		return q
+	}
+
+	if pkg == "" {
+		return ""
+	}
+
+	return strings.ToUpper(pkg[:1]) + pkg[1:]
 }
 
 func (r *registry) nameTaken(name string) (reflect.Type, bool) {

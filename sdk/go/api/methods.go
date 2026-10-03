@@ -9,32 +9,32 @@ import (
 	"fmt"
 )
 
-// ListAdminApiKeys List platform credentials.
+// ListAdminAPIKeys List platform credentials.
 //
 // GET /admin/api-keys
-func (c *Client) ListAdminApiKeys(ctx context.Context, opts ...RequestOption) (AdminListResponse, error) {
+func (c *Client) ListAdminAPIKeys(ctx context.Context, opts ...RequestOption) (AdminListResponse, error) {
 	return do[AdminListResponse](ctx, c, "GET", "/admin/api-keys", nil, opts)
 }
 
-// CreateAdminApiKey Mint a platform credential.
+// CreateAdminAPIKey Mint a platform credential.
 //
 // POST /admin/api-keys
-func (c *Client) CreateAdminApiKey(ctx context.Context, body AdminCreateInput, opts ...RequestOption) (AdminCreatedResponse, error) {
+func (c *Client) CreateAdminAPIKey(ctx context.Context, body AdminCreateInput, opts ...RequestOption) (AdminCreatedResponse, error) {
 	return do[AdminCreatedResponse](ctx, c, "POST", "/admin/api-keys", body, opts)
 }
 
-// DeleteAdminApiKey Delete a platform credential.
+// DeleteAdminAPIKey Delete a platform credential.
 //
 // DELETE /admin/api-keys/:id
-func (c *Client) DeleteAdminApiKey(ctx context.Context, id string, opts ...RequestOption) error {
+func (c *Client) DeleteAdminAPIKey(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/admin/api-keys/%s", escape(id)), nil, opts)
 	return err
 }
 
-// RevokeAdminApiKey Revoke a platform credential.
+// RevokeAdminAPIKey Revoke a platform credential.
 //
 // POST /admin/api-keys/:id/revoke
-func (c *Client) RevokeAdminApiKey(ctx context.Context, id string, opts ...RequestOption) (AdminAPIKeyResponse, error) {
+func (c *Client) RevokeAdminAPIKey(ctx context.Context, id string, opts ...RequestOption) (AdminAPIKeyResponse, error) {
 	return do[AdminAPIKeyResponse](ctx, c, "POST", fmt.Sprintf("/admin/api-keys/%s/revoke", escape(id)), nil, opts)
 }
 
@@ -60,31 +60,31 @@ func (c *Client) DeleteAdminCertificate(ctx context.Context, name string, opts .
 	return err
 }
 
-// GetAdminCertificatePem Read a certificate's public half.
+// GetAdminCertificatePEM Read a certificate's public half.
 //
 // GET /admin/certificates/:name/pem
-func (c *Client) GetAdminCertificatePem(ctx context.Context, name string, opts ...RequestOption) (PEMResponse, error) {
+func (c *Client) GetAdminCertificatePEM(ctx context.Context, name string, opts ...RequestOption) (PEMResponse, error) {
 	return do[PEMResponse](ctx, c, "GET", fmt.Sprintf("/admin/certificates/%s/pem", escape(name)), nil, opts)
 }
 
-// GetAdminCertificatesAcme What ACME is configured to do, and what it holds.
+// GetAdminCertificatesACME What ACME is configured to do, and what it holds.
 //
 // GET /admin/certificates/acme
-func (c *Client) GetAdminCertificatesAcme(ctx context.Context, opts ...RequestOption) (ACMEResponse, error) {
+func (c *Client) GetAdminCertificatesACME(ctx context.Context, opts ...RequestOption) (ACMEResponse, error) {
 	return do[ACMEResponse](ctx, c, "GET", "/admin/certificates/acme", nil, opts)
 }
 
-// AcmeOrderAdminCertificate Obtain a certificate for one configured host.
+// ACMEOrderAdminCertificate Obtain a certificate for one configured host.
 //
 // POST /admin/certificates/acme/order
-func (c *Client) AcmeOrderAdminCertificate(ctx context.Context, body RenewInput, opts ...RequestOption) (MessageResponse, error) {
+func (c *Client) ACMEOrderAdminCertificate(ctx context.Context, body RenewInput, opts ...RequestOption) (MessageResponse, error) {
 	return do[MessageResponse](ctx, c, "POST", "/admin/certificates/acme/order", body, opts)
 }
 
-// AcmeRenewAdminCertificate Discard what is cached for a host and order again.
+// ACMERenewAdminCertificate Discard what is cached for a host and order again.
 //
 // POST /admin/certificates/acme/renew
-func (c *Client) AcmeRenewAdminCertificate(ctx context.Context, body RenewInput, opts ...RequestOption) (MessageResponse, error) {
+func (c *Client) ACMERenewAdminCertificate(ctx context.Context, body RenewInput, opts ...RequestOption) (MessageResponse, error) {
 	return do[MessageResponse](ctx, c, "POST", "/admin/certificates/acme/renew", body, opts)
 }
 
@@ -95,10 +95,10 @@ func (c *Client) GenerateAdminCertificate(ctx context.Context, body GenerateInpu
 	return do[ManagedResponse](ctx, c, "POST", "/admin/certificates/generate", body, opts)
 }
 
-// GenerateCaAdminCertificate Generate a certificate authority.
+// GenerateCAAdminCertificate Generate a certificate authority.
 //
 // POST /admin/certificates/generate-ca
-func (c *Client) GenerateCaAdminCertificate(ctx context.Context, body GenerateCAInput, opts ...RequestOption) (ManagedResponse, error) {
+func (c *Client) GenerateCAAdminCertificate(ctx context.Context, body GenerateCAInput, opts ...RequestOption) (ManagedResponse, error) {
 	return do[ManagedResponse](ctx, c, "POST", "/admin/certificates/generate-ca", body, opts)
 }
 
@@ -123,45 +123,45 @@ func (c *Client) RunAdminJob(ctx context.Context, name string, opts ...RequestOp
 	return do[RunJobResponse](ctx, c, "POST", fmt.Sprintf("/admin/jobs/%s/run", escape(name)), nil, opts)
 }
 
-// ListAdminOauthProviders List.
+// ListAdminOAuthProviders List.
 //
 // GET /admin/oauth-providers/
-func (c *Client) ListAdminOauthProviders(ctx context.Context, opts ...RequestOption) (OauthproviderListResponse, error) {
-	return do[OauthproviderListResponse](ctx, c, "GET", "/admin/oauth-providers", nil, opts)
+func (c *Client) ListAdminOAuthProviders(ctx context.Context, opts ...RequestOption) (OAuthProviderListResponse, error) {
+	return do[OAuthProviderListResponse](ctx, c, "GET", "/admin/oauth-providers", nil, opts)
 }
 
-// CreateAdminOauthProvider Create.
+// CreateAdminOAuthProvider Create.
 //
 // POST /admin/oauth-providers/
-func (c *Client) CreateAdminOauthProvider(ctx context.Context, body UpsertInput, opts ...RequestOption) (ProviderResponse, error) {
+func (c *Client) CreateAdminOAuthProvider(ctx context.Context, body UpsertInput, opts ...RequestOption) (ProviderResponse, error) {
 	return do[ProviderResponse](ctx, c, "POST", "/admin/oauth-providers", body, opts)
 }
 
-// DeleteAdminOauthProvider Delete.
+// DeleteAdminOAuthProvider Delete.
 //
 // DELETE /admin/oauth-providers/:id
-func (c *Client) DeleteAdminOauthProvider(ctx context.Context, id string, opts ...RequestOption) (DeletedResponse, error) {
+func (c *Client) DeleteAdminOAuthProvider(ctx context.Context, id string, opts ...RequestOption) (DeletedResponse, error) {
 	return do[DeletedResponse](ctx, c, "DELETE", fmt.Sprintf("/admin/oauth-providers/%s", escape(id)), nil, opts)
 }
 
-// GetAdminOauthProvider Get.
+// GetAdminOAuthProvider Get.
 //
 // GET /admin/oauth-providers/:id
-func (c *Client) GetAdminOauthProvider(ctx context.Context, id string, opts ...RequestOption) (ProviderResponse, error) {
+func (c *Client) GetAdminOAuthProvider(ctx context.Context, id string, opts ...RequestOption) (ProviderResponse, error) {
 	return do[ProviderResponse](ctx, c, "GET", fmt.Sprintf("/admin/oauth-providers/%s", escape(id)), nil, opts)
 }
 
-// UpdateAdminOauthProvider Update.
+// UpdateAdminOAuthProvider Update.
 //
 // PATCH /admin/oauth-providers/:id
-func (c *Client) UpdateAdminOauthProvider(ctx context.Context, id string, body PatchInput, opts ...RequestOption) (ProviderResponse, error) {
+func (c *Client) UpdateAdminOAuthProvider(ctx context.Context, id string, body PatchInput, opts ...RequestOption) (ProviderResponse, error) {
 	return do[ProviderResponse](ctx, c, "PATCH", fmt.Sprintf("/admin/oauth-providers/%s", escape(id)), body, opts)
 }
 
-// TestAdminOauthProvider Test.
+// TestAdminOAuthProvider Test.
 //
 // POST /admin/oauth-providers/:id/test
-func (c *Client) TestAdminOauthProvider(ctx context.Context, id string, opts ...RequestOption) (TestResponse, error) {
+func (c *Client) TestAdminOAuthProvider(ctx context.Context, id string, opts ...RequestOption) (TestResponse, error) {
 	return do[TestResponse](ctx, c, "POST", fmt.Sprintf("/admin/oauth-providers/%s/test", escape(id)), nil, opts)
 }
 
@@ -251,46 +251,46 @@ func (c *Client) UpdateAdminSettings(ctx context.Context, body UpdateInput, opts
 	return do[SettingListResponse](ctx, c, "PUT", "/admin/settings", body, opts)
 }
 
-// ListAdminSharedSmtpServers List.
+// ListAdminSharedSMTPServers List.
 //
 // GET /admin/shared-smtp-servers/
-func (c *Client) ListAdminSharedSmtpServers(ctx context.Context, opts ...RequestOption) (SharedListResponse, error) {
+func (c *Client) ListAdminSharedSMTPServers(ctx context.Context, opts ...RequestOption) (SharedListResponse, error) {
 	return do[SharedListResponse](ctx, c, "GET", "/admin/shared-smtp-servers", nil, opts)
 }
 
-// CreateAdminSharedSmtpServer Create.
+// CreateAdminSharedSMTPServer Create.
 //
 // POST /admin/shared-smtp-servers/
-func (c *Client) CreateAdminSharedSmtpServer(ctx context.Context, body SharedCreateInput, opts ...RequestOption) (SharedResponse, error) {
+func (c *Client) CreateAdminSharedSMTPServer(ctx context.Context, body SharedCreateInput, opts ...RequestOption) (SharedResponse, error) {
 	return do[SharedResponse](ctx, c, "POST", "/admin/shared-smtp-servers", body, opts)
 }
 
-// DeleteAdminSharedSmtpServer Delete.
+// DeleteAdminSharedSMTPServer Delete.
 //
 // DELETE /admin/shared-smtp-servers/:id
-func (c *Client) DeleteAdminSharedSmtpServer(ctx context.Context, id string, opts ...RequestOption) error {
+func (c *Client) DeleteAdminSharedSMTPServer(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/admin/shared-smtp-servers/%s", escape(id)), nil, opts)
 	return err
 }
 
-// GetAdminSharedSmtpServer Get.
+// GetAdminSharedSMTPServer Get.
 //
 // GET /admin/shared-smtp-servers/:id
-func (c *Client) GetAdminSharedSmtpServer(ctx context.Context, id string, opts ...RequestOption) (SharedResponse, error) {
+func (c *Client) GetAdminSharedSMTPServer(ctx context.Context, id string, opts ...RequestOption) (SharedResponse, error) {
 	return do[SharedResponse](ctx, c, "GET", fmt.Sprintf("/admin/shared-smtp-servers/%s", escape(id)), nil, opts)
 }
 
-// UpdateAdminSharedSmtpServer Update.
+// UpdateAdminSharedSMTPServer Update.
 //
 // PATCH /admin/shared-smtp-servers/:id
-func (c *Client) UpdateAdminSharedSmtpServer(ctx context.Context, id string, body SharedUpdateInput, opts ...RequestOption) (SharedResponse, error) {
+func (c *Client) UpdateAdminSharedSMTPServer(ctx context.Context, id string, body SharedUpdateInput, opts ...RequestOption) (SharedResponse, error) {
 	return do[SharedResponse](ctx, c, "PATCH", fmt.Sprintf("/admin/shared-smtp-servers/%s", escape(id)), body, opts)
 }
 
-// TestAdminSharedSmtpServer Test.
+// TestAdminSharedSMTPServer Test.
 //
 // POST /admin/shared-smtp-servers/:id/test
-func (c *Client) TestAdminSharedSmtpServer(ctx context.Context, id string, opts ...RequestOption) (SharedTestResponse, error) {
+func (c *Client) TestAdminSharedSMTPServer(ctx context.Context, id string, opts ...RequestOption) (SharedTestResponse, error) {
 	return do[SharedTestResponse](ctx, c, "POST", fmt.Sprintf("/admin/shared-smtp-servers/%s/test", escape(id)), nil, opts)
 }
 
@@ -379,46 +379,46 @@ func (c *Client) ListAnalytics(ctx context.Context, opts ...RequestOption) (Tren
 	return do[TrendResponse](ctx, c, "GET", "/analytics", nil, opts)
 }
 
-// ListApiKeys List.
+// ListAPIKeys List.
 //
 // GET /api-keys/
-func (c *Client) ListApiKeys(ctx context.Context, opts ...RequestOption) (ApikeyListResponse, error) {
-	return do[ApikeyListResponse](ctx, c, "GET", "/api-keys", nil, opts)
+func (c *Client) ListAPIKeys(ctx context.Context, opts ...RequestOption) (APIKeyListResponse, error) {
+	return do[APIKeyListResponse](ctx, c, "GET", "/api-keys", nil, opts)
 }
 
-// CreateApiKey Create.
+// CreateAPIKey Create.
 //
 // POST /api-keys/
-func (c *Client) CreateApiKey(ctx context.Context, body ApikeyCreateInput, opts ...RequestOption) (CreatedResponse, error) {
+func (c *Client) CreateAPIKey(ctx context.Context, body APIKeyCreateInput, opts ...RequestOption) (CreatedResponse, error) {
 	return do[CreatedResponse](ctx, c, "POST", "/api-keys", body, opts)
 }
 
-// DeleteApiKey Delete.
+// DeleteAPIKey Delete.
 //
 // DELETE /api-keys/:id
-func (c *Client) DeleteApiKey(ctx context.Context, id string, opts ...RequestOption) error {
+func (c *Client) DeleteAPIKey(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/api-keys/%s", escape(id)), nil, opts)
 	return err
 }
 
-// GetApiKey Get.
+// GetAPIKey Get.
 //
 // GET /api-keys/:id
-func (c *Client) GetApiKey(ctx context.Context, id string, opts ...RequestOption) (APIKeyResponse, error) {
+func (c *Client) GetAPIKey(ctx context.Context, id string, opts ...RequestOption) (APIKeyResponse, error) {
 	return do[APIKeyResponse](ctx, c, "GET", fmt.Sprintf("/api-keys/%s", escape(id)), nil, opts)
 }
 
-// UpdateApiKey Update.
+// UpdateAPIKey Update.
 //
 // PATCH /api-keys/:id
-func (c *Client) UpdateApiKey(ctx context.Context, id string, body ApikeyUpdateInput, opts ...RequestOption) (APIKeyResponse, error) {
+func (c *Client) UpdateAPIKey(ctx context.Context, id string, body APIKeyUpdateInput, opts ...RequestOption) (APIKeyResponse, error) {
 	return do[APIKeyResponse](ctx, c, "PATCH", fmt.Sprintf("/api-keys/%s", escape(id)), body, opts)
 }
 
-// RevokeApiKey Revoke.
+// RevokeAPIKey Revoke.
 //
 // POST /api-keys/:id/revoke
-func (c *Client) RevokeApiKey(ctx context.Context, id string, opts ...RequestOption) (APIKeyResponse, error) {
+func (c *Client) RevokeAPIKey(ctx context.Context, id string, opts ...RequestOption) (APIKeyResponse, error) {
 	return do[APIKeyResponse](ctx, c, "POST", fmt.Sprintf("/api-keys/%s/revoke", escape(id)), nil, opts)
 }
 
@@ -635,17 +635,17 @@ func (c *Client) GetDomain(ctx context.Context, id string, opts ...RequestOption
 	return do[DetailResponse](ctx, c, "GET", fmt.Sprintf("/domains/%s", escape(id)), nil, opts)
 }
 
-// DeleteDomainDkimRotate Cancel DKIM rotation.
+// DeleteDomainDKIMRotate Cancel DKIM rotation.
 //
 // DELETE /domains/:id/dkim/rotate
-func (c *Client) DeleteDomainDkimRotate(ctx context.Context, id string, opts ...RequestOption) (DetailResponse, error) {
+func (c *Client) DeleteDomainDKIMRotate(ctx context.Context, id string, opts ...RequestOption) (DetailResponse, error) {
 	return do[DetailResponse](ctx, c, "DELETE", fmt.Sprintf("/domains/%s/dkim/rotate", escape(id)), nil, opts)
 }
 
-// DkimRotateDomain Rotate DKIM key.
+// DKIMRotateDomain Rotate DKIM key.
 //
 // POST /domains/:id/dkim/rotate
-func (c *Client) DkimRotateDomain(ctx context.Context, id string, opts ...RequestOption) (DetailResponse, error) {
+func (c *Client) DKIMRotateDomain(ctx context.Context, id string, opts ...RequestOption) (DetailResponse, error) {
 	return do[DetailResponse](ctx, c, "POST", fmt.Sprintf("/domains/%s/dkim/rotate", escape(id)), nil, opts)
 }
 
@@ -1264,140 +1264,140 @@ func (c *Client) GetSenderSigningPublicKey(ctx context.Context, id string, opts 
 	return do[PublicKeyResponse](ctx, c, "GET", fmt.Sprintf("/senders/%s/signing/public-key", escape(id)), nil, opts)
 }
 
-// ListSmtpCredentials List.
+// ListSMTPCredentials List.
 //
 // GET /smtp-credentials/
-func (c *Client) ListSmtpCredentials(ctx context.Context, opts ...RequestOption) (SmtpcredentialListResponse, error) {
-	return do[SmtpcredentialListResponse](ctx, c, "GET", "/smtp-credentials", nil, opts)
+func (c *Client) ListSMTPCredentials(ctx context.Context, opts ...RequestOption) (SMTPCredentialListResponse, error) {
+	return do[SMTPCredentialListResponse](ctx, c, "GET", "/smtp-credentials", nil, opts)
 }
 
-// CreateSmtpCredential Create.
+// CreateSMTPCredential Create.
 //
 // POST /smtp-credentials/
-func (c *Client) CreateSmtpCredential(ctx context.Context, body SmtpcredentialCreateInput, opts ...RequestOption) (SmtpcredentialCreatedResponse, error) {
-	return do[SmtpcredentialCreatedResponse](ctx, c, "POST", "/smtp-credentials", body, opts)
+func (c *Client) CreateSMTPCredential(ctx context.Context, body SMTPCredentialCreateInput, opts ...RequestOption) (SMTPCredentialCreatedResponse, error) {
+	return do[SMTPCredentialCreatedResponse](ctx, c, "POST", "/smtp-credentials", body, opts)
 }
 
-// DeleteSmtpCredential Delete.
+// DeleteSMTPCredential Delete.
 //
 // DELETE /smtp-credentials/:id
-func (c *Client) DeleteSmtpCredential(ctx context.Context, id string, opts ...RequestOption) error {
+func (c *Client) DeleteSMTPCredential(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/smtp-credentials/%s", escape(id)), nil, opts)
 	return err
 }
 
-// GetSmtpCredential Get.
+// GetSMTPCredential Get.
 //
 // GET /smtp-credentials/:id
-func (c *Client) GetSmtpCredential(ctx context.Context, id string, opts ...RequestOption) (SmtpcredentialCredentialResponse, error) {
-	return do[SmtpcredentialCredentialResponse](ctx, c, "GET", fmt.Sprintf("/smtp-credentials/%s", escape(id)), nil, opts)
+func (c *Client) GetSMTPCredential(ctx context.Context, id string, opts ...RequestOption) (SMTPCredentialCredentialResponse, error) {
+	return do[SMTPCredentialCredentialResponse](ctx, c, "GET", fmt.Sprintf("/smtp-credentials/%s", escape(id)), nil, opts)
 }
 
-// UpdateSmtpCredential Update.
+// UpdateSMTPCredential Update.
 //
 // PATCH /smtp-credentials/:id
-func (c *Client) UpdateSmtpCredential(ctx context.Context, id string, body SmtpcredentialUpdateInput, opts ...RequestOption) (SmtpcredentialCredentialResponse, error) {
-	return do[SmtpcredentialCredentialResponse](ctx, c, "PATCH", fmt.Sprintf("/smtp-credentials/%s", escape(id)), body, opts)
+func (c *Client) UpdateSMTPCredential(ctx context.Context, id string, body SMTPCredentialUpdateInput, opts ...RequestOption) (SMTPCredentialCredentialResponse, error) {
+	return do[SMTPCredentialCredentialResponse](ctx, c, "PATCH", fmt.Sprintf("/smtp-credentials/%s", escape(id)), body, opts)
 }
 
-// RevokeSmtpCredential Revoke.
+// RevokeSMTPCredential Revoke.
 //
 // POST /smtp-credentials/:id/revoke
-func (c *Client) RevokeSmtpCredential(ctx context.Context, id string, opts ...RequestOption) (SmtpcredentialCredentialResponse, error) {
-	return do[SmtpcredentialCredentialResponse](ctx, c, "POST", fmt.Sprintf("/smtp-credentials/%s/revoke", escape(id)), nil, opts)
+func (c *Client) RevokeSMTPCredential(ctx context.Context, id string, opts ...RequestOption) (SMTPCredentialCredentialResponse, error) {
+	return do[SMTPCredentialCredentialResponse](ctx, c, "POST", fmt.Sprintf("/smtp-credentials/%s/revoke", escape(id)), nil, opts)
 }
 
-// ListSmtpServerGroups List.
+// ListSMTPServerGroups List.
 //
 // GET /smtp-server-groups/
-func (c *Client) ListSmtpServerGroups(ctx context.Context, opts ...RequestOption) (GroupListResponse, error) {
+func (c *Client) ListSMTPServerGroups(ctx context.Context, opts ...RequestOption) (GroupListResponse, error) {
 	return do[GroupListResponse](ctx, c, "GET", "/smtp-server-groups", nil, opts)
 }
 
-// CreateSmtpServerGroup Create.
+// CreateSMTPServerGroup Create.
 //
 // POST /smtp-server-groups/
-func (c *Client) CreateSmtpServerGroup(ctx context.Context, body GroupCreateInput, opts ...RequestOption) (GroupResponse, error) {
+func (c *Client) CreateSMTPServerGroup(ctx context.Context, body GroupCreateInput, opts ...RequestOption) (GroupResponse, error) {
 	return do[GroupResponse](ctx, c, "POST", "/smtp-server-groups", body, opts)
 }
 
-// DeleteSmtpServerGroup Delete.
+// DeleteSMTPServerGroup Delete.
 //
 // DELETE /smtp-server-groups/:id
-func (c *Client) DeleteSmtpServerGroup(ctx context.Context, id string, opts ...RequestOption) error {
+func (c *Client) DeleteSMTPServerGroup(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/smtp-server-groups/%s", escape(id)), nil, opts)
 	return err
 }
 
-// GetSmtpServerGroup Get.
+// GetSMTPServerGroup Get.
 //
 // GET /smtp-server-groups/:id
-func (c *Client) GetSmtpServerGroup(ctx context.Context, id string, opts ...RequestOption) (GroupResponse, error) {
+func (c *Client) GetSMTPServerGroup(ctx context.Context, id string, opts ...RequestOption) (GroupResponse, error) {
 	return do[GroupResponse](ctx, c, "GET", fmt.Sprintf("/smtp-server-groups/%s", escape(id)), nil, opts)
 }
 
-// UpdateSmtpServerGroup Update.
+// UpdateSMTPServerGroup Update.
 //
 // PATCH /smtp-server-groups/:id
-func (c *Client) UpdateSmtpServerGroup(ctx context.Context, id string, body GroupUpdateInput, opts ...RequestOption) (GroupResponse, error) {
+func (c *Client) UpdateSMTPServerGroup(ctx context.Context, id string, body GroupUpdateInput, opts ...RequestOption) (GroupResponse, error) {
 	return do[GroupResponse](ctx, c, "PATCH", fmt.Sprintf("/smtp-server-groups/%s", escape(id)), body, opts)
 }
 
-// ListSmtpServers List.
+// ListSMTPServers List.
 //
 // GET /smtp-servers/
-func (c *Client) ListSmtpServers(ctx context.Context, opts ...RequestOption) (SmtpserverListResponse, error) {
-	return do[SmtpserverListResponse](ctx, c, "GET", "/smtp-servers", nil, opts)
+func (c *Client) ListSMTPServers(ctx context.Context, opts ...RequestOption) (SMTPServerListResponse, error) {
+	return do[SMTPServerListResponse](ctx, c, "GET", "/smtp-servers", nil, opts)
 }
 
-// CreateSmtpServer Create.
+// CreateSMTPServer Create.
 //
 // POST /smtp-servers/
-func (c *Client) CreateSmtpServer(ctx context.Context, body SmtpserverCreateInput, opts ...RequestOption) (ServerResponse, error) {
+func (c *Client) CreateSMTPServer(ctx context.Context, body SMTPServerCreateInput, opts ...RequestOption) (ServerResponse, error) {
 	return do[ServerResponse](ctx, c, "POST", "/smtp-servers", body, opts)
 }
 
-// DeleteSmtpServer Delete.
+// DeleteSMTPServer Delete.
 //
 // DELETE /smtp-servers/:id
-func (c *Client) DeleteSmtpServer(ctx context.Context, id string, opts ...RequestOption) error {
+func (c *Client) DeleteSMTPServer(ctx context.Context, id string, opts ...RequestOption) error {
 	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/smtp-servers/%s", escape(id)), nil, opts)
 	return err
 }
 
-// GetSmtpServer Get.
+// GetSMTPServer Get.
 //
 // GET /smtp-servers/:id
-func (c *Client) GetSmtpServer(ctx context.Context, id string, opts ...RequestOption) (ServerResponse, error) {
+func (c *Client) GetSMTPServer(ctx context.Context, id string, opts ...RequestOption) (ServerResponse, error) {
 	return do[ServerResponse](ctx, c, "GET", fmt.Sprintf("/smtp-servers/%s", escape(id)), nil, opts)
 }
 
-// UpdateSmtpServer Update.
+// UpdateSMTPServer Update.
 //
 // PATCH /smtp-servers/:id
-func (c *Client) UpdateSmtpServer(ctx context.Context, id string, body SmtpserverUpdateInput, opts ...RequestOption) (ServerResponse, error) {
+func (c *Client) UpdateSMTPServer(ctx context.Context, id string, body SMTPServerUpdateInput, opts ...RequestOption) (ServerResponse, error) {
 	return do[ServerResponse](ctx, c, "PATCH", fmt.Sprintf("/smtp-servers/%s", escape(id)), body, opts)
 }
 
-// DisableSmtpServer Disable.
+// DisableSMTPServer Disable.
 //
 // POST /smtp-servers/:id/disable
-func (c *Client) DisableSmtpServer(ctx context.Context, id string, opts ...RequestOption) (ServerResponse, error) {
+func (c *Client) DisableSMTPServer(ctx context.Context, id string, opts ...RequestOption) (ServerResponse, error) {
 	return do[ServerResponse](ctx, c, "POST", fmt.Sprintf("/smtp-servers/%s/disable", escape(id)), nil, opts)
 }
 
-// EnableSmtpServer Enable.
+// EnableSMTPServer Enable.
 //
 // POST /smtp-servers/:id/enable
-func (c *Client) EnableSmtpServer(ctx context.Context, id string, opts ...RequestOption) (ServerResponse, error) {
+func (c *Client) EnableSMTPServer(ctx context.Context, id string, opts ...RequestOption) (ServerResponse, error) {
 	return do[ServerResponse](ctx, c, "POST", fmt.Sprintf("/smtp-servers/%s/enable", escape(id)), nil, opts)
 }
 
-// TestSmtpServer Test.
+// TestSMTPServer Test.
 //
 // POST /smtp-servers/:id/test
-func (c *Client) TestSmtpServer(ctx context.Context, id string, opts ...RequestOption) (SmtpserverTestResponse, error) {
-	return do[SmtpserverTestResponse](ctx, c, "POST", fmt.Sprintf("/smtp-servers/%s/test", escape(id)), nil, opts)
+func (c *Client) TestSMTPServer(ctx context.Context, id string, opts ...RequestOption) (SMTPServerTestResponse, error) {
+	return do[SMTPServerTestResponse](ctx, c, "POST", fmt.Sprintf("/smtp-servers/%s/test", escape(id)), nil, opts)
 }
 
 // ListStylesheets List.
@@ -1579,10 +1579,10 @@ func (c *Client) ImportSubscriber(ctx context.Context, body ImportInput, opts ..
 	return do[ImportResponse](ctx, c, "POST", "/subscribers/import", body, opts)
 }
 
-// ImportCsvSubscriber Import CSV.
+// ImportCSVSubscriber Import CSV.
 //
 // POST /subscribers/import/csv
-func (c *Client) ImportCsvSubscriber(ctx context.Context, opts ...RequestOption) (ImportResponse, error) {
+func (c *Client) ImportCSVSubscriber(ctx context.Context, opts ...RequestOption) (ImportResponse, error) {
 	return do[ImportResponse](ctx, c, "POST", "/subscribers/import/csv", nil, opts)
 }
 
