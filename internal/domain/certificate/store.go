@@ -105,17 +105,18 @@ func (s *Store) Put(ctx context.Context, c *certmodel.Certificate) error {
 	notAfter := notAfterOf(c.CertPEM)
 	now := time.Now().UTC()
 
-	_, err = s.Exec(ctx, `
+	// RETURNING, so the caller holds the row as stored: a replacement
+	// keeps the created_at of the row it replaced.
+	return s.QueryRow(ctx, `
 		INSERT INTO certificates (scope, name, data, cert_pem, not_after, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (scope, name) DO UPDATE SET
 			data = EXCLUDED.data,
 			cert_pem = EXCLUDED.cert_pem,
 			not_after = EXCLUDED.not_after,
-			updated_at = EXCLUDED.updated_at`,
-		c.Scope, c.Name, sealed, c.CertPEM, notAfter, now, now)
-
-	return err
+			updated_at = EXCLUDED.updated_at
+		RETURNING created_at, updated_at`,
+		c.Scope, c.Name, sealed, c.CertPEM, notAfter, now, now).Scan(&c.CreatedAt, &c.UpdatedAt)
 }
 
 // PutIfAbsent writes an entry only when the key is free, and reports
@@ -146,8 +147,15 @@ func (s *Store) PutIfAbsent(ctx context.Context, c *certmodel.Certificate) (bool
 	}
 
 	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
 
-	return n > 0, err
+	if n > 0 {
+		c.CreatedAt, c.UpdatedAt = now, now
+	}
+
+	return n > 0, nil
 }
 
 // Delete removes one certificate by id.

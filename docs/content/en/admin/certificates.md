@@ -176,7 +176,9 @@ curl -X POST http://localhost:3000/api/v1/admin/certificates/generate \
 
 Every subject field is optional and the common name defaults to the first host.
 `hosts` is not optional: Go and every browser stopped matching hostnames against the common name years ago, so a
-certificate with no subject alt name matches nothing anywhere.
+certificate with no subject alt name matches nothing anywhere. Each entry must be a host name, a host name under one
+leading `*.` wildcard label, or an IP address - anything else is refused rather than written into a certificate no
+client would match.
 
 Omit `issuer` and it is self-signed, which is the whole of what this endpoint did before authorities existed.
 

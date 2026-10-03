@@ -459,3 +459,39 @@ func clip(s string) string {
 
 	return s
 }
+
+// The row a write hands back carries the timestamps it was stored with,
+// since the create response is built from it. A replacement keeps the
+// created_at of the row it replaced.
+func TestAWriteReportsItsTimestamps(t *testing.T) {
+	s := testStore(t)
+	cert, key := selfSigned(t, "edge.example.com", time.Now().Add(time.Hour))
+
+	first := &certmodel.Certificate{Scope: certmodel.ScopeManaged, Name: "edge", Data: key, CertPEM: cert}
+	if err := s.Put(t.Context(), first); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	if first.CreatedAt.IsZero() || first.UpdatedAt.IsZero() {
+		t.Fatalf("Put left timestamps zero: %v %v", first.CreatedAt, first.UpdatedAt)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	again := &certmodel.Certificate{Scope: certmodel.ScopeManaged, Name: "edge", Data: key, CertPEM: cert}
+	if err := s.Put(t.Context(), again); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	if !again.CreatedAt.Equal(first.CreatedAt) || !again.UpdatedAt.After(first.UpdatedAt) {
+		t.Errorf("replacement: created %v (want %v), updated %v", again.CreatedAt, first.CreatedAt, again.UpdatedAt)
+	}
+
+	fresh := &certmodel.Certificate{Scope: certmodel.ScopeManaged, Name: "root", Data: key, CertPEM: cert}
+	if won, err := s.PutIfAbsent(t.Context(), fresh); err != nil || !won {
+		t.Fatalf("PutIfAbsent: %v %v", won, err)
+	}
+
+	if fresh.CreatedAt.IsZero() || fresh.UpdatedAt.IsZero() {
+		t.Errorf("PutIfAbsent left timestamps zero")
+	}
+}

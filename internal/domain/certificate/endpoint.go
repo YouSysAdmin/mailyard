@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"net"
 	"slices"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
+	"github.com/yousysadmin/mailyard/internal/core/dnsname"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -240,6 +242,12 @@ func (h *Handler) Generate(c fiber.Ctx) error {
 		return resp
 	}
 
+	for _, host := range in.Hosts {
+		if !validSAN(host) {
+			return response.BadRequest(c, host+" is not a host name or an IP address")
+		}
+	}
+
 	var issuer *certgen.Issuer
 	if in.Issuer != "" {
 		var err error
@@ -291,6 +299,12 @@ func (h *Handler) GenerateCA(c fiber.Ctx) error {
 	})
 	if err != nil {
 		return response.BadRequest(c, err.Error())
+	}
+
+	// A listener may be assigned a name before anything is stored under
+	// it, and an authority landing there would be served to every client.
+	if resp, refused := h.refuseCAOverAnAssignedName(c, in.Name, certPEM); refused {
+		return resp
 	}
 
 	rec := &certmodel.Certificate{
@@ -416,13 +430,26 @@ func (h *Handler) store(c fiber.Ctx, name, data, certPEM string) error {
 func (h *Handler) Delete(c fiber.Ctx) error {
 	name := c.Params("name")
 
+	rec, err := h.Runtime.Store.Certificate.GetPublic(c.Context(), certmodel.ScopeManaged, name)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if rec == nil {
+		return response.NotFound(c, "certificate not found")
+	}
+
+	// An authority is never served, whatever is assigned to it.
+	d := detailsOf(rec.CertPEM)
+	servable := d == nil || !d.IsCA
+
 	var dormant []string
 	for listener, assigned := range h.assignments() {
 		if assigned != name {
 			continue
 		}
 
-		if h.terminatesTLS(listener) {
+		if h.terminatesTLS(listener) && servable {
 			return response.BadRequest(c,
 				"the "+listener+" listener is serving this certificate - assign it another one first")
 		}
@@ -644,12 +671,15 @@ func (h *Handler) managed(r *certmodel.Certificate, assignments map[string]strin
 	// is on the wire, Dormant is a recorded intention with no
 	// handshake behind it. Merged, a plaintext listener reads as
 	// serving a certificate.
+	// An authority assigned to a listener is not what it serves: the
+	// resolver skips it and falls through the chain.
+	isCA := m.Details != nil && m.Details.IsCA
 	for listener, assigned := range assignments {
 		if assigned != r.Name {
 			continue
 		}
 
-		if h.terminatesTLS(listener) {
+		if h.terminatesTLS(listener) && !isCA {
 			m.UsedBy = append(m.UsedBy, listener)
 		} else {
 			m.Dormant = append(m.Dormant, listener)
@@ -660,6 +690,17 @@ func (h *Handler) managed(r *certmodel.Certificate, assignments map[string]strin
 	slices.Sort(m.Dormant)
 
 	return m
+}
+
+// validSAN reports whether a requested name can go into a certificate:
+// an IP address, or a host name optionally under one leading wildcard
+// label.
+func validSAN(host string) bool {
+	if net.ParseIP(host) != nil {
+		return true
+	}
+
+	return dnsname.Valid(strings.TrimPrefix(host, "*."))
 }
 
 // detailsOf parses for display, and answers nil rather than an error
