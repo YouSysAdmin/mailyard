@@ -50,10 +50,17 @@ const maxPending = 256
 // webhook domain store.
 type Sink interface {
 	List(ctx context.Context, projID string) ([]*whmodel.Webhook, error)
+
+	// Get re-reads one hook before each attempt, nil when it is gone,
+	// so a delivery follows an edit, a disable or a delete made while
+	// it waited.
+	Get(ctx context.Context, projID, id string) (*whmodel.Webhook, error)
 	RecordDelivery(ctx context.Context, d *whmodel.Delivery) error
 
-	// Disable is called once, after the LAST attempt at a delivery
-	// failed, with the failure that ended it. The hook is out of
+	// Disable is called after the LAST attempt at a delivery failed,
+	// with the failure that ended it. Several deliveries can end on the
+	// same hook at once, so the sink must record the change only when
+	// it actually took the hook out. The hook is out of
 	// rotation until somebody re-enables it - retrying a dead endpoint
 	// on every event forever parked a goroutine per event and held a
 	// delivery slot through every retry sleep, so eight dead hooks
@@ -307,6 +314,15 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 			return
 		}
 
+		current, live := d.current(ctx, h, event)
+		if !live {
+			release()
+
+			return
+		}
+
+		h = current
+
 		// Deferred inside the attempt, so a panic in the post returns
 		// the slots on its way to the recover above rather than
 		// leaking one of the eight for good.
@@ -363,6 +379,27 @@ func (d *Dispatcher) deliver(h *whmodel.Webhook, event string, body []byte) {
 	if err := d.sink.Disable(ctx, h, lastFailure); err != nil {
 		d.log.Error("dispatch: disable webhook", "webhook_id", h.ID, "err", err)
 	}
+}
+
+// current re-reads the hook an attempt is about to use. A hook that was
+// deleted, disabled or unsubscribed from the event since the delivery
+// began ends it quietly, and an edited URL or a rotated secret is used
+// from here on. A failed read keeps the copy in hand rather than
+// dropping the event over a database blip.
+func (d *Dispatcher) current(ctx context.Context, h *whmodel.Webhook, event string) (*whmodel.Webhook, bool) {
+	fresh, err := d.sink.Get(ctx, h.ProjectID, h.ID)
+	if err != nil {
+		d.log.Warn("dispatch: could not re-read the webhook, using the copy in hand",
+			"webhook_id", h.ID, "err", err)
+
+		return h, true
+	}
+
+	if fresh == nil || !fresh.Enabled() || !fresh.Subscribed(event) {
+		return nil, false
+	}
+
+	return fresh, true
 }
 
 func (d *Dispatcher) post(ctx context.Context, h *whmodel.Webhook, event string, body []byte) (int, error) {

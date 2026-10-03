@@ -34,15 +34,23 @@ func (s *DispatchSink) List(ctx context.Context, projID string) ([]*whmodel.Webh
 	return s.Store.List(ctx, projID)
 }
 
+// Get re-reads one hook for the dispatcher, nil when it is gone.
+func (s *DispatchSink) Get(ctx context.Context, projID, id string) (*whmodel.Webhook, error) {
+	return s.Store.Get(ctx, projID, id)
+}
+
 // RecordDelivery files one attempt.
 func (s *DispatchSink) RecordDelivery(ctx context.Context, d *whmodel.Delivery) error {
 	return s.Store.RecordDelivery(ctx, d)
 }
 
 // Disable takes the hook out of rotation and records why, as a project
-// event the owners are mailed about.
+// event the owners are mailed about. Only the call that actually moved
+// the hook records and raises - every delivery in flight on a dead
+// endpoint ends here, and one disable is one event.
 func (s *DispatchSink) Disable(ctx context.Context, h *whmodel.Webhook, reason string) error {
-	if err := s.Store.Disable(ctx, h.ProjectID, h.ID, reason); err != nil {
+	changed, err := s.Store.Disable(ctx, h.ProjectID, h.ID, reason)
+	if err != nil || !changed {
 		return err
 	}
 

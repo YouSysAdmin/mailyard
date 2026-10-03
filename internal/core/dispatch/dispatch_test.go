@@ -19,16 +19,54 @@ type memSink struct {
 	mu         sync.Mutex
 	hooks      []*whmodel.Webhook
 	deliveries []*whmodel.Delivery
+	disabled   int
+}
+
+// edit changes the stored hook under the lock, the way a console edit
+// lands while a delivery waits.
+func (s *memSink) edit(id string, fn func(*whmodel.Webhook)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, h := range s.hooks {
+		if h.ID == id {
+			if fn == nil {
+				s.hooks = append(s.hooks[:i], s.hooks[i+1:]...)
+
+				return
+			}
+
+			fn(h)
+		}
+	}
 }
 
 func (s *memSink) List(context.Context, string) ([]*whmodel.Webhook, error) {
 	return s.hooks, nil
 }
 
+func (s *memSink) Get(_ context.Context, _, id string) (*whmodel.Webhook, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, h := range s.hooks {
+		if h.ID == id {
+			c := *h
+
+			return &c, nil
+		}
+	}
+
+	return nil, nil
+}
+
 func (s *memSink) Disable(_ context.Context, h *whmodel.Webhook, reason string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	h.DisabledAt, h.DisabledReason = new(time.Now()), reason
+	s.disabled++
+	for _, stored := range s.hooks {
+		if stored.ID == h.ID {
+			stored.DisabledAt, stored.DisabledReason = new(time.Now()), reason
+		}
+	}
 
 	return nil
 }
@@ -223,6 +261,16 @@ func (s *projectSink) List(_ context.Context, projID string) ([]*whmodel.Webhook
 	return s.hooks[projID], nil
 }
 
+func (s *projectSink) Get(_ context.Context, projID, id string) (*whmodel.Webhook, error) {
+	for _, h := range s.hooks[projID] {
+		if h.ID == id {
+			return h, nil
+		}
+	}
+
+	return nil, nil
+}
+
 // panicTransport stands in for a network stack that panics mid-post.
 type panicTransport struct{}
 
@@ -250,5 +298,95 @@ func TestAPanickingPostReturnsItsSlots(t *testing.T) {
 
 	if got := len(d.slot("proj")); got != 0 {
 		t.Errorf("%d project slots still held after the panics", got)
+	}
+}
+
+// A delivery re-reads its hook before every attempt: a retry after the
+// URL was edited goes to the new one, and a hook deleted while the
+// delivery waited ends it with no further attempt and no disable.
+func TestARetryFollowsTheHookAsItIsNow(t *testing.T) {
+	var mu sync.Mutex
+	hitsA, hitsB := 0, 0
+	sink := &memSink{}
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hitsB++
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer b.Close()
+
+	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hitsA++
+		mu.Unlock()
+		sink.edit("h1", func(h *whmodel.Webhook) { h.URL = b.URL })
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer a.Close()
+
+	sink.hooks = []*whmodel.Webhook{{ID: "h1", ProjectID: "proj", URL: a.URL, Events: []string{whmodel.EventEmailSent}}}
+	d := testDispatcher(sink)
+	d.Emit(t.Context(), "proj", whmodel.EventEmailSent, "", nil)
+	d.Close(2 * time.Second)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if hitsA != 1 || hitsB != 1 {
+		t.Errorf("hits: old url %d, new url %d, want 1 and 1", hitsA, hitsB)
+	}
+}
+
+func TestADeletedHookStopsRetrying(t *testing.T) {
+	sink := &memSink{}
+	var mu sync.Mutex
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		sink.edit("h1", nil)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	sink.hooks = []*whmodel.Webhook{{ID: "h1", ProjectID: "proj", URL: srv.URL, Events: []string{whmodel.EventEmailSent}}}
+	d := testDispatcher(sink)
+	d.Emit(t.Context(), "proj", whmodel.EventEmailSent, "", nil)
+	d.Close(2 * time.Second)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if hits != 1 {
+		t.Errorf("attempts = %d, want 1 - the hook was deleted after the first", hits)
+	}
+
+	if sink.disabled != 0 {
+		t.Errorf("Disable called %d times for a deleted hook", sink.disabled)
+	}
+}
+
+func TestADisabledHookStopsRetrying(t *testing.T) {
+	sink := &memSink{}
+	var mu sync.Mutex
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		sink.edit("h1", func(h *whmodel.Webhook) { h.DisabledAt = new(time.Now()) })
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	sink.hooks = []*whmodel.Webhook{{ID: "h1", ProjectID: "proj", URL: srv.URL, Events: []string{whmodel.EventEmailSent}}}
+	d := testDispatcher(sink)
+	d.Emit(t.Context(), "proj", whmodel.EventEmailSent, "", nil)
+	d.Close(2 * time.Second)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if hits != 1 || sink.disabled != 0 {
+		t.Errorf("attempts %d, disables %d, want 1 and 0", hits, sink.disabled)
 	}
 }

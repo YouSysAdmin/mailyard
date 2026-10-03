@@ -1049,8 +1049,9 @@ type WebhookStore interface {
 	Delete(ctx context.Context, projID, id string) error
 
 	// Disable is the dispatcher giving up on an endpoint, Enable the
-	// owner putting it back. Enable reports whether the id existed.
-	Disable(ctx context.Context, projID, id, reason string) error
+	// owner putting it back. Disable reports whether this call took an
+	// enabled hook out, Enable whether the id existed.
+	Disable(ctx context.Context, projID, id, reason string) (bool, error)
 	Enable(ctx context.Context, projID, id string) (bool, error)
 
 	// RotateSecret replaces the signing secret and reports whether the

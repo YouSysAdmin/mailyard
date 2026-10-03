@@ -135,6 +135,13 @@ Delivery is attempted `webhook.max_attempts` times (3 by default, **including** 
 `webhook.retry_delay` between attempts (10s) and each request bounded by `webhook.timeout` (10s). Any `2xx` is success.
 Redirects are not followed.
 
+Each attempt reads the webhook as it is at that moment. A retry after the URL was edited or the secret rotated goes to
+the new URL with the new signature, and a delivery whose webhook was deleted, disabled or unsubscribed from the event in
+the meantime stops without another attempt. When several deliveries give up on the same endpoint, the webhook is
+disabled once, with one audit event and one notification.
+
+The URL must be `http://` or `https://`.
+
 Every attempt is recorded — see [Delivery Tracking](/docs/webhooks/delivery-tracking), which also covers what happens
 when the attempts run out.
 

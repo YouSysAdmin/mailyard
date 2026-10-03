@@ -131,16 +131,24 @@ func (s *Store) Put(ctx context.Context, h *whmodel.Webhook) error {
 }
 
 // Disable takes a hook out of rotation with the reason the dispatcher
-// gave up. Scoped by project like every other write, though the
-// dispatcher already holds the row - a caller handing it a foreign hook
-// must still change nothing.
-func (s *Store) Disable(ctx context.Context, projID, id, reason string) error {
-	_, err := s.Exec(ctx, `
+// gave up, and reports whether this call is what disabled it. Scoped by
+// project like every other write, though the dispatcher already holds
+// the row - a caller handing it a foreign hook must still change
+// nothing. Of several deliveries giving up on one hook at once only one
+// sees true, which is what keeps the audit event and the notification
+// to one.
+func (s *Store) Disable(ctx context.Context, projID, id, reason string) (bool, error) {
+	res, err := s.Exec(ctx, `
         UPDATE webhooks SET disabled_at = now(), disabled_reason = ?
         WHERE project_id = ? AND id = ? AND disabled_at IS NULL
     `, reason, projID, id)
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	n, err := res.RowsAffected()
+
+	return n > 0, err
 }
 
 // Enable puts a disabled hook back. Reports whether a row changed, so
@@ -195,13 +203,18 @@ func (s *Store) RecordDelivery(ctx context.Context, d *whmodel.Delivery) error {
 		d.CreatedAt = time.Now().UTC()
 	}
 
+	// Written only while the hook exists. A hook deleted during an
+	// attempt has nowhere to file it, and the foreign key would turn a
+	// finished delivery into an error.
 	_, err := s.Exec(ctx, `
         INSERT INTO webhook_deliveries (
             id, webhook_id, project_id, event, status, http_status,
             error_message, attempt, created_at, payload
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, d.ID, d.WebhookID, d.ProjectID, d.Event, d.Status, d.HTTPStatus,
-		d.ErrorMessage, d.Attempt, d.CreatedAt, d.Payload)
+        )
+        SELECT ?, w.id, w.project_id, ?, ?, ?, ?, ?, ?, ?
+        FROM webhooks w WHERE w.id = ? AND w.project_id = ?
+    `, d.ID, d.Event, d.Status, d.HTTPStatus,
+		d.ErrorMessage, d.Attempt, d.CreatedAt, d.Payload, d.WebhookID, d.ProjectID)
 
 	return err
 }
@@ -397,13 +410,13 @@ func (h *Handler) Create(c fiber.Ctx) error {
 // actually enforces it, because a name can resolve differently between
 // this moment and the first delivery.
 func (h *Handler) refuseTarget(c fiber.Ctx, target string) string {
-	if h.Runtime.Config.Webhook.AllowPrivateTargets {
-		return ""
+	u, err := url.Parse(target)
+	if err != nil || u.Hostname() == "" || (!strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https")) {
+		return "url is not a valid absolute http(s) url"
 	}
 
-	u, err := url.Parse(target)
-	if err != nil || u.Hostname() == "" {
-		return "url is not a valid absolute http(s) url"
+	if h.Runtime.Config.Webhook.AllowPrivateTargets {
+		return ""
 	}
 
 	if !safedial.HostAllowed(c.Context(), u.Hostname()) {
@@ -515,7 +528,7 @@ func (h *Handler) Disable(c fiber.Ctx) error {
 		return response.NotFound(c, "webhook not found")
 	}
 
-	if err := h.Runtime.Store.Webhook.Disable(c.Context(), rc.Project.ID, hook.ID, reason); err != nil {
+	if _, err := h.Runtime.Store.Webhook.Disable(c.Context(), rc.Project.ID, hook.ID, reason); err != nil {
 		return response.Internal(c, err)
 	}
 
