@@ -59,7 +59,7 @@ func TestAnIdentityProviderSignInOwesTheSecondFactor(t *testing.T) {
 	})
 	app.Post("/2fa", h.OAuthSecondFactor)
 
-	res, err := app.Test(httptest.NewRequest(http.MethodGet, "/pending", nil))
+	res, err := app.Test(httptest.NewRequest(http.MethodGet, "/pending", nil), fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestAnIdentityProviderSignInOwesTheSecondFactor(t *testing.T) {
 			req.AddCookie(pending)
 		}
 
-		res, err := app.Test(req)
+		res, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -85,7 +85,7 @@ func TestARefusedConfirmationSaysWhy(t *testing.T) {
 
 	ask := func(pw string) (int, string) {
 		t.Helper()
-		res, err := app.Test(httptest.NewRequest(fiber.MethodPost, "/?pw="+pw, nil))
+		res, err := app.Test(httptest.NewRequest(fiber.MethodPost, "/?pw="+pw, nil), fiber.TestConfig{Timeout: 0})
 		if err != nil {
 			t.Fatal(err)
 		}
