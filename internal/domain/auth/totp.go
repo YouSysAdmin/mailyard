@@ -22,19 +22,6 @@ import (
 // authenticator app. Re-running setup replaces a pending secret but
 // refuses when 2FA is already enabled - disable first.
 //
-// A live session is the whole gate, and no password re-auth, which is
-// deliberate rather than an omission - it reads like one beside
-// PasskeyRegisterBegin, which does demand the password.
-//
-// The reason that rule gives is the reason it does not extend here:
-// enrolling or removing a passkey changes HOW THE ACCOUNT CAN BE
-// ENTERED, so a hijacked session must not be enough. Enrolling a second
-// factor adds a REQUIREMENT to entering it. The worst a hijacked session
-// achieves is locking the owner out, which is recoverable - ResetTOTP
-// exists for exactly that and refuses to run on the caller's own
-// account, so a stolen admin session cannot use it to strip its own
-// second factor.
-//
 // Disabling is gated by a CODE, which proves possession. Enrolling is
 // gated by the PASSWORD, as passkey enrolment is, so a hijacked
 // session cannot enrol a factor the owner does not hold.
@@ -74,13 +61,8 @@ func (h *Handler) TOTPSetup(c fiber.Ctx) error {
 		return response.Conflict(c, "two-factor auth is already enabled, disable it first")
 	}
 
-	if !h.reauthenticated(c.Context(), u, in.Password) {
-		h.Runtime.Audit.Security(c, &amodel.Event{
-			Type: amodel.TypeLoginFailed, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusForbidden,
-			Detail: "wrong password confirming two-factor enrolment",
-		})
-
-		return response.Forbidden(c, "wrong password")
+	if refusal, refused := h.refuseReauth(c, u, in.Password, amodel.TypeLoginFailed, "two-factor enrolment"); refused {
+		return refusal
 	}
 
 	key, err := totp.Generate(totp.GenerateOpts{

@@ -40,6 +40,10 @@ export const authApi = {
   login: (email: string, password: string, totpCode?: string) =>
     appApi.post<{ user: User }>('/auth/login', { email, password, totp_code: totpCode }),
   logout: () => appApi.post('/auth/logout'),
+  // The code an identity provider sign-in still owes when the account
+  // has two-factor auth on. The pending sign-in rides in a cookie.
+  ssoSecondFactor: (totpCode: string) =>
+    appApi.post<{ user: User; invite?: string }>('/auth/oauth/2fa', { totp_code: totpCode }),
   // On installs with system mail the account is created unverified
   // and the response carries verification_required instead of a user.
   register: (email: string, password: string) =>

@@ -24,6 +24,10 @@ const (
 	// old assertion or downgrade the ceremony it is checked against,
 	// so it gets a key of its own rather than sharing the at-rest one.
 	KeyPasskey = "mailyard/passkey-ceremony/v1"
+
+	// KeyOIDCSecondFactor seals the cookie that carries an identity
+	// provider sign-in across to the second factor it still owes.
+	KeyOIDCSecondFactor = "mailyard/oidc-second-factor/v1"
 )
 
 // DeriveKey expands the operator's single jwt_secret into a

@@ -251,6 +251,10 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	oauthLimiter := perMinute(rt, rt.Config.RateLimit.OIDCPerMinute, nil)
 	appAPI.Get("/auth/oauth/:slug/start", oauthLimiter, ah.OAuthStart)
 	appAPI.Get("/auth/oauth/:slug/callback", oauthLimiter, ah.OAuthCallback)
+	// The code an identity provider sign-in still owes when the account
+	// has two-factor auth on. It finishes a sign-in, so it shares the
+	// login budget like the other ways in.
+	appAPI.Post("/auth/oauth/2fa", loginLimiter, requireJSONBody, ah.OAuthSecondFactor)
 
 	// The product surface. Everything usable remotely lives here:
 	// sending, templates, campaigns, domains, and platform

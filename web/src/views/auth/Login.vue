@@ -32,6 +32,11 @@ const passkeyLoading = ref(false)
 // can run the ceremony. Resolved once on mount so the button does not
 // flicker in.
 const passkeyReady = ref(false)
+// An identity provider sign-in to an account with two-factor auth on
+// lands here owing the code.
+const ssoSecondFactor = ref(route.query.sso_2fa === '1')
+const ssoCode = ref('')
+const ssoLoading = ref(false)
 
 const ssoErrors: Record<string, string> = {
   sso_idp_error: 'The identity provider reported an error',
@@ -141,6 +146,27 @@ async function submit() {
   }
 }
 
+async function submitSsoCode() {
+  if (!ssoCode.value) return
+  ssoLoading.value = true
+  error.value = ''
+  try {
+    const res = await authApi.ssoSecondFactor(ssoCode.value)
+    auth.setUser(res.data.user)
+    if (res.data.invite) {
+      enterInvitation(res.data.invite)
+
+      return
+    }
+
+    afterSignIn()
+  } catch (e) {
+    error.value = apiErrorMessage(e, 'Sign in failed')
+  } finally {
+    ssoLoading.value = false
+  }
+}
+
 async function resendVerification() {
   if (!email.value) return
   resendLoading.value = true
@@ -189,7 +215,29 @@ function ssoLogin(p: LoginProvider) {
       </button>
     </div>
 
-    <form class="auth-form" v-if="info?.local_enabled !== false" @submit.prevent="submit">
+    <form v-if="ssoSecondFactor" class="auth-form" @submit.prevent="submitSsoCode">
+      <FormField label="Authenticator or recovery code" for="sso-totp">
+        <input
+          id="sso-totp"
+          v-model="ssoCode"
+          type="text"
+          class="form-input"
+          maxlength="19"
+          autocomplete="one-time-code"
+          placeholder="123456 or xxxx-xxxx-xxxx-xxxx"
+          required
+        />
+      </FormField>
+      <button class="btn btn-primary btn-block" type="submit" :disabled="ssoLoading">
+        {{ ssoLoading ? 'Signing in...' : 'Continue' }}
+      </button>
+    </form>
+
+    <form
+      class="auth-form"
+      v-if="!ssoSecondFactor && info?.local_enabled !== false"
+      @submit.prevent="submit"
+    >
       <FormField label="Email" for="email">
         <input
           id="email"
@@ -235,7 +283,7 @@ function ssoLogin(p: LoginProvider) {
       </p>
     </form>
 
-    <template v-if="passkeyReady || info?.providers?.length">
+    <template v-if="!ssoSecondFactor && (passkeyReady || info?.providers?.length)">
       <div v-if="info?.local_enabled !== false" class="auth-or"><span>or</span></div>
       <button
         v-if="passkeyReady"

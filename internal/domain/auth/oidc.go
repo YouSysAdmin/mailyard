@@ -4,6 +4,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	coreoidc "github.com/yousysadmin/mailyard/internal/core/oidc"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/validation"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	opmodel "github.com/yousysadmin/mailyard/internal/models/oauthprovider"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
@@ -162,7 +164,28 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 		return redirectLogin(c, "sso_access_denied")
 	}
 
-	if err := h.startSession(c, u, row.ID); err != nil {
+	// An account carrying a second factor owes it whatever proved the
+	// first one, so the provider's word alone does not open a session.
+	// The sign-in waits in a sealed cookie for the code.
+	if u.TOTPEnabled {
+		if err := h.setPendingSecondFactor(c, pendingSecondFactor{
+			UserID: u.ID, ProviderID: row.ID, ProviderSlug: row.Slug, Invite: invite,
+			Expires: time.Now().Add(oidcSecondFactorTTL),
+		}); err != nil {
+			return response.Internal(c, err)
+		}
+
+		return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/login?sso_2fa=1")
+	}
+
+	return h.finishOIDCSignIn(c, u, row.ID, row.Slug, invite, true)
+}
+
+// finishOIDCSignIn opens the session for an identity provider sign-in
+// and either redirects (the callback) or answers JSON (the second
+// factor step).
+func (h *Handler) finishOIDCSignIn(c fiber.Ctx, u *usermodel.User, providerID, providerSlug, invite string, redirect bool) error {
+	if err := h.startSession(c, u, providerID); err != nil {
 		return response.Internal(c, err)
 	}
 
@@ -179,14 +202,23 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	// satisfying an allowlist from being a privilege grant, and it means
 	// somebody the provider admits simply belongs to nothing until they
 	// are invited - which the projects page answers.
-	slog.Info("auth: oauth login", "user_id", u.ID, "provider", row.Slug)
+	status := fiber.StatusFound
+	if !redirect {
+		status = fiber.StatusOK
+	}
+
+	slog.Info("auth: oauth login", "user_id", u.ID, "provider", providerSlug)
 	h.Runtime.Audit.Security(c, &amodel.Event{
 		Type:       amodel.TypeOIDCLogin,
 		ActorID:    u.ID,
 		ActorEmail: u.Email,
-		Status:     fiber.StatusFound,
-		Detail:     "provider " + row.Slug,
+		Status:     status,
+		Detail:     "provider " + providerSlug,
 	})
+
+	if !redirect {
+		return response.Success(c, OIDCSecondFactorResponse{User: u, Invite: invite})
+	}
 
 	// Back to the invitation the sign-in started from, if it started
 	// from one. Otherwise the console root.
@@ -203,6 +235,112 @@ func (h *Handler) OAuthCallback(c fiber.Ctx) error {
 	}
 
 	return c.Redirect().Status(fiber.StatusFound).To(env.ConsolePath + "/")
+}
+
+// oidcSecondFactorTTL is how long a provider sign-in waits for its
+// second factor.
+const oidcSecondFactorTTL = 5 * time.Minute
+
+// oidcSecondFactorCookie carries the pending sign-in.
+const oidcSecondFactorCookie = "mailyard_oidc_2fa"
+
+// pendingSecondFactor is a provider sign-in still owing a code.
+type pendingSecondFactor struct {
+	UserID       string    `json:"user_id"`
+	ProviderID   string    `json:"provider_id"`
+	ProviderSlug string    `json:"provider_slug"`
+	Invite       string    `json:"invite"`
+	Expires      time.Time `json:"expires"`
+}
+
+func (h *Handler) secondFactorSealer() *crypto.Service {
+	return crypto.NewFor(h.Runtime.Config.Auth.JWTSecret, crypto.KeyOIDCSecondFactor)
+}
+
+func (h *Handler) setPendingSecondFactor(c fiber.Ctx, p pendingSecondFactor) error {
+	b, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+
+	enc, err := h.secondFactorSealer().Encrypt(string(b))
+	if err != nil {
+		return err
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name: oidcSecondFactorCookie, Value: enc, Path: "/", HTTPOnly: true,
+		SameSite: "Strict", Secure: cookieSecure(c, h.Runtime), Expires: p.Expires,
+	})
+
+	return nil
+}
+
+func (h *Handler) clearPendingSecondFactor(c fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{
+		Name: oidcSecondFactorCookie, Value: "", Path: "/", HTTPOnly: true,
+		SameSite: "Strict", Secure: cookieSecure(c, h.Runtime),
+		Expires: time.Unix(0, 0), MaxAge: -1,
+	})
+}
+
+// pendingSecondFactorOf reads the cookie, or nil when there is none or
+// it has lapsed.
+func (h *Handler) pendingSecondFactorOf(c fiber.Ctx) *pendingSecondFactor {
+	raw := c.Cookies(oidcSecondFactorCookie)
+	if raw == "" {
+		return nil
+	}
+
+	plain, err := h.secondFactorSealer().Decrypt(raw)
+	if err != nil {
+		return nil
+	}
+
+	var p pendingSecondFactor
+	if err := json.Unmarshal([]byte(plain), &p); err != nil || time.Now().After(p.Expires) {
+		return nil
+	}
+
+	return &p
+}
+
+// OAuthSecondFactor serves POST /app/api/auth/oauth/2fa: the code an
+// identity provider sign-in still owes for an account with two-factor
+// auth on. Same check, same single use and same lock as the code on a
+// password sign-in.
+func (h *Handler) OAuthSecondFactor(c fiber.Ctx) error {
+	in, resp, ok := validation.Bind[oidcSecondFactorInput](c)
+	if !ok {
+		return resp
+	}
+
+	p := h.pendingSecondFactorOf(c)
+	if p == nil {
+		return response.Unauthorized(c, "the sign-in expired, start again")
+	}
+
+	u, err := h.Runtime.Store.User.GetByID(c.Context(), p.UserID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if u == nil || u.Disabled {
+		h.clearPendingSecondFactor(c)
+
+		return response.Unauthorized(c, "the sign-in expired, start again")
+	}
+
+	// Two-factor auth switched off in between leaves nothing owed.
+	if u.TOTPEnabled && !h.consumeSecondFactor(c, u, in.TOTPCode) {
+		h.recordLoginFailure(c, u, u.Email, "wrong two-factor code after identity provider "+p.ProviderSlug)
+
+		return response.Unauthorized(c, "invalid two-factor code")
+	}
+
+	h.clearPendingSecondFactor(c)
+
+	return h.finishOIDCSignIn(c, u, p.ProviderID, p.ProviderSlug, p.Invite, false)
 }
 
 // inviteToken keeps only what an invitation token can be: 64 hex
@@ -253,7 +391,11 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 		}
 
 		if u != nil {
-			h.linkIdentity(ctx, prov, u, claims)
+			// A disabled account is refused by the caller, and nothing
+			// is written for it on the way.
+			if !u.Disabled {
+				h.linkIdentity(ctx, prov, u, claims)
+			}
 
 			return u, nil
 		}
@@ -284,7 +426,9 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 				return nil, fmt.Errorf("an unverified account already exists for %s", email)
 			}
 
-			h.linkIdentity(ctx, prov, existing, claims)
+			if !existing.Disabled {
+				h.linkIdentity(ctx, prov, existing, claims)
+			}
 
 			return existing, nil
 		}

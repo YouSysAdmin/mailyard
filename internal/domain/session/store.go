@@ -95,10 +95,11 @@ func (s *Store) Put(ctx context.Context, m *smodel.Session) error {
 	return err
 }
 
-// Revoke kills one session. Scoped by user so a caller can only
-// revoke their own - the id alone is not authority.
+// Revoke kills one live session. Scoped by user so a caller can only
+// revoke their own - the id alone is not authority. false means no
+// such session, or one already revoked.
 func (s *Store) Revoke(ctx context.Context, userID, id string) (bool, error) {
-	res, err := s.Exec(ctx, `UPDATE sessions SET revoked = TRUE WHERE user_id = ? AND id = ?`, userID, id)
+	res, err := s.Exec(ctx, `UPDATE sessions SET revoked = TRUE WHERE user_id = ? AND id = ? AND revoked = FALSE`, userID, id)
 	if err != nil {
 		return false, err
 	}

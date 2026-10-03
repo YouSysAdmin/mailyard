@@ -235,8 +235,8 @@ func (h *Handler) RecoveryCodesRegenerate(c fiber.Ctx) error {
 		return resp
 	}
 
-	if !h.reauthenticated(c.Context(), u, in.Password) {
-		return response.Unauthorized(c, "password is incorrect")
+	if refusal, refused := h.refuseReauth(c, u, in.Password, amodel.TypeLoginFailed, "new recovery codes"); refused {
+		return refusal
 	}
 
 	if !u.TOTPEnabled {

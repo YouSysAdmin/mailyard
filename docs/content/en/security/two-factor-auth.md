@@ -16,6 +16,10 @@ then enter a code to confirm. From then on sign-in asks for a code after the pas
 
 A code is single use: presenting the same one twice is refused, even inside the 90-second skew window.
 
+A local account that has been linked to an identity provider - by signing in through it with the same verified email -
+keeps its second factor. Signing in through the provider then asks for the code as well, before any session is opened:
+the provider proves the first factor, not the second.
+
 ## Recovery codes
 
 Turning 2FA on also hands you **ten recovery codes**, shown once. Each one signs you in a single time in place of the

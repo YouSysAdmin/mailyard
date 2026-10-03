@@ -70,6 +70,10 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		return resp
 	}
 
+	// Every refusal below answers no sooner than loginFailureFloor
+	// after this, so the legs cannot be told apart by timing.
+	start := time.Now()
+
 	u, err := h.Runtime.Store.User.Get(c.Context(), in.Email)
 	if err != nil {
 		return response.Internal(c, err)
@@ -83,7 +87,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		_ = authenticator.VerifyDummyPassword(in.Password)
 		h.recordLoginFailure(c, u, in.Email, "unknown or disabled account")
 
-		return response.Unauthorized(c, "invalid credentials")
+		return refuseLogin(c, start)
 	}
 
 	// A locked account answers like a wrong password, and BEFORE the
@@ -102,7 +106,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		_ = authenticator.VerifyDummyPassword(in.Password)
 		h.recordLoginFailure(c, u, in.Email, "account locked")
 
-		return response.Unauthorized(c, "invalid credentials")
+		return refuseLogin(c, start)
 	}
 
 	if !authenticator.VerifyPassword(u.PasswordHash, in.Password) {
@@ -110,7 +114,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		h.recordPasswordFailure(c.Context(), u.ID)
 		h.chargeAddress(u.ID, ip)
 
-		return response.Unauthorized(c, "invalid credentials")
+		return refuseLogin(c, start)
 	}
 
 	h.clearPasswordFailures(c.Context(), u.ID)
@@ -231,8 +235,8 @@ func (h *Handler) Register(c fiber.Ctx) error {
 			return response.Internal(c, err)
 		}
 
-		// No session: the mailbox has to answer first. The link signs
-		// the account in when clicked.
+		// No session: the mailbox has to answer first, and confirming
+		// it does not sign the account in either.
 		return response.Created(c, RegisterPendingResponse{
 			VerificationRequired: true,
 			Message:              "Check your mailbox for a confirmation link to finish signing up.",
@@ -415,26 +419,76 @@ func addressKey(ip string) string {
 	return p.String()
 }
 
+// loginFailureFloor is the least time a refused sign-in takes. A known
+// account does database work an unknown one does not, and the floor
+// hides the difference.
+const loginFailureFloor = 750 * time.Millisecond
+
+// refuseLogin answers a refused sign-in once loginFailureFloor has
+// passed since start.
+func refuseLogin(c fiber.Ctx, start time.Time) error {
+	if wait := loginFailureFloor - time.Since(start); wait > 0 {
+		time.Sleep(wait)
+	}
+
+	return response.Unauthorized(c, "invalid credentials")
+}
+
 // reauthenticated confirms the signed-in caller's password for a
 // sensitive change. It spends the same lockout as sign-in, so a stolen
 // session cannot guess the password faster than a stranger can, and a
 // locked account is refused without the password being looked at.
 func (h *Handler) reauthenticated(ctx context.Context, u *usermodel.User, password string) bool {
+	ok, _ := h.checkReauth(ctx, u, password)
+
+	return ok
+}
+
+// checkReauth is reauthenticated, also reporting whether a refusal
+// came from the lock rather than the password.
+func (h *Handler) checkReauth(ctx context.Context, u *usermodel.User, password string) (ok, locked bool) {
 	if h.loginLocked(ctx, u.ID) {
 		_ = authenticator.VerifyDummyPassword(password)
 
-		return false
+		return false, true
 	}
 
 	if !authenticator.VerifyPassword(u.PasswordHash, password) {
 		h.recordPasswordFailure(ctx, u.ID)
 
-		return false
+		return false, false
 	}
 
 	h.clearPasswordFailures(ctx, u.ID)
 
-	return true
+	return true, false
+}
+
+// refuseReauth confirms the password for a sensitive change and, when
+// it fails, records the failure and answers it. The answer is 403, not
+// 401: the session is fine, and the console reads 401 as an expired
+// one. A lock says it is a lock, since the right password would not
+// have helped.
+func (h *Handler) refuseReauth(c fiber.Ctx, u *usermodel.User, password, evType, action string) (error, bool) {
+	ok, locked := h.checkReauth(c.Context(), u, password)
+	if ok {
+		return nil, false
+	}
+
+	detail, msg := "wrong password confirming "+action, "current password is incorrect"
+	if locked {
+		detail = "account locked confirming " + action
+		msg = "this account is temporarily locked after failed sign-in attempts, " +
+			"try again later or sign in again from a trusted address"
+	}
+
+	slog.Warn("auth: password confirmation refused", "user_id", u.ID, "action", action, "locked", locked,
+		"client_ip", clientip.From(c))
+	h.Runtime.Audit.Security(c, &amodel.Event{
+		Type: evType, ActorID: u.ID, ActorEmail: u.Email, Status: fiber.StatusForbidden, Detail: detail,
+	})
+
+	return response.Forbidden(c, msg), true
 }
 
 // clearPasswordFailures forgets the count after a right password.

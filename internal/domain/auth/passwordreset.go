@@ -15,11 +15,13 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/core/systemmail"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	prmodel "github.com/yousysadmin/mailyard/internal/models/passwordreset"
+	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
 )
 
 // maxResetsPerHour caps how many links one account can be mailed.
@@ -76,22 +78,42 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 		return accepted()
 	}
 
+	// The rest runs after the answer, so an address with an account
+	// costs no more time than one without.
+	ip := clientip.From(c)
+	safego.Go(h.Runtime.Log, "auth: password reset", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), resetIssueTimeout)
+		defer cancel()
+
+		if err := h.issueReset(ctx, u, ip); err != nil {
+			slog.Error("auth: password reset failed", "user_id", u.ID, "err", err)
+		}
+	})
+
+	return accepted()
+}
+
+// resetIssueTimeout bounds the work a reset request does after it has
+// answered.
+const resetIssueTimeout = 30 * time.Second
+
+// issueReset spends the mail budget, stores a token and mails the link.
+func (h *Handler) issueReset(ctx context.Context, u *usermodel.User, ip string) error {
 	now := time.Now().UTC()
-	throttled, err := h.mailBudgetSpent(c, u.ID, now, maxResetsPerHour, maxResetsPerHourPerAccount,
-		h.Runtime.Store.PasswordReset.RecentRequestIPs)
+	ips, err := h.Runtime.Store.PasswordReset.RecentRequestIPs(ctx, u.ID, now.Add(-time.Hour))
 	if err != nil {
-		return response.Internal(c, err)
+		return err
 	}
 
-	if throttled {
-		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", clientip.From(c))
+	if budgetSpent(ips, ip, maxResetsPerHour, maxResetsPerHourPerAccount) {
+		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", ip)
 
-		return accepted()
+		return nil
 	}
 
 	plaintext, hash, err := prmodel.Generate()
 	if err != nil {
-		return response.Internal(c, err)
+		return err
 	}
 
 	tok := &prmodel.Token{
@@ -100,23 +122,20 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 		TokenHash: hash,
 		ExpiresAt: now.Add(prmodel.TTL),
 		CreatedAt: now,
-		RequestIP: clientip.From(c),
+		RequestIP: ip,
 	}
-	if err := h.Runtime.Store.PasswordReset.Put(c.Context(), tok); err != nil {
-		return response.Internal(c, err)
+	if err := h.Runtime.Store.PasswordReset.Put(ctx, tok); err != nil {
+		return err
 	}
 
 	link := strings.TrimRight(h.Runtime.Config.Server.PublicURL, "/") +
 		env.ConsolePath + "/reset-password?token=" + plaintext
 	subject, htmlBody, textBody := systemmail.PasswordReset(link, int(prmodel.TTL.Minutes()))
-
-	// Async: the caller must not learn from response timing whether a
-	// mail was actually dispatched.
 	h.Runtime.SystemMail.SendAsync([]string{u.Email}, subject, htmlBody, textBody)
 
-	slog.Info("auth: password reset requested", "user_id", u.ID, "client_ip", clientip.From(c))
+	slog.Info("auth: password reset requested", "user_id", u.ID, "client_ip", ip)
 
-	return accepted()
+	return nil
 }
 
 // PasswordResetConfirm redeems a token and sets the new password.
@@ -251,16 +270,8 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 			"this account signs in through an identity provider, change the password there")
 	}
 
-	if !h.reauthenticated(c.Context(), u, in.CurrentPassword) {
-		slog.Warn("auth: password change refused", "user_id", u.ID, "client_ip", clientip.From(c))
-		h.Runtime.Audit.Security(c, &amodel.Event{
-			Type:       amodel.TypePasswordChanged,
-			ActorID:    u.ID,
-			ActorEmail: u.Email,
-			Status:     fiber.StatusForbidden,
-		})
-
-		return response.Forbidden(c, "current password is incorrect")
+	if refusal, refused := h.refuseReauth(c, u, in.CurrentPassword, amodel.TypePasswordChanged, "a password change"); refused {
+		return refusal
 	}
 
 	hash, err := authenticator.HashPassword(in.Password)

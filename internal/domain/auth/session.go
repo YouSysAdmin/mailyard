@@ -124,6 +124,12 @@ func (h *Handler) RevokeSession(c fiber.Ctx) error {
 	}
 
 	if !ok {
+		// Revoking one already revoked changes nothing and records
+		// nothing.
+		if target != nil && target.UserID == rc.User.ID && target.Revoked {
+			return response.Success(c, RevokedResponse{Revoked: 0})
+		}
+
 		return response.NotFound(c, "session not found")
 	}
 

@@ -94,7 +94,15 @@ func ConsoleDocs() []apidoc.Route {
 				{Name: "error", Description: "The provider's error code when it refused."},
 				{Name: "error_description", Description: "The provider's explanation of the error."},
 			},
-			Responses: []apidoc.Response{apidoc.Redirect(302, "The console, signed in.")},
+			Responses: []apidoc.Response{apidoc.Redirect(302, "The console, signed in, or its sign-in page asking for the two-factor code.")},
+		},
+		{
+			Method:      "POST",
+			Path:        "/auth/oauth/2fa",
+			Summary:     "Identity provider second factor",
+			Description: "Open, no session needed. Finishes an identity provider sign-in for an account with two-factor auth on, carried by the cookie the callback set.",
+			Request:     oidcSecondFactorInput{},
+			Responses:   []apidoc.Response{apidoc.OK("The account, now signed in.", OIDCSecondFactorResponse{})},
 		},
 		{
 			Method:      "GET",

@@ -282,8 +282,8 @@ func wantsHTML(c fiber.Ctx) bool {
 // requireJSONBody refuses a body that is not application/json.
 //
 // It sits on every open console POST that reads a body, and it exists
-// for login CSRF - login, register, passkey finish and signup
-// verification all start a session. SameSite=Strict
+// for login CSRF - login, register and passkey finish start a session,
+// and the rest write account state. SameSite=Strict
 // keeps a cross-site request from carrying the victim's cookie, but a
 // top-level form POST from evil.example SETS one: the response is a
 // navigation, so the browser stores the attacker's session cookie and

@@ -37,9 +37,9 @@ type loginInput struct {
 }
 
 // registerInput is the public signup form. Same normalization rules
-// as login, but the password minimum is the real account policy (8)
-// rather than login's min=1, which only exists to reject empty input
-// without leaking policy.
+// as login, but the password minimum is the real account policy rather
+// than login's min=1, which only exists to reject empty input without
+// leaking policy.
 type registerInput struct {
 	Email string `json:"email"    validate:"required,email,max=320" normalize:"normalize"`
 	// Twelve, the same floor reset and change carry: the one route that
@@ -73,7 +73,7 @@ type resetConfirmInput struct {
 // changePasswordInput is the signed-in change, so it proves the
 // current password rather than a mailed token.
 type changePasswordInput struct {
-	CurrentPassword string `json:"current_password" validate:"required,min=1,max=256"`
+	CurrentPassword string `json:"current_password" validate:"required,min=1,max=256" normalize:"trim"`
 	Password        string `json:"password"         validate:"required,min=12,max=256,bcryptlen" normalize:"trim"`
 }
 
@@ -93,6 +93,12 @@ type systemMailTestInput struct {
 
 type totpCodeInput struct {
 	Code string `json:"code" validate:"required,len=6,numeric"`
+}
+
+// oidcSecondFactorInput is the code an identity provider sign-in still
+// owes: six digits from the authenticator, or a recovery code.
+type oidcSecondFactorInput struct {
+	TOTPCode string `json:"totp_code" validate:"required,min=6,max=19" normalize:"trim"`
 }
 
 // totpSetupInput proves the password before a second factor is
@@ -118,6 +124,13 @@ type totpSetupInput struct {
 // them out of here.
 type UserResponse struct {
 	User *usermodel.User `json:"user"`
+}
+
+// OIDCSecondFactorResponse is the signed-in account, and the
+// invitation the sign-in started from when there was one.
+type OIDCSecondFactorResponse struct {
+	User   *usermodel.User `json:"user"`
+	Invite string          `json:"invite,omitempty"`
 }
 
 // AuthDisabledResponse is the answer on an install running with

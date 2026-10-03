@@ -131,3 +131,25 @@ func TestRevokingOtherSessionsKeepsTheCallersOwn(t *testing.T) {
 		t.Errorf("another account lost %d sessions", 3-got)
 	}
 }
+
+// Revoking a session reports a change once. A second revoke of the same
+// one changes nothing, which is what lets the handler skip a second
+// audit row.
+func TestRevokingTwiceChangesOnce(t *testing.T) {
+	db := dbtest.Open(t)
+	dbtest.Migrate(t, db)
+	s := &Store{Base: database.NewBase(db)}
+	ctx := t.Context()
+
+	userID, sessions := seedSessions(t, s, ctx)
+
+	first, err := s.Revoke(ctx, userID, sessions[0])
+	if err != nil || !first {
+		t.Fatalf("first revoke: %v %v", first, err)
+	}
+
+	again, err := s.Revoke(ctx, userID, sessions[0])
+	if err != nil || again {
+		t.Fatalf("second revoke: %v %v, want no change", again, err)
+	}
+}
