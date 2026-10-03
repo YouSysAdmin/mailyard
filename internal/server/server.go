@@ -252,6 +252,7 @@ var LargeBodyPaths = []string{
 	"/api/v1/emails/send-template",
 	"/api/v1/emails/batch",
 	"/api/v1/templates/*/attachments",
+	"/api/v1/template-assets",
 	// A template export bundle carries every version, each up to a
 	// template's own size.
 	"/api/v1/templates/import",

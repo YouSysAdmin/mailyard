@@ -931,6 +931,18 @@ class API:
         "Block a list of addresses Needs suppressions:write."
         return self._t.request("POST", "/suppressions/import", body=body, query=query)
 
+    def list_template_assets(self, **query: Any) -> Any:
+        "List builder images"
+        return self._t.request("GET", "/template-assets", body=None, query=query)
+
+    def create_template_asset(self, body: Optional[Mapping[str, Any]] = None, **query: Any) -> Any:
+        "Upload builder image"
+        return self._t.request("POST", "/template-assets", body=body, query=query)
+
+    def delete_template_asset(self, id, **query: Any) -> Any:
+        "Delete builder image"
+        return self._t.request("DELETE", f"/template-assets/{_esc(id)}", body=None, query=query)
+
     def list_templates(self, **query: Any) -> Any:
         "List templates Needs templates:read."
         return self._t.request("GET", "/templates", body=None, query=query)

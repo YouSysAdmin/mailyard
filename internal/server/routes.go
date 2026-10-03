@@ -126,6 +126,13 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	trk.Post("/unsubscribe/:token", trh.UnsubscribeConfirm)
 	trk.Get("/view/:token", trh.WebView)
 
+	// Images uploaded in the template builder, fetched by mail clients
+	// with no session. The unguessable token is the authorization, and
+	// like the tracking routes it is bounded by the per-IP concurrency
+	// cap rather than a per-minute budget: a webmail image proxy fetches
+	// for every one of its users from a handful of addresses.
+	app.Get(template.AssetPath+"/:token", (&template.Handler{Runtime: rt}).ServeAsset)
+
 	// Amazon SES bounce and complaint notifications, delivered by SNS.
 	// Public because SNS presents no session and no API key: the
 	// authentication is the SNS signature plus the topic allowlist.
@@ -607,6 +614,13 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	tpl.Put("/:id/versions/:versionId/localizations", permWrite, th.PutLocalization)
 	tpl.Post("/:id/versions/:versionId/preview", permRead, th.PreviewVersion)
 	tpl.Delete("/:id/localizations/:localizationId", permDelete, th.DeleteLocalization)
+
+	// Builder images, a project's library rather than one template's,
+	// so the same picture is stored once however many templates use it.
+	assets := v1.Group("/template-assets", permOn(perm.ResourceTemplates))
+	assets.Get("/", permRead, th.ListAssets)
+	assets.Post("/", permWrite, th.UploadAsset)
+	assets.Delete("/:id", permDelete, th.DeleteAsset)
 
 	csh := &stylesheet.Handler{Runtime: rt}
 	sheets := v1.Group("/stylesheets", permOn(perm.ResourceTemplates))

@@ -1615,6 +1615,28 @@ func (c *Client) ImportSuppression(ctx context.Context, body SuppressionImportIn
 	return do[SuppressionImportResponse](ctx, c, "POST", "/suppressions/import", body, opts)
 }
 
+// ListTemplateAssets List builder images.
+//
+// GET /template-assets/
+func (c *Client) ListTemplateAssets(ctx context.Context, opts ...RequestOption) (AssetListResponse, error) {
+	return do[AssetListResponse](ctx, c, "GET", "/template-assets", nil, opts)
+}
+
+// CreateTemplateAsset Upload builder image.
+//
+// POST /template-assets/
+func (c *Client) CreateTemplateAsset(ctx context.Context, body AssetInput, opts ...RequestOption) (AssetResponse, error) {
+	return do[AssetResponse](ctx, c, "POST", "/template-assets", body, opts)
+}
+
+// DeleteTemplateAsset Delete builder image.
+//
+// DELETE /template-assets/:id
+func (c *Client) DeleteTemplateAsset(ctx context.Context, id string, opts ...RequestOption) error {
+	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/template-assets/%s", escape(id)), nil, opts)
+	return err
+}
+
 // ListTemplates List templates.
 //
 // GET /templates

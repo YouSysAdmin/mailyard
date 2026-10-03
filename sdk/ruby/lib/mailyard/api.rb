@@ -1156,6 +1156,21 @@ module Mailyard
       @t.request("POST", "/suppressions/import", body: body, query: query)
     end
 
+    # List builder images
+    def list_template_assets(**query)
+      @t.request("GET", "/template-assets", body: nil, query: query)
+    end
+
+    # Upload builder image
+    def create_template_asset(body: nil, **query)
+      @t.request("POST", "/template-assets", body: body, query: query)
+    end
+
+    # Delete builder image
+    def delete_template_asset(id, **query)
+      @t.request("DELETE", "/template-assets/#{esc(id)}", body: nil, query: query)
+    end
+
     # List templates Needs templates:read.
     def list_templates(**query)
       @t.request("GET", "/templates", body: nil, query: query)

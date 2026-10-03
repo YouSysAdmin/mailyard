@@ -708,6 +708,21 @@ type TemplateStore interface {
 	// once no message can still need it.
 	DeletedAttachmentsBefore(ctx context.Context, before time.Time) ([]*template.Attachment, error)
 	PurgeAttachment(ctx context.Context, projID, id string) error
+
+	// CreateAsset reports false when the project already holds the same
+	// bytes, which GetAssetBySHA256 then answers.
+	CreateAsset(ctx context.Context, a *template.Asset) (bool, error)
+	GetAsset(ctx context.Context, projID, id string) (*template.Asset, error)
+	GetAssetBySHA256(ctx context.Context, projID, sum string) (*template.Asset, error)
+
+	// GetAssetByToken is unscoped, the public URL's token is the
+	// authorization.
+	GetAssetByToken(ctx context.Context, token string) (*template.Asset, error)
+	FindAssets(ctx context.Context, projID string, limit, offset int) ([]*template.Asset, int, error)
+
+	// DeleteAsset refuses, reporting false, while a localization of the
+	// project's templates names the image.
+	DeleteAsset(ctx context.Context, projID, id string) (bool, error)
 }
 
 // StylesheetStore persists reusable CSS blocks.

@@ -3,6 +3,8 @@
 package template
 
 import (
+	"time"
+
 	"github.com/yousysadmin/mailyard/internal/core/render"
 	tmodel "github.com/yousysadmin/mailyard/internal/models/template"
 )
@@ -76,6 +78,13 @@ type attachmentInput struct {
 	Filename    string `json:"filename"     validate:"required,min=1,max=255"`
 	ContentType string `json:"content_type" validate:"omitempty,max=255,mediatype"`
 	Content     string `json:"content"      validate:"required"`
+}
+
+// assetInput uploads one builder image as base64 JSON. The type is
+// decided by sniffing the bytes, never declared.
+type assetInput struct {
+	Filename string `json:"filename" validate:"required,min=1,max=255" normalize:"trim"`
+	Content  string `json:"content"  validate:"required"`
 }
 
 // transferDoc is the self-contained export of one template:
@@ -202,4 +211,28 @@ type AttachmentResponse struct {
 // stylesheet inlined so it imports into an installation that has never seen it.
 type ExportResponse struct {
 	Export transferDoc `json:"export"`
+}
+
+// Asset is one builder image as the API answers it. URL is absolute,
+// built from server.public_url, and is what a template references.
+type Asset struct {
+	ID          string    `json:"id"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"content_type"`
+	Size        int64     `json:"size"`
+	URL         string    `json:"url"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// AssetListResponse is the project's builder images, newest first.
+type AssetListResponse struct {
+	Assets []Asset `json:"assets"`
+
+	// Total counts every image, whether or not a page was asked for.
+	Total int `json:"total"`
+}
+
+// AssetResponse is one builder image.
+type AssetResponse struct {
+	Asset Asset `json:"asset"`
 }

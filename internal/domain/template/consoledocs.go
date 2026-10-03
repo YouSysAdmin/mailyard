@@ -35,6 +35,40 @@ func ConsoleDocs() []apidoc.Route {
 			Responses:   []apidoc.Response{apidoc.Created("The result.", TemplateResponse{})},
 		},
 		{
+			Method:      "GET",
+			Path:        "/template-assets/",
+			Summary:     "List builder images",
+			Description: "Needs the `templates:read` permission. Newest first, the whole list unless `limit` asks for a page.",
+			Query: []apidoc.Param{
+				{Name: "limit", Type: "integer", Description: "Page size, at most 200. Without it the whole list is answered."},
+				{Name: "offset", Type: "integer", Description: "Rows to skip."},
+			},
+			Responses: []apidoc.Response{apidoc.OK("The images, each with the absolute URL a template references.", AssetListResponse{})},
+		},
+		{
+			Method:  "POST",
+			Path:    "/template-assets/",
+			Summary: "Upload builder image",
+			Description: "Needs the `templates:write` permission. PNG, JPEG, GIF or WebP, decided from the bytes, up to " +
+				"`sending.max_attachment_size`. Refused while `server.public_url` is unset. The same bytes uploaded " +
+				"again answer the image already stored with 200.",
+			Request: assetInput{},
+			Responses: []apidoc.Response{
+				apidoc.Created("The stored image.", AssetResponse{}),
+				apidoc.OK("The project already holds these bytes.", AssetResponse{}),
+				apidoc.BadRequest,
+			},
+		},
+		{
+			Method:  "DELETE",
+			Path:    "/template-assets/:id",
+			Summary: "Delete builder image",
+			Description: "Needs the `templates:delete` permission. Refused with 409 while a template localization references " +
+				"the image. Mail already delivered stops showing it.",
+			PathParams: []apidoc.Param{{Name: "id"}},
+			Responses:  []apidoc.Response{apidoc.NoContent, apidoc.NotFound, apidoc.Conflict},
+		},
+		{
 			Method:      "DELETE",
 			Path:        "/templates/:id",
 			Summary:     "Delete",

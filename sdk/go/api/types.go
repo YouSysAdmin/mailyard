@@ -114,6 +114,33 @@ type ApikeyUpdateInput struct {
 	ExpiresAt  string   `json:"expires_at"`
 }
 
+// Asset is the wire body.
+type Asset struct {
+	ID          string    `json:"id"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"content_type"`
+	Size        int64     `json:"size"`
+	URL         string    `json:"url"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// AssetInput is the request body.
+type AssetInput struct {
+	Filename string `json:"filename"`
+	Content  string `json:"content"`
+}
+
+// AssetListResponse is the response body.
+type AssetListResponse struct {
+	Assets []Asset `json:"assets"`
+	Total  int64   `json:"total"`
+}
+
+// AssetResponse is the response body.
+type AssetResponse struct {
+	Asset Asset `json:"asset"`
+}
+
 // AssignInput is the request body.
 type AssignInput struct {
 	PlanID string `json:"plan_id"`

@@ -692,15 +692,19 @@ const attachmentSelect = `
 SELECT id, project_id, template_id, filename, content_type, size, storage_key, content, created_at, deleted_at
 FROM template_attachments`
 
-// StorageKeysForProject collects every offloaded attachment key the
-// project's templates own, deleted ones included.
+// StorageKeysForProject collects every offloaded key the project's
+// templates own: attachments, deleted ones included, and builder
+// images.
 //
 // For project DELETION, where the rows go by cascade off projects and
 // nothing would name their objects afterwards.
 func (s *Store) StorageKeysForProject(ctx context.Context, projID string) ([]string, error) {
 	rows, err := s.Query(ctx, `
         SELECT storage_key FROM template_attachments
-        WHERE project_id = ? AND storage_key <> ''`, projID)
+        WHERE project_id = ? AND storage_key <> ''
+        UNION ALL
+        SELECT storage_key FROM template_assets
+        WHERE project_id = ? AND storage_key <> ''`, projID, projID)
 	if err != nil {
 		return nil, err
 	}
@@ -839,6 +843,140 @@ func scanAttachment(r interface{ Scan(...any) error }) (*tmodel.Attachment, erro
 	var a tmodel.Attachment
 	if err := r.Scan(&a.ID, &a.ProjectID, database.Str(&a.TemplateID), &a.Filename,
 		&a.ContentType, &a.Size, &a.StorageKey, &a.Content, &a.CreatedAt, &a.DeletedAt); err != nil {
+		return nil, err
+	}
+
+	return &a, nil
+}
+
+// ----------------------------------------------------------------------------
+// Builder images
+// ----------------------------------------------------------------------------
+const assetSelect = `
+SELECT id, project_id, filename, content_type, size, sha256, public_token, storage_key, content, created_at
+FROM template_assets`
+
+// CreateAsset inserts one image and reports whether it did. False means
+// the project already holds the same bytes, which GetAssetBySHA256 then
+// answers.
+func (s *Store) CreateAsset(ctx context.Context, a *tmodel.Asset) (bool, error) {
+	if a.CreatedAt.IsZero() {
+		a.CreatedAt = time.Now().UTC()
+	}
+
+	res, err := s.Exec(ctx, `
+        INSERT INTO template_assets (id, project_id, filename, content_type, size,
+            sha256, public_token, storage_key, content, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (project_id, sha256) DO NOTHING
+    `, a.ID, a.ProjectID, a.Filename, a.ContentType, a.Size,
+		a.SHA256, a.PublicToken, a.StorageKey, a.Content, a.CreatedAt)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// GetAsset returns one image within projID, or nil when there is no
+// such row.
+func (s *Store) GetAsset(ctx context.Context, projID, id string) (*tmodel.Asset, error) {
+	a, err := scanAsset(s.QueryRow(ctx, assetSelect+` WHERE project_id = ? AND id = ?`, projID, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return a, err
+}
+
+// GetAssetBySHA256 returns the project's image holding these bytes, or
+// nil when there is none.
+func (s *Store) GetAssetBySHA256(ctx context.Context, projID, sum string) (*tmodel.Asset, error) {
+	a, err := scanAsset(s.QueryRow(ctx, assetSelect+` WHERE project_id = ? AND sha256 = ?`, projID, sum))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return a, err
+}
+
+// GetAssetByToken returns the image a public URL names, in any
+// project, or nil when there is none. The token is the authorization.
+func (s *Store) GetAssetByToken(ctx context.Context, token string) (*tmodel.Asset, error) {
+	a, err := scanAsset(s.QueryRow(ctx, assetSelect+` WHERE public_token = ?`, token))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return a, err
+}
+
+// FindAssets lists the project's images, newest first, with the count.
+// Content is not read.
+func (s *Store) FindAssets(ctx context.Context, projID string, limit, offset int) ([]*tmodel.Asset, int, error) {
+	var total int
+	if err := s.QueryRow(ctx, `SELECT COUNT(*) FROM template_assets WHERE project_id = ?`,
+		projID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	q := `
+        SELECT id, project_id, filename, content_type, size, sha256, public_token, storage_key, '', created_at
+        FROM template_assets WHERE project_id = ? ORDER BY created_at DESC, id DESC`
+	args := []any{projID}
+	if limit > 0 {
+		q += ` LIMIT ? OFFSET ?`
+		args = append(args, limit, offset)
+	}
+
+	rows, err := s.Query(ctx, q, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	out := []*tmodel.Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		out = append(out, a)
+	}
+
+	return out, total, rows.Err()
+}
+
+// DeleteAsset removes one image unless a localization of the project's
+// templates still names its token, in the same statement so a save
+// cannot slip between the check and the delete. It reports whether
+// the row went.
+func (s *Store) DeleteAsset(ctx context.Context, projID, id string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        DELETE FROM template_assets a
+        WHERE a.project_id = ? AND a.id = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM template_localizations l
+              JOIN template_versions v ON v.id = l.version_id
+              JOIN templates t ON t.id = v.template_id
+              WHERE t.project_id = a.project_id
+                AND strpos(l.html_template, a.public_token) > 0)`, projID, id)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+func scanAsset(r interface{ Scan(...any) error }) (*tmodel.Asset, error) {
+	var a tmodel.Asset
+	if err := r.Scan(&a.ID, &a.ProjectID, &a.Filename, &a.ContentType, &a.Size, &a.SHA256,
+		&a.PublicToken, &a.StorageKey, &a.Content, &a.CreatedAt); err != nil {
 		return nil, err
 	}
 

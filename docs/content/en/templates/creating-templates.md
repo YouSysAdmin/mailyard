@@ -110,6 +110,34 @@ A key the send does not supply is an **error** rather than a blank — the reque
 nothing is queued. Campaign sends are the exception and render a missing key as empty, because subscriber custom fields
 are uneven by nature.
 
+## Images in the visual builder
+
+An image dropped into the visual builder is uploaded to Mailyard once and the template references it by URL:
+`<server.public_url>/assets/<token>`. Every message sent from the template carries that short URL, and the picture is
+fetched by the recipient's mail client when the message is opened. Uploading the same file again reuses the copy
+already stored, and the builder's asset manager lists every image the project has uploaded so a picture can be
+reused in another template.
+
+- **`server.public_url` must be set.** A mail client can only load an absolute address, so without it the upload is
+  refused and the builder says so.
+- **PNG, JPEG, GIF and WebP only**, decided from the file's bytes rather than its name. SVG is refused, because opened
+  directly it is a document that can run script. The size cap is `sending.max_attachment_size`.
+- **The URL is public** and needs no sign-in, which is what lets a mail client load it. The token in it is random and
+  unguessable, and it is tied to no secret, so rotating keys never breaks an image in mail already delivered.
+- **Deleting an image** is refused with `409` while any template still references it. Once deleted, mail already
+  delivered that shows it displays a broken image instead.
+
+The library is also on the API:
+
+```
+GET    /api/v1/template-assets
+POST   /api/v1/template-assets        {"filename": "logo.png", "content": "<base64>"}
+DELETE /api/v1/template-assets/{id}
+```
+
+The upload answers `201` with the image and its `url`, or `200` with the image already stored when the project holds
+the same bytes.
+
 ## List
 
 ```

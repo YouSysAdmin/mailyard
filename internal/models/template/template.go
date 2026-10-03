@@ -75,6 +75,22 @@ type Attachment struct {
 	DeletedAt *time.Time `json:"-"`
 }
 
+// Asset is an image uploaded in the template builder, stored once per
+// project and served publicly at /assets/<PublicToken>. Content is
+// inline base64 only when no blob store is configured.
+type Asset struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"content_type"`
+	Size        int64     `json:"size"`
+	SHA256      string    `json:"sha256"`
+	PublicToken string    `json:"-"`
+	StorageKey  string    `json:"-"`
+	Content     string    `json:"-"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // Draft is a version written together with the template that holds
 // it, by a create carrying content or by an import. A zero
 // Version.Version is numbered after the highest one in the set.
