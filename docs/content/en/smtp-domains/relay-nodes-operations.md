@@ -385,6 +385,7 @@ it just files no bounce and suppresses nothing.
 | `relay_node.inbound.proxy_protocol.trusted` |                 | Balancer addresses or CIDRs. Required when enabled - see [Rate Limiting](/docs/security/rate-limiting).                        |
 | `relay_node.inbound.tls.cert` / `.key`      |                 | STARTTLS pair. Neither set generates a self-signed one.                                                                        |
 | `relay_node.ipv6`                           | `false`         | Off on purpose: a half-configured v6 address fails for reasons that look nothing like the cause.                               |
+| `relay_node.allow_private_mx`               | `false`         | Let delivery dial an MX that resolves to loopback, private or reserved space. Off, a domain whose MX points into the node's own network is refused rather than dialled. |
 
 A node needs none of `database.dsn`, `database.crypto.encryption_key` or `auth.jwt_secret`, and
 is refused at startup if it is missing what it does need.

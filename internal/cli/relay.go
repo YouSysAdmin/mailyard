@@ -94,6 +94,7 @@ func runRelay(cmd *cobra.Command, _ []string) error {
 		DeliveryConcurrency: cfg.RelayNode.DeliveryConcurrency,
 		SMTPPort:            cfg.RelayNode.SMTPPort,
 		IPv6:                cfg.RelayNode.IPv6,
+		AllowPrivateMX:      cfg.RelayNode.AllowPrivateMX,
 		MaxMessageSize:      cfg.Submission.MaxMessageSize,
 		InboundEnabled:      cfg.RelayNode.Inbound.Enabled,
 		Version:             pkg.Version,

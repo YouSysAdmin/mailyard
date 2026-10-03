@@ -99,6 +99,16 @@ type RelayNodeConfig struct {
 	// have, and the refusals look nothing like the cause.
 	IPv6 bool `mapstructure:"ipv6"`
 
+	// AllowPrivateMX lets delivery dial an MX that resolves into
+	// loopback, RFC 1918 or other reserved space.
+	//
+	// Off by default: the MX is whatever the recipient domain's owner
+	// published, so a domain pointing its MX at 169.254.169.254 or an
+	// internal host would otherwise steer this node's own connection
+	// into the network it runs on. Turn it on only where the node
+	// delivers to mail hosts on its own private network on purpose.
+	AllowPrivateMX bool `mapstructure:"allow_private_mx"`
+
 	// Inbound turns this node into an MX as well as an egress.
 	Inbound RelayNodeInboundConfig `mapstructure:"inbound"`
 }

@@ -25,6 +25,10 @@ type Deliverer struct {
 	SMTPPort int
 	Network  string
 
+	// GuardPrivate refuses an MX that resolves into private or reserved
+	// space - see smtpclient.DirectConfig.
+	GuardPrivate bool
+
 	// MaxLifetime bounds how long a message may keep failing.
 	MaxLifetime time.Duration
 
@@ -205,9 +209,10 @@ func (d *Deliverer) attempt(ctx context.Context, m *Message) {
 		network = "tcp4"
 	}
 	cfg := smtpclient.DirectConfig{
-		HELO:    d.HELO,
-		Port:    d.SMTPPort,
-		Network: network,
+		HELO:         d.HELO,
+		Port:         d.SMTPPort,
+		Network:      network,
+		GuardPrivate: d.GuardPrivate,
 	}
 	send := d.Send
 	if send == nil {

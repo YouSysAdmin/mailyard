@@ -101,6 +101,11 @@ relay_node:
   # setup does not have, and the refusals look nothing like the cause.
   ipv6: false
 
+  # Delivery refuses an MX that resolves to loopback, private or reserved
+  # space - the MX is whatever the recipient domain published. Turn this
+  # on only where the node delivers to mail hosts on its own network.
+  allow_private_mx: false
+
   # The node as an MX as well as an egress. For a network the platform
   # cannot be reached from: mail sent into a region behind a firewall,
   # whose bounces cannot cross back. The node takes it on 25 and forwards

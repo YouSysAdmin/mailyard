@@ -854,6 +854,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("relay_node.delivery_concurrency", 8)
 	v.SetDefault("relay_node.smtp_port", 25)
 	v.SetDefault("relay_node.ipv6", false)
+	v.SetDefault("relay_node.allow_private_mx", false)
 	v.SetDefault("relay_node.inbound.enabled", false)
 	v.SetDefault("relay_node.inbound.addr", ":25")
 	v.SetDefault("relay_node.inbound.max_message_size", 26214400)

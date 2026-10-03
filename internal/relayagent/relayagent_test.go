@@ -205,6 +205,7 @@ func TestASecondAgentCannotOpenTheSameSpool(t *testing.T) {
 
 type fakeSender struct {
 	mu    sync.Mutex
+	cfg   smtpclient.DirectConfig
 	calls int
 	res   *smtpclient.DirectResult
 	err   error
@@ -212,9 +213,10 @@ type fakeSender struct {
 	hosts []string
 }
 
-func (f *fakeSender) send(_ context.Context, _ smtpclient.DirectConfig, hosts []string, msg *smtpclient.Raw) (*smtpclient.DirectResult, error) {
+func (f *fakeSender) send(_ context.Context, cfg smtpclient.DirectConfig, hosts []string, msg *smtpclient.Raw) (*smtpclient.DirectResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.cfg = cfg
 	f.calls++
 	f.hosts = hosts
 	f.sent = append(f.sent, msg.Data)
@@ -297,6 +299,29 @@ func TestADeliveredMessageLeavesTheQueue(t *testing.T) {
 	// The bytes the worker signed must reach the wire unchanged.
 	if len(send.sent) != 1 || string(send.sent[0]) != rawBody {
 		t.Error("the message was altered before delivery")
+	}
+}
+
+// The MX is published by whoever owns the recipient domain, so the
+// node's own dial is guarded against private space unless the operator
+// turned that off.
+func TestDeliveryCarriesThePrivateAddressGuard(t *testing.T) {
+	for _, guard := range []bool{true, false} {
+		s := testSpool(t)
+		if err := s.Put(queued(ids.New()), []byte(rawBody)); err != nil {
+			t.Fatalf("Put: %v", err)
+		}
+
+		send := &fakeSender{res: &smtpclient.DirectResult{
+			Host: "mx.example.org", Accepted: []string{"user@example.org"}, Rejected: map[string]error{},
+		}}
+		d, _ := testDeliverer(t, s, send)
+		d.GuardPrivate = guard
+		d.pass(t.Context())
+
+		if send.calls != 1 || send.cfg.GuardPrivate != guard {
+			t.Errorf("guard %v: %d sends, dialled with GuardPrivate=%v", guard, send.calls, send.cfg.GuardPrivate)
+		}
 	}
 }
 

@@ -51,6 +51,7 @@ type Config struct {
 	DeliveryConcurrency int
 	SMTPPort            int
 	IPv6                bool
+	AllowPrivateMX      bool
 	MaxMessageSize      int64
 	Version             string
 	// InboundEnabled says this node also runs an MX. Reported on the
@@ -135,6 +136,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Agent, error) {
 		HELO:         cfg.Hostname,
 		SMTPPort:     cfg.SMTPPort,
 		Network:      network,
+		GuardPrivate: !cfg.AllowPrivateMX,
 		MaxLifetime:  cfg.MaxLifetime,
 		Concurrency:  cfg.DeliveryConcurrency,
 		PollInterval: 30 * time.Second,
