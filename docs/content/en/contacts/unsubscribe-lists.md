@@ -27,7 +27,8 @@ same list skip the address; mail on other lists is unaffected.
 
 `id` is a UUID, and it travels inside the signed unsubscribe token as well as in the API, so it is worth keeping stable.
 
-`name` is the label you address the list by. Unique within the project, and required.
+`name` is the label you address the list by. Unique within the project without regard to case, and required. A blank
+name is refused on create and on update.
 
 `public_name` is the only field a recipient ever reads — it is the wording on the hosted unsubscribe page. Empty falls
 back to `name`, which is how a scope called `product-updates-v2` ends up shown to a customer. Set it.
@@ -35,7 +36,9 @@ back to `name`, which is how a scope called `product-updates-v2` ends up shown t
 `description` is for whoever maintains the list, and appears nowhere outside the console.
 
 `active` gates whether **new** links are minted. Turning a list off does not lift the opt-outs already recorded against
-it — people who unsubscribed stay unsubscribed, which is the only defensible reading of a switch like this.
+it — people who unsubscribed stay unsubscribed, which is the only defensible reading of a switch like this. A send that
+names an inactive list is still accepted and still skips the addresses that opted out of it. It just carries no
+one-click link and no `List-Unsubscribe` header for that list, and `{{ mailyard_unsubscribe_url }}` renders empty.
 
 ## Create an Unsubscribe List
 

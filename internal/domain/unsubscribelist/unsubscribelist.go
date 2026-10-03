@@ -63,10 +63,10 @@ func (s *Store) GetAny(ctx context.Context, id string) (*ulmodel.List, error) {
 	return l, err
 }
 
-// GetByName returns one unsubscribe list by name within projID, or nil
-// when there is no such row.
+// GetByName returns one unsubscribe list by name within projID, without
+// regard to case, or nil when there is no such row.
 func (s *Store) GetByName(ctx context.Context, projID, name string) (*ulmodel.List, error) {
-	row := s.QueryRow(ctx, listSelect+` WHERE project_id = ? AND name = ?`, projID, name)
+	row := s.QueryRow(ctx, listSelect+` WHERE project_id = ? AND LOWER(name) = LOWER(?)`, projID, name)
 	l, err := scanList(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -243,17 +243,18 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
-	if in.Name != "" && in.Name != l.Name {
-		clash, err := h.Runtime.Store.UnsubscribeList.GetByName(c.Context(), rc.Project.ID, in.Name)
+	if in.Name != nil && *in.Name != l.Name {
+		clash, err := h.Runtime.Store.UnsubscribeList.GetByName(c.Context(), rc.Project.ID, *in.Name)
 		if err != nil {
 			return response.Internal(c, err)
 		}
 
-		if clash != nil {
+		// A rename that only changes case finds the list itself.
+		if clash != nil && clash.ID != l.ID {
 			return response.Conflict(c, "an unsubscribe list with this name already exists")
 		}
 
-		l.Name = in.Name
+		l.Name = *in.Name
 	}
 
 	if in.PublicName != nil {

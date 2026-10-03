@@ -3,6 +3,8 @@
 package unsubscribelist
 
 import (
+	"strings"
+
 	ulmodel "github.com/yousysadmin/mailyard/internal/models/unsubscribelist"
 )
 
@@ -25,10 +27,19 @@ type createInput struct {
 }
 
 type updateInput struct {
-	Name        string  `json:"name"        validate:"omitempty,min=1,max=100" normalize:"trim"`
+	// Name is a pointer so a blank one is refused rather than read as
+	// absent. Trimmed in Normalize, which runs before the rules.
+	Name        *string `json:"name"        validate:"omitnil,min=1,max=100"`
 	PublicName  *string `json:"public_name" validate:"omitzero,max=100"`
 	Description *string `json:"description" validate:"omitzero,max=500"`
 	Active      *bool   `json:"active"`
+}
+
+// Normalize trims the name, since the tag pass does not reach a pointer.
+func (in *updateInput) Normalize() {
+	if in.Name != nil {
+		*in.Name = strings.TrimSpace(*in.Name)
+	}
 }
 
 // ----------------------------------------------------------------------------
