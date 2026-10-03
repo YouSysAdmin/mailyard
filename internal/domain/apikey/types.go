@@ -25,8 +25,9 @@ type createInput struct {
 
 	// Permissions are catalogue strings ("emails:write"), or the
 	// single wildcard "*". Omitting them mints a key that may do
-	// nothing, which is the safe reading of an unstated intent.
-	Permissions []string `json:"permissions" validate:"omitempty,max=42"`
+	// nothing, which is the safe reading of an unstated intent. The
+	// length is capped at the catalogue size by the handler.
+	Permissions []string `json:"permissions"`
 	AllowedIPs  []string `json:"allowed_ips" validate:"omitempty,max=20,dive,ipcidr"`
 	ExpiresAt   string   `json:"expires_at"  validate:"omitempty"`
 

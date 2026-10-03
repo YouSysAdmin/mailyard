@@ -211,6 +211,17 @@ func Lookup(res Resource) (Definition, bool) {
 	return Definition{}, false
 }
 
+// Size is how many permissions the catalogue defines, summed from the
+// declared actions. Write paths cap an input list at it.
+func Size() int {
+	n := 0
+	for _, d := range Registry {
+		n += len(d.Actions)
+	}
+
+	return n
+}
+
 // Allows reports whether this resource has action a at all. Parse
 // consults it, so "contacts:write" is refused as firmly as a misspelt
 // resource - both name something that does not exist.

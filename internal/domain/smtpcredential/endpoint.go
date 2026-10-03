@@ -63,6 +63,14 @@ func (h *Handler) Create(c fiber.Ctx) error {
 				" - mint a sandbox credential instead, or ask a project owner")
 	}
 
+	// A sandbox credential writes into the sandbox, so it needs that.
+	if in.Sandbox && !rc.Permissions.Has(perm.ResourceSandbox, perm.ActionWrite) {
+		return response.Forbidden(c,
+			"a sandbox credential needs "+
+				string(perm.Of(perm.ResourceSandbox, perm.ActionWrite))+
+				" - ask a project owner")
+	}
+
 	// GetByUsername returns a single row and the column is UNIQUE, so
 	// a collision would be a hard insert failure rather than a silent
 	// shadow. 64 bits makes it vanishingly unlikely either way, and a

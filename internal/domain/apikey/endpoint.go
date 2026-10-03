@@ -49,14 +49,6 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return resp
 	}
 
-	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResAPIKeys, 1); err != nil {
-		if qe, ok := errors.AsType[*quota.Error](err); ok {
-			return response.TooManyRequests(c, qe.Error())
-		}
-
-		return response.Internal(c, err)
-	}
-
 	perms, bad := normalizePermissions(in.Permissions)
 	if bad != "" {
 		return response.BadRequest(c, bad)
@@ -71,10 +63,20 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return response.Forbidden(c, "a key cannot carry \"*\" unless you hold it yourself - ask a project owner")
 	}
 
-	if short := rc.Permissions.Missing(perms); len(short) > 0 {
+	// What the key will HOLD, sandbox grants included, is what the
+	// caller must hold.
+	if short := rc.Permissions.Missing(perm.ForKey(perms, in.Sandbox).List()); len(short) > 0 {
 		return response.Forbidden(c,
 			"a key cannot carry a permission you do not hold yourself: "+
 				strings.Join(short, ", ")+" - ask a project owner")
+	}
+
+	if err := quota.CheckResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResAPIKeys, 1); err != nil {
+		if qe, ok := errors.AsType[*quota.Error](err); ok {
+			return response.TooManyRequests(c, qe.Error())
+		}
+
+		return response.Internal(c, err)
 	}
 
 	var expiresAt *time.Time
@@ -275,7 +277,7 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // An empty result is legal and means a key that may do nothing. That
 // is not a mistake worth guessing a default for.
 func normalizePermissions(in []string) ([]string, string) {
-	if len(in) > 2*len(perm.Registry) {
+	if len(in) > perm.Size()+1 {
 		return nil, "too many permissions - the catalogue is smaller than this list"
 	}
 

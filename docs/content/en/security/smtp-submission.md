@@ -130,7 +130,8 @@ a flag wrong in the message.
 SMTP credentials are project-scoped and always require a project - there is no personal/unscoped credential. Create one
 from the dashboard under **Developers -> SMTP Submission** (`/app/smtp-submission`), or directly via the API. Creating
 and revoking a credential require `apikeys:write`, deleting one `apikeys:delete` - an SMTP credential is a machine
-credential like an API key and shares its permission.
+credential like an API key and shares its permission. What the credential does needs a permission of its own as well:
+one that sends real mail needs `emails:write`, a `sandbox` one needs `sandbox:write`.
 
 ```
 POST /api/v1/smtp-credentials
@@ -161,12 +162,15 @@ Response (`201`):
     "password": "8b1c...e02f",
     "submission": {
         "enabled": true,
-        "host": "mailyard",
+        "host": "mail.example.com",
         "port": "587",
         "starttls": true
     }
 }
 ```
+
+`submission.host` is where a client connects: `submission.hostname` when it is a full name, otherwise the address the
+listener binds, and a wildcard bind is reported as the host of `server.public_url`.
 
 {{< callout type="warning" >}} **Save the password immediately.** Like an API key, the plaintext password is only
 returned once, at creation

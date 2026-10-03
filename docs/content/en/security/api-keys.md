@@ -178,8 +178,10 @@ credential (`admin api key <name>`) rather than a blank actor.
 POST /api/v1/api-keys
 ```
 
-Needs `apikeys:write`, and that is the whole rule - a key holding it mints other keys just as a member does. Nothing on
-this route asks how you authenticated.
+Needs `apikeys:write`, and a key may only carry what the caller holds: a permission you lack, or `*` when you do not
+hold it, answers `403` naming what is missing. A `sandbox` key carries `sandbox:read`, `sandbox:write` and
+`sandbox:delete` on top of its list, so minting one needs those three as well. A key holding `apikeys:write` mints other
+keys under the same rule, and nothing on this route asks how you authenticated.
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/api-keys \
@@ -208,9 +210,9 @@ curl -X POST http://localhost:3000/api/v1/api-keys \
   }'
 ```
 
-{{< callout type="warning" title="A key that can mint keys is owner-equivalent in its project" >}}
-`apikeys:write` lets the holder mint a key carrying any permission in the catalogue,
-`*` included, and then use it. Treat it as the whole project, not as one more permission - give it to a credential that
+{{< callout type="warning" title="A key that can mint keys can mint everything it holds" >}}
+`apikeys:write` lets the holder mint a key carrying any permission it holds itself, and then use it - so a credential
+holding `*` and `apikeys:write` can hand the whole project to a key nobody reviewed. Give it to a credential that
 provisions an installation, never to the key an application sends mail with.
 
 It stops at the project. A key minted this way cannot reach `/api/v1/admin`, however wide its permissions are: platform
@@ -220,7 +222,7 @@ administration is a different credential, not a permission. See [Platform creden
 | Field         | Type              | Description                                                                                                                                                                                                                                                                                                                                        |
 |---------------|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `name`        | string (required) | Human-readable label                                                                                                                                                                                                                                                                                                                               |
-| `permissions` | string[]          | Catalogue strings, or the single wildcard `*`. Omitted grants nothing.                                                                                                                                                                                                                                                                             |
+| `permissions` | string[]          | Catalogue strings, or the single wildcard `*`. Omitted grants nothing. At most the size of the catalogue.                                                                                                                                                                                                                                                                     |
 | `allowed_ips` | string[]          | Restrict usage to specific IPs or CIDR ranges                                                                                                                                                                                                                                                                                                      |
 | `expires_at`  | string            | RFC 3339 timestamp. Omitted means never expires.                                                                                                                                                                                                                                                                                                   |
 | `sandbox`     | boolean           | Everything this key sends is captured into the [sandbox](/docs/email-sending/sandbox) instead of delivered. Fixed at creation. Such a key is judged on `sandbox:write` rather than `emails:write` and needs no permission on emails at all - see [what a sandbox credential may do](/docs/email-sending/sandbox#what-a-sandbox-credential-may-do). |
