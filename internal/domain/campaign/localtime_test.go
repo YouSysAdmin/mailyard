@@ -42,3 +42,31 @@ func TestLocalDeliveryUsesTheWallClockAsWritten(t *testing.T) {
 		t.Errorf("no timezone: %v, want the instant as written", got)
 	}
 }
+
+// A campaign scheduled before the offset was stored keeps reading its
+// wall clock in UTC: 09:00+01:00 is 08:00Z, so 08:00 local everywhere.
+func TestACampaignWithNoStoredOffsetReadsUTC(t *testing.T) {
+	written, err := time.Parse(time.RFC3339, "2026-11-02T09:00:00+01:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	utc := written.UTC()
+	c := &cmodel.Campaign{SendAtLocalTime: true, ScheduledAt: &utc}
+
+	for _, tz := range []string{"America/New_York", "Asia/Tokyo"} {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			t.Skipf("no zoneinfo for %s", tz)
+		}
+
+		got := localDeliverAt(c, &submodel.Subscriber{Timezone: tz})
+		if got == nil {
+			t.Fatalf("%s: no delivery time", tz)
+		}
+
+		if h, m, _ := got.In(loc).Clock(); h != 8 || m != 0 {
+			t.Errorf("%s: delivers at %02d:%02d local, want 08:00", tz, h, m)
+		}
+	}
+}
