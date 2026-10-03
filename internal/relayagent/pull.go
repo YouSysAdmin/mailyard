@@ -117,6 +117,14 @@ func (a *Agent) spoolClaimed(m ClaimedMessage) (int, error) {
 			continue
 		}
 
+		// Already delivered or refused here, and the platform has not
+		// heard yet. Spooling it again would send it twice.
+		if done, err := a.spool.HasOutcome(m.ID, rcpt); err != nil {
+			return 0, err
+		} else if done {
+			continue
+		}
+
 		domain = strings.ToLower(domain)
 		byDomain[domain] = append(byDomain[domain], rcpt)
 	}

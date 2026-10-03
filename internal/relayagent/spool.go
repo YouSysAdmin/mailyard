@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -251,26 +252,68 @@ func (s *Spool) Has(id string) (bool, error) {
 	return found, err
 }
 
-// EmailIDs lists the distinct email ids the spool holds, which is what
-// a pull node tells the platform it still has.
+// EmailIDs lists the distinct email ids a pull node tells the platform
+// it still holds: every message in the queue, and every message with an
+// outcome not yet reported. A delivered message leaves the queue before
+// its outcome reaches the platform, and until then its assignment
+// stands, so leaving it out would have the next claim hand it back.
+// Both buckets are read in one transaction, so a delivery moving a
+// message from the queue to the outcomes cannot fall between them.
 func (s *Spool) EmailIDs() ([]string, error) {
-	msgs, err := s.All()
-	if err != nil {
-		return nil, err
-	}
-
 	seen := map[string]bool{}
-	out := make([]string, 0, len(msgs))
-	for _, m := range msgs {
-		if m.EmailID == "" || seen[m.EmailID] {
-			continue
+	var out []string
+	add := func(id string) {
+		if id == "" || seen[id] {
+			return
 		}
 
-		seen[m.EmailID] = true
-		out = append(out, m.EmailID)
+		seen[id] = true
+		out = append(out, id)
 	}
 
-	return out, nil
+	err := s.db.View(func(tx *bolt.Tx) error {
+		if err := tx.Bucket(bucketMessages).ForEach(func(_, v []byte) error {
+			var m Message
+			if uerr := json.Unmarshal(v, &m); uerr == nil {
+				add(m.EmailID)
+			}
+
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		return tx.Bucket(bucketOutcomes).ForEach(func(k, _ []byte) error {
+			id, _, _ := strings.Cut(string(k), outcomeKeySep)
+			add(id)
+
+			return nil
+		})
+	})
+
+	return out, err
+}
+
+// HasOutcome reports whether a terminal outcome for this recipient of
+// this message is still waiting to be reported.
+func (s *Spool) HasOutcome(emailID, recipient string) (bool, error) {
+	found := false
+	err := s.db.View(func(tx *bolt.Tx) error {
+		found = tx.Bucket(bucketOutcomes).Get([]byte(OutcomeKey(emailID, recipient))) != nil
+
+		return nil
+	})
+
+	return found, err
+}
+
+// outcomeKeySep joins the email id and the recipient in an outcome key.
+const outcomeKeySep = "|"
+
+// OutcomeKey is the key a pending outcome is stored under, one per
+// message and recipient.
+func OutcomeKey(emailID, recipient string) string {
+	return emailID + outcomeKeySep + recipient
 }
 
 // All returns every queued message, for the status endpoint.

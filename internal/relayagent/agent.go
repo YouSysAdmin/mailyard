@@ -330,8 +330,7 @@ func (a *Agent) recordOutcome(_ context.Context, o Outcome) {
 
 	// Keyed by message and recipient, so the same terminal result
 	// recorded twice is one row rather than two reports of one bounce.
-	key := o.EmailID + "|" + o.Recipient
-	if err := a.spool.PutOutcome(key, blob); err != nil {
+	if err := a.spool.PutOutcome(OutcomeKey(o.EmailID, o.Recipient), blob); err != nil {
 		a.log.Error("relay node: could not store an outcome", "err", err)
 	}
 }
