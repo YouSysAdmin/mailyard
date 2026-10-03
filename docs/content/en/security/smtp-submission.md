@@ -23,7 +23,7 @@ Submission is off by default. Enable it with configuration:
 |-------------------------------|----------------------------------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `submission.enabled`          | `MAILYARD_SUBMISSION_ENABLED`          | `false`             | Master switch for the submission listener.                                                                                                                                                                     |
 | `submission.addr`             | `MAILYARD_SUBMISSION_ADDR`             | `:587`              | Bind address. Separate from `inbound.addr` - the two listeners never share a port or process state. 587 is the submission port from RFC 6409, and it is privileged: see [Privileged ports](#privileged-ports). |
-| `submission.hostname`         | `MAILYARD_SUBMISSION_HOSTNAME`         | `mailyard`          | Hostname announced in the SMTP `EHLO` greeting.                                                                                                                                                                |
+| `submission.hostname`         | `MAILYARD_SUBMISSION_HOSTNAME`         | `mailyard`          | Hostname announced in the SMTP `EHLO` greeting. When it is a dotted name it is also the host the console and the credential API tell clients to connect to - see [Connecting your SMTP client](#connecting-your-smtp-client). |
 | `submission.max_message_size` | `MAILYARD_SUBMISSION_MAX_MESSAGE_SIZE` | `26214400` (25 MiB) | Maximum raw message size in bytes. Larger messages are rejected with `552`.                                                                                                                                    |
 | `submission.rate_per_minute`  | `MAILYARD_SUBMISSION_RATE_PER_MINUTE`  | `60`                | Per-IP maximum SMTP sessions per minute. `0` disables the limit.                                                                                                                                               |
 | `submission.tls.enabled`      | `MAILYARD_SUBMISSION_TLS_ENABLED`      | `true`              | Whether the listener offers STARTTLS. See below.                                                                                                                                                               |
@@ -221,11 +221,16 @@ Point your existing SMTP client at the submission host and port, with the genera
 
 | Setting             | Value                                                                                         |
 |---------------------|-----------------------------------------------------------------------------------------------|
-| Host                | `submission.addr` host (or wherever it's reachable from your app)                             |
+| Host                | The `host` the console and the credential API report, see below                               |
 | Port                | `submission.addr` port (default `587`)                                                        |
 | Encryption          | STARTTLS when `submission.tls` is configured, otherwise none                                  |
 | Auth mechanism      | `PLAIN`                                                                                       |
 | Username / Password | From the credential creation response, or any username plus an API key holding `emails:write` |
+
+The reported host is `submission.hostname` when that is a dotted name. The default `mailyard` is an `EHLO` name that
+resolves nowhere, so with it the host of `server.public_url` is reported instead, then the host of `submission.addr`
+when it is not a wildcard, then `localhost`. Set `submission.hostname` when clients reach the listener under a
+different name than the console.
 
 ```bash
 swaks --server localhost --port 587 \

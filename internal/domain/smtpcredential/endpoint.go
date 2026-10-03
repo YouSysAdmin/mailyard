@@ -4,8 +4,6 @@ package smtpcredential
 
 import (
 	"errors"
-	"net"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -246,37 +244,14 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	return response.NoContent(c)
 }
 
-// listenerInfo describes the listener a client would point at. Host
-// is the announced hostname (the EHLO name), which is the operator's
-// own statement of where submission lives, falling back to the bind
-// host when it looks routable.
+// listenerInfo describes the listener a client would point at.
 func (h *Handler) listenerInfo() ListenerInfo {
-	cfg := h.Runtime.Config.Submission
-	host, port := splitAddr(cfg.Addr)
-	if cfg.Hostname != "" {
-		host = cfg.Hostname
-	}
+	cfg := h.Runtime.Config
 
 	return ListenerInfo{
-		Enabled:  cfg.Enabled,
-		Host:     host,
-		Port:     port,
-		STARTTLS: cfg.TLS.Enabled,
+		Enabled:  cfg.Submission.Enabled,
+		Host:     cfg.SubmissionHost(),
+		Port:     cfg.SubmissionPort(),
+		STARTTLS: cfg.Submission.TLS.Enabled,
 	}
-}
-
-// splitAddr pulls host and port out of a bind address. A wildcard or
-// empty host is reported as localhost - it is the only thing a
-// reader can actually dial.
-func splitAddr(addr string) (string, string) {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return "localhost", strings.TrimPrefix(addr, ":")
-	}
-
-	if host == "" || host == "0.0.0.0" || host == "::" {
-		host = "localhost"
-	}
-
-	return host, port
 }

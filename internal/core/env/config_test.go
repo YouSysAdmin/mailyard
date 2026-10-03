@@ -152,3 +152,32 @@ func TestTheSurvivingKeysAreNotReportedAsRemoved(t *testing.T) {
 		t.Errorf("removedKeysIn() reported %v for keys that still work", got)
 	}
 }
+
+// The submission host is shown to be copied into a mail client, so it
+// has to be a name that client can dial - never the bare EHLO default.
+func TestSubmissionHostIsDialable(t *testing.T) {
+	cases := []struct {
+		name, hostname, publicURL, addr, want string
+	}{
+		{"dotted EHLO name wins", "smtp.example.com", "https://mail.example.com", ":587", "smtp.example.com"},
+		{"EHLO default falls back to the public url", "mailyard", "https://mail.example.com:8443", ":587", "mail.example.com"},
+		{"no public url uses a routable bind", "mailyard", "", "10.0.0.5:587", "10.0.0.5"},
+		{"wildcard bind is localhost", "mailyard", "", ":587", "localhost"},
+		{"empty hostname falls back too", "", "https://mail.example.com", "0.0.0.0:2587", "mail.example.com"},
+	}
+	for _, tc := range cases {
+		c := &Config{}
+		c.Submission.Hostname = tc.hostname
+		c.Server.PublicURL = tc.publicURL
+		c.Submission.Addr = tc.addr
+		if got := c.SubmissionHost(); got != tc.want {
+			t.Errorf("%s: SubmissionHost() = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+
+	c := &Config{}
+	c.Submission.Addr = "0.0.0.0:2587"
+	if got := c.SubmissionPort(); got != "2587" {
+		t.Errorf("SubmissionPort() = %q, want 2587", got)
+	}
+}

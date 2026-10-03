@@ -190,24 +190,12 @@ func (h *Handler) RevokeCredential(c fiber.Ctx) error {
 // page reports, so a developer can render connection settings without
 // reaching a route they are refused.
 func (h *Handler) submissionInfo() SandboxListenerInfo {
-	cfg := h.Runtime.Config.Submission
-	host := cfg.Hostname
-	if host == "" {
-		host = "localhost"
-	}
-
-	port := cfg.Addr
-	for i := len(port) - 1; i >= 0; i-- {
-		if port[i] == ':' {
-			port = port[i+1:]
-			break
-		}
-	}
+	cfg := h.Runtime.Config
 
 	return SandboxListenerInfo{
-		Enabled:  cfg.Enabled,
-		Host:     host,
-		Port:     port,
-		STARTTLS: cfg.TLS.Enabled,
+		Enabled:  cfg.Submission.Enabled,
+		Host:     cfg.SubmissionHost(),
+		Port:     cfg.SubmissionPort(),
+		STARTTLS: cfg.Submission.TLS.Enabled,
 	}
 }

@@ -1446,6 +1446,37 @@ func wildcardHost(host string) bool {
 // for a scratch instance nobody gave a public URL.
 func (c *Config) TLSHost() string { return publicURLHost(c.Server.PublicURL) }
 
+// SubmissionHost is the host a mail client is told to dial for
+// submission. `submission.hostname` is the EHLO name and wins only when
+// it is a dotted name, because the default `mailyard` resolves nowhere.
+// Next is the host of `server.public_url`, then a routable bind address,
+// then localhost.
+func (c *Config) SubmissionHost() string {
+	if h := strings.TrimSpace(c.Submission.Hostname); strings.Contains(h, ".") {
+		return h
+	}
+
+	if h := c.TLSHost(); h != "" {
+		return h
+	}
+
+	host, _, err := net.SplitHostPort(c.Submission.Addr)
+	if err == nil && !wildcardHost(host) {
+		return host
+	}
+
+	return "localhost"
+}
+
+// SubmissionPort is the port out of `submission.addr`.
+func (c *Config) SubmissionPort() string {
+	if _, port, err := net.SplitHostPort(c.Submission.Addr); err == nil {
+		return port
+	}
+
+	return strings.TrimPrefix(c.Submission.Addr, ":")
+}
+
 // TLSEnabled reports whether any listener terminates TLS here, which is
 // what decides whether a certificate has to be built at boot at all.
 func (c *Config) TLSEnabled() bool {
