@@ -149,6 +149,20 @@ func Internal(c fiber.Ctx, err error) error {
 		return NotFound(c, "not found")
 	}
 
+	// A write that would duplicate a unique key is a conflict, decided
+	// here so a duplicate that slips past a handler's own check under
+	// concurrency still answers the same 409 the check would have.
+	if err != nil && database.UniqueViolation(err, "") {
+		slog.Warn("write refused by a unique key",
+			"err", err,
+			"path", c.Path(),
+			"method", c.Method(),
+			"client_ip", clientip.From(c),
+		)
+
+		return Conflict(c, "a resource with the same unique value already exists")
+	}
+
 	if err != nil {
 		slog.Error("handler internal error",
 			"err", err,

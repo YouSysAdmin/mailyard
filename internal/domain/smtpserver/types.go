@@ -61,7 +61,7 @@ type createInput struct {
 	// GroupID places the server in a pool. Empty joins the project's
 	// default group, which is what every server did before groups
 	// existed.
-	GroupID  string `json:"group_id" validate:"omitempty,max=64"`
+	GroupID  string `json:"group_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 	Priority int    `json:"priority" validate:"omitempty,min=0,max=10000"`
 }
 
@@ -84,7 +84,7 @@ type updateInput struct {
 	// different things here.
 	AllowedDomains *[]string `json:"allowed_domains" validate:"omitzero,dive,min=1,max=253"`
 
-	GroupID  string `json:"group_id" validate:"omitempty,max=64"`
+	GroupID  string `json:"group_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 	Priority *int   `json:"priority" validate:"omitzero,min=0,max=10000"`
 
 	// Provider is not patchable, deliberately. Switching a live row from

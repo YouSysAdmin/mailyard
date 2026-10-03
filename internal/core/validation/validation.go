@@ -38,8 +38,8 @@
 package validation
 
 import (
+	"bytes"
 	"encoding/json/v2"
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -122,8 +122,13 @@ type fiberCtx interface {
 //  4. validator.Struct so rules consult the final shape.
 func BindAndValidate[T any](c fiberCtx) (T, error) {
 	var payload T
-	if err := json.Unmarshal(c.Body(), &payload); err != nil {
-		return payload, fmt.Errorf("decode body: %w", err)
+	body := c.Body()
+	if len(bytes.TrimSpace(body)) == 0 {
+		return payload, &DecodeError{Rule: "required", Message: "Request body is required"}
+	}
+
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return payload, decodeError(reflect.TypeFor[T](), err)
 	}
 
 	applyNormalizeTags(reflect.ValueOf(&payload))

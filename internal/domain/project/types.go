@@ -90,7 +90,7 @@ type updateInput struct {
 // wrote, so the store's tenancy check is the validation.
 type memberInput struct {
 	Email  string `json:"email"   validate:"required,email,max=320" normalize:"normalize"`
-	RoleID string `json:"role_id" validate:"omitempty,max=64"`
+	RoleID string `json:"role_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 }
 
 // memberRoleInput patches a membership: its role, its ownership, or
@@ -102,7 +102,7 @@ type memberInput struct {
 // delete the project, which is not something members:write should
 // reach.
 type memberRoleInput struct {
-	RoleID *string `json:"role_id" validate:"omitzero,max=64"`
+	RoleID *string `json:"role_id" validate:"omitzero,uuid"`
 	Owner  *bool   `json:"owner"`
 }
 
@@ -110,14 +110,14 @@ type memberRoleInput struct {
 // named role. Empty offers the project default - see memberInput.
 type inviteInput struct {
 	Email  string `json:"email"   validate:"required,email,max=320" normalize:"normalize"`
-	RoleID string `json:"role_id" validate:"omitempty,max=64"`
+	RoleID string `json:"role_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 }
 
 // defaultRoleInput names the role members carry when they have none of
 // their own. An explicit "" clears it, which leaves those members
 // reaching nothing at all.
 type defaultRoleInput struct {
-	RoleID string `json:"role_id" validate:"omitempty,max=64"`
+	RoleID string `json:"role_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 }
 
 // roleInput defines a project role. Permissions is required and may

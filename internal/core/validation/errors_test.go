@@ -15,6 +15,8 @@ func TestFriendlyField(t *testing.T) {
 		{"name", "Name"},
 		{"priority", "Priority"},
 		{"some_new_field", "Some new field"},
+		{"smtp_server_id", "SMTP server ID"},
+		{"allowed_ips", "Allowed IPs"},
 		// Empty / malformed inputs degrade gracefully.
 		{"", "This field"},
 	}

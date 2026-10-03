@@ -47,6 +47,11 @@ func TestAnIDThatCannotBeAUUIDIsNotFound(t *testing.T) {
 		// caller can produce by editing a path, so it stays a 500.
 		{"a malformed integer", &pgconn.PgError{Code: "22P02", Routine: "pg_strtoint32_safe"},
 			fiber.StatusInternalServerError, `{"error":"internal server error"}`},
+		// A duplicate that slipped past a handler's own check.
+		{"a unique key violation", fmt.Errorf("create domain: %w", &pgconn.PgError{Code: "23505", ConstraintName: "domains_name_key"}),
+			fiber.StatusConflict, `{"error":"a resource with the same unique value already exists"}`},
+		{"a foreign key violation", &pgconn.PgError{Code: "23503"},
+			fiber.StatusInternalServerError, `{"error":"internal server error"}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

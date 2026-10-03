@@ -54,7 +54,7 @@ type sendInput struct {
 	// UnsubscribeListID scopes to send to a transactional opt-out
 	// list, so {{ mailyard_unsubscribe_url }} renders a one-click link
 	// that blocks only that category of mail.
-	UnsubscribeListID string `json:"unsubscribe_list_id" validate:"omitempty,max=64" normalize:"trim"`
+	UnsubscribeListID string `json:"unsubscribe_list_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 
 	// The RFC 2369 / 8058 List-Unsubscribe targets, for an application
 	// that runs its own opt-out. Mailyard carries the header and does
@@ -93,7 +93,7 @@ type sendInput struct {
 
 	// SMTPServerID pins one server exactly and overrides the group.
 	// Mostly for testing a specific server end to end.
-	SMTPServerID string `json:"smtp_server_id" validate:"omitempty,max=64" normalize:"trim"`
+	SMTPServerID string `json:"smtp_server_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 
 	// Sandbox captures this message instead of sending it.
 	//
@@ -135,12 +135,12 @@ type templateSendInput struct {
 
 	// Same routing selectors as a plain send. See sendInput.
 	SMTPGroup    string `json:"smtp_group"     validate:"omitempty,max=100" normalize:"normalize"`
-	SMTPServerID string `json:"smtp_server_id" validate:"omitempty,max=64"  normalize:"trim"`
+	SMTPServerID string `json:"smtp_server_id" validate:"omitempty,uuid"  normalize:"trim,lower"`
 
 	// Same opt-out scope as a plain send, and the reason it is here:
 	// a template may reference {{ mailyard_unsubscribe_url }}, and
 	// without this there is no list to bind the link to.
-	UnsubscribeListID string `json:"unsubscribe_list_id" validate:"omitempty,max=64" normalize:"trim"`
+	UnsubscribeListID string `json:"unsubscribe_list_id" validate:"omitempty,uuid" normalize:"trim,lower"`
 
 	// Same caller-supplied unsubscribe targets as a plain send. See
 	// sendInput, which is also where these are carried from.

@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/queue"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -226,7 +227,7 @@ func (g *claimGate) leave(nodeID string) {
 func (h *Handler) completeAssigned(ctx context.Context, node *nodemodel.Node, outcomes []reportOutcome) int {
 	byEmail := map[string][]reportOutcome{}
 	for _, o := range outcomes {
-		if o.EmailID != "" && o.Recipient != "" {
+		if o.EmailID != "" && o.Recipient != "" && ids.Valid(o.EmailID) {
 			byEmail[o.EmailID] = append(byEmail[o.EmailID], o)
 		}
 	}

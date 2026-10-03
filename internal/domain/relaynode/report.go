@@ -5,6 +5,7 @@ package relaynode
 import (
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain/bounce"
@@ -69,7 +70,7 @@ func (h *Handler) Report(c fiber.Ctx) error {
 	delivered := 0
 
 	for _, o := range in.Outcomes {
-		if o.EmailID == "" || o.Recipient == "" {
+		if o.EmailID == "" || o.Recipient == "" || !ids.Valid(o.EmailID) {
 			continue
 		}
 

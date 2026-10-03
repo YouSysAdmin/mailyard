@@ -118,7 +118,9 @@ Single objects use a singular key:
 }
 ```
 
-Errors carry an `error` string, and validation failures add a `fields` array:
+Errors carry an `error` string, and validation failures add a `fields` array. `field` is the JSON key the request
+sent, so a body with a value of the wrong type names that key too, with `rule` set to `type` (for example
+`"Name must be a string"`):
 
 ```json
 {
@@ -136,6 +138,10 @@ Errors carry an `error` string, and validation failures add a `fields` array:
 The HTTP status is the authority: `200`/`201` success, `400` invalid input, `401`
 unauthenticated, `403` the credential lacks the permission, `404` missing (or in another project),
 `409` conflict, `429` rate limit or quota, `503` maintenance mode.
+
+A request that would duplicate something unique answers `409`, including when two identical creates race each other.
+An id field in a request body that is not a UUID is a `400` naming that field, while an id in the path that is not a
+UUID is a `404`, since no resource can have it.
 
 ## Identifiers
 

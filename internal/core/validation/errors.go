@@ -22,11 +22,14 @@ type FieldError struct {
 	Message string `json:"message"`
 }
 
-// Humanize converts validator.ValidationErrors into []FieldError.
-// Non-validator errors (typically a JSON-decode failure from
-// BindAndValidate) collapse to a single field-less entry so the
-// caller can still render something.
+// Humanize converts validator.ValidationErrors into []FieldError. A
+// body that did not decode reports the key it concerns, and any other
+// error collapses to a single field-less entry.
 func Humanize(err error) []FieldError {
+	if de, ok := errors.AsType[*DecodeError](err); ok {
+		return []FieldError{{Field: de.Field, Rule: de.Rule, Message: de.Message}}
+	}
+
 	ve, ok := errors.AsType[validator.ValidationErrors](err)
 	if !ok {
 		return []FieldError{{Message: err.Error()}}
@@ -75,7 +78,7 @@ func Summary(fes []FieldError) string {
 		parts = append(parts, fe.Message)
 	}
 
-	return "validation failed: " + strings.Join(parts, "; ")
+	return "validation failed: " + strings.Join(parts, ". ")
 }
 
 // sizeUnit names what min, max and len count. The tag is the same for
@@ -156,6 +159,13 @@ var friendlyLabels = map[string]string{
 	"id": "ID",
 }
 
+// friendlyWords are the abbreviations a label spells in capitals
+// wherever they appear in it.
+var friendlyWords = map[string]string{
+	"id": "ID", "ids": "IDs", "smtp": "SMTP", "url": "URL", "ip": "IP", "ips": "IPs",
+	"dkim": "DKIM", "ses": "SES", "arn": "ARN",
+}
+
 // friendlyField converts a json tag name to a human-readable label
 // suitable for an end-user-facing error message. Known cases come
 // from the friendlyLabels map - everything else falls through to a
@@ -176,6 +186,12 @@ func friendlyField(jsonField string) string {
 
 	parts := strings.Split(jsonField, "_")
 	for i, p := range parts {
+		if w, ok := friendlyWords[p]; ok {
+			parts[i] = w
+
+			continue
+		}
+
 		if i == 0 && len(p) > 0 {
 			parts[i] = strings.ToUpper(p[:1]) + p[1:]
 		}

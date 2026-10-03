@@ -49,7 +49,7 @@ type registerInput struct {
 }
 
 type heartbeatInput struct {
-	NodeID  string `json:"node_id" validate:"required"`
+	NodeID  string `json:"node_id" validate:"required,uuid" normalize:"trim,lower"`
 	Token   string `json:"token" validate:"required"`
 	Version string `json:"version" validate:"omitempty,max=64" normalize:"trim"`
 	// InboundDomainsETag is the fingerprint of the accept list this
@@ -70,7 +70,7 @@ type heartbeatInput struct {
 }
 
 type inboundInput struct {
-	NodeID string `json:"node_id" validate:"required"`
+	NodeID string `json:"node_id" validate:"required,uuid" normalize:"trim,lower"`
 	Token  string `json:"token" validate:"required"`
 	// EnvelopeFrom may legitimately be empty: a null return path is
 	// exactly what a bounce report carries, and bounces are the
@@ -90,13 +90,13 @@ type inboundInput struct {
 }
 
 type renewInput struct {
-	NodeID string `json:"node_id" validate:"required"`
+	NodeID string `json:"node_id" validate:"required,uuid" normalize:"trim,lower"`
 	Token  string `json:"token" validate:"required"`
 	CSR    string `json:"csr" validate:"required"`
 }
 
 type reportInput struct {
-	NodeID   string          `json:"node_id" validate:"required"`
+	NodeID   string          `json:"node_id" validate:"required,uuid" normalize:"trim,lower"`
 	Token    string          `json:"token" validate:"required"`
 	Outcomes []reportOutcome `json:"outcomes" validate:"max=5000,dive"`
 }
@@ -124,7 +124,7 @@ type reportOutcome struct {
 
 // claimInput is a pull node asking for its assigned mail.
 type claimInput struct {
-	NodeID string `json:"node_id" validate:"required"`
+	NodeID string `json:"node_id" validate:"required,uuid" normalize:"trim,lower"`
 	Token  string `json:"token" validate:"required"`
 	// Max bounds the batch, WaitSeconds how long to park the request
 	// when nothing is assigned yet. Both are capped by the platform.
