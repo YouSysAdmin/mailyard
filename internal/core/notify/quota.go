@@ -73,7 +73,7 @@ func (r *Raiser) QuotaObserver(ctx context.Context, projID string) quota.Observe
 						"submission answers a temporary 452, so a sending client will retry rather "+
 						"than lose the message. Raise the plan or spread the load.",
 					plan, limit, per, used),
-				Link:      "/usage",
+				Link:      "/projects/" + projID,
 				DedupeKey: "quota_reached:" + window + ":" + hour,
 			})
 
@@ -89,7 +89,7 @@ func (r *Raiser) QuotaObserver(ctx context.Context, projID string) quota.Observe
 				"Plan %q allows %d emails %s. Sends are refused once the window is full - the "+
 					"API with 429 and SMTP submission with a temporary 452.",
 				plan, limit, per),
-			Link:      "/usage",
+			Link:      "/projects/" + projID,
 			DedupeKey: "quota_warn:" + window + ":" + hour,
 		})
 	}
