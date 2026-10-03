@@ -119,6 +119,11 @@ func (h *SharedHandler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
+	if srv.IsNode() && (in.Status != "" ||
+		touchesDial(in.Host, in.Port, in.Username, in.Password, in.Encryption, in.ProviderConfig)) {
+		return response.BadRequest(c, errNodeDial)
+	}
+
 	before := srv.Server
 	if in.Name != "" {
 		srv.Name = in.Name
@@ -150,6 +155,12 @@ func (h *SharedHandler) Update(c fiber.Ctx) error {
 
 	if in.ProviderConfig != nil {
 		srv.ProviderConfig = *in.ProviderConfig
+		// Against the row's own provider, which a PATCH cannot change, so
+		// clearing a required option is refused - the same rule as the
+		// project path.
+		if err := transport.ValidateOptions(srv.Provider, srv.ProviderConfig); err != nil {
+			return response.BadRequest(c, err.Error())
+		}
 	}
 
 	if in.SESTopicARN != nil {

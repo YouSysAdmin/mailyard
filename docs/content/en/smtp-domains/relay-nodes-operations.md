@@ -68,6 +68,11 @@ mail. The `relay_nodes_auto_approve` [setting](/docs/admin/platform-settings) ex
 for autoscaling groups and is off by default.
 {{< /callout >}}
 
+An enrolled node also appears as a server row, in the shared pool or in its project's SMTP servers. Its name, priority
+and allow lists can be edited there, but its host, port, credentials, encryption, provider options and status cannot:
+the node reports its own address, and approving or suspending it happens on the relay nodes page. A server `PATCH`
+naming any of those on a node's row answers `400`.
+
 ## A node for one project
 
 The same binary, enrolled by a tenant instead of the operator. It becomes one of

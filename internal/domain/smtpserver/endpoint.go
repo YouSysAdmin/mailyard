@@ -158,6 +158,10 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return resp
 	}
 
+	if srv.IsNode() && touchesDial(in.Host, in.Port, in.Username, in.Password, in.Encryption, in.ProviderConfig) {
+		return response.BadRequest(c, errNodeDial)
+	}
+
 	before := *srv
 	if in.Name != "" {
 		srv.Name = in.Name
@@ -260,6 +264,21 @@ func (h *Handler) answerServer(c fiber.Ctx, projID, id string) error {
 	}
 
 	return response.Success(c, ServerResponse{SMTPServer: srv})
+}
+
+// errNodeDial refuses a PATCH that would rewrite how a relay node's row
+// is reached, or whether it carries mail. The node reports its own
+// address, and approval and suspension are decided on the relay nodes
+// page - a server PATCH setting either would step around both.
+const errNodeDial = "this server is a relay node - its address, credentials and status are managed " +
+	"by the node and the relay nodes page. Name, priority and the allow lists may be changed here"
+
+// touchesDial reports whether a PATCH names any field that decides how
+// a server is dialled.
+func touchesDial(host string, port int, username, password *string, encryption string,
+	providerConfig *map[string]string,
+) bool {
+	return host != "" || port != 0 || username != nil || password != nil || encryption != "" || providerConfig != nil
 }
 
 // errServerIsANode is the refusal both server Delete routes give a row
