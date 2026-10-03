@@ -16,7 +16,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import grapesjs, { type Editor, type PropertySelect } from 'grapesjs'
 import newsletterPreset from 'grapesjs-preset-newsletter'
 import 'grapesjs/dist/css/grapes.min.css'
-import { templatesApi } from '../../api/templates'
+import { templatesApi, type TemplateAsset } from '../../api/templates'
 import { apiErrorMessage } from '../../api/client'
 import type { Template, TemplateLocalization, TemplateVersion } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'
@@ -94,6 +94,69 @@ const radioLabels: Record<string, Record<string, string>> = {
   'font-style': { normal: 'Normal', italic: 'Italic' },
 }
 
+/** The file's bytes as base64, the prefix of the data URL cut off. */
+function asBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const url = String(reader.result ?? '')
+      const comma = url.indexOf(',')
+      resolve(comma >= 0 ? url.slice(comma + 1) : url)
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+/** An uploaded image as the asset manager lists it. */
+function assetEntry(a: TemplateAsset) {
+  return { type: 'image', src: a.url, name: a.filename }
+}
+
+/**
+ * Uploads images to the project's library instead of embedding them.
+ *
+ * GrapesJS' default writes a dropped image into the HTML as a data:
+ * URL, which Gmail and Outlook do not display and which every message
+ * then stores again in its body. Uploaded, the template carries an
+ * absolute URL and the bytes are stored once. Called from the asset
+ * manager's file input and drop area, and for a file dropped straight
+ * onto the canvas, which passes `done` to set the new image's src.
+ */
+async function uploadImages(
+  e: DragEvent,
+  done?: (res: { data: { src: string }[] }) => void,
+): Promise<void> {
+  const input = e.target instanceof HTMLInputElement ? e.target : null
+  const files = Array.from(e.dataTransfer?.files ?? input?.files ?? [])
+  const added: ReturnType<typeof assetEntry>[] = []
+  for (const file of files) {
+    try {
+      const res = await templatesApi.uploadAsset({
+        filename: file.name,
+        content: await asBase64(file),
+      })
+      added.push(assetEntry(res.data.asset))
+    } catch (err) {
+      notify.error(apiErrorMessage(err, `Failed to upload "${file.name}"`))
+    }
+  }
+
+  if (input) input.value = ''
+  if (added.length) editor?.AssetManager.add(added, { at: 0 })
+  done?.({ data: added })
+}
+
+/** The project's images, so one uploaded for another template can be reused. */
+async function loadAssets() {
+  try {
+    const res = await templatesApi.listAssets()
+    editor?.AssetManager.add((res.data.assets ?? []).map(assetEntry))
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to load the image library'))
+  }
+}
+
 function startEditor(html: string) {
   if (!canvas.value) return
 
@@ -115,7 +178,15 @@ function startEditor(html: string) {
     telemetry: false,
     plugins: [newsletterPreset],
     deviceManager: { devices },
+    assetManager: {
+      embedAsBase64: false,
+      // Only enables the file input, uploadFile does the request.
+      upload: '/api/v1/template-assets/',
+      uploadFile: uploadImages,
+    },
   })
+
+  void loadAssets()
 
   if (html) editor.setComponents(html)
 
@@ -428,6 +499,13 @@ onBeforeUnmount(() => {
     center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l14 14'/%3E%3Cpath d='M7.2 7.3a2.5 2.5 0 0 0 3.5 3.5'/%3E%3Cpath d='M4.3 4.7C2.7 5.8 1.5 7.4 1.5 9c0 0 2.5 4.5 7.5 4.5 1.3 0 2.4-.3 3.4-.8'/%3E%3Cpath d='M7.4 3.7c.5-.1 1-.2 1.6-.2 5 0 7.5 5.5 7.5 5.5-.4.8-1 1.7-1.8 2.5'/%3E%3C/svg%3E")
     center / contain no-repeat;
+}
+
+/* Removing an image from the library is a delete on the server, and
+   mail already delivered would lose it, so the asset manager's one
+   click remove is not offered. */
+.builder-canvas :deep([data-toggle='asset-remove']) {
+  display: none;
 }
 
 /* GrapesJS paints its chrome from four theme classes. Mapping them to

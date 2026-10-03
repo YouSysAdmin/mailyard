@@ -57,6 +57,17 @@ export interface AttachmentUploadPayload {
   content: string
 }
 
+// An image uploaded in the visual builder. url is absolute and is what
+// the template's HTML references.
+export interface TemplateAsset {
+  id: string
+  filename: string
+  content_type: string
+  size: number
+  url: string
+  created_at: string
+}
+
 // Portable export document (format mailyard-template-v1).
 export interface TemplateExportVersion {
   version: number
@@ -134,6 +145,10 @@ export const templatesApi = {
     api.delete(`/templates/${id}/attachments/${attId}`),
   attachmentDownloadURL: (id: string, attId: string) =>
     browserURL(`/templates/${id}/attachments/${attId}/download`),
+
+  listAssets: () => api.get<{ assets: TemplateAsset[]; total: number }>('/template-assets/'),
+  uploadAsset: (payload: { filename: string; content: string }) =>
+    api.post<{ asset: TemplateAsset }>('/template-assets/', payload),
 
   exportURL: (id: string) => browserURL(`/templates/${id}/export`),
   export: (id: string) => api.get<{ export: TemplateExportDoc }>(`/templates/${id}/export`),
