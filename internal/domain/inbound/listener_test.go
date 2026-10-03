@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/eventbus"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
 	imodel "github.com/yousysadmin/mailyard/internal/models/inbound"
@@ -324,22 +325,53 @@ func TestInboundDuplicateIsIdempotent(t *testing.T) {
 	}
 }
 
+// A message that will not parse is stored failed, announced once, and
+// a redelivery of the same bytes is the same row.
 func TestInboundMalformedStoredAsFailed(t *testing.T) {
 	addr, rows, events := startListener(t, "")
-	if err := deliver(addr, "someone@remote.example", []string{"support@in.example.com"},
-		"Content-Type: multipart/mixed\r\n\r\nnot a boundary\r\n"); err != nil {
-		t.Fatalf("deliver: %v", err)
+	for range 2 {
+		if err := deliver(addr, "someone@remote.example", []string{"support@in.example.com"},
+			"Content-Type: multipart/mixed\r\n\r\nnot a boundary\r\n"); err != nil {
+			t.Fatalf("deliver: %v", err)
+		}
 	}
 
 	if len(rows.rows) != 1 || rows.rows[0].Status != imodel.StatusFailed {
-		t.Fatalf("malformed message must be stored failed, rows = %+v", rows.rows)
+		t.Fatalf("malformed message must be stored failed once, rows = %+v", rows.rows)
 	}
 
 	if len(rows.rows[0].Raw) == 0 {
 		t.Error("raw bytes must be retained for failed parses")
 	}
 
-	if len(*events) != 0 {
-		t.Errorf("no webhook for failed parse, events = %v", *events)
+	if rows.rows[0].DedupHash == "" {
+		t.Error("a failed parse must carry a dedup key")
+	}
+
+	if len(*events) != 1 || (*events)[0] != "inbound.received" {
+		t.Errorf("a failed parse must be announced once, events = %v", *events)
+	}
+}
+
+// An arrival reaches the live event stream, which the console reads.
+func TestAnArrivalIsPublishedOnTheEventStream(t *testing.T) {
+	rows := &fakeInbound{}
+	var published []eventbus.Event
+	svc := &Service{
+		Inbound:      rows,
+		Suppressions: &fakeSuppressions{},
+		Publish:      func(e eventbus.Event) { published = append(published, e) },
+		Log:          slog.New(slog.DiscardHandler),
+	}
+	d := &dmodel.Domain{ID: "dom-1", ProjectID: "proj-1", Domain: "in.example.com", Verified: true}
+
+	if _, err := svc.Ingest(t.Context(), d, "", []string{"support@in.example.com"},
+		[]byte(inboundMsg), Conn{}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+
+	if len(published) != 1 || published[0].Type != eventbus.TypeInboundReceived ||
+		published[0].ProjectID != "proj-1" {
+		t.Fatalf("published = %+v, want one email.inbound.received for proj-1", published)
 	}
 }

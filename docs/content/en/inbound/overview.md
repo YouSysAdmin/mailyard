@@ -53,19 +53,20 @@ sending MTA  ──►  SMTP on :25  ──►  RCPT TO checked against verified
    project, and anything unclaimed is refused there.
 2. Mailyard authenticates the sender (SPF, DKIM, DMARC), stores the verdict on the record and stamps an
    `Authentication-Results` header.
-3. The message is parsed, deduplicated by Message-ID and content hash, and persisted (raw `.eml` and attachments go to
-   blob storage when configured).
+3. The message is parsed, deduplicated (see [Deduplication](receiving.md#deduplication)) and persisted. Attachments go
+   to blob storage when one is configured. The raw message is kept, in the database, only for a message that would not
+   parse.
 4. The record is dispatched asynchronously as an `inbound.received` [webhook event](../webhooks/event-types.md) to
-   subscribed project webhooks.
+   subscribed project webhooks, and published on the console's live event stream as `email.inbound.received`.
 5. You can browse, download and delete inbound mail from the project management API.
 
 ## Statuses
 
-| Status     | Meaning                                                             |
-|------------|---------------------------------------------------------------------|
-| `received` | Stored and parsed.                                                  |
-| `rejected` | Refused at ingest, for instance a suppressed sender or a duplicate. |
-| `failed`   | The MIME tree could not be parsed. The raw message is kept.         |
+| Status     | Meaning                                                                                |
+|------------|----------------------------------------------------------------------------------------|
+| `received` | Stored and parsed.                                                                     |
+| `rejected` | Refused at ingest: a suppressed sender, or a DMARC `p=reject` failure with refusal on. |
+| `failed`   | The MIME tree could not be parsed. The raw message is kept.                            |
 
 ## Next Steps
 

@@ -126,6 +126,7 @@ that distinction.
     "data": {
         "id": "7d3f9a12-4b2c-7e81-9a03-5f6d8c1e2b47",
         "domain": "mail.example.com",
+        "status": "received",
         "sender": "Jane Doe <jane@example.com>",
         "bounce_address": "bounces@example.com",
         "recipients": [
@@ -138,6 +139,9 @@ that distinction.
     }
 }
 ```
+
+`status` is `received`, or `failed` for a message that arrived but would not parse as MIME. A failed message is
+stored with its raw bytes and no sender, subject or Message-ID, so those fields are empty.
 
 Metadata only: **no bodies, no headers and no attachments**. A received message can be tens of megabytes, and a webhook
 body that size is a delivery that times out rather than a convenience. Fetch what you need with

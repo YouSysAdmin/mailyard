@@ -159,3 +159,81 @@ func TestHeaderAddressTakesTheFirstOccurrence(t *testing.T) {
 		t.Errorf("got %q, want first.example", got)
 	}
 }
+
+// dmarcAt answers a DMARC record for each named _dmarc host and nothing
+// else.
+func dmarcAt(records map[string]string) func(string) ([]string, error) {
+	return func(name string) ([]string, error) {
+		if v, ok := records[name]; ok {
+			return []string{v}, nil
+		}
+
+		return nil, nil
+	}
+}
+
+// A subdomain with no record of its own is held to the organizational
+// domain's sp=, falling back to its p=.
+func TestASubdomainInheritsTheOrganizationalPolicy(t *testing.T) {
+	raw := []byte("From: Pay <alerts@secure.paypal.com>\r\nSubject: x\r\n\r\nhi\r\n")
+	cases := []struct {
+		record, want string
+	}{
+		{"v=DMARC1; p=reject", "reject"},
+		{"v=DMARC1; p=reject; sp=none", "none"},
+		{"v=DMARC1; p=none; sp=quarantine", "quarantine"},
+	}
+	for _, tc := range cases {
+		lookup := dmarcAt(map[string]string{"_dmarc.paypal.com": tc.record})
+		res := Verify(t.Context(), Config{LookupTXT: lookup}, "203.0.113.9", "", "relay.example", raw)
+		if res.DMARC != ResultFail || res.DMARCPolicy != tc.want {
+			t.Errorf("%q: dmarc=%s policy=%q, want fail and %q", tc.record, res.DMARC, res.DMARCPolicy, tc.want)
+		}
+	}
+
+	lookup := dmarcAt(map[string]string{"_dmarc.paypal.com": "v=DMARC1; p=reject"})
+	res := Verify(t.Context(), Config{LookupTXT: lookup}, "203.0.113.9", "", "relay.example", raw)
+	if !res.Rejectable() {
+		t.Error("a spoofed subdomain of a p=reject domain must be rejectable")
+	}
+}
+
+// The subdomain's own record wins over the organizational one.
+func TestTheSubdomainsOwnRecordWins(t *testing.T) {
+	raw := []byte("From: a@news.example.com\r\nSubject: x\r\n\r\nhi\r\n")
+	lookup := dmarcAt(map[string]string{
+		"_dmarc.news.example.com": "v=DMARC1; p=none",
+		"_dmarc.example.com":      "v=DMARC1; p=reject",
+	})
+
+	res := Verify(t.Context(), Config{LookupTXT: lookup}, "203.0.113.9", "", "relay.example", raw)
+	if res.DMARCPolicy != "none" {
+		t.Errorf("policy = %q, want none", res.DMARCPolicy)
+	}
+}
+
+// Relaxed alignment compares organizational domains, so a sibling
+// subdomain aligns and a second registrable domain does not.
+func TestRelaxedAlignmentUsesTheOrganizationalDomain(t *testing.T) {
+	if !alignedWith("mail.example.com", "news.example.com", false) {
+		t.Error("siblings under one organizational domain must align")
+	}
+
+	if alignedWith("example.co.uk", "other.co.uk", false) {
+		t.Error("two registrable domains under a public suffix must not align")
+	}
+
+	if alignedWith("mail.example.com", "news.example.com", true) {
+		t.Error("strict alignment demands the same name")
+	}
+}
+
+func TestAuthenticationResultsNamesThePolicy(t *testing.T) {
+	h := AuthenticationResults("mx.example", Result{
+		SPF: ResultNone, DKIM: ResultNone, DMARC: ResultFail,
+		DMARCPolicy: "reject", HeaderFrom: "secure.paypal.com",
+	})
+	if !strings.Contains(h, "dmarc=fail (p=reject) header.from=secure.paypal.com") {
+		t.Errorf("header %q does not name the applied policy", h)
+	}
+}

@@ -23,6 +23,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/dsn"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/core/eventbus"
 	"github.com/yousysadmin/mailyard/internal/core/mailauth"
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
 	"github.com/yousysadmin/mailyard/internal/core/metrics"
@@ -86,6 +87,9 @@ type Service struct {
 	Log      *slog.Logger
 	MaxSize  int64
 
+	// Publish hands a stored arrival to the live event stream. Nil-safe.
+	Publish func(eventbus.Event)
+
 	// Hostname names this receiver in the Authentication-Results
 	// header it stamps.
 	Hostname string
@@ -131,6 +135,10 @@ func NewService(rt *env.Runtime) *Service {
 	}
 	if rt.Dispatch != nil {
 		svc.Emit = rt.Dispatch.Emit
+	}
+
+	if rt.Events != nil {
+		svc.Publish = rt.Events.Publish
 	}
 
 	return svc
@@ -292,11 +300,8 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 		rec.Status = imodel.StatusFailed
 		rec.ErrorMessage = fmt.Sprintf("parse: %v", perr)
 		rec.Raw = raw
-		if err := s.Inbound.Put(ctx, rec); err != nil {
-			return nil, err
-		}
 
-		return rec, nil
+		return s.storeUnparsed(ctx, d, rec, returnPath, envelopeTo, raw)
 	}
 
 	rec.MessageID = parsed.MessageID
@@ -395,24 +400,7 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 		return nil, err
 	}
 
-	if s.Emit != nil {
-		s.Emit(ctx, rec.ProjectID, webhookmodel.EventInboundReceived, rec.Sender, map[string]any{
-			"id":             rec.ID,
-			"domain":         d.Domain,
-			"sender":         rec.Sender,
-			"bounce_address": rec.BounceAddress,
-			"recipients":     rec.Recipients,
-			"subject":        rec.Subject,
-			"message_id":     rec.MessageID,
-			"size":           rec.Size,
-			"received_at":    rec.ReceivedAt,
-		})
-	}
-
-	metrics.InboundReceived.Inc()
-	s.Log.Info("inbound: message received",
-		"id", rec.ID, "project_id", rec.ProjectID, "domain", d.Domain,
-		"sender", rec.Sender, "bounce_address", rec.BounceAddress, "size", rec.Size)
+	s.announce(ctx, rec, d)
 
 	// After the message is safely stored: if it is a failure report
 	// addressed to the project's bounce address, feed it into the
@@ -421,6 +409,73 @@ func (s *Service) Ingest(ctx context.Context, d *dmodel.Domain, envelopeFrom str
 	s.processReport(ctx, rec, raw, conn.ReportScope)
 
 	return rec, nil
+}
+
+// storeUnparsed stores a message that would not parse. It has no
+// Message-ID or subject to key on, so the dedup key is the raw bytes
+// with the envelope, which still makes an MTA retry one row.
+func (s *Service) storeUnparsed(ctx context.Context, d *dmodel.Domain, rec *imodel.Email, returnPath string, envelopeTo []string, raw []byte) (*imodel.Email, error) {
+	rec.DedupHash = rawDedupHash(returnPath, envelopeTo, raw)
+	existing, err := s.Inbound.FindByDedupHash(ctx, d.ProjectID, rec.DedupHash)
+	if err != nil {
+		return nil, err
+	}
+
+	if existing != nil {
+		return existing, ErrDuplicate
+	}
+
+	if err := s.Inbound.Put(ctx, rec); err != nil {
+		if existing := s.duplicateOf(ctx, rec, err); existing != nil {
+			return existing, ErrDuplicate
+		}
+
+		return nil, err
+	}
+
+	s.announce(ctx, rec, d)
+
+	return rec, nil
+}
+
+// announce tells the project a message was stored: the inbound.received
+// webhook and the live event stream. Also counted in the metric.
+func (s *Service) announce(ctx context.Context, rec *imodel.Email, d *dmodel.Domain) {
+	payload := map[string]any{
+		"id":             rec.ID,
+		"domain":         d.Domain,
+		"status":         rec.Status,
+		"sender":         rec.Sender,
+		"bounce_address": rec.BounceAddress,
+		"recipients":     rec.Recipients,
+		"subject":        rec.Subject,
+		"message_id":     rec.MessageID,
+		"size":           rec.Size,
+		"received_at":    rec.ReceivedAt,
+	}
+	if s.Emit != nil {
+		s.Emit(ctx, rec.ProjectID, webhookmodel.EventInboundReceived, rec.Sender, payload)
+	}
+
+	if s.Publish != nil {
+		s.Publish(eventbus.Event{
+			Type:      eventbus.TypeInboundReceived,
+			ProjectID: rec.ProjectID,
+			Data: map[string]any{
+				"id":         rec.ID,
+				"status":     rec.Status,
+				"sender":     rec.Sender,
+				"recipients": rec.Recipients,
+				"subject":    rec.Subject,
+			},
+			At: rec.ReceivedAt,
+		})
+	}
+
+	metrics.InboundReceived.Inc()
+	s.Log.Info("inbound: message received",
+		"id", rec.ID, "project_id", rec.ProjectID, "domain", d.Domain, "status", rec.Status,
+		"sender", rec.Sender, "bounce_address", rec.BounceAddress, "size", rec.Size)
 }
 
 // processReport turns a delivery status notification arriving at the
@@ -549,6 +604,16 @@ func (s *Service) releaseAttachments(ctx context.Context, rec *imodel.Email) {
 				"id", rec.ID, "key", a.StorageKey, "err", err)
 		}
 	}
+}
+
+// rawDedupHash fingerprints a message that would not parse, from its
+// bytes and envelope.
+func rawDedupHash(sender string, recipients []string, raw []byte) string {
+	h := sha256.New()
+	_, _ = fmt.Fprintf(h, "raw|%s|%s|", strings.ToLower(sender), strings.ToLower(strings.Join(recipients, ",")))
+	_, _ = h.Write(raw)
+
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // dedupHash fingerprints messages that carry no Message-ID so MTA

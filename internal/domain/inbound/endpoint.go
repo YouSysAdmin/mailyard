@@ -152,6 +152,7 @@ func (h *Handler) Retry(c fiber.Ctx) error {
 	h.Runtime.Dispatch.Emit(c.Context(), e.ProjectID, webhookmodel.EventInboundReceived, e.Sender, map[string]any{
 		"id":             e.ID,
 		"domain":         e.Domain,
+		"status":         e.Status,
 		"sender":         e.Sender,
 		"bounce_address": e.BounceAddress,
 		"recipients":     e.Recipients,

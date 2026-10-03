@@ -50,16 +50,27 @@ The field worth acting on is `aligned`. A message can carry a perfectly valid DK
 domain — that is not authentication of the `From` address, and only alignment says the signing domain and the visible
 sender agree.
 
-Mailyard refuses a message on authentication failure only when **both** conditions hold: the sender's domain publishes
-`p=reject`, and
+The policy is the From domain's own DMARC record. When the From domain publishes none, the record of its organizational
+domain applies (RFC 7489, the registrable domain by the public suffix list), with its `sp=` for a subdomain and `p=`
+when `sp=` is absent - so `secure.example.com` is held to what `example.com` publishes. Relaxed alignment admits any
+name under the same organizational domain. The `dmarc` entry of `Authentication-Results` names the applied policy and
+the From domain, as in `dmarc=fail (p=reject) header.from=secure.example.com`.
+
+Mailyard refuses a message on authentication failure only when **both** conditions hold: the policy that applies to the
+sender's domain is `p=reject`, and
 `MAILYARD_INBOUND_REJECT_ON_DMARC_FAIL=true`. The default is to accept and record, because silently dropping mail is the
 most damaging thing a receiver can do, and ordinary forwarding breaks SPF as a matter of course. Look at what your real
 traffic scores before turning refusal on.
 
 ## Deduplication
 
-A message is deduplicated per project by `Message-ID`. When a message carries none, a content hash stands in. A
-redelivery — which is normal SMTP behaviour after a timeout — is stored once.
+A message is deduplicated per project on one key built from its `Message-ID` together with the envelope sender, the
+envelope recipients, the subject and the size. A `Message-ID` is whatever the sender typed, so it never settles a
+duplicate alone: a different message reusing an id is a different message. A message that will not parse is keyed on
+its raw bytes and envelope instead.
+
+A redelivery, which is normal SMTP behaviour after a timeout, is stored once. It is not refused: the sending server is
+answered `250` as for the first copy, no second record is written and no second webhook is sent.
 
 ## Reading received mail
 
@@ -85,7 +96,8 @@ is the same either way.
 ## Being told about new mail
 
 Rather than polling the list endpoint, subscribe a webhook to the
-`inbound.received` [event](../webhooks/event-types.md). That is the only push notification for received mail — the
-console's own live feed carries outbound delivery results, not arrivals.
+`inbound.received` [event](../webhooks/event-types.md). That is the push notification for a machine. The console's own
+live feed also carries each arrival, as `email.inbound.received`, but it is a ticker for whoever is signed in and
+reaches only the viewers connected to the node that received the message.
 
 See [Managing Inbound Email](managing.md).

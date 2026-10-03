@@ -128,7 +128,7 @@ Attachment entries carry metadata only. Fetch the bytes through the download end
 DELETE /api/v1/inbound-emails/{id}
 ```
 
-Removes the record and best-effort deletes its blob-stored raw message and attachments. Returns `204 No Content`.
+Removes the record and best-effort deletes its blob-stored attachments. Returns `204 No Content`.
 
 ## Re-dispatch
 
@@ -179,7 +179,8 @@ endpoint reads them the same way either way.
 
 ## Live updates
 
-The console shows inbound arrivals as they land, over its own event feed. To be notified machine-side, subscribe to
+Each arrival is published on the console's live event stream as `email.inbound.received`. That stream reaches only the
+viewers connected to the node that received the message. To be notified machine-side, subscribe to
 `inbound.received` with a [webhook](/docs/webhooks/overview). It carries metadata only - no bodies or attachments -
 so fetch those with the endpoints above. See [Event Types](/docs/webhooks/event-types) for the payload.
 

@@ -26,6 +26,7 @@ import (
 
 	"blitiri.com.ar/go/spf"
 	"github.com/emersion/go-msgauth/dmarc"
+	"golang.org/x/net/publicsuffix"
 
 	"github.com/yousysadmin/mailyard/internal/core/dkim"
 )
@@ -50,9 +51,14 @@ type Result struct {
 	DKIMSigs  []dkim.Result `json:"dkim_signatures,omitempty"`
 	DMARC     string        `json:"dmarc"`
 
-	// DMARCPolicy is the domain owner's published p= value: "none",
-	// "quarantine" or "reject". Empty when no record exists.
+	// DMARCPolicy is the policy that applies to the From domain: "none",
+	// "quarantine" or "reject". Its own record's p=, or when it has none,
+	// the organizational domain's sp= falling back to its p=. Empty when
+	// neither publishes a record.
 	DMARCPolicy string `json:"dmarc_policy,omitempty"`
+
+	// HeaderFrom is the From header domain DMARC was evaluated for.
+	HeaderFrom string `json:"header_from,omitempty"`
 
 	// Aligned reports whether anything the From domain vouches for
 	// actually passed, which is the question DMARC answers and the
@@ -102,7 +108,7 @@ func Verify(ctx context.Context, cfg Config, clientIP, envelopeFrom, heloName st
 		}
 	}
 
-	res.DMARC, res.DMARCPolicy, res.Aligned = checkDMARC(ctx, cfg, raw, res)
+	res.DMARC, res.DMARCPolicy, res.HeaderFrom, res.Aligned = checkDMARC(ctx, cfg, raw, res)
 
 	return res
 }
@@ -156,23 +162,25 @@ func checkSPF(ctx context.Context, clientIP, envelopeFrom, heloName string) (res
 // message claiming to be From your bank. DMARC asks whether the domain
 // in the From header - the one a human reads - is the domain that
 // vouched for the message.
-func checkDMARC(ctx context.Context, cfg Config, raw []byte, res Result) (result, policy string, aligned bool) {
-	fromDomain := domainOf(headerAddress(raw, "From"))
+func checkDMARC(ctx context.Context, cfg Config, raw []byte, res Result) (result, policy, fromDomain string, aligned bool) {
+	fromDomain = domainOf(headerAddress(raw, "From"))
 	if fromDomain == "" {
-		return ResultPermError, "", false
+		return ResultPermError, "", "", false
 	}
 
-	rec, err := lookupDMARC(ctx, cfg, fromDomain)
-	if err != nil || rec == nil {
+	rec, policy, err := policyFor(ctx, cfg, fromDomain)
+	if err != nil {
+		return ResultTempError, "", fromDomain, false
+	}
+
+	if rec == nil {
 		// No policy published. Nothing to align against and nothing the
 		// owner has asked for, so this is "none", not a failure.
-		return ResultNone, "", false
+		return ResultNone, "", fromDomain, false
 	}
 
-	policy = string(rec.Policy)
-
-	// Relaxed alignment (the default) admits a subdomain, strict
-	// demands an exact match.
+	// Relaxed alignment (the default) admits the same organizational
+	// domain, strict demands an exact match.
 	spfAligned := res.SPF == ResultPass &&
 		alignedWith(res.SPFDomain, fromDomain, rec.SPFAlignment == dmarc.AlignmentStrict)
 	dkimAligned := false
@@ -184,10 +192,56 @@ func checkDMARC(ctx context.Context, cfg Config, raw []byte, res Result) (result
 	}
 
 	if spfAligned || dkimAligned {
-		return ResultPass, policy, true
+		return ResultPass, policy, fromDomain, true
 	}
 
-	return ResultFail, policy, false
+	return ResultFail, policy, fromDomain, false
+}
+
+// policyFor finds the record that governs fromDomain (RFC 7489 6.6.3):
+// the domain's own, else the organizational domain's, where sp= applies
+// to a subdomain and p= stands in when sp= is absent. A temporary DNS
+// failure is an error, an absent or unusable record is a nil record.
+func policyFor(ctx context.Context, cfg Config, fromDomain string) (*dmarc.Record, string, error) {
+	rec, err := lookupDMARC(ctx, cfg, fromDomain)
+	if err != nil && dmarc.IsTempFail(err) {
+		return nil, "", err
+	}
+
+	if err == nil && rec != nil {
+		return rec, string(rec.Policy), nil
+	}
+
+	org := organizationalDomain(fromDomain)
+	if org == "" || org == fromDomain {
+		return nil, "", nil
+	}
+
+	rec, err = lookupDMARC(ctx, cfg, org)
+	if err != nil && dmarc.IsTempFail(err) {
+		return nil, "", err
+	}
+
+	if err != nil || rec == nil {
+		return nil, "", nil
+	}
+
+	if rec.SubdomainPolicy != "" {
+		return rec, string(rec.SubdomainPolicy), nil
+	}
+
+	return rec, string(rec.Policy), nil
+}
+
+// organizationalDomain is the registrable domain of name per the public
+// suffix list, or "" when name is itself a public suffix.
+func organizationalDomain(name string) string {
+	org, err := publicsuffix.EffectiveTLDPlusOne(strings.ToLower(strings.TrimSuffix(name, ".")))
+	if err != nil {
+		return ""
+	}
+
+	return org
 }
 
 func lookupDMARC(ctx context.Context, cfg Config, domain string) (*dmarc.Record, error) {
@@ -205,6 +259,7 @@ func lookupDMARC(ctx context.Context, cfg Config, domain string) (*dmarc.Record,
 }
 
 // alignedWith reports whether authDomain vouches for fromDomain.
+// Relaxed mode compares organizational domains, strict mode the names.
 func alignedWith(authDomain, fromDomain string, strict bool) bool {
 	a := strings.ToLower(strings.TrimSuffix(authDomain, "."))
 	f := strings.ToLower(strings.TrimSuffix(fromDomain, "."))
@@ -220,11 +275,9 @@ func alignedWith(authDomain, fromDomain string, strict bool) bool {
 		return false
 	}
 
-	// Relaxed: an organizational-domain match. Comparing suffixes is an
-	// approximation of the public-suffix walk the RFC describes, and it
-	// is deliberately the conservative direction - it can refuse an
-	// alignment a full PSL check would allow, never the reverse.
-	return strings.HasSuffix(a, "."+f) || strings.HasSuffix(f, "."+a)
+	org := organizationalDomain(f)
+
+	return org != "" && org == organizationalDomain(a)
 }
 
 // headerAddress pulls one address-bearing header out of raw. Only the
@@ -295,7 +348,16 @@ func AuthenticationResults(hostname string, r Result) string {
 		parts = append(parts, "dkim="+r.DKIM)
 	}
 
-	parts = append(parts, "dmarc="+r.DMARC)
+	dmarcPart := "dmarc=" + r.DMARC
+	if r.DMARCPolicy != "" {
+		dmarcPart += " (p=" + r.DMARCPolicy + ")"
+	}
+
+	if r.HeaderFrom != "" {
+		dmarcPart += " header.from=" + r.HeaderFrom
+	}
+
+	parts = append(parts, dmarcPart)
 
 	return strings.Join(parts, "; ")
 }
