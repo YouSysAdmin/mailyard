@@ -20,6 +20,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/transport"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	setmodel "github.com/yousysadmin/mailyard/internal/models/setting"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
 )
 
@@ -103,6 +104,10 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	}
 
 	if ok, resp := h.refusePrivateTarget(c, srv); !ok {
+		return resp
+	}
+
+	if ok, resp := refuseKeylessSES(c, h.Runtime, srv); !ok {
 		return resp
 	}
 
@@ -209,6 +214,10 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		srv.Priority = *in.Priority
 	}
 
+	if ok, resp := refuseKeylessSES(c, h.Runtime, srv); !ok {
+		return resp
+	}
+
 	if in.GroupID != "" {
 		groupID, resp, ok := h.resolveGroup(c, rc.Project.ID, in.GroupID)
 		if !ok {
@@ -310,7 +319,7 @@ func (h *Handler) Test(c fiber.Ctx) error {
 	// means for it: a dial and an AUTH for SMTP, an account read for an
 	// API. Neither sends anything.
 	testErr := testTransport(c.Context(), srv, h.Runtime.RelayNodeTLS,
-		h.Runtime.Config.Sending.AllowPrivateSMTPTargets)
+		h.Runtime.Config.Sending.AllowPrivateSMTPTargets, platformProject(h.Runtime))
 	reason := ""
 	if testErr != nil {
 		reason = testErr.Error()
@@ -428,9 +437,11 @@ func (h *Handler) invalidateSESTopics() {
 // resolves the same thing in email.Processor.nodeTLS.
 //
 // allowPrivate is the operator's sending.allow_private_smtp_targets,
-// applied the way the delivery worker applies it.
+// applied the way the delivery worker applies it, and platformProject
+// the platform_mail_project setting, whose rows may use the machine's
+// own credentials as the delivery worker lets them.
 func testTransport(ctx context.Context, srv *ssmodel.Server,
-	nodeTLS func(context.Context, string) (*tls.Config, error), allowPrivate bool) error {
+	nodeTLS func(context.Context, string) (*tls.Config, error), allowPrivate bool, platformProject string) error {
 	var dialTLS *tls.Config
 	if srv.IsNode() {
 		if nodeTLS == nil {
@@ -453,6 +464,10 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 		spec.GuardPrivate = false
 	}
 
+	if srv.ProjectID != "" && srv.ProjectID == platformProject {
+		spec.AmbientCredentials = true
+	}
+
 	t, err := transport.Open(spec)
 	if err != nil {
 		// A row naming a provider that will not open is a configuration
@@ -462,6 +477,27 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 	}
 
 	return t.Test(ctx)
+}
+
+// platformProject is the platform_mail_project setting, "" when unset.
+func platformProject(rt *env.Runtime) string {
+	return rt.Settings.String(setmodel.KeyPlatformMailProject)
+}
+
+// refuseKeylessSES refuses a project's SES row with no key pair, unless
+// the project is the one platform mail is sent through. The machine's
+// own AWS credentials are the operator's, and a tenant row without a
+// key would otherwise send on them.
+func refuseKeylessSES(c fiber.Ctx, rt *env.Runtime, srv *ssmodel.Server) (bool, error) {
+	if srv.Provider != transport.ProviderSES || srv.ProjectID == platformProject(rt) {
+		return true, nil
+	}
+
+	if transport.UsesAmbientCredentials(srv.Provider, srv.Username) || srv.Password == "" {
+		return false, response.BadRequest(c, transport.ErrSESNeedsKey)
+	}
+
+	return true, nil
 }
 
 // errNodePulls is the refusal a connection test gives a relay node in
@@ -484,7 +520,7 @@ func testNode(c fiber.Ctx, rt *env.Runtime, srv *ssmodel.Server) error {
 	}
 
 	if testErr := testTransport(c.Context(), srv, rt.RelayNodeTLS,
-		rt.Config.Sending.AllowPrivateSMTPTargets); testErr != nil {
+		rt.Config.Sending.AllowPrivateSMTPTargets, platformProject(rt)); testErr != nil {
 		return response.Success(c, TestResponse{Ok: false, Error: testErr.Error()})
 	}
 

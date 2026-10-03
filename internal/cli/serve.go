@@ -401,6 +401,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		Log:              log,
 		AutoSuppress:     cfg.Sending.AutoSuppressOnReject,
 		AllowPrivateSMTP: cfg.Sending.AllowPrivateSMTPTargets,
+		PlatformProject:  func() string { return rt.Settings.String(smodel.KeyPlatformMailProject) },
 		Blob:             rt.Blob,
 		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
 		RelayClient:      relayClient,

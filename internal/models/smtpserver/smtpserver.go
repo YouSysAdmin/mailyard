@@ -228,6 +228,10 @@ func (s *Server) Spec(nodeTLS *tls.Config) transport.Spec {
 		TLS:          nodeTLS,
 		Options:      s.ProviderConfig,
 		GuardPrivate: s.ProjectID != "" && !s.IsNode(),
+
+		// The shared pool is the operator's own. A project row gets it
+		// only from a caller that knows it is the platform mail project.
+		AmbientCredentials: s.ProjectID == "",
 	}
 }
 

@@ -252,7 +252,7 @@ func (h *SharedHandler) Test(c fiber.Ctx) error {
 
 	now := new(time.Now().UTC())
 	testErr := testTransport(c.Context(), &srv.Server, h.Runtime.RelayNodeTLS,
-		h.Runtime.Config.Sending.AllowPrivateSMTPTargets)
+		h.Runtime.Config.Sending.AllowPrivateSMTPTargets, "")
 	reason := ""
 	if testErr != nil {
 		reason = testErr.Error()

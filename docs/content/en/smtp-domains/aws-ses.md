@@ -6,8 +6,9 @@ weight: 60
 
 Two ways, and the choice is about credentials rather than about deliverability.
 
-- **Over the API** (`provider: ses`). No stored secret at all when Mailyard runs on AWS - the instance role signs the
-  calls. Nothing outbound on 587. This is the one to pick on EC2, ECS or EKS.
+- **Over the API** (`provider: ses`). Nothing outbound on 587. The platform's own servers need no stored secret when
+  Mailyard runs on AWS - the instance role signs the calls - and a project brings an access key for its own SES account.
+  This is the one to pick on EC2, ECS or EKS.
 - **Over SMTP.** A dial like any other provider, with SES SMTP credentials. Pick this when Mailyard runs outside AWS, or
   when the SES account belongs to somebody who will only hand you credentials.
 
@@ -23,7 +24,7 @@ has to mint SES SMTP credentials and store a long-lived secret to reach a servic
 Grant the role `ses:SendEmail` and `ses:GetAccount` - the second is what the **Test** button uses, and it proves the
 credentials without sending anything.
 
-*SMTP Servers* > *Add server*, choose **Amazon SES (API)**, and leave the key fields empty:
+On the shared pool, or in the platform mail project, choose **Amazon SES (API)** and leave the key fields empty:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/smtp-servers \
@@ -44,8 +45,12 @@ curl -X POST http://localhost:3000/api/v1/smtp-servers \
 - **`region` is required** and is not guessed. The wrong one answers
   "email address is not verified" about an identity that plainly is.
 - **Leave `username` and `password` empty** to use the machine's own credentials - the instance role, an ECS task role,
-  an EKS service account, or the environment. Set them to an access key id and secret when the SES account is not the
-  one this machine belongs to, which is the ordinary case for a tenant.
+  an EKS service account, or the environment. Those credentials are the operator's, so only two kinds of row may do
+  this: a server in the [shared pool](/docs/admin/shared-servers), and a server of the project named by the
+  `platform_mail_project` platform setting. Every other project must set an access key id and secret for its own SES
+  account. A keyless row elsewhere is refused when it is saved, and refused again at delivery - a row left over from
+  before the rule, or from a project that stopped being the platform mail project, is taken out of rotation with that
+  reason, like a server whose login was refused.
 - **`configuration_set` is how bounces come back.** On the SMTP path notifications are usually attached to the identity.
   On the API path a configuration set is what carries sending events to SNS, and without one the send works and the
   feedback is silent. See

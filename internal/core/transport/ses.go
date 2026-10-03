@@ -52,6 +52,11 @@ const (
 	OptSESEndpoint = "endpoint"
 )
 
+// ErrSESNeedsKey is the refusal for a project's SES row with no access
+// key, on the write and at delivery alike.
+const ErrSESNeedsKey = "an Amazon SES server needs an access key id and secret - only the shared pool and " +
+	"the platform mail project may send on this machine's own AWS credentials"
+
 // sesHTTPTimeout bounds one API call, raw message included.
 const sesHTTPTimeout = 60 * time.Second
 
@@ -108,6 +113,13 @@ func openSES(spec Spec) (Transport, error) {
 			client:  sesv2.New(sesv2.Options{}, opts...),
 			confSet: spec.Option(OptSESConfigurationSet),
 		}, nil
+	}
+
+	// No key pair on a row that may not borrow the operator's identity.
+	// A fault of the row, so delivery takes it out of rotation and moves
+	// on, and a test reports it.
+	if !spec.AmbientCredentials {
+		return nil, &sesFailure{fault: true, err: errors.New(ErrSESNeedsKey)}
 	}
 
 	// No key pair: the default credential chain. Environment, shared
@@ -296,9 +308,9 @@ func sesDescriptor() Descriptor {
 					"messages send and bounces report nothing back.",
 			},
 		},
-		CredentialHint: "An IAM access key id and secret. Leave BOTH empty to use the " +
-			"machine's own credentials - an EC2 instance role, an ECS task role or " +
-			"the environment - which is the point of sending over the API. A tenant " +
-			"whose SES account differs from this machine's needs the key pair.",
+		CredentialHint: "An IAM access key id and secret. Only the shared pool and the " +
+			"platform mail project may leave BOTH empty, to use the machine's own " +
+			"credentials - an EC2 instance role, an ECS task role or the environment. " +
+			"Every other project's server needs its own key pair.",
 	}
 }

@@ -92,6 +92,25 @@ func TestSESRefusesToGuessARegion(t *testing.T) {
 	}
 }
 
+// A row with no key may not borrow the machine's credentials unless the
+// spec says it may, and the refusal is a fault of the row so delivery
+// takes it out of rotation rather than retrying on it.
+func TestSESWithoutAKeyNeedsLeaveForAmbientCredentials(t *testing.T) {
+	_, err := Open(Spec{Provider: ProviderSES, Options: map[string]string{OptSESRegion: "eu-central-1"}})
+	if err == nil {
+		t.Fatal("a keyless SES row opened on the machine's credentials without leave")
+	}
+
+	if f, ok := errors.AsType[ServerFault](err); !ok || !f.ServerFault() {
+		t.Errorf("refusal %v is not a server fault", err)
+	}
+
+	if !UsesAmbientCredentials(ProviderSES, "") || UsesAmbientCredentials(ProviderSES, "AKIA") ||
+		UsesAmbientCredentials(ProviderSMTP, "") {
+		t.Error("UsesAmbientCredentials answers wrong")
+	}
+}
+
 // What SES is actually sent.
 //
 // The three things worth pinning are the ones a reader cannot check by

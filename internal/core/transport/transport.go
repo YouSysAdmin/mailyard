@@ -79,6 +79,12 @@ type Spec struct {
 	// operator's sending.allow_private_smtp_targets.
 	GuardPrivate bool
 
+	// AmbientCredentials lets a provider with no key on the row sign
+	// with this machine's own credentials - an instance role or the
+	// environment. Those belong to the operator, so only the shared
+	// pool and the project platform mail is sent through get it.
+	AmbientCredentials bool
+
 	// Options are the provider's non-secret settings, from the row's
 	// provider_config column: a SES region, a configuration set name.
 	//
@@ -295,6 +301,13 @@ func ReSigns(provider string) bool {
 	}
 
 	return false
+}
+
+// UsesAmbientCredentials reports whether a row with this provider and
+// login would sign with the machine's own credentials rather than a
+// key of its own.
+func UsesAmbientCredentials(provider, username string) bool {
+	return provider == ProviderSES && username == ""
 }
 
 // Dials reports whether a provider connects to a host and port, which

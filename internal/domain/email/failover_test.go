@@ -33,6 +33,7 @@ type scriptedSend struct {
 	// the return path was recomputed for the server actually tried.
 	envelopes []string
 	providers []string
+	ambient   []bool
 }
 
 func (s *scriptedSend) fn(_ context.Context, spec transport.Spec, msg *smtpclient.Message) error {
@@ -45,6 +46,7 @@ func (s *scriptedSend) fn(_ context.Context, spec transport.Spec, msg *smtpclien
 	// carry the provider, for the same reason it must not carry the
 	// signature or the return path.
 	s.providers = append(s.providers, spec.Provider)
+	s.ambient = append(s.ambient, spec.AmbientCredentials)
 
 	return s.byHost[spec.Host]
 }
@@ -250,5 +252,29 @@ func TestAFaultOnASharedOrNodeServerMarksNothing(t *testing.T) {
 
 	if got := p.Store.SMTPServer.(*fakeGroupServers).invalid; len(got) != 0 {
 		t.Fatalf("marked invalid %v, want none", got)
+	}
+}
+
+// Only the platform mail project's rows may sign with the machine's own
+// credentials. Any other project's row is dialled without that leave,
+// so a keyless SES row there is refused by the transport.
+func TestOnlyThePlatformProjectBorrowsTheMachineCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		platform string
+		want     bool
+	}{{"", false}, {"proj-other", false}, {"proj-a", true}} {
+		script := &scriptedSend{}
+		p := failoverProcessor(t, []*ssmodel.Server{
+			srv("ses", func(s *ssmodel.Server) { s.Host = "ses" }),
+		}, script)
+		p.PlatformProject = func() string { return tc.platform }
+
+		if out := p.Process(t.Context(), delivery()); out.Kind != queue.KindDone {
+			t.Fatalf("platform %q: outcome %v: %v", tc.platform, out.Kind, out.Err)
+		}
+
+		if len(script.ambient) != 1 || script.ambient[0] != tc.want {
+			t.Errorf("platform %q: ambient %v, want %v", tc.platform, script.ambient, tc.want)
+		}
 	}
 }

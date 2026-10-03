@@ -57,6 +57,11 @@ type Processor struct {
 	// the shared pool and relay nodes never had it.
 	AllowPrivateSMTP bool
 
+	// PlatformProject returns the platform_mail_project setting. That
+	// project's servers, like the shared pool, may sign SES calls with
+	// this machine's own credentials. Nil means no project may.
+	PlatformProject func() string
+
 	// RelayClient supplies the certificate a worker presents to a
 	// relay node, and the authority to verify the node against. Nil
 	// when relay nodes are not configured, in which case a node can
@@ -352,6 +357,10 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		spec := srv.Spec(nodeTLS)
 		if p.AllowPrivateSMTP {
 			spec.GuardPrivate = false
+		}
+
+		if p.PlatformProject != nil && srv.ProjectID != "" && srv.ProjectID == p.PlatformProject() {
+			spec.AmbientCredentials = true
 		}
 
 		sendErr = p.deliver(ctx, spec, msg)
