@@ -48,9 +48,9 @@ func ConsoleDocs() []apidoc.Route {
 			Method:      "POST",
 			Path:        "/projects/",
 			Summary:     "Create",
-			Description: "Platform administrators, plus any signed-in account when the user_project_creation platform setting is on. It is off by default, so on a fresh installation this answers 403 to everybody else. GET /projects reports the same answer as can_create.",
+			Description: "Platform administrators and platform API keys, plus any signed-in account when the user_project_creation platform setting is on. It is off by default, so on a fresh installation this answers 403 to everybody else. GET /projects reports the same answer as can_create. The owner is the caller. A platform administrator may name another account in owner_email, and a platform API key must, since it has no account of its own. An address that is unknown or belongs to a disabled account answers 400 on owner_email.",
 			Request:     createInput{},
-			Responses:   []apidoc.Response{apidoc.Created("The result.", ProjectResponse{})},
+			Responses:   []apidoc.Response{apidoc.Created("The result.", ProjectCreatedResponse{})},
 		},
 		{
 			Method:      "DELETE",

@@ -10,18 +10,19 @@ This guide walks you through sending your first email with Mailyard.
 
 Follow the [Installation](/docs/getting-started/installation) guide to start Mailyard with Docker Compose.
 
-## 2. Sign In
+## 2. Sign In and Mint a Platform Key
 
 Sign in at `http://localhost:3000/app` with `admin@example.com` and the bootstrap password from the container log.
 
-For the curl below, get a cookie jar. The login response carries no token — the session is an `HttpOnly` cookie and
-nothing else:
+The calls below need a credential of their own. Under **Admin - Platform Credentials**, create a key and copy the
+token - it is shown **once**:
 
 ```bash
-curl -c cookies.txt -X POST http://localhost:3000/app/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"<from the log>"}'
+ADMIN=mya_...
 ```
+
+A platform key reaches the whole installation, and acts as an owner in any project it names. See
+[Authentication](/docs/security/authentication).
 
 ## 3. Create a Project
 
@@ -30,9 +31,12 @@ console shows a **New project** button on first sign-in, or:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/projects \
-  -b cookies.txt -H "Content-Type: application/json" \
-  -d '{"name": "My App"}'
+  -H "Authorization: Bearer $ADMIN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My App", "owner_email": "admin@example.com"}'
 ```
+
+A platform key has no account to own the project with, so `owner_email` names the account that does.
 
 Keep the `id` from the response. It is a UUID, and every project-scoped call needs it in the `X-Mailyard-Project-Id`
 header.
@@ -45,7 +49,7 @@ PROJECT=81af718e-f0ae-4780-a0d7-9f05b34dabcc
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/api-keys \
-  -b cookies.txt \
+  -H "Authorization: Bearer $ADMIN" \
   -H "X-Mailyard-Project-Id: $PROJECT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -71,7 +75,7 @@ answers `403` — which is the safe reading of an unstated intent, not a bug. Th
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/smtp-servers \
-  -b cookies.txt \
+  -H "Authorization: Bearer $ADMIN" \
   -H "X-Mailyard-Project-Id: $PROJECT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -91,14 +95,14 @@ than after it. Add the domain, publish the TXT record it gives you, and verify:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/domains \
-  -b cookies.txt \
+  -H "Authorization: Bearer $ADMIN" \
   -H "X-Mailyard-Project-Id: $PROJECT" \
   -H "Content-Type: application/json" \
   -d '{"domain": "yourdomain.com"}'
 
 # publish the returned mailyard-verification=... TXT record at the apex, then
 curl -X POST http://localhost:3000/api/v1/domains/<id>/verify \
-  -b cookies.txt \
+  -H "Authorization: Bearer $ADMIN" \
   -H "X-Mailyard-Project-Id: $PROJECT"
 ```
 

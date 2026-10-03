@@ -9,10 +9,10 @@ same everywhere.
 
 ## Two Surfaces
 
-| Surface           | Prefix         | Authentication                                                                | Project                                                     |
-|-------------------|----------------|-------------------------------------------------------------------------------|-------------------------------------------------------------|
-| **Product**       | `/api/v1/...`  | `Authorization: Bearer myk_...` **or** the session cookie                     | Implied by the key, else the `X-Mailyard-Project-Id` header |
-| **Console's own** | `/app/api/...` | Session cookie `__Host-mailyard_session` (`mailyard_session` over plain HTTP) | `X-Mailyard-Project-Id` header                              |
+| Surface           | Prefix         | Authentication                                                                | Project                                                             |
+|-------------------|----------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| **Product**       | `/api/v1/...`  | `Authorization: Bearer myk_...` or `mya_...`, **or** the session cookie       | Implied by a project key, else the `X-Mailyard-Project-Id` header   |
+| **Console's own** | `/app/api/...` | Session cookie `__Host-mailyard_session` (`mailyard_session` over plain HTTP) | `X-Mailyard-Project-Id` header                                      |
 
 They are split by what an operation **is**, not by who calls it.
 
@@ -24,7 +24,7 @@ settings. Standing an installation up is exactly the kind of thing an operator w
 behind the browser.
 
 `/app/api` carries what cannot be used remotely: signing in, passkey and 2FA ceremonies, the OIDC round-trip, session
-management, the live event stream. An API key is not accepted there, and would have nothing to do with it.
+management, answering an invitation, the live event stream. An API key is not accepted there, and would have nothing to do with it.
 
 Accepting the cookie on `/api/v1` costs nothing in safety: the session cookie is
 `SameSite=Strict`, so a browser never sends it cross-site, and a mutating request carrying it from an origin that is
@@ -37,8 +37,8 @@ header, falling back to `?project_id=` and then, only if you are a member of exa
 to no project is an ordinary state and nothing is created for a new account, so a route that needs a project answers
 `400` naming the header rather than inventing one.
 
-An API key is bound to exactly one project, so the header is unnecessary with a key, and a mismatching one is rejected
-with `403` rather than ignored.
+A project key is bound to exactly one project, so the header is unnecessary with it, and a mismatching one is rejected
+with `403` rather than ignored. A platform key belongs to no project and names one with the header.
 {{< /callout >}}
 
 ```bash
@@ -59,8 +59,7 @@ curl -c cookies.txt -X POST http://localhost:3000/app/api/auth/login \
 
 ### Getting `cookies.txt`
 
-Every console example on these pages passes `-b cookies.txt`. That file is a curl cookie jar, and you create it by
-logging in with `-c`:
+A session from curl is a cookie jar, and you create it by logging in with `-c`:
 
 ```bash
 curl -c cookies.txt -X POST http://localhost:3000/app/api/auth/login \
@@ -74,9 +73,8 @@ cookies.txt` request is authenticated until the session expires.
 {{< callout type="warning" title="The login response contains no token" >}}
 The reply body is `{"user": {...}}` and nothing else. The session JWT is delivered **only** as the session cookie
 (`__Host-mailyard_session` over HTTPS, `mailyard_session` over plain HTTP), which is `HttpOnly` - there is no token
-field to copy out of the JSON. This is why the console examples use a
-cookie jar rather than an
-`Authorization` header.
+field to copy out of the JSON. This is why a session from curl is a cookie jar rather than an `Authorization`
+header.
 
 A bearer header does work, but the token has to come from the cookie itself:
 

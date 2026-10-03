@@ -26,6 +26,11 @@ type createInput struct {
 	Slug            string `json:"slug"             validate:"omitempty,min=1,max=100" normalize:"normalize"`
 	Description     string `json:"description"      validate:"omitempty,max=500"       normalize:"trim"`
 	DefaultLanguage string `json:"default_language" validate:"omitempty,min=2,max=10"  normalize:"normalize"`
+
+	// OwnerEmail names the account that owns the project. Only a
+	// platform administrator may name another account, and a platform
+	// credential must name one.
+	OwnerEmail string `json:"owner_email" validate:"omitempty,email,max=320" normalize:"normalize"`
 }
 
 // updateInput is the PATCH /api/projects/:id body. Empty strings
@@ -177,6 +182,13 @@ type ProjectAccess struct {
 // ProjectResponse is one project.
 type ProjectResponse struct {
 	Project *projmodel.Project `json:"project"`
+}
+
+// ProjectCreatedResponse is a new project and the address of the
+// account that owns it, beside the owner_id the project carries.
+type ProjectCreatedResponse struct {
+	Project    *projmodel.Project `json:"project"`
+	OwnerEmail string             `json:"owner_email"`
 }
 
 // ProjectAccessResponse is one project together with what the caller

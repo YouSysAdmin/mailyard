@@ -199,7 +199,7 @@ These routes address the project by **path id**, so they do not use the
 
 | Method   | Path                                        | Needs                                            |
 |----------|---------------------------------------------|--------------------------------------------------|
-| `POST`   | `/api/v1/projects`                          | any signed-in account                            |
+| `POST`   | `/api/v1/projects`                          | see [Creating a project](#creating-a-project)    |
 | `GET`    | `/api/v1/projects`                          | any signed-in account                            |
 | `GET`    | `/api/v1/projects/{id}`                     | membership                                       |
 | `PATCH`  | `/api/v1/projects/{id}`                     | `settings:write`                                 |
@@ -237,11 +237,21 @@ POST /api/v1/projects
   "name": "Acme Industrial",
   "slug": "acme-industrial",
   "description": "Order confirmations, dispatch notices and the monthly dispatch",
-  "default_language": "en"
+  "default_language": "en",
+  "owner_email": "ops@acme.example"
 }
 ```
 
-Only `name` is required, and the caller becomes the project **owner**.
+Only `name` is required. The project **owner** is the caller, unless `owner_email` names somebody else:
+
+| Caller                        | `owner_email`                                            |
+|-------------------------------|----------------------------------------------------------|
+| platform API key (`mya_...`)  | required - the key has no account to own it with         |
+| platform administrator        | optional - leave it out to own the project               |
+| anyone else allowed to create | leave it out, or give your own address (`403` otherwise) |
+
+The address must belong to an existing, enabled account, otherwise `400` naming `owner_email`. Nothing is created or
+invited here - add the account first under [User Management](/docs/admin/user-management).
 
 `slug` is derived from the name when you leave it out, and must be unique across the installation — lowercase letters,
 digits and single hyphens between them, anything else answers `400`. It is **immutable** once set, because it ends up in operator bookmarks and scripts, so it is worth
@@ -250,9 +260,9 @@ a moment's thought rather than accepting whatever the name produces.
 `default_language` falls back to `en`.
 
 {{< callout type="warning" title="Closed to ordinary accounts by default" >}}
-This endpoint answers `403` unless the caller is a platform administrator, or the `user_project_creation`
-[platform setting](/docs/admin/platform-settings) is on. It ships off, so a fresh installation is one where an
-administrator makes the projects and everybody else arrives by invitation.
+This endpoint answers `403` unless the caller is a platform administrator or a platform API key, or the
+`user_project_creation` [platform setting](/docs/admin/platform-settings) is on. It ships off, so a fresh installation
+is one where an administrator makes the projects and everybody else arrives by invitation.
 
 `GET /api/v1/projects` reports the same answer as `can_create`, which is what the console reads to decide whether to
 offer the button.
@@ -260,9 +270,9 @@ offer the button.
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/projects \
-  -H "Authorization: Bearer myk_..." \
+  -H "Authorization: Bearer mya_..." \
   -H "Content-Type: application/json" \
-  -d '{"name": "Acme Inc", "slug": "acme"}'
+  -d '{"name": "Acme Inc", "slug": "acme", "owner_email": "ops@acme.example"}'
 ```
 
 Response (`201`):
@@ -277,7 +287,8 @@ Response (`201`):
         "owner_id": "b8493407-52ae-4d51-8396-9c8864977976",
         "default_role_id": "",
         "created_at": "2026-05-31T10:00:00Z"
-    }
+    },
+    "owner_email": "ops@acme.example"
 }
 ```
 

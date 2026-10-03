@@ -6,10 +6,13 @@ weight: 10
 
 `/api/v1` takes a bearer token. Two kinds:
 
-| Token     | Reaches           | Bound to         |
-|-----------|-------------------|------------------|
-| `myk_...` | the product API   | one project      |
-| `mya_...` | `/api/v1/admin/*` | the installation |
+| Token     | Reaches                                                 | Bound to         |
+|-----------|---------------------------------------------------------|------------------|
+| `myk_...` | the product API                                         | one project      |
+| `mya_...` | `/api/v1/admin/*`, and any project as one of its owners | the installation |
+
+A platform key has no project of its own. It names one with `X-Mailyard-Project-Id`, or by path id under
+`/api/v1/projects/{id}/`, and acts there as an owner would.
 
 ```
 Authorization: Bearer myk_...
@@ -39,14 +42,14 @@ Adding a provider does not turn off local login. It is how you configure the fir
 one breaks. Keep at least one local admin account.
 {{< /callout >}}
 
-## Routes a session still owns
+## Routes a project key cannot reach
 
-A few `/api/v1` routes address a project by path id and read the caller's MEMBERSHIP, so an API key is refused on them
-however wide its permissions are:
+A few `/api/v1` routes address a project by path id and read the caller's MEMBERSHIP, so a project key is refused on
+them however wide its permissions are:
 
 - `/api/v1/projects` and everything under `/api/v1/projects/{id}/`
 
-Do those in the console, or with a signed-in session.
+Use a platform key, a signed-in session, or the console.
 
 ## Roles
 

@@ -1478,6 +1478,13 @@ type ProjectCreateInput struct {
 	Slug            string `json:"slug"`
 	Description     string `json:"description"`
 	DefaultLanguage string `json:"default_language"`
+	OwnerEmail      string `json:"owner_email"`
+}
+
+// ProjectCreatedResponse is the response body.
+type ProjectCreatedResponse struct {
+	Project    *Project `json:"project"`
+	OwnerEmail string   `json:"owner_email"`
 }
 
 // ProjectListResponse is the response body.

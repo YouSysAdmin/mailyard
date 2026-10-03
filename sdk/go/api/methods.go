@@ -944,8 +944,8 @@ func (c *Client) ListProjects(ctx context.Context, opts ...RequestOption) (Proje
 // CreateProject Create.
 //
 // POST /projects/
-func (c *Client) CreateProject(ctx context.Context, body ProjectCreateInput, opts ...RequestOption) (ProjectResponse, error) {
-	return do[ProjectResponse](ctx, c, "POST", "/projects", body, opts)
+func (c *Client) CreateProject(ctx context.Context, body ProjectCreateInput, opts ...RequestOption) (ProjectCreatedResponse, error) {
+	return do[ProjectCreatedResponse](ctx, c, "POST", "/projects", body, opts)
 }
 
 // DeleteProject Delete.

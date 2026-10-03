@@ -23,6 +23,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/domain"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
+	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
 )
 
 // invitationTTL bounds how long an unaccepted invitation stays
@@ -138,14 +139,20 @@ func (h *Handler) accessForList(c fiber.Ctx, projects []*projmodel.Project) (map
 	return out, nil
 }
 
-// Create adds a project with the caller as owner.
+// Create adds a project. Its owner is the caller, or the account a
+// platform administrator names in owner_email - see ownerOf.
 func (h *Handler) Create(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
-	if rc == nil || rc.User == nil {
+	if rc == nil || (rc.User == nil && rc.AdminAPIKey == nil) {
 		return response.Forbidden(c, "project creation requires an authenticated user")
 	}
 
 	in, resp, ok := validation.Bind[createInput](c)
+	if !ok {
+		return resp
+	}
+
+	owner, resp, ok := h.ownerOf(c, rc, in.OwnerEmail)
 	if !ok {
 		return resp
 	}
@@ -177,7 +184,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		Name:            in.Name,
 		Slug:            slug,
 		Description:     in.Description,
-		OwnerID:         rc.User.ID,
+		OwnerID:         owner.ID,
 		DefaultLanguage: in.DefaultLanguage,
 		// Answered as written, not re-read, so the empty sets are set
 		// here or the response says null where every later read says
@@ -189,11 +196,61 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		w.DefaultLanguage = "en"
 	}
 
-	if err := h.Runtime.Store.Project.CreateWithOwner(c.Context(), w, rc.User.ID); err != nil {
+	if err := h.Runtime.Store.Project.CreateWithOwner(c.Context(), w, owner.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
-	return response.Created(c, ProjectResponse{Project: w})
+	return response.Created(c, ProjectCreatedResponse{Project: w, OwnerEmail: owner.Email})
+}
+
+// ownerOf decides who owns a project being created.
+//
+// Without owner_email it is the caller. A platform credential has no
+// account to own anything with, so it must name one. Only a platform
+// administrator may name somebody else: an account allowed to create
+// projects by the platform setting owns what it creates.
+//
+// A named account that does not exist or is disabled is refused on
+// the field, never created or invited here.
+func (h *Handler) ownerOf(c fiber.Ctx, rc *domain.RequestContext, email string) (*usermodel.User, error, bool) {
+	if email == "" {
+		if rc.User != nil {
+			return rc.User, nil, true
+		}
+
+		return nil, ownerRefused(c, "required", "owner_email is required with a platform credential"), false
+	}
+
+	if !rc.IsPlatformAdmin() {
+		if rc.User != nil && strings.EqualFold(rc.User.Email, email) {
+			return rc.User, nil, true
+		}
+
+		return nil, response.Forbidden(c, "only a platform administrator may create a project for another account"), false
+	}
+
+	u, err := h.Runtime.Store.User.Get(c.Context(), email)
+	if err != nil {
+		return nil, response.Internal(c, err), false
+	}
+
+	if u == nil {
+		return nil, ownerRefused(c, "exists", "No account has this address"), false
+	}
+
+	if u.Disabled {
+		return nil, ownerRefused(c, "enabled", "This account is disabled"), false
+	}
+
+	return u, nil, true
+}
+
+// ownerRefused is a 400 naming owner_email, in the shape validation
+// failures take.
+func ownerRefused(c fiber.Ctx, rule, msg string) error {
+	return response.BadRequestFields(c, msg, []validation.FieldError{
+		{Field: "owner_email", Rule: rule, Message: msg},
+	})
 }
 
 // Get returns one project the caller can see. Membership required,

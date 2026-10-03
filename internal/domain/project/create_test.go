@@ -86,9 +86,9 @@ func TestTheSettingOpensItToEverybody(t *testing.T) {
 }
 
 // The three ways of being nobody. A caller with no user reaches this
-// through machineAuth holding an API key, and Create refuses that
-// anyway - but the answer has to be no here too, or the list endpoint
-// tells a key-authenticated caller it may create one.
+// through machineAuth holding a project API key, and Create refuses
+// that anyway - but the answer has to be no here too, or the list
+// endpoint tells a key-authenticated caller it may create one.
 func TestNobodyIsNotSomebody(t *testing.T) {
 	rt := runtimeWith(t, true, false)
 

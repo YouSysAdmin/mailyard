@@ -20,7 +20,9 @@ import (
 //
 // A platform admin is never subject to the setting. Somebody has to
 // be able to make the first project on an installation where nobody
-// else may, and that somebody is the account bootstrap created.
+// else may, and that somebody is the account bootstrap created. A
+// platform credential counts as one: it names the owner rather than
+// being it, see Create.
 //
 // Auth disabled is every caller, the same exemption requireAdmin
 // makes: an installation running with authentication switched off has
@@ -38,16 +40,14 @@ func MayCreate(rt *env.Runtime, rc *domain.RequestContext) bool {
 		return true
 	}
 
-	// The RequestContext rather than the user, because that is what
-	// both callers hold - and because Create refuses a caller with no
-	// USER anyway, an admin API key included, so there is no
-	// IsPlatformAdmin branch to make here.
-	if rc == nil || rc.User == nil {
-		return false
+	// IsPlatformAdmin and not User.IsAdmin: a platform credential has
+	// no user.
+	if rc.IsPlatformAdmin() {
+		return true
 	}
 
-	if rc.User.IsAdmin() {
-		return true
+	if rc == nil || rc.User == nil {
+		return false
 	}
 
 	return rt.Settings.Bool(settingmodel.KeyUserProjectCreation)

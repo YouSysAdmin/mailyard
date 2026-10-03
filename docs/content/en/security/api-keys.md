@@ -140,7 +140,9 @@ its own resource for that reason rather than riding along with the rest.
 ## Platform Credentials
 
 `/api/v1/admin` - users, plans, identity providers, the shared SMTP pool, installation settings - takes a **different
-key**, minted under **Admin - Platform Credentials**. Its tokens start `mya_` rather than `myk_`.
+key**, minted under **Admin - Platform Credentials**. Its tokens start `mya_` rather than `myk_`. The same key acts as
+an owner in any project it names, and creates projects for an account it names - see
+[Creating a project](/docs/projects/overview#creating-a-project).
 
 ```bash
 curl http://localhost:3000/api/v1/admin/users \
