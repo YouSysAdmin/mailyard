@@ -71,7 +71,7 @@ func (s *Store) Get(ctx context.Context, projID, id string) (*dmodel.Domain, err
 // GetVerifiedByName is the MX listener's routing lookup. Not
 // project scoped: the domain row decides the project.
 func (s *Store) GetVerifiedByName(ctx context.Context, name string) (*dmodel.Domain, error) {
-	row := s.QueryRow(ctx, domainSelect+` WHERE domain = ? AND verified = TRUE`, strings.ToLower(name))
+	row := s.QueryRow(ctx, domainSelect+` WHERE domain = ? AND verified = TRUE`, normalizeName(name))
 	d, err := s.scanDomain(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -332,16 +332,39 @@ func (s *Store) VerifiedNamesIn(ctx context.Context, projID string) ([]string, e
 	return out, rows.Err()
 }
 
-// GetByName finds a domain regardless of verification state, used by
-// the claim flow to detect names already taken by any project.
-func (s *Store) GetByName(ctx context.Context, name string) (*dmodel.Domain, error) {
-	row := s.QueryRow(ctx, domainSelect+` WHERE domain = ?`, strings.ToLower(name))
+// GetByNameIn finds projID's own claim of a name, verified or not.
+// Another project's unverified claim of the same name is not an
+// obstacle - see DropStaleClaims.
+func (s *Store) GetByNameIn(ctx context.Context, projID, name string) (*dmodel.Domain, error) {
+	row := s.QueryRow(ctx, domainSelect+` WHERE project_id = ? AND domain = ?`, projID, normalizeName(name))
 	d, err := s.scanDomain(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 
 	return d, err
+}
+
+// DropStaleClaims removes other projects' UNVERIFIED claims of name and
+// of every name below it, called once projID verified name. The zone is
+// projID's now, so none of them could ever verify.
+func (s *Store) DropStaleClaims(ctx context.Context, name, projID string) (int64, error) {
+	name = normalizeName(name)
+	res, err := s.Exec(ctx, `
+        DELETE FROM domains
+        WHERE verified = FALSE AND project_id <> ?
+          AND (domain = ? OR domain LIKE ?)`, projID, name, "%."+database.EscapeLike(name))
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
+}
+
+// normalizeName is the stored spelling of a domain: trimmed, lowercase,
+// no trailing dot.
+func normalizeName(name string) string {
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
 }
 
 // List returns every domain in projID.
@@ -406,7 +429,7 @@ func (s *Store) Put(ctx context.Context, d *dmodel.Domain) error {
             dkim_verified         = excluded.dkim_verified,
             dmarc_verified        = excluded.dmarc_verified,
             checked_at            = excluded.checked_at
-    `, d.ID, d.ProjectID, d.CreatedBy, strings.ToLower(d.Domain),
+    `, d.ID, d.ProjectID, d.CreatedBy, normalizeName(d.Domain),
 		d.VerificationToken, d.Verified, database.NullTime(d.VerifiedAt), d.CreatedAt,
 		d.DKIMSelector, sealed, d.DKIMPublicKey,
 		d.DKIMNextSelector, sealedNext, d.DKIMNextPublicKey,
@@ -590,15 +613,16 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 
-	// Names are globally unique - a domain claimed by another
-	// project must look taken, not missing.
-	existing, err := h.Runtime.Store.Domain.GetByName(c.Context(), in.Domain)
+	// A claim is per project until it verifies, so only this project's
+	// own row is a duplicate. A name another project VERIFIED is refused
+	// by the zone check below.
+	existing, err := h.Runtime.Store.Domain.GetByNameIn(c.Context(), rc.Project.ID, in.Domain)
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
 	if existing != nil {
-		return response.Conflict(c, "this domain is already claimed")
+		return response.Conflict(c, "this project already claimed this domain")
 	}
 
 	taken, err := h.Runtime.Store.Domain.ZoneTakenByAnother(c.Context(), in.Domain, rc.Project.ID)
@@ -619,7 +643,7 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		ID:                ids.New(),
 		ProjectID:         rc.Project.ID,
 		CreatedBy:         userID(rc),
-		Domain:            strings.ToLower(in.Domain),
+		Domain:            normalizeName(in.Domain),
 		VerificationToken: hex.EncodeToString(token),
 	}
 	if err := h.Runtime.Store.Domain.Put(c.Context(), d); err != nil {
@@ -686,6 +710,7 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 		res.DKIM = false
 	}
 
+	wasVerified := d.Verified
 	d.Verified = res.Ownership
 	if res.Ownership {
 		d.VerifiedAt = &now
@@ -697,8 +722,23 @@ func (h *Handler) Verify(c fiber.Ctx) error {
 	d.DMARCVerified = res.DMARC
 	d.CheckedAt = &now
 
+	// The partial unique index on verified names refuses a second
+	// project verifying the same name at the same moment, which answers
+	// 409 through response.Internal.
 	if err := h.Runtime.Store.Domain.Put(c.Context(), d); err != nil {
 		return response.Internal(c, err)
+	}
+
+	if d.Verified && !wasVerified {
+		dropped, err := h.Runtime.Store.Domain.DropStaleClaims(c.Context(), d.Domain, d.ProjectID)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		if dropped > 0 {
+			slog.Info("domains: stale claims of other projects dropped",
+				"domain", d.Domain, "project_id", d.ProjectID, "dropped", dropped)
+		}
 	}
 
 	if minted {

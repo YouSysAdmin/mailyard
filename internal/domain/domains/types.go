@@ -3,6 +3,8 @@
 package domains
 
 import (
+	"strings"
+
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
 )
 
@@ -20,6 +22,12 @@ import (
 
 type createInput struct {
 	Domain string `json:"domain" validate:"required,fqdn,max=253" normalize:"normalize"`
+}
+
+// Normalize drops a trailing dot. "example.com." is the same name, and
+// stored as typed it would be a second claim no lookup ever matches.
+func (in *createInput) Normalize() {
+	in.Domain = strings.TrimSuffix(in.Domain, ".")
 }
 
 // grantInput names the project a domain is shared with, by its slug:

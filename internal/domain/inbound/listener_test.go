@@ -50,8 +50,12 @@ func (f *fakeDomains) GetVerifiedCoveringFor(context.Context, string, string) (*
 func (f *fakeDomains) ZoneTakenByAnother(context.Context, string, string) (bool, error) {
 	return false, nil
 }
-func (f *fakeDomains) GetByName(context.Context, string) (*dmodel.Domain, error) { return nil, nil }
-func (f *fakeDomains) List(context.Context, string) ([]*dmodel.Domain, error)    { return nil, nil }
+func (f *fakeDomains) GetByNameIn(context.Context, string, string) (*dmodel.Domain, error) {
+	return nil, nil
+}
+
+func (f *fakeDomains) DropStaleClaims(context.Context, string, string) (int64, error) { return 0, nil }
+func (f *fakeDomains) List(context.Context, string) ([]*dmodel.Domain, error)         { return nil, nil }
 func (f *fakeDomains) VerifiedNames(context.Context) ([]string, error) {
 	if f.verified == nil {
 		return nil, nil

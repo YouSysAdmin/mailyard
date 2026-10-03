@@ -1125,7 +1125,15 @@ type DomainStore interface {
 	// name, a domain above it or one below it - a verified domain holds
 	// its whole zone, and claiming or verifying inside it is refused.
 	ZoneTakenByAnother(ctx context.Context, name, projID string) (bool, error)
-	GetByName(ctx context.Context, name string) (*domain.Domain, error)
+
+	// GetByNameIn is projID's own claim of name, verified or not. A
+	// claim is per project until it verifies.
+	GetByNameIn(ctx context.Context, projID, name string) (*domain.Domain, error)
+
+	// DropStaleClaims removes other projects' unverified claims of name
+	// and of names below it, once projID verified it. Those claims can
+	// never verify any more.
+	DropStaleClaims(ctx context.Context, name, projID string) (int64, error)
 	List(ctx context.Context, projID string) ([]*domain.Domain, error)
 
 	// VerifiedNames is the accept list a platform relay node running

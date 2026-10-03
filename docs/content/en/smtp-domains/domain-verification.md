@@ -14,8 +14,12 @@ Every outbound surface refuses a `From` on a domain this project has not verifie
 campaigns and the SMTP relay alike — and the check runs again at delivery, so unverifying a domain stops messages that
 are already queued.
 
-It is a per-project claim, not a global one. Domain names are unique across an install, so a domain another project
-verified is refused here exactly as an unknown one is, with the same message.
+It is a per-project claim, not a global one. A domain another project verified is refused here exactly as an unknown
+one is, with the same message.
+
+Until a claim verifies it holds nothing: several projects may claim the same name, and the first to pass the TXT check
+owns it. Verifying removes the other projects' unverified claims of that name and of every name below it, since none of
+them could verify any more. A trailing dot is dropped - `example.com.` is the same claim as `example.com`.
 
 A claim covers **subdomains**. Verifying `example.com` is enough to send as
 `news@mail.example.com` and to receive mail addressed there. Matching is by whole labels, so `evilexample.com` is not
