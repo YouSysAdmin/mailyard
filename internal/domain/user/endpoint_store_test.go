@@ -37,7 +37,7 @@ func TestTheLastAdministratorSurvivesTheHandler(t *testing.T) {
 		t.Fatalf("seed admin: %v", err)
 	}
 
-	h := &Handler{Runtime: &env.Runtime{Store: &store.Store{User: st}}}
+	h := &Handler{Runtime: &env.Runtime{Store: &store.Store{User: st, Project: &fakeMemberships{}}}}
 	app := fiber.New()
 	app.Use(func(c fiber.Ctx) error {
 		c.Locals(domain.ContextKey, &domain.RequestContext{AdminAPIKey: &akmodel.Admin{ID: "k"}})

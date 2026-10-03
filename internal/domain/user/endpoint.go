@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -273,6 +274,18 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 		return response.NotFound(c, "user not found")
 	}
 
+	// A project whose only owner is gone can never be given away or shut
+	// down, the same reason the last owner cannot leave it.
+	sole, err := h.soleOwnerOf(c.Context(), id)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if len(sole) > 0 {
+		return response.Conflict(c, "this account is the only owner of "+strings.Join(sole, ", ")+
+			" - make somebody else an owner there, or delete the project, first")
+	}
+
 	if err := h.Runtime.Store.User.DeleteKeepingAnAdmin(c.Context(), id); errors.Is(err, ErrLastAdmin) {
 		return response.Conflict(c, "this is the last enabled administrator - promote somebody else first")
 	} else if err != nil {
@@ -280,6 +293,42 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	}
 
 	return response.NoContent(c)
+}
+
+// soleOwnerOf names the projects the account owns alone.
+func (h *Handler) soleOwnerOf(ctx context.Context, userID string) ([]string, error) {
+	mine, err := h.Runtime.Store.Project.MembershipsForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []string
+	for _, m := range mine {
+		if !m.Owner {
+			continue
+		}
+
+		members, err := h.Runtime.Store.Project.ListMembers(ctx, m.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+
+		others := slices.ContainsFunc(members, func(o *projmodel.Member) bool {
+			return o.Owner && o.UserID != userID
+		})
+		if others {
+			continue
+		}
+
+		name := m.ProjectID
+		if p, err := h.Runtime.Store.Project.Get(ctx, m.ProjectID); err == nil && p != nil {
+			name = p.Name
+		}
+
+		out = append(out, name)
+	}
+
+	return out, nil
 }
 
 // endSessions revokes every session of the account: a reset of a

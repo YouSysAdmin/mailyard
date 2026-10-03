@@ -25,7 +25,7 @@ POST /api/v1/admin/users
 | Field      | Notes                                                                                                                           |
 |------------|---------------------------------------------------------------------------------------------------------------------------------|
 | `email`    | Required. Normalized to lower case.                                                                                             |
-| `password` | Optional, minimum 12 characters. Leave it out for an account that signs in only through SSO - it then has no password to guess. |
+| `password` | Optional, minimum 12 characters, and not only whitespace. Leave it out for an account that signs in only through SSO - it then has no password to guess. |
 | `admin`    | Platform administration. Defaults to false.                                                                                     |
 
 | `admin` | What it grants                                                                                                                           |
@@ -117,6 +117,9 @@ DELETE /api/v1/admin/users/{id}
 
 Removes the account immediately and answers `204`. Deleting your own account is refused, and an id that names nobody is
 `404` so a double-click reads as "already gone" rather than silent success.
+
+Deleting the only owner of a project answers `409` and names the projects: a project with no owner can never be given
+away or shut down. Make another member an owner there, or delete the project, first.
 
 {{< callout type="warning" title="There is no undo and no grace period" >}}
 Deletion is immediate. If you want an account kept but locked out, set `disabled`

@@ -5,6 +5,7 @@ package user
 import (
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
+	"strings"
 )
 
 // The wire types of this domain: what requests carry in and what
@@ -30,7 +31,7 @@ type PasskeyResetResponse struct {
 // OIDC-only accounts have none and can only sign in through the IdP.
 type createInput struct {
 	Email    string `json:"email"      validate:"required,email,max=320"    normalize:"normalize"`
-	Password string `json:"password"   validate:"omitempty,min=12,max=256,bcryptlen"   normalize:"trim"`
+	Password string `json:"password"   validate:"omitempty,notblank,min=12,max=256,bcryptlen"`
 
 	// Admin is the whole of platform administration.
 	Admin bool `json:"admin"`
@@ -41,7 +42,7 @@ type createInput struct {
 // "absent" apart from "set to false".
 type updateInput struct {
 	Email    string `json:"email"      validate:"omitempty,email,max=320"   normalize:"normalize"`
-	Password string `json:"password"   validate:"omitempty,min=12,max=256,bcryptlen"   normalize:"trim"`
+	Password string `json:"password"   validate:"omitempty,notblank,min=12,max=256,bcryptlen"`
 	Admin    *bool  `json:"admin"`
 	Disabled *bool  `json:"disabled"`
 
@@ -80,3 +81,20 @@ type RevokedResponse struct {
 type ProjectsResponse struct {
 	Projects []*projmodel.Project `json:"projects"`
 }
+
+// trimPassword trims a password that has content and leaves one made
+// only of whitespace as sent, so notblank refuses it rather than a trim
+// turning it into "no password".
+func trimPassword(p string) string {
+	if t := strings.TrimSpace(p); t != "" {
+		return t
+	}
+
+	return p
+}
+
+// Normalize implements validation.Normalizer.
+func (in *createInput) Normalize() { in.Password = trimPassword(in.Password) }
+
+// Normalize implements validation.Normalizer.
+func (in *updateInput) Normalize() { in.Password = trimPassword(in.Password) }
