@@ -3,7 +3,6 @@
 package subscriber
 
 import (
-	"github.com/gofiber/fiber/v3"
 	smodel "github.com/yousysadmin/mailyard/internal/models/subscriber"
 	slmodel "github.com/yousysadmin/mailyard/internal/models/subscriberlist"
 )
@@ -25,14 +24,15 @@ type upsertInput struct {
 	Name         string         `json:"name"          validate:"omitempty,max=200"      normalize:"trim"`
 	Status       string         `json:"status"        validate:"omitempty,oneof=subscribed unsubscribed bounced complained"`
 	CustomFields map[string]any `json:"custom_fields" validate:"omitempty,max=50"`
-	Timezone     string         `json:"timezone"      validate:"omitempty,max=64"       normalize:"trim"`
+	Timezone     string         `json:"timezone"      validate:"omitempty,max=64,timezone" normalize:"trim"`
 	Language     string         `json:"language"      validate:"omitempty,min=2,max=10" normalize:"normalize"`
 }
 
 // importInput is the POST /api/subscribers/import body: bulk upsert
-// by email.
+// by email. Rows are validated one by one, so a bad row is reported in
+// the response rather than refusing the whole import.
 type importInput struct {
-	Subscribers []upsertInput `json:"subscribers" validate:"required,min=1,max=10000,dive"`
+	Subscribers []upsertInput `json:"subscribers" validate:"required,min=1,max=10000"`
 }
 
 // ----------------------------------------------------------------------------
@@ -64,8 +64,16 @@ type MembershipResponse struct {
 // whole import: a single bad address in a ten thousand row file should
 // not cost the other nine thousand.
 type ImportResponse struct {
-	Created int         `json:"created"`
-	Updated int         `json:"updated"`
-	Skipped int         `json:"skipped"`
-	Errors  []fiber.Map `json:"errors"`
+	Created int           `json:"created"`
+	Updated int           `json:"updated"`
+	Skipped int           `json:"skipped"`
+	Errors  []ImportError `json:"errors"`
+}
+
+// ImportError is one refused row: its position in the import, the
+// address it carried and why.
+type ImportError struct {
+	Index int    `json:"index"`
+	Email string `json:"email"`
+	Error string `json:"error"`
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
+	"maps"
 	"net/mail"
 	"strconv"
 	"strings"
@@ -224,7 +225,8 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 }
 
 // Import bulk-upserts subscribers from JSON. Existing emails are
-// updated, invalid rows are reported and skipped.
+// updated with what the row carries, invalid rows are reported and
+// skipped.
 func (h *Handler) Import(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[importInput](c)
@@ -323,18 +325,18 @@ func (h *Handler) runImport(c fiber.Ctx, projID string, items []upsertInput) err
 	}
 
 	created, updated := 0, 0
-	var rowErrors []fiber.Map
+	rowErrors := []ImportError{}
 	for i, item := range items {
-		if _, err := mail.ParseAddress(item.Email); err != nil {
-			rowErrors = append(rowErrors, fiber.Map{"index": i, "email": item.Email, "error": "invalid email"})
+		if err := validation.NormalizeAndValidate(&item); err != nil {
+			rowErrors = append(rowErrors, ImportError{Index: i, Email: item.Email, Error: validation.Summary(validation.Humanize(err))})
+
 			continue
 		}
 
-		if item.Status != "" {
-			if _, ok := submodel.ValidStatuses[item.Status]; !ok {
-				rowErrors = append(rowErrors, fiber.Map{"index": i, "email": item.Email, "error": "unknown status " + item.Status})
-				continue
-			}
+		if _, err := mail.ParseAddress(item.Email); err != nil {
+			rowErrors = append(rowErrors, ImportError{Index: i, Email: item.Email, Error: "invalid email"})
+
+			continue
 		}
 
 		existing, err := h.Runtime.Store.Subscriber.GetByEmail(c.Context(), projID, item.Email)
@@ -344,14 +346,7 @@ func (h *Handler) runImport(c fiber.Ctx, projID string, items []upsertInput) err
 
 		sub := item.toModel(projID)
 		if existing != nil {
-			sub.ID = existing.ID
-			sub.CreatedAt = existing.CreatedAt
-			sub.SubscribedAt = existing.SubscribedAt
-			sub.UpdatedAt = new(time.Now().UTC())
-			if sub.Status == "" {
-				sub.Status = existing.Status
-			}
-
+			sub = mergeImported(existing, &item)
 			updated++
 		} else {
 			created++
@@ -362,14 +357,46 @@ func (h *Handler) runImport(c fiber.Ctx, projID string, items []upsertInput) err
 		}
 	}
 
-	if rowErrors == nil {
-		rowErrors = []fiber.Map{}
-	}
-
 	return response.Success(c, ImportResponse{
 		Created: created, Updated: updated,
 		Skipped: len(rowErrors), Errors: rowErrors,
 	})
+}
+
+// mergeImported folds an import row onto the subscriber it names. What
+// the row leaves empty keeps what the subscriber has, and its custom
+// fields are laid over the existing ones key by key, so a file carrying
+// one column does not erase the others.
+func mergeImported(existing *submodel.Subscriber, in *upsertInput) *submodel.Subscriber {
+	sub := *existing
+	sub.UpdatedAt = new(time.Now().UTC())
+	if in.Name != "" {
+		sub.Name = in.Name
+	}
+
+	if in.Status != "" && in.Status != sub.Status {
+		sub.Status = in.Status
+		if in.Status == submodel.StatusUnsubscribed {
+			sub.UnsubscribedAt = new(time.Now().UTC())
+		}
+	}
+
+	if in.Timezone != "" {
+		sub.Timezone = in.Timezone
+	}
+
+	if in.Language != "" {
+		sub.Language = in.Language
+	}
+
+	if len(in.CustomFields) > 0 {
+		fields := make(map[string]any, len(existing.CustomFields)+len(in.CustomFields))
+		maps.Copy(fields, existing.CustomFields)
+		maps.Copy(fields, in.CustomFields)
+		sub.CustomFields = fields
+	}
+
+	return &sub
 }
 
 func (in *upsertInput) toModel(projID string) *submodel.Subscriber {

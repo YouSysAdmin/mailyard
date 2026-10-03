@@ -8,12 +8,13 @@ Two routes take a batch of subscribers. They differ only in how you hand over th
 identical, down to the response.
 
 {{< callout type="warning" title="Import means upsert, not insert" >}}
-A row whose address already exists in the project **updates** that subscriber rather than being skipped. The stored id,
-`created_at` and `subscribed_at` are kept, and a row that leaves `status` empty keeps the status the subscriber already
-had — so re-importing a list does not resurrect people who unsubscribed since the last run.
+A row whose address already exists in the project **updates** that subscriber rather than being skipped, with what the
+row carries. A field the row leaves empty keeps what the subscriber has: a blank `name`, `timezone`, `language` or
+`status` changes nothing, so re-importing a list does not resurrect people who unsubscribed since the last run.
+`custom_fields` are laid over the stored ones key by key, so a file carrying one column updates that field and leaves
+the others alone.
 
-That is the behaviour you want for a nightly sync and the behaviour to be careful with for a one-off file: a blank
-`name` column overwrites the name you have.
+That is the behaviour you want for a nightly sync. To clear a field, edit the subscriber instead.
 {{< /callout >}}
 
 Both routes are project-scoped and need the `subscribers:write` permission.
@@ -44,8 +45,9 @@ curl -X POST http://localhost:3000/api/v1/subscribers/import \
   }'
 ```
 
-Only `email` is required per row. `status` must be one of `subscribed`, `unsubscribed`, `bounced` or `complained`, and
-`custom_fields` holds at most 50 keys. Addresses are trimmed and lowercased on the way in, so `Alice@Example.com ` and
+Only `email` is required per row. `status` must be one of `subscribed`, `unsubscribed`, `bounced` or `complained`,
+`timezone` an IANA zone name such as `Europe/London`, and `custom_fields` holds at most 50 keys. Each row is checked on
+its own, and a row that fails is reported in the response rather than refusing the call. Addresses are trimmed and lowercased on the way in, so `Alice@Example.com ` and
 `alice@example.com` are one subscriber rather than two.
 
 ## CSV
@@ -109,7 +111,7 @@ Both routes answer `200` with the same report:
   "skipped": 2,
   "errors": [
     { "index": 88,  "email": "not-an-address", "error": "invalid email" },
-    { "index": 903, "email": "dana@example.com", "error": "unknown status pending" }
+    { "index": 903, "email": "dana@example.com", "error": "Status must be one of: subscribed, unsubscribed, bounced, complained" }
   ]
 }
 ```
