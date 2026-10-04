@@ -295,14 +295,43 @@ func (s *Store) FilterSuppressed(ctx context.Context, projID string, emails []st
 // unsubscribe list: it also drops addresses that opted out of that
 // list specifically.
 func (s *Store) FilterSuppressedForList(ctx context.Context, projID, listID string, emails []string) (allowed, blocked []string, err error) {
-	for _, raw := range emails {
-		bare := strings.ToLower(smtpclient.EnvelopeAddress(raw))
-		hit, err := s.IsSuppressedForList(ctx, projID, bare, listID)
-		if err != nil {
+	if len(emails) == 0 {
+		return nil, nil, nil
+	}
+
+	bare := make([]string, len(emails))
+	for i, raw := range emails {
+		bare[i] = strings.ToLower(smtpclient.EnvelopeAddress(raw))
+	}
+
+	// One statement for the whole recipient list, on the primary: a
+	// block written a moment ago must hold for this send.
+	rows, err := s.Query(ctx, `
+        SELECT DISTINCT email FROM suppressions
+        WHERE project_id = ? AND email = ANY(?::text[])
+          AND (unsubscribe_list_id IS NULL OR unsubscribe_list_id = ?::uuid)`,
+		projID, bare, database.NullStr(listID))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	hit := map[string]bool{}
+	for rows.Next() {
+		var e string
+		if err := rows.Scan(&e); err != nil {
 			return nil, nil, err
 		}
 
-		if hit {
+		hit[e] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	for i, raw := range emails {
+		if hit[bare[i]] {
 			blocked = append(blocked, raw)
 		} else {
 			allowed = append(allowed, raw)
