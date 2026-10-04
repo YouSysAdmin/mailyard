@@ -18,6 +18,7 @@ import (
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
@@ -136,7 +137,7 @@ func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 	addr := smtpclient.EnvelopeAddress(to)
 	if _, err := mail.ParseAddress(addr); err != nil {
 		s.backend.Log.Warn("relay node: refused a recipient",
-			"rcpt", to, "remote", s.remote, "reason", "not a valid address")
+			"rcpt", safetext.MaskAddress(to), "remote", s.remote, "reason", "not a valid address")
 
 		return &smtp.SMTPError{Code: 501, Message: "recipient is not a valid address"}
 	}

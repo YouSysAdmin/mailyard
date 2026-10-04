@@ -420,10 +420,7 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 			// through the mail they were sent - or an admin removes
 			// the squatter.
 			if !existing.EmailVerified {
-				slog.Warn("auth: refusing to link to an unverified local account",
-					"email", email, "provider", prov.Slug)
-
-				return nil, fmt.Errorf("an unverified account already exists for %s", email)
+				return nil, fmt.Errorf("an unverified account already exists for the address, provider %s", prov.Slug)
 			}
 
 			if !existing.Disabled {
@@ -439,7 +436,7 @@ func (h *Handler) findOrCreateOAuthUser(c fiber.Ctx, prov *opmodel.Provider, cla
 	}
 
 	if !prov.AutoRegister {
-		return nil, fmt.Errorf("no account for %s and auto-registration is off for provider %s", email, prov.Slug)
+		return nil, fmt.Errorf("no account for the address and auto-registration is off for provider %s", prov.Slug)
 	}
 
 	// The first user of the installation gets admin so whoever set the

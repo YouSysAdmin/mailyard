@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/server"
 
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
@@ -892,7 +893,7 @@ func trackContacts(ctx context.Context, st *store.Store, log *slog.Logger, job *
 		delivered := sent && !slices.ContainsFunc(refused, func(r string) bool { return strings.EqualFold(r, addr) })
 		if err := st.Contact.RecordOutcome(ctx, job.ProjectID, addr, name, delivered, now); err != nil {
 			log.Warn("contacts: record outcome failed",
-				"email_id", job.ID, "recipient", addr, "err", err)
+				"email_id", job.ID, "recipient", safetext.MaskAddress(addr), "err", err)
 		}
 	}
 }

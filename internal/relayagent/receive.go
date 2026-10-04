@@ -23,6 +23,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/iplimit"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 )
 
@@ -294,7 +295,7 @@ func (s *receiveSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 		// cannot be reached - both look exactly like this from the
 		// sender's side and like nothing at all from the console.
 		s.backend.Log.Warn("relay node: recipient deferred, no domain list yet",
-			"rcpt", addr, "ip", s.ip)
+			"rcpt", safetext.MaskAddress(addr), "ip", s.ip)
 
 		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0},
 			Message: "this node has not yet received its recipient domain list"}
@@ -306,14 +307,14 @@ func (s *receiveSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 	// this log is the one debugging an accept list.
 	if !s.backend.Accept.covers(addr) {
 		s.backend.Log.Info("relay node: recipient refused",
-			"rcpt", addr, "ip", s.ip, "reason", "not on the platform's domain list")
+			"rcpt", safetext.MaskAddress(addr), "ip", s.ip, "reason", "not on the platform's domain list")
 
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "relay not permitted"}
 	}
 
 	if !s.backend.Local.covers(addr) {
 		s.backend.Log.Info("relay node: recipient refused",
-			"rcpt", addr, "ip", s.ip, "reason", "outside relay_node.domains")
+			"rcpt", safetext.MaskAddress(addr), "ip", s.ip, "reason", "outside relay_node.domains")
 
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "relay not permitted"}
 	}
@@ -383,7 +384,7 @@ func (s *receiveSession) Data(r io.Reader) (err error) {
 	}
 
 	s.backend.Log.Info("relay node: received",
-		"id", m.ID, "from", s.from, "recipients", len(s.to), "bytes", len(raw), "client_ip", s.ip)
+		"id", m.ID, "from", safetext.MaskAddress(s.from), "recipients", len(s.to), "bytes", len(raw), "client_ip", s.ip)
 
 	if s.backend.Wake != nil {
 		s.backend.Wake()
