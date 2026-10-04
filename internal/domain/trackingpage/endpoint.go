@@ -111,7 +111,7 @@ func (h *Handler) Open(c fiber.Ctx) error {
 
 	// The id in the URL is an EMAIL id, for campaign and transactional
 	// mail alike - one identifier, so this handler resolves one thing.
-	e, err := h.Runtime.Store.Email.GetAny(ctx, emailID)
+	e, err := h.Runtime.Store.Email.GetTrackingState(ctx, emailID)
 	if err != nil {
 		slog.Error("tracking: open lookup", "email_id", emailID, "err", err)
 
@@ -167,7 +167,7 @@ func (h *Handler) Click(c fiber.Ctx) error {
 	}
 
 	ctx := c.Context()
-	e, err := h.Runtime.Store.Email.GetAny(ctx, emailID)
+	e, err := h.Runtime.Store.Email.GetTrackingState(ctx, emailID)
 	if err != nil || e == nil {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
 	}

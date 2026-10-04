@@ -172,3 +172,12 @@ type KeyHolder struct {
 func (k KeyHolder) Pending() bool {
 	return k.EmailID == "" && k.SandboxEmailID == ""
 }
+
+// TrackingState is what an open or a click reads of its message: enough
+// to name the partition and the counters, and none of the body.
+type TrackingState struct {
+	ProjectID  string
+	CreatedAt  time.Time
+	OpenCount  int
+	ClickCount int
+}

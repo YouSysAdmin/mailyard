@@ -182,3 +182,35 @@ func TestTheTrackingMarksNeedTheRowsOwnCreatedAt(t *testing.T) {
 		t.Errorf("a wrong created_at counted %d opens (err=%v), want 0", opens, err)
 	}
 }
+
+// The tracking read finds the row inside and outside its id's window,
+// carries the counters the handlers bound on, and answers nil for an id
+// nothing has.
+func TestTheTrackingReadFindsTheRowAndItsCounters(t *testing.T) {
+	s, projID, ctx := pruneFixture(t)
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	inside, outside := ids.New(), ids.New()
+	seedAt(t, s, ctx, projID, inside, now)
+	seedAt(t, s, ctx, projID, outside, now.Add(-72*time.Hour))
+	if _, err := s.DB().ExecContext(ctx,
+		`UPDATE emails SET open_count = 3, click_count = 2 WHERE id = $1`, inside); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, id := range []string{inside, outside} {
+		st, err := s.GetTrackingState(ctx, id)
+		if err != nil || st == nil || st.ProjectID != projID {
+			t.Fatalf("%s: %+v %v", id, st, err)
+		}
+	}
+
+	st, err := s.GetTrackingState(ctx, inside)
+	if err != nil || st.OpenCount != 3 || st.ClickCount != 2 || !st.CreatedAt.Equal(now) {
+		t.Fatalf("counters %+v %v", st, err)
+	}
+
+	if st, err := s.GetTrackingState(ctx, ids.New()); err != nil || st != nil {
+		t.Fatalf("an unknown id: %+v %v", st, err)
+	}
+}

@@ -28,13 +28,16 @@ type replayEmails struct {
 	opens int64
 }
 
-func (r *replayEmails) GetAny(context.Context, string) (*emailmodel.Email, error) {
-	return r.row, nil
+func (r *replayEmails) GetTrackingState(context.Context, string) (*emailmodel.TrackingState, error) {
+	return &emailmodel.TrackingState{
+		ProjectID: r.row.ProjectID, CreatedAt: r.row.CreatedAt,
+		OpenCount: r.row.OpenCount, ClickCount: r.row.ClickCount,
+	}, nil
 }
 
 func (r *replayEmails) MarkOpened(context.Context, string, time.Time, time.Time) (bool, int64, error) {
 	r.opens++
-	// The next GetAny reads the count back, as the real store does.
+	// The next GetTrackingState reads the count back, as the real store does.
 	r.row.OpenCount = int(r.opens)
 
 	return r.opens == 1, r.opens, nil

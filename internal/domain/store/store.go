@@ -796,6 +796,10 @@ type EmailFilter struct {
 type EmailStore interface {
 	Get(ctx context.Context, projID, id string) (*email.Email, error)
 	GetAny(ctx context.Context, id string) (*email.Email, error)
+
+	// GetTrackingState is GetAny for an open or a click, which needs
+	// four columns of a row that may carry megabytes of body.
+	GetTrackingState(ctx context.Context, id string) (*email.TrackingState, error)
 	List(ctx context.Context, projID string, f EmailFilter) ([]*email.Email, error)
 	Put(ctx context.Context, e *email.Email) error
 

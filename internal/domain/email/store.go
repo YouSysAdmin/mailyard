@@ -238,6 +238,43 @@ func (s *Store) GetAny(ctx context.Context, id string) (*emailmodel.Email, error
 	return e, err
 }
 
+// GetTrackingState is GetAny narrowed to what the tracking handlers
+// read, with the same id-window pruning. A message stored inline
+// carries its attachments in the row, and every open would otherwise
+// read them.
+func (s *Store) GetTrackingState(ctx context.Context, id string) (*emailmodel.TrackingState, error) {
+	scan := func(r *sql.Row) (*emailmodel.TrackingState, error) {
+		var st emailmodel.TrackingState
+		if err := r.Scan(&st.ProjectID, &st.CreatedAt, &st.OpenCount, &st.ClickCount); err != nil {
+			return nil, err
+		}
+
+		return &st, nil
+	}
+
+	if from, to, ok := pruneByID(id); ok {
+		st, err := scan(s.QueryRow(ctx, `
+            SELECT project_id, created_at, open_count, click_count FROM emails
+            WHERE id = ? AND created_at >= ? AND created_at < ?`, id, from, to))
+		if err == nil {
+			return st, nil
+		}
+
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
+
+	st, err := scan(s.QueryRow(ctx, `
+        SELECT project_id, created_at, open_count, click_count FROM emails
+        WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return st, err
+}
+
 // listLimit is the store's own clamp, one more than the API ceiling
 // because the handler asks for limit+1 to learn whether a next page
 // exists.
