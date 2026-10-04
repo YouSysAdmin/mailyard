@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
@@ -335,13 +336,24 @@ const acmeWarnBefore = 14 * 24 * time.Hour
 // boot.
 func (b *Builder) watchACME() {
 	ctx, cancel := context.WithCancel(context.Background())
-	b.onShutdown(func(context.Context) error {
+	done := make(chan struct{})
+
+	// Shutdown waits for the loop to leave, so nothing touches the
+	// manager once the caller moves on.
+	b.onShutdown(func(sctx context.Context) error {
 		cancel()
 
-		return nil
+		select {
+		case <-done:
+			return nil
+		case <-sctx.Done():
+			return fmt.Errorf("acme watcher: %w", sctx.Err())
+		}
 	})
 
 	go func() {
+		defer close(done)
+
 		t := time.Tick(acmeCheckInterval)
 		for {
 			// Through the MANAGER, never the served config. The served

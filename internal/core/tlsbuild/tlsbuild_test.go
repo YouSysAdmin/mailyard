@@ -129,19 +129,14 @@ func TestShutdownStopsTheACMEWatcher(t *testing.T) {
 	b := &Builder{Store: store, ACME: staticACME(ACME{Enabled: true, Hosts: []string{host}})}
 	b.watchACME()
 
-	// Let the first pass land, then stop.
+	// Let the first pass land, then stop. Shutdown returns once the
+	// loop has left, and reports the watcher if it never does.
 	waitFor(t, func() bool { return len(store.asked()) > 0 })
-	if err := b.Shutdown(t.Context()); err != nil {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := b.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown: %v", err)
-	}
-
-	after := len(store.asked())
-
-	// The ticker is an hour out, so any further call within this window
-	// means the goroutine outlived Shutdown.
-	time.Sleep(100 * time.Millisecond)
-	if now := len(store.asked()); now != after {
-		t.Errorf("watcher kept running after Shutdown: %d -> %d reads", after, now)
 	}
 }
 
