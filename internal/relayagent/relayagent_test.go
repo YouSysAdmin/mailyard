@@ -583,3 +583,40 @@ func TestAnOutcomeWithNoIDIsNotReported(t *testing.T) {
 		t.Error("the message was not delivered")
 	}
 }
+
+// A destination that never answers holds one attempt for AttemptTimeout,
+// not for as long as it likes, and the message is kept for a retry.
+func TestAStalledDestinationEndsTheAttempt(t *testing.T) {
+	s := testSpool(t)
+	if err := s.Put(queued(ids.New()), []byte(rawBody)); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	d, outcomes := testDeliverer(t, s, &fakeSender{})
+	d.AttemptTimeout = 50 * time.Millisecond
+	d.Send = func(ctx context.Context, _ smtpclient.DirectConfig, _ []string, _ *smtpclient.Raw) (*smtpclient.DirectResult, error) {
+		<-ctx.Done()
+
+		return nil, ctx.Err()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		d.pass(t.Context())
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the pass is still waiting on a destination that never answers")
+	}
+
+	left, err := s.All()
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+
+	if len(left) != 1 || len(*outcomes) != 0 {
+		t.Fatalf("a timed out attempt must defer: %d queued, outcomes %+v", len(left), *outcomes)
+	}
+}

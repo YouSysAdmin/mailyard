@@ -32,6 +32,10 @@ type Deliverer struct {
 	// MaxLifetime bounds how long a message may keep failing.
 	MaxLifetime time.Duration
 
+	// AttemptTimeout bounds one SMTP conversation end to end. Zero
+	// means defaultAttemptTimeout.
+	AttemptTimeout time.Duration
+
 	// Concurrency caps simultaneous outbound sessions.
 	Concurrency int
 
@@ -219,11 +223,18 @@ func (d *Deliverer) attempt(ctx context.Context, m *Message) {
 		send = smtpclient.SendDirect
 	}
 
-	res, err := send(ctx, cfg, hosts, &smtpclient.Raw{
+	timeout := d.AttemptTimeout
+	if timeout <= 0 {
+		timeout = defaultAttemptTimeout
+	}
+
+	sendCtx, cancel := context.WithTimeout(ctx, timeout)
+	res, err := send(sendCtx, cfg, hosts, &smtpclient.Raw{
 		EnvelopeFrom: m.EnvelopeFrom,
 		To:           m.Recipients,
 		Data:         body,
 	})
+	cancel()
 	if err != nil {
 		if se, ok := errors.AsType[*smtpclient.SendError](err); ok && se.Permanent() {
 			// The destination refused the message itself, not one
@@ -282,6 +293,11 @@ func (d *Deliverer) attempt(ctx context.Context, m *Message) {
 	m.Recipients = retry
 	d.defer_(m, "some recipients deferred")
 }
+
+// defaultAttemptTimeout matches the platform worker's attempt_timeout
+// default. The idle deadline alone lets a peer that trickles a byte a
+// minute hold a session for good.
+const defaultAttemptTimeout = 10 * time.Minute
 
 func (d *Deliverer) expired(m *Message) bool {
 	if d.MaxLifetime <= 0 {
