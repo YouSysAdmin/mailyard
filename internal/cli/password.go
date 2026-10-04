@@ -91,6 +91,7 @@ func newSetPasswordCmd() *cobra.Command {
 	cmd.Flags().StringVar(&email, "email", "", "user to update (defaults to auth.local.email)")
 	cmd.Flags().StringVar(&password, "password", "", "new password (avoid: lands in shell history, prefer --stdin)")
 	cmd.Flags().BoolVar(&stdin, "stdin", false, "read the password from stdin")
+	cmd.MarkFlagsMutuallyExclusive("password", "stdin")
 
 	return cmd
 }
@@ -183,14 +184,9 @@ func resolveSecret(prompt io.Writer, label, flagValue string, fromStdin bool) (s
 	}
 
 	if fromStdin {
-		var b []byte
-		buf := make([]byte, 1024)
-		for {
-			n, err := os.Stdin.Read(buf)
-			b = append(b, buf[:n]...)
-			if err != nil || n == 0 {
-				break
-			}
+		b, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return "", fmt.Errorf("read %s from stdin: %w", strings.ToLower(label), err)
 		}
 
 		return strings.TrimRight(string(b), "\r\n"), nil

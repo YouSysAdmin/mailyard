@@ -36,6 +36,13 @@ func newTLSCmd() *cobra.Command {
 			"database, without a running server.\n\n" +
 			"Use this to recover from an assignment that made the console\n" +
 			"unreachable - the console is otherwise the only place these are set.",
+
+		// Runnable for the same reason root is: a mistyped subcommand
+		// comes back as a usage error rather than help and exit 0.
+		Args: noArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
 	}
 
 	cmd.AddCommand(newTLSStatusCmd(), newTLSAssignCmd(), newTLSUnassignCmd())

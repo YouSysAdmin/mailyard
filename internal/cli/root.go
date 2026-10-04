@@ -34,7 +34,7 @@ func NewRoot() *cobra.Command {
 		},
 	}
 	root.SetFlagErrorFunc(flagError)
-	root.PersistentFlags().String("config", "", "config file path (yaml); defaults to ./mailyard.yaml")
+	root.PersistentFlags().String("config", "", "config file path (yaml), defaults to ./mailyard.yaml")
 
 	// help and completion stay ungrouped and land under cobra's own
 	// "Additional Commands".

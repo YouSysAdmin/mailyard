@@ -112,6 +112,7 @@ func newRekeyCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&newKey, "key", "", "the new key (avoid: lands in shell history, prefer --stdin)")
 	cmd.Flags().BoolVar(&stdin, "stdin", false, "read the new key from stdin")
+	cmd.MarkFlagsMutuallyExclusive("key", "stdin")
 	cmd.Flags().BoolVar(&forgetTracking, "forget-tracking", false,
 		"do not keep the old tracking key, so unsubscribe links delivered so far stop working")
 
