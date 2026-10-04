@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"net"
 	"slices"
@@ -114,6 +115,9 @@ type Lookup struct {
 	mu  sync.RWMutex
 	hit map[string]cached
 
+	// swept is when store last swept hit for expired answers.
+	swept time.Time
+
 	// now is a test seam. Nil means time.Now.
 	now func() time.Time
 }
@@ -187,15 +191,28 @@ func (l *Lookup) cachedTargets(domain string) ([]Target, bool) {
 	return slices.Clone(c.targets), true
 }
 
+// sweepAt is the cache size past which a store sweeps expired entries,
+// at most once per CacheTTL.
+const sweepAt = 1024
+
 // store keeps its own copy. The slice handed back to the first caller
 // is the same one every later caller would read from, so storing it
 // directly lets one delivery's reordering rewrite the answer for the
 // whole domain.
 func (l *Lookup) store(domain string, targets []Target) {
 	kept := slices.Clone(targets)
+	now := l.clock()
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.hit[domain] = cached{targets: kept, at: l.clock()}
+
+	// Expired answers are dropped as new ones arrive, or a node that
+	// delivers to many domains keeps every one it ever resolved.
+	if len(l.hit) >= sweepAt && now.Sub(l.swept) > l.cfg.CacheTTL {
+		l.swept = now
+		maps.DeleteFunc(l.hit, func(_ string, c cached) bool { return now.Sub(c.at) > l.cfg.CacheTTL })
+	}
+
+	l.hit[domain] = cached{targets: kept, at: now}
 }
 
 func (l *Lookup) resolve(ctx context.Context, domain string) ([]Target, error) {

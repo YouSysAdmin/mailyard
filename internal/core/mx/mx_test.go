@@ -5,6 +5,7 @@ package mx
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -303,5 +304,24 @@ func TestEqualPreferenceIsShuffledWithinItsBand(t *testing.T) {
 
 	if len(seen) < 2 {
 		t.Errorf("40 resolutions always picked %v first, so equal preferences are not shuffled", seen)
+	}
+}
+
+// Expired answers do not pile up on a node that delivers to many
+// domains.
+func TestExpiredAnswersAreSwept(t *testing.T) {
+	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	l := New(Config{CacheTTL: time.Minute})
+	l.now = func() time.Time { return now }
+
+	for i := range sweepAt {
+		l.store(fmt.Sprintf("d%d.example", i), nil)
+	}
+
+	now = now.Add(2 * time.Minute)
+	l.store("fresh.example", nil)
+
+	if len(l.hit) != 1 {
+		t.Fatalf("%d answers kept, want only the fresh one", len(l.hit))
 	}
 }
