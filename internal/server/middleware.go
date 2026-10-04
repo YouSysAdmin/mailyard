@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"mime"
 	"net/url"
@@ -51,9 +52,19 @@ func requestContext(rt *env.Runtime, resolver *clientip.Resolver) fiber.Handler 
 		c.Locals(domain.ContextKey, rc)
 		slogfiber.AddCustomAttributes(c, slog.Any("context", rc))
 
+		ctx, cancel := context.WithTimeout(c.Context(), requestDeadline)
+		defer cancel()
+
+		c.SetContext(ctx)
+
 		return c.Next()
 	}
 }
+
+// requestDeadline bounds the work a request does on c.Context(). The
+// same two minutes as the server's read and write timeouts, so a slow
+// query stops about when its answer could no longer be written.
+const requestDeadline = 2 * time.Minute
 
 // requireAuth gates protected /api/* routes on a valid session
 // cookie.

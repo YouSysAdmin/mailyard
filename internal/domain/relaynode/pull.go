@@ -113,6 +113,13 @@ func (h *Handler) Claim(c fiber.Ctx) error {
 	wait := min(time.Duration(in.WaitSeconds)*time.Second, cfg.ClaimWaitMax)
 
 	ctx := c.Context()
+
+	// The wait ends ahead of the request's own deadline, so a long
+	// claim_wait_max still answers rather than being cut off.
+	if d, ok := ctx.Deadline(); ok {
+		wait = max(min(wait, time.Until(d)-10*time.Second), 0)
+	}
+
 	now := time.Now().UTC()
 
 	// One parked claim per node, and the NEWEST one parks: a new claim
