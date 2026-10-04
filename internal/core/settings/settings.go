@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 	"unicode"
 
 	"github.com/yousysadmin/mailyard/internal/core/dnsname"
@@ -38,6 +37,10 @@ type Loader interface {
 // Service caches the resolved settings.
 type Service struct {
 	loader Loader
+
+	// reload holds a whole Reload, the read and the swap together, so a
+	// slower reload that read older rows cannot land after a newer one.
+	reload sync.Mutex
 
 	mu     sync.RWMutex
 	values map[string]string
@@ -62,6 +65,9 @@ func (s *Service) applyDefaults() {
 // to the registry default, so removing a row restores the default on
 // the next reload.
 func (s *Service) Reload(ctx context.Context) error {
+	s.reload.Lock()
+	defer s.reload.Unlock()
+
 	stored, err := s.loader.All(ctx)
 	if err != nil {
 		return err
@@ -85,24 +91,6 @@ func (s *Service) Reload(ctx context.Context) error {
 	s.mu.Unlock()
 
 	return nil
-}
-
-// StartRefresh reloads every interval until ctx is cancelled, so
-// nodes that did not serve the write converge.
-func (s *Service) StartRefresh(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		return
-	}
-
-	t := time.Tick(interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t:
-			_ = s.Reload(ctx)
-		}
-	}
 }
 
 // String returns the raw value, or "" for an unknown key.

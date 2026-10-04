@@ -4,7 +4,9 @@ package settings
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
@@ -206,5 +208,69 @@ func TestPerKeyRulesRefuseWhatCannotWork(t *testing.T) {
 	got, err := Validate(smodel.KeyACMEHosts, `["Mail.Example.COM"]`)
 	if err != nil || got != `["mail.example.com"]` {
 		t.Errorf("hosts normalized to %q, %v", got, err)
+	}
+}
+
+// staleThenFresh answers its first read with old rows and holds it until
+// released, then answers every later read with new rows.
+type staleThenFresh struct {
+	mu      sync.Mutex
+	calls   int
+	reading chan struct{}
+	release chan struct{}
+}
+
+func (l *staleThenFresh) All(context.Context) ([]*smodel.Setting, error) {
+	l.mu.Lock()
+	l.calls++
+	first := l.calls == 1
+	l.mu.Unlock()
+
+	if first {
+		close(l.reading)
+		<-l.release
+
+		return []*smodel.Setting{{Key: smodel.KeyMaintenanceMode, Value: "false"}}, nil
+	}
+
+	return []*smodel.Setting{{Key: smodel.KeyMaintenanceMode, Value: "true"}}, nil
+}
+
+// A periodic reload that read before an admin's write cannot land after
+// the reload that write triggered.
+func TestASlowReloadDoesNotOverwriteANewerOne(t *testing.T) {
+	l := &staleThenFresh{reading: make(chan struct{}), release: make(chan struct{})}
+	s := New(l)
+
+	slow := make(chan error, 1)
+	go func() { slow <- s.Reload(t.Context()) }()
+	<-l.reading
+
+	fresh := make(chan error, 1)
+	go func() { fresh <- s.Reload(t.Context()) }()
+
+	// Give the fresh reload the chance to finish first, which it may
+	// only do when reloads are not serialized.
+	select {
+	case err := <-fresh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(l.release)
+	if err := <-slow; err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-fresh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the second reload never finished")
+	}
+
+	if !s.Bool(smodel.KeyMaintenanceMode) {
+		t.Fatal("the slow reload's older rows replaced the newer ones")
 	}
 }
