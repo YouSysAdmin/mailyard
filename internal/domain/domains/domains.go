@@ -98,14 +98,42 @@ func (s *Store) GetVerifiedByName(ctx context.Context, name string) (*dmodel.Dom
 // Matching is by whole LABELS, never by string suffix - see
 // dnsname.Covering, which a relay node uses for the same question.
 func (s *Store) GetVerifiedCovering(ctx context.Context, name string) (*dmodel.Domain, error) {
-	for _, candidate := range dnsname.Covering(name) {
-		d, err := s.GetVerifiedByName(ctx, candidate)
-		if err != nil || d != nil {
-			return d, err
-		}
+	chain, err := s.verifiedChain(ctx, name)
+	if err != nil || len(chain) == 0 {
+		return nil, err
 	}
 
-	return nil, nil
+	return chain[0], nil
+}
+
+// verifiedChain is every verified row covering name, most specific
+// first, in one statement. A name is verified by at most one project,
+// so there is a row per label at most.
+func (s *Store) verifiedChain(ctx context.Context, name string) ([]*dmodel.Domain, error) {
+	candidates := dnsname.Covering(name)
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	rows, err := s.Query(ctx, domainSelect+`
+        WHERE domain = ANY(?::text[]) AND verified = TRUE
+        ORDER BY length(domain) DESC`, candidates)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+	var chain []*dmodel.Domain
+	for rows.Next() {
+		d, err := s.scanDomain(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		chain = append(chain, d)
+	}
+
+	return chain, rows.Err()
 }
 
 // GetVerifiedCoveringFor answers whether projID may SEND as name: the
@@ -118,20 +146,9 @@ func (s *Store) GetVerifiedCovering(ctx context.Context, name string) (*dmodel.D
 // row on the way up that belongs to the same owner. The most specific
 // row is what is returned, so its key signs.
 func (s *Store) GetVerifiedCoveringFor(ctx context.Context, name, projID string) (*dmodel.Domain, error) {
-	var chain []*dmodel.Domain
-	for _, candidate := range dnsname.Covering(name) {
-		d, err := s.GetVerifiedByName(ctx, candidate)
-		if err != nil {
-			return nil, err
-		}
-
-		if d != nil {
-			chain = append(chain, d)
-		}
-	}
-
-	if len(chain) == 0 {
-		return nil, nil
+	chain, err := s.verifiedChain(ctx, name)
+	if err != nil || len(chain) == 0 {
+		return nil, err
 	}
 
 	d := chain[0]
