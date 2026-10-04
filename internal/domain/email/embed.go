@@ -6,6 +6,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"sync"
 
 	templatedomain "github.com/yousysadmin/mailyard/internal/domain/template"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
@@ -19,11 +20,24 @@ const embeddedSuffix = "@mailyard"
 // client loads it: a src attribute or a CSS url(). Groups are the
 // opener, the token and the character that ends the URL, so a URL
 // carrying a query or a fragment is not one of ours.
+//
+// Compiled once per base. The base is the configured public URL, so in
+// practice that is once per process.
 func assetRefPattern(base string) *regexp.Regexp {
-	return regexp.MustCompile(`(?i)(\bsrc\s*=\s*["']?|url\(\s*(?:["']|&quot;|&#34;|&#39;)?)` +
+	if re, ok := assetPatterns.Load(base); ok {
+		return re.(*regexp.Regexp)
+	}
+
+	re := regexp.MustCompile(`(?i)(\bsrc\s*=\s*["']?|url\(\s*(?:["']|&quot;|&#34;|&#39;)?)` +
 		regexp.QuoteMeta(base+templatedomain.AssetPath+"/") +
 		`([A-Za-z0-9_-]{1,64})(["'\s)>&]|$)`)
+	actual, _ := assetPatterns.LoadOrStore(base, re)
+
+	return actual.(*regexp.Regexp)
 }
+
+// assetPatterns holds assetRefPattern's compiled expressions by base.
+var assetPatterns sync.Map
 
 // embedAssets rewrites every builder image of projID that the HTML
 // loads from the hosted URL to a cid: reference, and appends one
