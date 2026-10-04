@@ -140,6 +140,16 @@ func NewSigner(domain, selector, privatePEM string) (*Signer, error) {
 		selector = DefaultSelector
 	}
 
+	key, err := parseKey(privatePEM)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Signer{domain: domain, selector: selector, key: key}, nil
+}
+
+// parseKey reads a decrypted PEM private key, PKCS#8 or PKCS#1.
+func parseKey(privatePEM string) (crypto.Signer, error) {
 	block, _ := pem.Decode([]byte(privatePEM))
 	if block == nil {
 		return nil, errors.New("dkim: private key is not valid PEM")
@@ -160,7 +170,7 @@ func NewSigner(domain, selector, privatePEM string) (*Signer, error) {
 		return nil, fmt.Errorf("dkim: private key of type %T cannot sign", parsed)
 	}
 
-	return &Signer{domain: domain, selector: selector, key: signer}, nil
+	return signer, nil
 }
 
 // Sign returns raw with a DKIM-Signature header prepended.

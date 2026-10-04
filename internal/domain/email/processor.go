@@ -48,6 +48,10 @@ type Processor struct {
 	// message of a campaign references. Nil loads per message.
 	Attachments *attachcache.Cache
 
+	// DKIMKeys keeps parsed DKIM keys between messages. Nil, the
+	// default, parses the key for each message.
+	DKIMKeys *dkim.KeyCache
+
 	// BounceAddress is sending.bounce_address, the return path for
 	// mail leaving through the SHARED POOL only - the one case where
 	// the sending IPs belong to the platform, so a platform domain can
@@ -615,7 +619,7 @@ func (p *Processor) signerFor(ctx context.Context, e *emailmodel.Email) (*dkim.S
 		return nil, nil
 	}
 
-	return dkim.NewSigner(d.Domain, d.DKIMSelector, d.DKIMPrivateKey)
+	return p.DKIMKeys.Signer(d.Domain, d.DKIMSelector, d.DKIMPrivateKey)
 }
 
 // senderDomain is the lowercase host part of an RFC 5322 address.

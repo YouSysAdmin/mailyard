@@ -454,6 +454,12 @@ type SendingConfig struct {
 	// Which message a report concerns is answered separately, by
 	// smtpclient.HeaderEmailID.
 	BounceAddress string `mapstructure:"bounce_address"`
+
+	// DKIMKeyCache keeps parsed DKIM private keys in memory between
+	// messages instead of parsing the key for each one. Off by default:
+	// it saves CPU on a busy sender at the cost of decrypted keys staying
+	// in process memory for up to an hour. See dkim.KeyCache.
+	DKIMKeyCache bool `mapstructure:"dkim_key_cache"`
 }
 
 // CryptoConfig keys the at-rest encryption of secrets stored in the
@@ -897,6 +903,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("sending.allow_private_smtp_targets", false)
 	v.SetDefault("sending.spf_include", "")
 	v.SetDefault("sending.bounce_address", "")
+	v.SetDefault("sending.dkim_key_cache", false)
 	v.SetDefault("webhook.timeout", "10s")
 	v.SetDefault("webhook.max_attempts", 3)
 	v.SetDefault("webhook.retry_delay", "10s")

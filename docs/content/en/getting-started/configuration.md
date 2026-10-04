@@ -357,10 +357,24 @@ See [Attachments](/docs/email-sending/attachments) for the request shape and the
 | `MAILYARD_SENDING_BOUNCE_ADDRESS`       | —       | Return path for mail leaving through the **shared platform pool** only, where the sending IPs are ours. A project sending through its own server sets its own under Project settings. Empty leaves `MAIL FROM` as the From address. See [Bounce Handling](/docs/smtp-domains/bounce-handling) |
 | `MAILYARD_SENDING_SPF_INCLUDE`          | —       | Host tenants should name in their SPF record, e.g. `_spf.mail.example.com`. Empty means the console tells the operator to set it rather than printing a placeholder.                                                                                                                          |
 | `MAILYARD_INBOUND_REJECT_ON_DMARC_FAIL` | `false` | Refuse received mail when the From domain publishes `p=reject` and nothing it vouches for passed                                                                                                                                                                                              |
+| `MAILYARD_SENDING_DKIM_KEY_CACHE`       | `false` | Keep parsed DKIM private keys in memory between messages instead of parsing the key for every message. Saves CPU on a busy sender, at a security cost described below                                                                                                                         |
 
 Outbound mail is DKIM signed automatically for every domain a project has verified. Keys are RSA-2048, generated when
 ownership verifies, and the private half is encrypted with `database.crypto.encryption_key` before it reaches the
 database. There is no variable to turn signing on: a verified domain with a key gets signed mail.
+
+{{< callout type="warning" title="`sending.dkim_key_cache` trades key exposure for CPU" >}}
+Without the cache a decrypted DKIM private key exists in memory only while one message is signed. With it, a key stays
+in the worker's memory for up to an hour after it was first used, and a rotated key stays until its hour is up. A memory
+dump or a core file of a worker then holds the private keys of every domain it signed for recently.
+
+What it saves is parsing the key, roughly a tenth of the time spent signing one message. It does not save a database
+read: which key signs a message, and whether its domain is still verified and still the project's to send as, is read
+for every message, so unverifying or unsharing a domain stops signing at once either way.
+
+Turn it on for a worker that signs a large volume and whose memory you already treat as holding secrets. Leave it off
+otherwise.
+{{< /callout >}}
 
 Inbound mail is always authenticated and the verdict always stored.
 `MAILYARD_INBOUND_REJECT_ON_DMARC_FAIL` only decides whether a failure is also a refusal.

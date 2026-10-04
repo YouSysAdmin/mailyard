@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/yousysadmin/mailyard/internal/core/dkim"
 	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/server"
 
@@ -417,6 +418,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		PlatformProject:  func() string { return rt.Settings.String(smodel.KeyPlatformMailProject) },
 		Blob:             rt.Blob,
 		Attachments:      rt.Attachments,
+		DKIMKeys:         dkimKeyCache(cfg.Sending.DKIMKeyCache),
 		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
 		RelayClient:      relayClient,
 		Notify:           func() *notify.Raiser { return rt.Notify },
@@ -810,6 +812,16 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 	rt.Log.Info("auth: bootstrap user created", "email", u.Email, "user_id", u.ID)
 
 	return nil
+}
+
+// dkimKeyCache is the processor's DKIM key cache when the operator
+// turned it on, and nil otherwise.
+func dkimKeyCache(on bool) *dkim.KeyCache {
+	if !on {
+		return nil
+	}
+
+	return dkim.NewKeyCache()
 }
 
 // finalHookTimeout bounds what finalHook does for one message.

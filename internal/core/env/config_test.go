@@ -181,3 +181,28 @@ func TestSubmissionHostIsDialable(t *testing.T) {
 		t.Errorf("SubmissionPort() = %q, want 2587", got)
 	}
 }
+
+// The DKIM key cache is off unless the operator turns it on, and the
+// environment can turn it on.
+func TestTheDKIMKeyCacheIsOptIn(t *testing.T) {
+	t.Setenv("MAILYARD_DATABASE_DSN", "postgres://x@localhost/x")
+	t.Setenv("MAILYARD_AUTH_JWT_SECRET", "0123456789abcdef0123456789abcdef")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if cfg.Sending.DKIMKeyCache {
+		t.Fatal("the DKIM key cache is on by default")
+	}
+
+	t.Setenv("MAILYARD_SENDING_DKIM_KEY_CACHE", "true")
+	if cfg, err = Load(""); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if !cfg.Sending.DKIMKeyCache {
+		t.Fatal("MAILYARD_SENDING_DKIM_KEY_CACHE=true did not turn it on")
+	}
+}
