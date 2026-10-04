@@ -812,6 +812,9 @@ func bootstrapUser(ctx context.Context, rt *env.Runtime) error {
 	return nil
 }
 
+// finalHookTimeout bounds what finalHook does for one message.
+const finalHookTimeout = 30 * time.Second
+
 // finalHook is the worker's OnFinal, run once a message reaches a final
 // status. It reads rt.Notify when it runs rather than when it is built,
 // because the raiser is set after the worker.
@@ -826,6 +829,12 @@ func finalHook(rt *env.Runtime, st *store.Store, dispatcher *dispatch.Dispatcher
 			return
 		}
 
+		// The hook runs on the pool goroutine after the outcome is
+		// written, so it holds that goroutine. Bounded, so a stalled
+		// database cannot keep it from the next message for good.
+		ctx, cancel := context.WithTimeout(context.Background(), finalHookTimeout)
+		defer cancel()
+
 		// Sync the campaign message (no-op for transactional sends).
 		msgStatus := map[string]string{
 			emailmodel.StatusSent:       campaignmodel.MsgSent,
@@ -833,7 +842,7 @@ func finalHook(rt *env.Runtime, st *store.Store, dispatcher *dispatch.Dispatcher
 			emailmodel.StatusSuppressed: campaignmodel.MsgSkipped,
 		}[status]
 		if msgStatus != "" {
-			if err := campaign.Settle(context.Background(), st, dispatcher.Emit, rt.Notify,
+			if err := campaign.Settle(ctx, st, dispatcher.Emit, rt.Notify,
 				job.ProjectID, job.ID, msgStatus, errMsg); err != nil {
 				log.Error("campaign: settle message", "email_id", job.ID, "err", err)
 			}
@@ -844,7 +853,7 @@ func finalHook(rt *env.Runtime, st *store.Store, dispatcher *dispatch.Dispatcher
 		// never attempted, so recording it as a failure would blame
 		// the address for a decision we made about it.
 		if status == emailmodel.StatusSent || status == emailmodel.StatusFailed {
-			trackContacts(context.Background(), st, log, job, status == emailmodel.StatusSent, refused)
+			trackContacts(ctx, st, log, job, status == emailmodel.StatusSent, refused)
 		}
 
 		// Push to any live console viewer. Best effort and
@@ -877,7 +886,7 @@ func finalHook(rt *env.Runtime, st *store.Store, dispatcher *dispatch.Dispatcher
 
 		job.Status = status
 		job.ErrorMessage = errMsg
-		dispatcher.Emit(context.Background(), job.ProjectID, event, job.Sender, email.EventPayload(job))
+		dispatcher.Emit(ctx, job.ProjectID, event, job.Sender, email.EventPayload(job))
 	}
 }
 
