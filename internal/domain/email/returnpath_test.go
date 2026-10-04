@@ -107,7 +107,7 @@ func TestReturnPathFollowsTheServer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := returnPathProcessor(tc.platform, tc.proj)
 			e := &emailmodel.Email{ProjectID: "e66e7a4d-9e6c-4884-869a-cf9ffcf22181", Sender: "Noreply <noreply@user.com>"}
-			got := p.returnPathFor(t.Context(), e, tc.srv)
+			got := p.returnPathFor(t.Context(), e, tc.srv, &projectBounce{})
 			if got != tc.want {
 				t.Errorf("return path is %q, want %q", got, tc.want)
 			}

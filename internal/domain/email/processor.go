@@ -294,6 +294,7 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 	// recordRejection once per server, writing a pile of bounce rows
 	// for what is one bounce.
 	var sendErr error
+	var bounce projectBounce
 	for i, candidate := range candidates {
 		if i > 0 {
 			p.Log.Warn("email: smtp server failed, trying the next in the group",
@@ -314,7 +315,7 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		// because a receiver checks the return path's SPF against
 		// whichever IP connected. Carrying one server's return path
 		// onto another's IP is a guaranteed SPF failure.
-		msg.EnvelopeFrom = p.returnPathFor(ctx, e, srv)
+		msg.EnvelopeFrom = p.returnPathFor(ctx, e, srv, &bounce)
 
 		// A relay node that PULLS is not dialled at all. The finished
 		// bytes - signed, return path set, for THIS candidate - are
@@ -546,26 +547,34 @@ func (p *Processor) pickServer(ctx context.Context, e *emailmodel.Email) (*ssmod
 //
 // SES owns the envelope and discards this. Nothing here detects that,
 // because the value is simply unused on that path.
-func (p *Processor) returnPathFor(ctx context.Context, e *emailmodel.Email, srv *ssmodel.Server) string {
+func (p *Processor) returnPathFor(ctx context.Context, e *emailmodel.Email, srv *ssmodel.Server, bounce *projectBounce) string {
 	if srv != nil && srv.ProjectID == "" {
 		return orSender(p.BounceAddress, e)
 	}
 
-	w, err := p.Store.Project.Get(ctx, e.ProjectID)
-	if err != nil {
-		// Degrade to the aligned default rather than fail the send.
-		// A missing return path costs bounce reporting, a failed send
-		// costs the message.
-		p.Log.Warn("email: return path lookup failed", "project_id", e.ProjectID, "err", err)
+	if !bounce.read {
+		bounce.read = true
 
-		return orSender("", e)
+		w, err := p.Store.Project.Get(ctx, e.ProjectID)
+		switch {
+		case err != nil:
+			// Degrade to the aligned default rather than fail the send.
+			// A missing return path costs bounce reporting, a failed
+			// send costs the message.
+			p.Log.Warn("email: return path lookup failed", "project_id", e.ProjectID, "err", err)
+		case w != nil:
+			bounce.addr = w.BounceAddress
+		}
 	}
 
-	if w == nil {
-		return orSender("", e)
-	}
+	return orSender(bounce.addr, e)
+}
 
-	return orSender(w.BounceAddress, e)
+// projectBounce is the project's bounce address, read once per
+// delivery attempt however many candidates the failover walks.
+type projectBounce struct {
+	read bool
+	addr string
 }
 
 // orSender is the configured return path, or the From address when
