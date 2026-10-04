@@ -24,7 +24,6 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/retention"
-	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/core/settings"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	coretracking "github.com/yousysadmin/mailyard/internal/core/tracking"
@@ -212,13 +211,12 @@ func NewService(rt *env.Runtime) *Service {
 				}
 
 				raiser, id, log := rt.Notify, projID, rt.Log
-				go func() {
-					defer safego.Recover(log, "quota notification", "project_id", id)
+				rt.Background.Go(log, "quota notification", func() {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 
 					raiser.QuotaObserver(ctx, id)(window, used, limit, plan)
-				}()
+				})
 			}
 		},
 	}

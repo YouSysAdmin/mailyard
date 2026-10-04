@@ -87,6 +87,9 @@ type Sender struct {
 	// the email service that satisfies it needs the queue, and the
 	// Sender is handed to the alert notifier before the queue exists.
 	project ProjectSender
+
+	// Background tracks SendAsync for shutdown. Nil starts it untracked.
+	Background *safego.Group
 }
 
 // New builds a Sender. It never fails: with no address or no project,
@@ -201,7 +204,7 @@ func (s *Sender) SendAsync(to []string, subject, html, text string) {
 		return
 	}
 
-	safego.Go(s.log, "systemmail: send", func() {
+	s.Background.Go(s.log, "systemmail: send", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), s.sendTimeout)
 		defer cancel()
 		if err := s.Send(ctx, to, subject, html, text); err != nil {

@@ -15,7 +15,6 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
-	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/core/systemmail"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
@@ -81,7 +80,7 @@ func (h *Handler) PasswordResetRequest(c fiber.Ctx) error {
 	// The rest runs after the answer, so an address with an account
 	// costs no more time than one without.
 	ip := clientip.From(c)
-	safego.Go(h.Runtime.Log, "auth: password reset", func() {
+	h.Runtime.Background.Go(h.Runtime.Log, "auth: password reset", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), resetIssueTimeout)
 		defer cancel()
 

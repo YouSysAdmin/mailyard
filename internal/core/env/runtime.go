@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"github.com/yousysadmin/mailyard/internal/core/bell"
+	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"log/slog"
 
 	"github.com/yousysadmin/mailyard/internal/core/alertmail"
@@ -97,6 +98,10 @@ type Runtime struct {
 	// and platform_mail_from are set - every caller must keep working
 	// without it.
 	SystemMail *systemmail.Sender
+
+	// Background is the work a request starts and does not wait for,
+	// which shutdown waits for before the database closes.
+	Background *safego.Group
 
 	// Settings serves platform settings from memory. Always set in
 	// serve.go, seeded with registry defaults before the first load.

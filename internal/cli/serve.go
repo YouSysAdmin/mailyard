@@ -77,7 +77,7 @@ const shutdownTimeout = 15 * time.Second
 
 // drainTimeouts bounds each stage of a shutdown.
 type drainTimeouts struct {
-	server, smtp, runner, worker, cron, dispatch, audit time.Duration
+	server, smtp, runner, worker, cron, dispatch, audit, background time.Duration
 }
 
 // role selects which halves of the process a node runs.
@@ -309,6 +309,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// configure twice and the mail is signed with the project's DKIM
 	// key. The queue it goes into is handed over below, once the
 	// worker exists.
+	rt.Background = &safego.Group{}
 	rt.SystemMail = systemmail.New(func() systemmail.Address {
 		return systemmail.Address{
 			From:     rt.Settings.String(smodel.KeyPlatformMailFrom),
@@ -316,6 +317,7 @@ func runServe(cmd *cobra.Command, r role) error {
 			Project:  rt.Settings.String(smodel.KeyPlatformMailProject),
 		}
 	}, log)
+	rt.SystemMail.Background = rt.Background
 	if rt.SystemMail.Enabled() {
 		log.Info("platform mail enabled", "from", rt.SystemMail.From(), "project_id", rt.SystemMail.Project())
 	} else {
@@ -333,6 +335,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		Enabled:    func() bool { return rt.Settings.Bool(smodel.KeySecurityAlertsEnabled) },
 		ConsoleURL: strings.TrimRight(cfg.Server.PublicURL, "/") + env.ConsolePath,
 		Log:        log,
+		Background: rt.Background,
 	}
 	if cfg.Server.PublicURL == "" {
 		// The mail still goes, it just carries no link. Said out loud
@@ -675,6 +678,12 @@ func runServe(cmd *cobra.Command, r role) error {
 		dispatcher.Close(t.dispatch)
 		rt.Audit.Close(t.audit)
 
+		// Last before the database closes: the audit writer is what
+		// starts alert mail, so it must have stopped first.
+		if !rt.Background.Wait(t.background) {
+			log.Warn("shutdown: background work still running, abandoned")
+		}
+
 		// Logged rather than returned: a scrape must not decide the
 		// exit status of a clean shutdown.
 		if err := metricsSrv.Shutdown(5 * time.Second); err != nil {
@@ -695,7 +704,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		return drain(fmt.Errorf("signal %s", s), drainTimeouts{
 			server: shutdownTimeout, smtp: 10 * time.Second, runner: 10 * time.Second,
 			worker: 30 * time.Second, cron: 30 * time.Second, dispatch: 10 * time.Second,
-			audit: 5 * time.Second,
+			audit: 5 * time.Second, background: 30 * time.Second,
 		})
 
 	case err := <-errCh:
@@ -705,6 +714,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		const quick = 5 * time.Second
 		if serr := drain(fmt.Errorf("listener failed: %w", err), drainTimeouts{
 			server: quick, smtp: quick, runner: quick, worker: quick, cron: quick, dispatch: quick, audit: quick,
+			background: quick,
 		}); serr != nil {
 			log.Warn("server shutdown", "err", serr)
 		}

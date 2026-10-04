@@ -78,6 +78,10 @@ type Notifier struct {
 	ConsoleURL string
 	Log        *slog.Logger
 
+	// Background tracks the mail an event starts, for shutdown. Nil
+	// starts it untracked.
+	Background *safego.Group
+
 	mu   sync.Mutex
 	sent map[string]time.Time
 }
@@ -96,7 +100,7 @@ func (n *Notifier) OnAudit(e *amodel.Event) {
 
 	// Off the audit writer's goroutine from here: resolving recipients is
 	// a database round trip, and this loop is what drains the trail.
-	safego.Go(n.Log, "alertmail: audit", func() {
+	n.Background.Go(n.Log, "alertmail: audit", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		n.deliver(ctx, a, e)
@@ -125,7 +129,7 @@ func (n *Notifier) OnNotification(note *nmodel.Notification) {
 		return
 	}
 
-	safego.Go(n.Log, "alertmail: notification", func() {
+	n.Background.Go(n.Log, "alertmail: notification", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
