@@ -38,7 +38,10 @@ type Handler struct {
 	Runtime *env.Runtime
 
 	// providers memoizes the login page's provider list - see Info.
-	providers *memo.Value[[]LoginProvider]
+	// Built once, through providersOnce, because Info is open and its
+	// first requests arrive together.
+	providers     *memo.Value[[]LoginProvider]
+	providersOnce sync.Once
 
 	// addressFailures remembers which addresses failed a password for
 	// which account inside the lockout window - see failedFrom.
@@ -546,9 +549,9 @@ func (h *Handler) Info(c fiber.Ctx) error {
 	// Only name, slug, and type are exposed. The list is public by
 	// necessity - the login page needs it before anyone has signed in -
 	// so it must not carry client ids, issuers, or allowlists.
-	if h.providers == nil {
+	h.providersOnce.Do(func() {
 		h.providers = memo.New[[]LoginProvider](infoMemo)
-	}
+	})
 
 	list, err := h.providers.Get(func() ([]LoginProvider, error) {
 		provs, err := h.Runtime.Store.OAuthProvider.ListLoginable(context.Background())
