@@ -117,6 +117,17 @@ type Maintainer struct {
 	// the rest of the package put together, and safety code nothing
 	// presses the button on is a claim rather than a guard.
 	Ceiling int
+
+	// now is a test seam. Nil means time.Now.
+	now func() time.Time
+}
+
+func (m *Maintainer) clock() time.Time {
+	if m.now != nil {
+		return m.now()
+	}
+
+	return time.Now()
 }
 
 func (m *Maintainer) ceiling() int {
@@ -143,7 +154,7 @@ func (m *Maintainer) EnsureAhead(ctx context.Context) (created int, err error) {
 		return 0, err
 	}
 
-	start := dayStart(time.Now().UTC())
+	start := dayStart(m.clock().UTC())
 	for i := 0; i <= daysAhead; i++ {
 		from := start.AddDate(0, 0, i)
 		to := from.AddDate(0, 0, 1)

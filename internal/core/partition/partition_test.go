@@ -165,11 +165,16 @@ func TestDailyPartitionsLandBesideTheWeeklyOnes(t *testing.T) {
 // puts it back.
 func TestEnsureAheadRecreatesMissingDays(t *testing.T) {
 	m, db := testMaintainer(t)
+
+	// One instant for the whole test, so a run across midnight UTC does
+	// not move "today" between the settle and the check.
+	now := time.Now().UTC()
+	m.now = func() time.Time { return now }
 	if _, err := m.EnsureAhead(t.Context()); err != nil {
 		t.Fatalf("settle: %v", err)
 	}
 
-	ahead := dayStart(time.Now().UTC()).AddDate(0, 0, daysAhead)
+	ahead := dayStart(now).AddDate(0, 0, daysAhead)
 	name := partitionName(ahead)
 
 	//sqlconst:allow the name comes from partitionName, not from any input
