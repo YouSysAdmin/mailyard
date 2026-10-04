@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -89,7 +90,9 @@ func (h *Handler) UploadAttachment(c fiber.Ctx) error {
 
 	if err := h.Runtime.Store.Template.PutAttachment(c.Context(), a); err != nil {
 		if a.StorageKey != "" {
-			_ = h.Runtime.Blob.Delete(c.Context(), a.StorageKey)
+			if derr := h.Runtime.Blob.Delete(c.Context(), a.StorageKey); derr != nil {
+				slog.Warn("template attachment: drop an unused upload", "key", a.StorageKey, "err", derr)
+			}
 		}
 
 		return response.Internal(c, err)

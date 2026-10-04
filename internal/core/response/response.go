@@ -11,6 +11,7 @@ import (
 	"mime"
 
 	"github.com/gofiber/fiber/v3"
+	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
@@ -169,6 +170,7 @@ func Internal(c fiber.Ctx, err error) error {
 			"path", c.Path(),
 			"method", c.Method(),
 			"client_ip", clientip.From(c),
+			"request_id", slogfiber.GetRequestID(c),
 		)
 	}
 

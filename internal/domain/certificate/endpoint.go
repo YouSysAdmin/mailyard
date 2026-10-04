@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"slices"
 	"strings"
@@ -491,7 +492,11 @@ func (h *Handler) clearAssignment(c fiber.Ctx, listener string) error {
 		return err
 	}
 
-	_ = h.Runtime.Settings.Reload(c.Context())
+	// The row is gone either way. A failed reload leaves this node on
+	// the old assignment until the next refresh, which is worth a line.
+	if err := h.Runtime.Settings.Reload(c.Context()); err != nil {
+		slog.Warn("certificate: settings reload after unassign", "key", key, "err", err)
+	}
 
 	return nil
 }
