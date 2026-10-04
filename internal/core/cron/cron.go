@@ -22,6 +22,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/yousysadmin/mailyard/internal/core/safego"
 )
 
 // Schedule decides when a job runs next.
@@ -260,16 +262,9 @@ func (m *Manager) execute(ctx context.Context, st *jobState) error {
 	started := time.Now().UTC()
 	m.log.Info("cron: job start", "job", name)
 
-	err := func() (err error) {
-		// A panicking job must not take the process with it.
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic: %v", r)
-			}
-		}()
-
-		return st.job.Run(ctx)
-	}()
+	// A panicking job must not take the process with it, and its stack
+	// is logged where it happened.
+	err := safego.Do(m.log, "cron: "+name, func() error { return st.job.Run(ctx) })
 
 	finished := time.Now().UTC()
 	m.mu.Lock()

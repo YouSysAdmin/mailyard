@@ -69,8 +69,14 @@ func (c *queueCollector) Describe(ch chan<- *prometheus.Desc) { ch <- c.desc }
 
 // Collect implements prometheus.Collector, sampling the current
 // values.
+//
+// Bounded like the partition collector below: the count reads every
+// partition, and a wedged database must not hang the scrape.
 func (c *queueCollector) Collect(ch chan<- prometheus.Metric) {
-	counts, err := c.count(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	counts, err := c.count(ctx)
 	if err != nil {
 		return
 	}
