@@ -174,8 +174,12 @@ func TestTheCacheExpires(t *testing.T) {
 func TestAReadFailureIsAnError(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
-	a := NewAllowlist(db)
-	_ = db.Close()
+
+	// A handle of its own to break, so Open's cleanup can still drop
+	// the schema.
+	peer := dbtest.Peer(t)
+	a := NewAllowlist(peer)
+	_ = peer.Close()
 
 	if _, err := a.Allowed(t.Context(), "arn:project"); err == nil {
 		t.Error("a database failure was reported as a clean answer")
