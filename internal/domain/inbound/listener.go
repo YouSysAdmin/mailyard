@@ -16,6 +16,7 @@ import (
 	"github.com/emersion/go-smtp"
 
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 	dmodel "github.com/yousysadmin/mailyard/internal/models/domain"
 
@@ -43,7 +44,7 @@ func (b *Backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 	}
 
 	if !b.Limiter.Allow(ip) {
-		b.Service.Log.Warn("inbound: rate limited", "ip", ip)
+		b.Service.Log.Warn("inbound: rate limited", "client_ip", ip)
 
 		return nil, &smtp.SMTPError{Code: 421, EnhancedCode: smtp.EnhancedCode{4, 7, 0}, Message: "rate limit exceeded"}
 	}
@@ -157,7 +158,7 @@ func (s *session) Data(r io.Reader) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			safego.Report(s.backend.Service.Log, "inbound: data",
-				rec, "from", s.from, "remote_ip", s.ip)
+				rec, "from", safetext.MaskAddress(s.from), "client_ip", s.ip)
 			err = &smtp.SMTPError{
 				Code:         451,
 				EnhancedCode: smtp.EnhancedCode{4, 3, 0},
@@ -201,7 +202,7 @@ func (s *session) Data(r io.Reader) (err error) {
 	case errors.Is(ierr, ErrDMARCFail):
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 7, 1}, Message: "dmarc policy rejects this message"}
 	default:
-		s.backend.Service.Log.Error("inbound: ingest failed", "ip", s.ip, "err", ierr)
+		s.backend.Service.Log.Error("inbound: ingest failed", "client_ip", s.ip, "err", ierr)
 
 		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "temporary failure"}
 	}

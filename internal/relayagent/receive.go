@@ -224,7 +224,7 @@ func (b *ReceiveBackend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 	}
 
 	if !b.Limiter.Allow(ip) {
-		b.Log.Warn("relay node: inbound rate limited", "ip", ip)
+		b.Log.Warn("relay node: inbound rate limited", "client_ip", ip)
 
 		return nil, &smtp.SMTPError{Code: 421, EnhancedCode: smtp.EnhancedCode{4, 7, 0}, Message: "rate limit exceeded"}
 	}
@@ -295,7 +295,7 @@ func (s *receiveSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 		// cannot be reached - both look exactly like this from the
 		// sender's side and like nothing at all from the console.
 		s.backend.Log.Warn("relay node: recipient deferred, no domain list yet",
-			"rcpt", safetext.MaskAddress(addr), "ip", s.ip)
+			"rcpt", safetext.MaskAddress(addr), "client_ip", s.ip)
 
 		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0},
 			Message: "this node has not yet received its recipient domain list"}
@@ -307,14 +307,14 @@ func (s *receiveSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 	// this log is the one debugging an accept list.
 	if !s.backend.Accept.covers(addr) {
 		s.backend.Log.Info("relay node: recipient refused",
-			"rcpt", safetext.MaskAddress(addr), "ip", s.ip, "reason", "not on the platform's domain list")
+			"rcpt", safetext.MaskAddress(addr), "client_ip", s.ip, "reason", "not on the platform's domain list")
 
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "relay not permitted"}
 	}
 
 	if !s.backend.Local.covers(addr) {
 		s.backend.Log.Info("relay node: recipient refused",
-			"rcpt", safetext.MaskAddress(addr), "ip", s.ip, "reason", "outside relay_node.domains")
+			"rcpt", safetext.MaskAddress(addr), "client_ip", s.ip, "reason", "outside relay_node.domains")
 
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "relay not permitted"}
 	}
@@ -341,7 +341,7 @@ func (s *receiveSession) Data(r io.Reader) (err error) {
 	// would be a remote kill of the node.
 	defer func() {
 		if rec := recover(); rec != nil {
-			safego.Report(s.backend.Log, "relay node: inbound data", rec, "from", s.from, "remote_ip", s.ip)
+			safego.Report(s.backend.Log, "relay node: inbound data", rec, "from", safetext.MaskAddress(s.from), "client_ip", s.ip)
 			err = &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0},
 				Message: "temporary failure processing message"}
 		}

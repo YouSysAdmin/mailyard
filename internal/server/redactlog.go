@@ -142,7 +142,7 @@ func redactURLs(log *slog.Logger, inner fiber.Handler) fiber.Handler {
 			slog.String("route", c.Route().Path),
 			slog.Int("status", status),
 			slog.Duration("latency", time.Since(start)),
-			slog.String("ip", clientip.From(c)),
+			slog.String("client_ip", clientip.From(c)),
 		}
 
 		switch {

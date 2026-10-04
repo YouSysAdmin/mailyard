@@ -21,6 +21,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/mailparse"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/smtpdata"
 	"github.com/yousysadmin/mailyard/internal/domain/email"
@@ -107,7 +108,7 @@ func (b *Backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 	}
 
 	if !b.Limiter.Allow(ip) {
-		b.Log.Warn("submission: rate limited", "ip", ip)
+		b.Log.Warn("submission: rate limited", "client_ip", ip)
 
 		return nil, &smtp.SMTPError{Code: 421, EnhancedCode: smtp.EnhancedCode{4, 7, 0}, Message: "rate limit exceeded"}
 	}
@@ -261,7 +262,7 @@ func (s *session) Auth(mech string) (sasl.Server, error) {
 		// burned its attempts. Cheap, and it stops the guessing loop
 		// from costing a lookup per try.
 		if s.authFailures >= maxAuthFailures {
-			s.backend.Log.Warn("submission: auth attempts exhausted on connection", "ip", s.ip)
+			s.backend.Log.Warn("submission: auth attempts exhausted on connection", "client_ip", s.ip)
 
 			return smtp.ErrAuthFailed
 		}
@@ -315,7 +316,7 @@ func (s *session) authCredential(ctx context.Context, username, password string)
 	now := time.Now().UTC()
 	if cred == nil || !scmodel.HashEquals(password, cred.PasswordHash) ||
 		!cred.IsValid() || !cred.AllowsIP(s.ip) {
-		s.backend.Log.Warn("submission: auth rejected", "ip", s.ip, "username", username)
+		s.backend.Log.Warn("submission: auth rejected", "client_ip", s.ip, "username", username)
 
 		return nil, smtp.ErrAuthFailed
 	}
@@ -369,7 +370,7 @@ func (s *session) authAPIKey(ctx context.Context, password string) (*principal, 
 	if k == nil || !akmodel.HashEquals(password, k.KeyHash) || !k.IsValid(now) ||
 		!k.AllowsIP(s.ip) ||
 		!perm.ForKey(k.Permissions, k.Sandbox).Has(sending, perm.ActionWrite) {
-		s.backend.Log.Warn("submission: auth rejected", "ip", s.ip)
+		s.backend.Log.Warn("submission: auth rejected", "client_ip", s.ip)
 
 		return nil, smtp.ErrAuthFailed
 	}
@@ -456,7 +457,7 @@ func (s *session) Data(r io.Reader) (err error) {
 	// still takes down every other tenant's delivery.
 	defer func() {
 		if rec := recover(); rec != nil {
-			safego.Report(s.backend.Log, "submission: data", rec, "from", s.from, "remote_ip", s.ip)
+			safego.Report(s.backend.Log, "submission: data", rec, "from", safetext.MaskAddress(s.from), "client_ip", s.ip)
 			err = &smtp.SMTPError{
 				Code:         451,
 				EnhancedCode: smtp.EnhancedCode{4, 3, 0},
@@ -695,7 +696,7 @@ func (s *session) mapSendError(err error) error {
 		return &smtp.SMTPError{Code: 452, EnhancedCode: smtp.EnhancedCode{4, 7, 0}, Message: qe.Error()}
 	}
 
-	s.backend.Log.Error("submission: send failed", "ip", s.ip, "err", err)
+	s.backend.Log.Error("submission: send failed", "client_ip", s.ip, "err", err)
 
 	return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "temporary failure"}
 }
