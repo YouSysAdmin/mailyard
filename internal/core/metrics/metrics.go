@@ -3,15 +3,14 @@
 // Package metrics exposes Prometheus instrumentation. Counters are
 // package-level so instrumented code paths do not need wiring -
 // HTTPHandler is served by server.MetricsServer, on a listener of its
-// own and only when metrics.enabled is true, and an unexported
-// registry keeps the default Go runtime collectors.
+// own and only when metrics.enabled is true. Everything registers with
+// the default registry, beside the Go runtime collectors it carries.
 package metrics
 
 import (
 	"context"
-	"time"
-
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
