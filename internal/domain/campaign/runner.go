@@ -375,6 +375,7 @@ func (r *Runner) fanOut(ctx context.Context, c *cmodel.Campaign) error {
 // into a delay - a quota pause with no delay is an immediate re-claim.
 func (r *Runner) deliverBatch(ctx context.Context, c *cmodel.Campaign, batch []*cmodel.Message) (quotaPaused bool) {
 	queued, failed := 0, 0
+	b := &batchMemo{resolve: r.EmailService.ResolveTemplate, links: map[string]bool{}}
 	for _, m := range batch {
 		select {
 		case <-r.stop:
@@ -406,7 +407,7 @@ func (r *Runner) deliverBatch(ctx context.Context, c *cmodel.Campaign, batch []*
 			return false
 		}
 
-		if err := r.deliverMessage(ctx, c, m); err != nil {
+		if err := r.deliverMessage(ctx, c, m, b); err != nil {
 			// A quota rejection is a WAIT, not a failure.
 			//
 			// quota.Error is the type the HTTP surface answers 429 with
@@ -442,7 +443,7 @@ func (r *Runner) deliverBatch(ctx context.Context, c *cmodel.Campaign, batch []*
 
 // deliverMessage renders the campaign template for one subscriber and
 // queues the email.
-func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmodel.Message) error {
+func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmodel.Message, b *batchMemo) error {
 	sub, err := r.Store.Subscriber.Get(ctx, c.ProjectID, m.SubscriberID)
 	if err != nil {
 		return err
@@ -463,7 +464,7 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		return r.Store.Campaign.UpdateMessage(ctx, m.ID, cmodel.MsgSkipped, msgOptedOut, "")
 	}
 
-	out, t, err := renderForSubscriber(ctx, r.EmailService, c, m.Variant, sub)
+	out, t, err := renderForSubscriber(ctx, b.resolveTemplate, c, m.Variant, sub)
 	if err != nil {
 		return err
 	}
@@ -495,7 +496,7 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 		return err
 	}
 
-	r.applyTracking(ctx, c, m, req)
+	r.applyTracking(ctx, c, m, req, b.links)
 	e, _, err := r.EmailService.Send(ctx, c.ProjectID, c.CreatedBy, "", req)
 	if err != nil {
 		return err
@@ -528,6 +529,40 @@ func (r *Runner) deliverMessage(ctx context.Context, c *cmodel.Campaign, m *cmod
 	}
 
 	return nil
+}
+
+// templateResolver is the store half of rendering a template ref.
+type templateResolver func(ctx context.Context, projID string, ref *email.TemplateRef) (*email.ResolvedTemplate, error)
+
+// batchMemo is what one batch reads once and reuses for every message
+// in it: the resolved template per template and language, and the
+// tracked link hashes already stored. Per batch, so an edit to the
+// template reaches the next batch.
+type batchMemo struct {
+	resolve   templateResolver
+	templates map[string]*email.ResolvedTemplate
+	links     map[string]bool
+}
+
+// resolveTemplate is resolve, remembered by template and language.
+func (b *batchMemo) resolveTemplate(ctx context.Context, projID string, ref *email.TemplateRef) (*email.ResolvedTemplate, error) {
+	key := ref.ID + "|" + ref.Language
+	if rt, ok := b.templates[key]; ok {
+		return rt, nil
+	}
+
+	rt, err := b.resolve(ctx, projID, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	if b.templates == nil {
+		b.templates = map[string]*email.ResolvedTemplate{}
+	}
+
+	b.templates[key] = rt
+
+	return rt, nil
 }
 
 // resolveVariant answers which template and subject override a
@@ -563,7 +598,10 @@ func resolveVariant(c *cmodel.Campaign, variant string) (templateID, subject str
 // nothing else - the template's sample data is deliberately not
 // consulted, because a send never reads it and a preview that filled
 // the blanks from it looked right until the mail went out.
-func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Campaign,
+//
+// resolve is the store half. The runner passes a batch's memo of it, the
+// preview the service's own, and both render the same way after it.
+func renderForSubscriber(ctx context.Context, resolve templateResolver, c *cmodel.Campaign,
 	variant string, sub *submodel.Subscriber) (*render.Output, *tmodel.Template, error) {
 	templateID, variantSubject := resolveVariant(c, variant)
 
@@ -583,15 +621,17 @@ func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Camp
 	// reserved name the body accepts.
 	data = tracking.WithSystemVars(data)
 
-	out, t, err := svc.RenderTemplate(ctx, c.ProjectID, &email.TemplateRef{
-		ID:       templateID,
-		Language: language,
-		Data:     data,
-		Lenient:  true,
-	})
+	rt, err := resolve(ctx, c.ProjectID, &email.TemplateRef{ID: templateID, Language: language})
 	if err != nil {
 		return nil, nil, err
 	}
+
+	out, err := rt.Render(data, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	t := rt.Template
 
 	if variantSubject != "" {
 		rd := &render.Renderer{MissingKeyBehavior: render.MissingKeyZero}
@@ -613,7 +653,10 @@ func renderForSubscriber(ctx context.Context, svc *email.Service, c *cmodel.Camp
 // for click tracking, injects the open pixel, and stamps the
 // List-Unsubscribe headers. No-op when tracking is disabled (the
 // sentinels are stripped so no broken links ship).
-func (r *Runner) applyTracking(ctx context.Context, c *cmodel.Campaign, m *cmodel.Message, req *email.SendRequest) {
+//
+// seen holds the link hashes this batch already stored, so a link every
+// recipient carries is written once per batch rather than per message.
+func (r *Runner) applyTracking(ctx context.Context, c *cmodel.Campaign, m *cmodel.Message, req *email.SendRequest, seen map[string]bool) {
 	if !r.Tracking.Enabled() {
 		req.Subject = tracking.SubstituteSystemLinks(req.Subject, tracking.Links{})
 		req.HTML = tracking.SubstituteSystemLinks(req.HTML, tracking.Links{})
@@ -646,6 +689,11 @@ func (r *Runner) applyTracking(ctx context.Context, c *cmodel.Campaign, m *cmode
 	req.HTML = html
 	req.Tracked = true
 	for _, l := range links {
+		if seen[l.Hash] {
+			continue
+		}
+
+		seen[l.Hash] = true
 		if err := r.Store.Campaign.UpsertTrackedLink(ctx, &cmodel.TrackedLink{
 			ProjectID: c.ProjectID, CampaignID: c.ID, OriginalURL: l.URL, Hash: l.Hash,
 		}); err != nil {

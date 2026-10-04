@@ -25,7 +25,7 @@ func TestAnUnsubscribeDisabledCampaignCarriesNoOptOut(t *testing.T) {
 		c := &cmodel.Campaign{ID: "c", ProjectID: "p", UnsubscribeDisabled: disabled}
 		m := &cmodel.Message{ID: "m"}
 		req := &email.SendRequest{HTML: body, Text: body}
-		r.applyTracking(t.Context(), c, m, req)
+		r.applyTracking(t.Context(), c, m, req, map[string]bool{})
 
 		if tracking.HasSystemSentinels(req.HTML) || tracking.HasSystemSentinels(req.Text) {
 			t.Errorf("disabled=%v: a sentinel shipped:\n%s", disabled, req.HTML)

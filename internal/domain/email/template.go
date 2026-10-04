@@ -30,6 +30,31 @@ type TemplateRef struct {
 // localization with language fallback -> stylesheet) and renders it.
 // Sends render strict (missing data keys are caller errors).
 func (s *Service) RenderTemplate(ctx context.Context, projID string, ref *TemplateRef) (*render.Output, *tmodel.Template, error) {
+	rt, err := s.ResolveTemplate(ctx, projID, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out, err := rt.Render(ref.Data, ref.Lenient)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return out, rt.Template, nil
+}
+
+// ResolvedTemplate is what a template ref names once the store has
+// answered: the template and the sources it renders. It reads nothing
+// further, so a caller rendering one template for many recipients can
+// resolve once and render each.
+type ResolvedTemplate struct {
+	Template *tmodel.Template
+	input    render.Input
+}
+
+// ResolveTemplate is the store half of RenderTemplate. ref.Data and
+// ref.Lenient are not read.
+func (s *Service) ResolveTemplate(ctx context.Context, projID string, ref *TemplateRef) (*ResolvedTemplate, error) {
 	var t *tmodel.Template
 	var err error
 	switch {
@@ -38,44 +63,44 @@ func (s *Service) RenderTemplate(ctx context.Context, projID string, ref *Templa
 	case ref.Name != "":
 		t, err = s.Store.Template.GetByName(ctx, projID, ref.Name)
 	default:
-		return nil, nil, reqErrf("template_id or template_name is required")
+		return nil, reqErrf("template_id or template_name is required")
 	}
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if t == nil {
-		return nil, nil, reqErrf("template not found")
+		return nil, reqErrf("template not found")
 	}
 
 	if t.ActiveVersionID == nil {
-		return nil, nil, reqErrf("template %q has no active version", t.Name)
+		return nil, reqErrf("template %q has no active version", t.Name)
 	}
 
 	v, err := s.Store.Template.GetVersion(ctx, projID, t.ID, *t.ActiveVersionID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if v == nil {
-		return nil, nil, reqErrf("template %q active version is missing", t.Name)
+		return nil, reqErrf("template %q active version is missing", t.Name)
 	}
 
 	loc, err := templatedomain.ResolveLocalization(ctx, s.Store.Template, projID, t, v.ID, ref.Language)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if loc == nil {
-		return nil, nil, reqErrf("template %q has no localizations", t.Name)
+		return nil, reqErrf("template %q has no localizations", t.Name)
 	}
 
 	css := ""
 	if v.StylesheetID != nil {
 		sheet, err := s.Store.Stylesheet.Get(ctx, projID, *v.StylesheetID)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		if sheet != nil {
@@ -83,6 +108,15 @@ func (s *Service) RenderTemplate(ctx context.Context, projID string, ref *Templa
 		}
 	}
 
+	return &ResolvedTemplate{
+		Template: t,
+		input:    render.Input{Subject: loc.Subject, HTML: loc.HTML, Text: loc.Text, CSS: css},
+	}, nil
+}
+
+// Render renders the resolved sources against data. Lenient renders a
+// missing key as its zero value rather than failing.
+func (rt *ResolvedTemplate) Render(data map[string]any, lenient bool) (*render.Output, error) {
 	// The reserved {{ mailyard_* }} variables render as placeholders
 	// that Send swaps for real per-message URLs once the email has an
 	// id. Applied HERE, so every surface that renders a template gets
@@ -93,22 +127,21 @@ func (s *Service) RenderTemplate(ctx context.Context, projID string, ref *Templa
 	// Written last, so a caller's own data cannot shadow a reserved
 	// name. The campaign runner applies this to its own map as well,
 	// because it renders a variant subject separately from here.
-	data := coretracking.WithSystemVars(ref.Data)
+	data = coretracking.WithSystemVars(data)
 
 	behavior := render.MissingKeyError
-	if ref.Lenient {
+	if lenient {
 		behavior = render.MissingKeyZero
 	}
 
 	r := &render.Renderer{MissingKeyBehavior: behavior}
-	out, err := r.Render(&render.Input{
-		Subject: loc.Subject, HTML: loc.HTML, Text: loc.Text, CSS: css,
-	}, data)
+	in := rt.input
+	out, err := r.Render(&in, data)
 	if err != nil {
-		return nil, nil, reqErrf("template render failed: %v", err)
+		return nil, reqErrf("template render failed: %v", err)
 	}
 
-	return out, t, nil
+	return out, nil
 }
 
 // StripSystemLinks removes the reserved-variable placeholders from a

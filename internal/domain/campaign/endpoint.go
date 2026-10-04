@@ -582,7 +582,7 @@ func (h *Handler) Preview(c fiber.Ctx) error {
 		}
 	}
 
-	out, _, err := renderForSubscriber(c.Context(), email.NewService(h.Runtime), cam, variant, sub)
+	out, _, err := renderForSubscriber(c.Context(), email.NewService(h.Runtime).ResolveTemplate, cam, variant, sub)
 	if err != nil {
 		if _, ok := errors.AsType[*email.RequestError](err); ok {
 			return response.BadRequest(c, err.Error())
