@@ -21,6 +21,8 @@ package dbtest
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,7 +203,9 @@ func extensionRace(err error, stmt string) bool {
 
 // schemaName turns a test name into a legal, unique identifier.
 // t.Name() carries slashes and capitals from subtests, neither of
-// which survives an unquoted identifier.
+// which survives an unquoted identifier. Packages run as parallel
+// processes and may share a test name, so the process id and a hash
+// of the full name end it.
 func schemaName(t *testing.T) string {
 	var b strings.Builder
 	b.WriteString("t_")
@@ -216,13 +220,16 @@ func schemaName(t *testing.T) string {
 
 	name := b.String()
 
-	// Postgres truncates identifiers at 63 bytes, and a silent
-	// truncation could collide two long test names onto one schema.
-	if len(name) > 60 {
-		name = name[:60]
+	// Postgres truncates identifiers at 63 bytes, so the readable part
+	// is cut and the suffix keeps two long names apart.
+	if len(name) > 40 {
+		name = name[:40]
 	}
 
-	return name
+	h := fnv.New32a()
+	h.Write([]byte(t.Name()))
+
+	return fmt.Sprintf("%s_%d_%08x", name, os.Getpid(), h.Sum32())
 }
 
 // Migrate applies the real migrations to the test schema.
