@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/relayca"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
@@ -113,7 +115,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	if err != nil {
 		// A bad request is the caller's fault, anything else is ours.
 		// Both are refusals, but only one is worth a 500.
-		if strings.Contains(err.Error(), "certificate request") {
+		if _, bad := errors.AsType[*relayca.RequestError](err); bad {
 			return response.BadRequest(c, "certificate request is not usable: "+err.Error())
 		}
 
@@ -336,7 +338,7 @@ func (h *Handler) Renew(c fiber.Ctx) error {
 
 	certPEM, caPEM, err := h.CA.SignNode(c.Context(), node.ID, in.CSR, srv.Host, []string{srv.Host})
 	if err != nil {
-		if strings.Contains(err.Error(), "certificate request") {
+		if _, bad := errors.AsType[*relayca.RequestError](err); bad {
 			return response.BadRequest(c, "certificate request is not usable: "+err.Error())
 		}
 

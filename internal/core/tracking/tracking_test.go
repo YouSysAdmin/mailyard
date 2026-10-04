@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -74,8 +75,8 @@ func TestWebViewTokenExpiry(t *testing.T) {
 
 	// Hand-craft an expired token.
 	expired := s.token("view:em-1:" + itoa(time.Now().Add(-time.Hour).Unix()))
-	if _, err := s.VerifyWebViewToken(expired); err == nil {
-		t.Error("expired token must fail")
+	if _, err := s.VerifyWebViewToken(expired); !errors.Is(err, ErrExpired) {
+		t.Errorf("expired token: %v, want ErrExpired", err)
 	}
 
 	// An unsubscribe token must not verify as a web view token.

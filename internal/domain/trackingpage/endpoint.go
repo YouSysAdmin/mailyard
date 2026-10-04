@@ -495,7 +495,7 @@ func (h *Handler) WebView(c fiber.Ctx) error {
 	if err != nil {
 		status := fiber.StatusNotFound
 		msg := pageBody("This link is invalid or incomplete.")
-		if strings.Contains(err.Error(), "expired") {
+		if errors.Is(err, tracking.ErrExpired) {
 			status = fiber.StatusGone
 			msg = "This message is no longer available online."
 		}

@@ -44,7 +44,7 @@ func ImportSMIME(certPEM, keyPEM, email string) (Material, error) {
 
 	key, err := parseKey(keyPEM)
 	if err != nil {
-		return Material{}, err
+		return Material{}, &KeyError{err}
 	}
 
 	return smimeMaterial(chain, key, email)
@@ -69,6 +69,14 @@ func ImportPKCS12(der []byte, password, email string) (Material, error) {
 
 	return smimeMaterial(append([]*x509.Certificate{leaf}, cas...), signer, email)
 }
+
+// KeyError is a refusal about the private key rather than the
+// certificate, so a form can point at the right field.
+type KeyError struct{ Err error }
+
+func (e *KeyError) Error() string { return e.Err.Error() }
+
+func (e *KeyError) Unwrap() error { return e.Err }
 
 func parseChain(certPEM string) ([]*x509.Certificate, error) {
 	var chain []*x509.Certificate
@@ -144,7 +152,7 @@ func smimeMaterial(chain []*x509.Certificate, key crypto.Signer, email string) (
 
 	pub, ok := leaf.PublicKey.(interface{ Equal(crypto.PublicKey) bool })
 	if !ok || !pub.Equal(key.Public()) {
-		return Material{}, errors.New("mailsign: the private key does not match the certificate")
+		return Material{}, &KeyError{errors.New("mailsign: the private key does not match the certificate")}
 	}
 
 	switch key.(type) {

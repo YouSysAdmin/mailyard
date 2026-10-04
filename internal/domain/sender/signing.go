@@ -122,7 +122,7 @@ func passphraseOr(err error, field string) string {
 
 // smimeField points a PEM refusal at the half it is about.
 func smimeField(err error) string {
-	if err != nil && strings.Contains(err.Error(), "private key") {
+	if _, ok := errors.AsType[*mailsign.KeyError](err); ok {
 		return "private_key"
 	}
 

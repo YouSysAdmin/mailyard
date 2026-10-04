@@ -145,22 +145,30 @@ const (
 // would let one node request a certificate for another node's name -
 // which, with AllowedPeerNames narrowing on exactly those names, is
 // how it would connect where it should not.
+// RequestError is a certificate request the CA will not sign. It is
+// the caller's fault, where every other SignRequest error is ours.
+type RequestError struct{ Err error }
+
+func (e *RequestError) Error() string { return e.Err.Error() }
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
 func (c *CA) SignRequest(csrPEM string, role Role, cn string, hosts []string, now time.Time) (string, error) {
 	block, _ := pem.Decode([]byte(csrPEM))
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		return "", errors.New("not a pem certificate request")
+		return "", &RequestError{errors.New("not a pem certificate request")}
 	}
 
 	csr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		return "", fmt.Errorf("parse certificate request: %w", err)
+		return "", &RequestError{fmt.Errorf("parse certificate request: %w", err)}
 	}
 
 	// A CSR is self-signed by the key it names. Skipping this would
 	// let a caller present somebody else's public key and receive a
 	// certificate for it.
 	if err := csr.CheckSignature(); err != nil {
-		return "", fmt.Errorf("certificate request signature: %w", err)
+		return "", &RequestError{fmt.Errorf("certificate request signature: %w", err)}
 	}
 
 	serial, err := certgen.Serial()

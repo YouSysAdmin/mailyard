@@ -21,6 +21,9 @@ import (
 	"time"
 )
 
+// ErrExpired is a link whose signature is good and whose time is up.
+var ErrExpired = errors.New("link expired")
+
 // WebViewTTL bounds how long a hosted "view in browser" link stays
 // valid. A web-view link exposes full message content, so unlike
 // unsubscribe tokens it carries an expiry.
@@ -187,7 +190,7 @@ func (s *Signer) VerifyWebViewToken(tok string) (string, error) {
 	}
 
 	if time.Now().Unix() > exp {
-		return "", errors.New("link expired")
+		return "", ErrExpired
 	}
 
 	return payload, nil

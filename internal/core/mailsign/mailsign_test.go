@@ -267,19 +267,26 @@ func TestSMIMEImportRefusesWhatAClientWould(t *testing.T) {
 
 	cases := []struct {
 		name, cert, key, want string
+
+		// aboutKey is a refusal the form points at the key field.
+		aboutKey bool
 	}{
-		{"another address", otherLeaf, otherKey, "not issued to"},
-		{"mismatched key", leafPEM, otherKey, "does not match"},
-		{"expired", expiredLeaf, expiredKey, "expired"},
-		{"no mail usage", tlsLeaf, tlsKey, "email protection"},
-		{"a CA certificate", caLeaf, caKey, "certificate authority"},
-		{"no certificate", keyPEM, keyPEM, "no certificate"},
-		{"no key", leafPEM + caPEM, caPEM, "unsupported private key block"},
+		{"another address", otherLeaf, otherKey, "not issued to", false},
+		{"mismatched key", leafPEM, otherKey, "does not match", true},
+		{"expired", expiredLeaf, expiredKey, "expired", false},
+		{"no mail usage", tlsLeaf, tlsKey, "email protection", false},
+		{"a CA certificate", caLeaf, caKey, "certificate authority", false},
+		{"no certificate", keyPEM, keyPEM, "no certificate", false},
+		{"no key", leafPEM + caPEM, caPEM, "unsupported private key block", true},
 	}
 	for _, c := range cases {
 		_, err := ImportSMIME(c.cert, c.key, "billing@example.com")
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: got %v, want an error naming %q", c.name, err, c.want)
+		}
+
+		if _, ok := errors.AsType[*KeyError](err); ok != c.aboutKey {
+			t.Errorf("%s: about the key %v, want %v", c.name, ok, c.aboutKey)
 		}
 	}
 }

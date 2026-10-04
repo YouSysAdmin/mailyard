@@ -4,6 +4,7 @@ package paging
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -55,7 +56,7 @@ func TimeWindow(c fiber.Ctx) (from, to *time.Time, err error) {
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
 		t, _, err := Bound(raw)
 		if err != nil {
-			return nil, nil, errors.New("from " + ErrBound.Error())
+			return nil, nil, fmt.Errorf("from %w", ErrBound)
 		}
 
 		from = &t
@@ -64,7 +65,7 @@ func TimeWindow(c fiber.Ctx) (from, to *time.Time, err error) {
 	if raw := strings.TrimSpace(c.Query("to")); raw != "" {
 		t, dateOnly, err := Bound(raw)
 		if err != nil {
-			return nil, nil, errors.New("to " + ErrBound.Error())
+			return nil, nil, fmt.Errorf("to %w", ErrBound)
 		}
 
 		if dateOnly {

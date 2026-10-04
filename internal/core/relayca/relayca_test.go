@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net"
 	"slices"
@@ -150,8 +151,13 @@ func TestGarbageIsNotARequest(t *testing.T) {
 		"not pem":     "hello",
 		"wrong block": "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
 	} {
-		if _, err := ca.SignRequest(in, RoleNode, "n", []string{"n"}, time.Now()); err == nil {
+		_, err := ca.SignRequest(in, RoleNode, "n", []string{"n"}, time.Now())
+		if err == nil {
 			t.Errorf("%s was accepted as a certificate request", name)
+		}
+
+		if _, ok := errors.AsType[*RequestError](err); !ok {
+			t.Errorf("%s: %v is not reported as the caller's request", name, err)
 		}
 	}
 }

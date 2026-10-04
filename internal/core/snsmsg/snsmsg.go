@@ -185,11 +185,11 @@ func (v *Verifier) Verify(m *Message) error {
 
 	canonical, err := m.canonical()
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrUntrusted, err)
+		return fmt.Errorf("%w: %w", ErrUntrusted, err)
 	}
 
 	if err := cert.CheckSignature(algo, canonical, sig); err != nil {
-		return fmt.Errorf("%w: %s", ErrUntrusted, err)
+		return fmt.Errorf("%w: %w", ErrUntrusted, err)
 	}
 
 	if v.MaxAge > 0 {
@@ -271,7 +271,7 @@ func (v *Verifier) certificate(rawURL string) (*x509.Certificate, error) {
 
 	cert, err = x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: signing certificate: %s", ErrUntrusted, err)
+		return nil, fmt.Errorf("%w: signing certificate: %w", ErrUntrusted, err)
 	}
 
 	// Checked on the way in as well as on the way out of the cache.
