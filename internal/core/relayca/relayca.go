@@ -132,6 +132,14 @@ const (
 	RoleClient Role = "client"
 )
 
+// RequestError is a certificate request the CA will not sign. It is
+// the caller's fault, where every other SignRequest error is ours.
+type RequestError struct{ Err error }
+
+func (e *RequestError) Error() string { return e.Err.Error() }
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
 // SignRequest signs a certificate signing request produced by a node.
 //
 // A CSR rather than a generated pair, so the private key never
@@ -145,14 +153,6 @@ const (
 // would let one node request a certificate for another node's name -
 // which, with AllowedPeerNames narrowing on exactly those names, is
 // how it would connect where it should not.
-// RequestError is a certificate request the CA will not sign. It is
-// the caller's fault, where every other SignRequest error is ours.
-type RequestError struct{ Err error }
-
-func (e *RequestError) Error() string { return e.Err.Error() }
-
-func (e *RequestError) Unwrap() error { return e.Err }
-
 func (c *CA) SignRequest(csrPEM string, role Role, cn string, hosts []string, now time.Time) (string, error) {
 	block, _ := pem.Decode([]byte(csrPEM))
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {

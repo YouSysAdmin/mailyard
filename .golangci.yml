@@ -26,6 +26,17 @@ linters:
     - bodyclose
     - rowserrcheck
     - sqlclosecheck
+    # errorlint keeps an error in the chain where errors.Is and errors.As
+    # can reach it. The rest were clean when added and only ever fire on
+    # a regression.
+    - errorlint
+    - copyloopvar
+    - durationcheck
+    - intrange
+    - misspell
+    - nolintlint
+    - unconvert
+    - wastedassign
 
   settings:
     staticcheck:

@@ -41,7 +41,7 @@ func TestConcurrentFirstInfoRequestsShareOneMemo(t *testing.T) {
 				return
 			}
 
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if resp.StatusCode != fiber.StatusOK {
 				t.Errorf("status %d", resp.StatusCode)
 			}

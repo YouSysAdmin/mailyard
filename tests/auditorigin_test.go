@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// An audit event takes where it came from from one place.
+// An audit event learns its origin in one place.
 //
 // `Recorder.Project` and `Recorder.Security` take the request and stamp
 // the origin, so an event cannot be recorded without one - and that

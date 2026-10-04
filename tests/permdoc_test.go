@@ -180,7 +180,7 @@ func routePermissions(t *testing.T) map[string]string {
 				return true
 			}
 
-			action := ""
+			var action string
 			switch {
 			case namesAny(call.Args, "permDelete"):
 				action = "delete"

@@ -63,7 +63,7 @@ func Valid(name string) bool {
 			return false
 		}
 
-		for i := 0; i < len(label); i++ {
+		for i := range len(label) {
 			ch := label[i]
 			ok := ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '-'
 			if !ok {

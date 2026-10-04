@@ -43,7 +43,7 @@ func TestAHandlerContextHasADeadline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if left <= 0 || left > requestDeadline {
 		t.Fatalf("deadline %v away, expected within %v", left, requestDeadline)
 	}
