@@ -214,7 +214,10 @@ func NewService(rt *env.Runtime) *Service {
 				raiser, id, log := rt.Notify, projID, rt.Log
 				go func() {
 					defer safego.Recover(log, "quota notification", "project_id", id)
-					raiser.QuotaObserver(context.Background(), id)(window, used, limit, plan)
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+
+					raiser.QuotaObserver(ctx, id)(window, used, limit, plan)
 				}()
 			}
 		},

@@ -5,6 +5,7 @@ package notify
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/quota"
@@ -62,6 +63,10 @@ func (r *Raiser) QuotaObserver(ctx context.Context, projID string) quota.Observe
 		hour := time.Now().UTC().Format("2006-01-02T15")
 		per := "per " + window
 		if used >= limit {
+			if !r.firstThisHour(projID+":quota_reached:"+window, hour) {
+				return
+			}
+
 			r.Raise(ctx, &nmodel.Notification{
 				ProjectID: projID,
 				Type:      nmodel.TypeQuota,
@@ -80,6 +85,10 @@ func (r *Raiser) QuotaObserver(ctx context.Context, projID string) quota.Observe
 			return
 		}
 
+		if !r.firstThisHour(projID+":quota_warn:"+window, hour) {
+			return
+		}
+
 		r.Raise(ctx, &nmodel.Notification{
 			ProjectID: projID,
 			Type:      nmodel.TypeQuota,
@@ -93,4 +102,26 @@ func (r *Raiser) QuotaObserver(ctx context.Context, projID string) quota.Observe
 			DedupeKey: "quota_warn:" + window + ":" + hour,
 		})
 	}
+}
+
+// firstThisHour reports whether key has not been raised in this hour by
+// this process, and records it. A project over its limit observes on
+// every send, and the database dedupe alone made each of those an
+// upsert. Keys from an earlier hour are dropped as the map is written.
+func (r *Raiser) firstThisHour(key, hour string) bool {
+	r.quotaMu.Lock()
+	defer r.quotaMu.Unlock()
+
+	if r.quotaRaised[key] == hour {
+		return false
+	}
+
+	if r.quotaRaised == nil {
+		r.quotaRaised = map[string]string{}
+	}
+
+	maps.DeleteFunc(r.quotaRaised, func(_, h string) bool { return h != hour })
+	r.quotaRaised[key] = hour
+
+	return true
 }

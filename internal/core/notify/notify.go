@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/eventbus"
@@ -37,6 +38,11 @@ type Raiser struct {
 	// Alerts mails the ones that mean something is wrong. Optional: a
 	// nil Alerter leaves the notification in the console only.
 	Alerts Alerter
+
+	// quotaRaised holds the quota dedupe keys this process has already
+	// raised, by hour - see firstThisHour.
+	quotaMu     sync.Mutex
+	quotaRaised map[string]string
 }
 
 // Raise files a notification and, when it is genuinely new, pushes it

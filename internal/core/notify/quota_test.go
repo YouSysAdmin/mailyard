@@ -41,3 +41,28 @@ func TestTheWarningThresholdIsEightyPercent(t *testing.T) {
 		t.Fatalf("warnAt = %d, want 80 - the docs and the dashboard both say 80", warnAt)
 	}
 }
+
+// A project over its limit observes on every send, and only the first
+// observation in an hour reaches the database.
+func TestAQuotaKeyIsRaisedOnceAnHour(t *testing.T) {
+	r := &Raiser{}
+	if !r.firstThisHour("p1:quota_warn:hour", "2026-10-04T10") {
+		t.Fatal("the first observation was held back")
+	}
+
+	if r.firstThisHour("p1:quota_warn:hour", "2026-10-04T10") {
+		t.Fatal("a repeat in the same hour was let through")
+	}
+
+	if !r.firstThisHour("p2:quota_warn:hour", "2026-10-04T10") {
+		t.Fatal("another project was held back by the first")
+	}
+
+	if !r.firstThisHour("p1:quota_warn:hour", "2026-10-04T11") {
+		t.Fatal("the next hour was held back")
+	}
+
+	if len(r.quotaRaised) != 1 {
+		t.Fatalf("%d keys kept, the earlier hour should be gone", len(r.quotaRaised))
+	}
+}
