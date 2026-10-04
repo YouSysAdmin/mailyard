@@ -263,6 +263,7 @@ func resolveSession(c fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims,
 		return claims, true
 	}
 
+	gen := rt.Sessions.Generation()
 	sess, err := rt.Store.Session.Get(c.Context(), claims.SessionID)
 	// A missing row means the session was purged after expiry, which
 	// is the same answer as revoked: this token is finished.
@@ -270,7 +271,7 @@ func resolveSession(c fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims,
 		return claims, false
 	}
 
-	rt.Sessions.Store(sess.ID, sess.UserID, sess.ExpiresAt, now)
+	rt.Sessions.Store(gen, sess.ID, sess.UserID, sess.ExpiresAt, now)
 
 	// Refresh last_seen_at at most once per touch interval. Writing on
 	// every request would put a write in front of every read.

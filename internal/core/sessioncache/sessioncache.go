@@ -39,6 +39,10 @@ type Cache struct {
 	// lastSweep bounds how often eviction walks the map.
 	lastSweep time.Time
 
+	// gen moves on every invalidation, so a read that started before a
+	// revoke cannot store the session it read once the revoke has run.
+	gen uint64
+
 	// Broadcast, when set, tells the other nodes to drop their caches.
 	// Set before the server starts serving.
 	Broadcast func()
@@ -77,14 +81,33 @@ func (c *Cache) Lookup(id string, now time.Time) (userID string, ok bool) {
 	return e.userID, true
 }
 
-// Store records a verified session.
-func (c *Cache) Store(id, userID string, sessionExpiry, now time.Time) {
+// Generation is taken BEFORE the database read that Store records. A
+// revoke landing between the two moves it on, and Store then drops
+// what it was given.
+func (c *Cache) Generation() uint64 {
+	if c == nil {
+		return 0
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.gen
+}
+
+// Store records a verified session, read from the database after gen
+// was taken.
+func (c *Cache) Store(gen uint64, id, userID string, sessionExpiry, now time.Time) {
 	if c == nil || id == "" {
 		return
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if gen != c.gen {
+		return
+	}
+
 	c.entries[id] = entry{
 		userID:    userID,
 		expiresAt: sessionExpiry,
@@ -105,6 +128,7 @@ func (c *Cache) Invalidate(id string) {
 
 	c.mu.Lock()
 	delete(c.entries, id)
+	c.gen++
 	c.mu.Unlock()
 	c.broadcast()
 }
@@ -126,6 +150,7 @@ func (c *Cache) InvalidateAllLocal() {
 
 	c.mu.Lock()
 	c.entries = map[string]entry{}
+	c.gen++
 	c.mu.Unlock()
 }
 
