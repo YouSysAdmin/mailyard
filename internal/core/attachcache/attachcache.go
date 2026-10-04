@@ -58,6 +58,9 @@ func New(maxBytes int64, ttl time.Duration) *Cache {
 	}
 }
 
+// loadTimeout bounds one shared load.
+const loadTimeout = time.Minute
+
 // Get answers key from the cache, or calls load and keeps its answer.
 // Concurrent misses for one key share a single load. An error is never
 // kept, so the next call loads again.
@@ -77,7 +80,13 @@ func (c *Cache) Get(ctx context.Context, key string, load func(context.Context) 
 			return v, nil
 		}
 
-		v, err := load(ctx)
+		// The load is shared, so it runs past the caller that started
+		// it: one waiter giving up must not fail the others. Bounded on
+		// its own instead.
+		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loadTimeout)
+		defer cancel()
+
+		v, err := load(lctx)
 		if err != nil {
 			return "", err
 		}
