@@ -133,6 +133,19 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 		return
 	}
 
+	// Matched before the body is built. Every message emits, and most
+	// projects have no hook listening for most events.
+	matched := hooks[:0:0]
+	for _, h := range hooks {
+		if h.Enabled() && h.Subscribed(event) && matchesFilters(h.Filters, sender) {
+			matched = append(matched, h)
+		}
+	}
+
+	if len(matched) == 0 {
+		return
+	}
+
 	body, err := Body(event, payload)
 	if err != nil {
 		d.log.Error("dispatch: marshal payload", "event", event, "err", err)
@@ -149,11 +162,7 @@ func (d *Dispatcher) Emit(ctx context.Context, projID, event, sender string, pay
 		return
 	}
 
-	for _, h := range hooks {
-		if !h.Enabled() || !h.Subscribed(event) || !matchesFilters(h.Filters, sender) {
-			continue
-		}
-
+	for _, h := range matched {
 		if d.pending[projID] >= maxPending {
 			d.log.Warn("dispatch: too many deliveries waiting for this project, event dropped",
 				"event", event, "project_id", projID, "webhook_id", h.ID, "pending", d.pending[projID])
