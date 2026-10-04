@@ -437,19 +437,6 @@ func runServe(cmd *cobra.Command, r role) error {
 	workerCtx, stopWorker := context.WithCancelCause(context.Background())
 	defer stopWorker(nil)
 
-	// The worker is CONSTRUCTED on every role, and only STARTED on a
-	// worker one. An api node still hands rt.Queue to the email
-	// service, whose Wake broadcasts - so accepting a send on an api
-	// node is what tells the worker nodes to look. Leaving
-	// rt.Queue nil there would drop that signal and put every send
-	// back on the poll interval.
-	if r.worker {
-		// safego.Go on the long-lived loops: each already guards its
-		// own unit of work, this catches a panic in the loop
-		// machinery itself rather than letting it end the process.
-		safego.Go(log, "queue: worker loop", func() { worker.Start(workerCtx) })
-	}
-
 	// Tracking signer: mints the public /tracking/ URLs. Needs the
 	// public base URL to build absolute links - without it campaigns
 	// send untracked.
@@ -491,9 +478,6 @@ func runServe(cmd *cobra.Command, r role) error {
 	// is why this waits for the queue: a service built before rt.Queue
 	// cannot wake the worker.
 	rt.SystemMail.UseProject(email.NewService(rt))
-	if r.worker {
-		safego.Go(log, "campaign: runner loop", func() { runner.Start(workerCtx) })
-	}
 
 	// Cross-node wake. Once the roles are split the node that accepts
 	// a send is routinely not the one that delivers it, so without
@@ -594,6 +578,24 @@ func runServe(cmd *cobra.Command, r role) error {
 	rt.Notify = &notify.Raiser{Store: st, Bus: rt.Events, Log: log, Alerts: rt.Alerts}
 
 	registerJobs(cmd.Context(), r, rt, st, db, log)
+
+	// The worker and the runner are CONSTRUCTED on every role, and only
+	// STARTED on a worker one. An api node still hands rt.Queue to the
+	// email service, whose Wake broadcasts - so accepting a send on an
+	// api node is what tells the worker nodes to look. Leaving rt.Queue
+	// nil there would drop that signal and put every send back on the
+	// poll interval.
+	//
+	// Started here, after everything they read is wired: Broadcast,
+	// processor.Pull and rt.Notify are plain fields, read from the loop
+	// goroutines without a lock.
+	if r.worker {
+		// safego.Go on the long-lived loops: each already guards its
+		// own unit of work, this catches a panic in the loop
+		// machinery itself rather than letting it end the process.
+		safego.Go(log, "queue: worker loop", func() { worker.Start(workerCtx) })
+		safego.Go(log, "campaign: runner loop", func() { runner.Start(workerCtx) })
+	}
 
 	safego.Go(log, "cron: scheduler loop", func() { rt.Cron.Start(workerCtx) })
 
