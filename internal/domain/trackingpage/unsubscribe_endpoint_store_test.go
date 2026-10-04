@@ -95,7 +95,9 @@ func newUnsubscribeFixture(t *testing.T, status string) *unsubscribeFixture {
 	}
 
 	// The handler logs every step. Not into the test output.
+	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
 
 	signer := tracking.NewSigner("https://mail.example.test", "test-secret-test-secret-test-secret")
 	h := &Handler{Runtime: &env.Runtime{Store: st, Tracking: signer}}

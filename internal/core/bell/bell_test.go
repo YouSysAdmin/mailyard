@@ -5,33 +5,39 @@ package bell
 import (
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
 // One ring releases every waiter, a wait with no ring times out, and a
 // ring before anybody waits is not remembered.
+//
+// In a synctest bubble, so "every waiter is parked" is synctest.Wait
+// rather than a sleep that is long enough on most machines.
 func TestRingReleasesEveryWaiter(t *testing.T) {
-	var b Bell
-	b.Ring()
+	synctest.Test(t, func(t *testing.T) {
+		var b Bell
+		b.Ring()
 
-	var wg sync.WaitGroup
-	rang := make([]bool, 3)
-	for i := range rang {
-		wg.Go(func() {
-			rang[i] = b.Wait(t.Context(), 5*time.Second)
-		})
-	}
-
-	time.Sleep(50 * time.Millisecond)
-	b.Ring()
-	wg.Wait()
-	for i, r := range rang {
-		if !r {
-			t.Errorf("waiter %d timed out, want released by the ring", i)
+		var wg sync.WaitGroup
+		rang := make([]bool, 3)
+		for i := range rang {
+			wg.Go(func() {
+				rang[i] = b.Wait(t.Context(), 5*time.Second)
+			})
 		}
-	}
 
-	if b.Wait(t.Context(), 20*time.Millisecond) {
-		t.Error("a wait after the ring was released, want a timeout")
-	}
+		synctest.Wait()
+		b.Ring()
+		wg.Wait()
+		for i, r := range rang {
+			if !r {
+				t.Errorf("waiter %d timed out, want released by the ring", i)
+			}
+		}
+
+		if b.Wait(t.Context(), 20*time.Millisecond) {
+			t.Error("a wait after the ring was released, want a timeout")
+		}
+	})
 }

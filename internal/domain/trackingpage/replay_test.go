@@ -86,7 +86,9 @@ func TestReplayingThePixelStopsWritingEvents(t *testing.T) {
 		Tracking: signer,
 		Store:    &store.Store{Email: emails, Campaign: camps},
 	}}
+	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
 
 	app := fiber.New()
 	app.Get("/tracking/open/:file", h.Open)
