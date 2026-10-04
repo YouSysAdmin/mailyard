@@ -156,6 +156,10 @@ func resolveShared(ctx context.Context, st *store.Store, projID, sender string) 
 		return nil, err
 	}
 
+	// Whether the project verified the sender's domain is one answer
+	// for the whole pool, asked at most once and only when a strict
+	// server needs it.
+	var verified *bool
 	var out []*ssmodel.Server
 	for _, srv := range pool {
 		if !srv.AllowsSender(sender) || !srv.AllowsDomain(sender) {
@@ -163,12 +167,16 @@ func resolveShared(ctx context.Context, st *store.Store, projID, sender string) 
 		}
 
 		if srv.SecurityMode == ssmodel.SecurityStrict {
-			ok, err := ownsVerifiedDomain(ctx, st, projID, sender)
-			if err != nil {
-				return nil, err
+			if verified == nil {
+				ok, err := ownsVerifiedDomain(ctx, st, projID, sender)
+				if err != nil {
+					return nil, err
+				}
+
+				verified = &ok
 			}
 
-			if !ok {
+			if !*verified {
 				continue
 			}
 		}
