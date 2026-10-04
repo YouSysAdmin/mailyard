@@ -65,6 +65,10 @@ type Worker struct {
 	// the database closes.
 	abortCtx context.Context
 	abort    context.CancelFunc
+
+	// lastRecover is when pollOnce last ran the stuck-row recovery.
+	// Read and written only by the poll loop.
+	lastRecover time.Time
 }
 
 // NewWorker builds a Worker.
@@ -202,21 +206,29 @@ func (w *Worker) Stop(timeout time.Duration) {
 // their outcome.
 const abortGrace = 10 * time.Second
 
-// pollOnce recovers stuck rows, claims due work, and hands it to the
-// pool. It claims only as many rows as there are goroutines waiting.
+// pollOnce recovers stuck rows (at most once per poll interval),
+// claims due work, and hands it to the pool. It claims only as many rows as there are goroutines waiting.
 func (w *Worker) pollOnce(ctx context.Context) {
 	now := time.Now().UTC()
 
-	// A query cut by our own shutdown is not a failure. ctx.Err is asked
-	// rather than the error, which the driver may wrap past errors.Is.
-	if n, err := w.src.RecoverStuck(ctx, now.Add(-w.cfg.ClaimTimeout)); err != nil {
-		if ctx.Err() != nil {
-			return
-		}
+	// Recovery once per poll interval, not on every wake. Under steady
+	// sending a wake arrives with nearly every message, and a row is
+	// only stuck after ClaimTimeout, which is minutes.
+	if now.Sub(w.lastRecover) >= w.cfg.PollInterval {
+		w.lastRecover = now
 
-		w.log.Error("queue: recover stuck", "err", err)
-	} else if n > 0 {
-		w.log.Warn("queue: recovered stuck emails", "count", n)
+		// A query cut by our own shutdown is not a failure. ctx.Err is
+		// asked rather than the error, which the driver may wrap past
+		// errors.Is.
+		if n, err := w.src.RecoverStuck(ctx, now.Add(-w.cfg.ClaimTimeout)); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+
+			w.log.Error("queue: recover stuck", "err", err)
+		} else if n > 0 {
+			w.log.Warn("queue: recovered stuck emails", "count", n)
+		}
 	}
 
 	free := int(w.idle.Load())

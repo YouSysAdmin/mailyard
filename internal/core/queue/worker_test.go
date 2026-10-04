@@ -500,3 +500,32 @@ func TestThePollClaimsOnlyWhatCanStart(t *testing.T) {
 type ctxProcessor func(ctx context.Context, job *emailmodel.Email) Outcome
 
 func (f ctxProcessor) Process(ctx context.Context, job *emailmodel.Email) Outcome { return f(ctx, job) }
+
+// countingRecovery counts the stuck-row sweeps a worker asks for.
+type countingRecovery struct {
+	*memSource
+	recovers atomic.Int32
+}
+
+func (s *countingRecovery) RecoverStuck(context.Context, time.Time) (int, error) {
+	s.recovers.Add(1)
+
+	return 0, nil
+}
+
+// A burst of wakes claims each time but sweeps for stuck rows once per
+// poll interval.
+func TestWakesDoNotRepeatTheStuckSweep(t *testing.T) {
+	src := &countingRecovery{memSource: newMemSource()}
+	cfg := testConfig()
+	cfg.PollInterval = time.Hour
+	w := NewWorker(src, funcProcessor(func(*emailmodel.Email) Outcome { return Done() }), cfg, slog.New(slog.DiscardHandler))
+
+	for range 5 {
+		w.pollOnce(t.Context())
+	}
+
+	if n := src.recovers.Load(); n != 1 {
+		t.Fatalf("%d sweeps for five polls inside one interval, want 1", n)
+	}
+}
