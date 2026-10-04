@@ -1250,7 +1250,7 @@ tbody tr:hover td {
   top: 0;
   z-index: 1;
   padding: 8px 12px;
-  background: var(--bg-card);
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border-primary);
 }
 
