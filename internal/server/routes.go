@@ -1160,7 +1160,7 @@ func buildTag(site fs.FS) string {
 		// either, and the mount below reports that per request. The
 		// partial sum is still a usable tag, so this is logged rather
 		// than made fatal.
-		slog.Warn("cache: could not hash an embedded tree for its ETag", "error", err)
+		slog.Warn("cache: could not hash an embedded tree for its ETag", "err", err)
 	}
 
 	return `"` + hex.EncodeToString(sum.Sum(nil)[:16]) + `"`

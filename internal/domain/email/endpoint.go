@@ -167,7 +167,7 @@ func (h *Handler) sendOnce(c fiber.Ctx, rc *domain.RequestContext, send func() (
 	}
 
 	if cerr := keys.CompleteKey(c.Context(), rc.Project.ID, key, e.ID); cerr != nil {
-		h.Runtime.Log.Warn("email: completing an idempotency key", "error", cerr)
+		h.Runtime.Log.Warn("email: completing an idempotency key", "project_id", rc.Project.ID, "email_id", e.ID, "err", cerr)
 	}
 
 	return response.Created(c, SendResponse{Email: e, Suppressed: emptyIfNil(blocked)})
@@ -208,7 +208,7 @@ func (h *Handler) captureOnce(c fiber.Ctx, rc *domain.RequestContext, req *SendR
 	}
 
 	if cerr := keys.CompleteSandboxKey(c.Context(), rc.Project.ID, key, e.ID); cerr != nil {
-		h.Runtime.Log.Warn("email: completing an idempotency key", "error", cerr)
+		h.Runtime.Log.Warn("email: completing an idempotency key", "project_id", rc.Project.ID, "sandbox_email_id", e.ID, "err", cerr)
 	}
 
 	return response.Created(c, SandboxCaptureResponse{SandboxEmail: e, Sandboxed: true})
@@ -251,7 +251,7 @@ func (h *Handler) replay(c fiber.Ctx, rc *domain.RequestContext, held emailmodel
 // releaseKey gives a reserved key back after a failed send.
 func (h *Handler) releaseKey(c fiber.Ctx, rc *domain.RequestContext, key string) {
 	if err := h.Runtime.Store.Email.ReleaseKey(c.Context(), rc.Project.ID, key); err != nil {
-		h.Runtime.Log.Warn("email: releasing an idempotency key", "error", err)
+		h.Runtime.Log.Warn("email: releasing an idempotency key", "project_id", rc.Project.ID, "err", err)
 	}
 }
 

@@ -115,7 +115,7 @@ func (h *Handler) check() readiness {
 		// the response. A pgx connection error carries the DSN's host,
 		// port, user and database name, and this endpoint answers
 		// anybody.
-		slog.Error("health: database unreachable", "error", err)
+		slog.Error("health: database unreachable", "err", err)
 		checks["database"] = "unreachable"
 		ready = false
 	} else {
