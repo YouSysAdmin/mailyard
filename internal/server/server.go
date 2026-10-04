@@ -385,8 +385,8 @@ func (s *Server) Start() error {
 			return fmt.Errorf("tls listen %s: %w", addr, err)
 		}
 
-		// No mode to name anymore. Which certificate this serves is
-		// resolved per handshake - assigned, then acme, then the
+		// No certificate source is logged here. Which certificate this
+		// serves is resolved per handshake - assigned, then acme, then the
 		// self-signed pair - so a word logged here would be a guess that
 		// stops being true the moment an admin assigns one.
 		slog.Info("server start", "addr", addr, "tls", true)
@@ -446,8 +446,8 @@ func safeRecover(c fiber.Ctx) (err error) {
 // cachePolicy is the default answer to "may this response be stored",
 // and the answer is no. It runs on every request, before any route, so
 // a surface that never thought about caching is safe rather than
-// silently heuristic - which is what a response with no Cache-Control
-// gets, and what /docs, the probes and the bare redirect used to get.
+// silently heuristic, which is what a response with no Cache-Control
+// gets.
 //
 // no-store and not no-cache: almost everything this binary answers is
 // session-bound or otherwise dynamic, and no-store forbids storing

@@ -93,13 +93,9 @@ func Open(t *testing.T) *sql.DB {
 	db.SetMaxOpenConns(1)
 
 	t.Cleanup(func() {
-		// Same interpolation and same reason as the three above, and it
-		// went unmarked because the guard could not see it: this is
-		// *sql.DB.Exec, which takes the query first, and sqlSinks maps
-		// Exec to the second argument for database.Base. The lookup found
-		// nothing at that index and skipped the call. Both ends are fixed
-		// - the marker is here, and sqlSinkArg now shifts to the first
-		// argument when it is a string expression.
+		// Same interpolation and same reason as the three above.
+		// *sql.DB.Exec takes the query first, and the guard reads it
+		// there.
 		//
 		//sqlconst:allow schema is an identifier from schemaName, restricted to [a-z0-9_]
 		if _, err := db.Exec(`DROP SCHEMA IF EXISTS ` + schema + ` CASCADE`); err != nil {

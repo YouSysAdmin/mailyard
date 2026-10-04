@@ -73,7 +73,7 @@ func New(rpID, origin string) (*Service, error) {
 		RPOrigins:     []string{origin},
 		// Enforced HERE, not only advertised to the browser. Without
 		// Enforce the sealed ceremony cookie carries no server-checked
-		// expiry, so a captured challenge and its assertion stayed
+		// expiry, and a captured challenge and its assertion would stay
 		// answerable until the JWT secret rotated.
 		Timeouts: webauthn.TimeoutsConfig{
 			Login:        webauthn.TimeoutConfig{Enforce: true, Timeout: ceremonyTimeout, TimeoutUVD: ceremonyTimeout},

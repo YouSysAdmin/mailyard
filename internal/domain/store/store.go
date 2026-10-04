@@ -829,11 +829,10 @@ type EmailStore interface {
 	// CountByStatus tallies the log, over a created_at window when
 	// either bound is given.
 	CountByStatus(ctx context.Context, projID string, from, to *time.Time) (map[string]int, error)
-	CountCreatedSince(ctx context.Context, projID string, since time.Time) (int, error)
 
 	// AcceptedSince reads the per-minute volume counter, which is what
 	// the plan limits ask - see the email store for why it is not a
-	// COUNT over the emails table any more.
+	// COUNT over the emails table.
 	AcceptedSince(ctx context.Context, projID string, since time.Time) (int, error)
 	PruneVolumeBefore(ctx context.Context, before time.Time) (int64, error)
 

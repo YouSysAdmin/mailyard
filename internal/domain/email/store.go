@@ -910,19 +910,6 @@ func (s *Store) PruneVolumeBefore(ctx context.Context, before time.Time) (int64,
 	return res.RowsAffected()
 }
 
-// CountCreatedSince counts rows created in the window.
-//
-// Not what plan volume limits read any more - that is quota's
-// AcceptedSince over email_volume, which counts in the same statement as
-// the insert. Nothing calls this, and the index that would serve it is
-// idx_emails_proj_created.
-func (s *Store) CountCreatedSince(ctx context.Context, projID string, since time.Time) (int, error) {
-	var n int
-	err := s.QueryRow(ctx, `SELECT COUNT(*) FROM emails WHERE project_id = ? AND created_at >= ?`, projID, since.UTC()).Scan(&n)
-
-	return n, err
-}
-
 // CountAllByStatus counts email rows by status across every
 // project, for the metrics scrape gauge.
 func (s *Store) CountAllByStatus(ctx context.Context) (map[string]int, error) {

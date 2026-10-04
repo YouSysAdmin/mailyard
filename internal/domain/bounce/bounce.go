@@ -81,12 +81,9 @@ func (s *Store) List(ctx context.Context, projID string, f store.BounceFilter) (
 
 	if f.Search != "" {
 		// LOWER(recipient), matching HasHardBounce and DeleteByEmail.
-		// recipient is stored exactly as the report named it, and the
-		// term is lowercased here - so `recipient LIKE 'bob@%'` missed
-		// every report about `Bob@x.test`, and the operator searching for
-		// the address they were shown got an empty page. Which is the one
-		// answer this list must never give wrongly: it reads as "that
-		// address has never bounced".
+		// recipient is stored exactly as the report named it and the
+		// term is lowercased, so both sides are compared lowered. An
+		// empty page here reads as "that address has never bounced".
 		query += ` AND LOWER(recipient) LIKE ? ESCAPE '\'`
 		args = append(args, database.EscapeLike(strings.ToLower(strings.TrimSpace(f.Search)))+"%")
 	}

@@ -448,9 +448,7 @@ func (h *Handler) projectForKey(c fiber.Ctx, token string) (string, bool) {
 		return "", false
 	}
 	now := time.Now().UTC()
-	// relay:write is the resource the relay:enroll scope became. It
-	// stayed apart from smtp rather than folding into it for the
-	// reason the scope's own comment gave: a machine holding this
+	// relay:write, apart from smtp, because a machine holding it
 	// receives the CONTENT of the project's outbound mail.
 	if k == nil || !akmodel.HashEquals(token, k.KeyHash) || !k.IsValid(now) ||
 		!k.AllowsIP(clientip.From(c)) || !perm.ForKey(k.Permissions, k.Sandbox).Has(perm.ResourceRelay, perm.ActionWrite) {

@@ -45,7 +45,7 @@ func newRelayCmd() *cobra.Command {
 			"recipient's own mail exchangers from this host's address.\n\n" +
 			"It holds no database credentials. On first run it enrols with\n" +
 			"relay_node.control_url using relay_node.enroll_token and receives a\n" +
-			"certificate; after that the certificate is its identity.\n\n" +
+			"certificate. After that the certificate is its identity.\n\n" +
 			"Outbound port 25 must be open and this host's PTR record must match\n" +
 			"relay_node.hostname, or nothing will be delivered. Both are checked\n" +
 			"at startup.",

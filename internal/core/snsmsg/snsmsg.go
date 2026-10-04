@@ -139,9 +139,9 @@ type Verifier struct {
 
 	// MaxAge bounds how old a message's Timestamp may be. Zero means
 	// no bound. The signature proves Amazon SENT the message, not
-	// WHEN it was presented: a captured notification stayed
-	// replayable for as long as the signing certificate was valid,
-	// and each replay filed another bounce row. An hour is generous
+	// WHEN it was presented: without a bound a captured notification
+	// is replayable for as long as the signing certificate is valid,
+	// and each replay files another bounce row. An hour is generous
 	// for SNS delivery retries and short enough that a capture is
 	// worthless by the time anyone could use it. A timestamp more
 	// than five minutes in the future is refused too, since that is

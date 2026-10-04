@@ -65,16 +65,6 @@ import (
 	"github.com/yousysadmin/mailyard/web"
 )
 
-// The SES receiver and the two relay node budgets were CONSTANTS here,
-// with the reasoning that sizes them written above each one. They are
-// `ratelimit.*` config keys now, and the reasoning went with them to
-// RateLimitConfig - a number an operator has to be able to change does
-// not belong in a binary, and the one that governs FORWARDED MAIL is
-// the one an operator meets first: a node has already answered 250 by
-// the time this refuses, so the fleet outgrowing it loses mail.
-//
-// Nothing else changed. The three defaults are what the constants were.
-
 func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// CORS, off by default. Registered first so preflights are
 	// answered before any auth middleware can reject the OPTIONS
@@ -598,11 +588,8 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	tpl.Post("/import", permWrite, th.Import)
 	tpl.Get("/:id", permRead, th.Get)
 	tpl.Patch("/:id", permWrite, th.Update)
-	// Destructive, and it stayed narrower than write through two
-	// designs: admin-only before permissions existed, then
-	// `permWrite, projAdmin` once they did, because two actions could
-	// not say "edit but not remove". The catalogue grew the third
-	// action and this is one token again.
+	// Destructive, so it takes delete rather than write: a role can
+	// edit templates without being able to remove them.
 	tpl.Delete("/:id", permDelete, th.Delete)
 	tpl.Get("/:id/export", permRead, th.Export)
 	tpl.Get("/:id/attachments", permRead, th.ListAttachments)

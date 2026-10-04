@@ -13,15 +13,12 @@ import (
 
 // The library logging, rerouted into ours.
 //
-// go-smtp defaults ErrorLog to a std-log writer on stderr, so a failed
-// TLS handshake - a worker presenting the wrong certificate, a
-// stranger probing the port - was reported in a format nothing else on
-// this node uses, or lost entirely under a collector reading json. And
-// a PROTOCOL refusal was reported to nobody at all: a malformed MAIL
-// FROM is answered 501 inside the library, the backend hooks never
-// run, and the node's log stayed empty while the platform's said the
-// node refused it. Debugging that means reading the log of the wrong
-// process, which is how it was actually found.
+// go-smtp defaults ErrorLog to a std-log writer on stderr, which puts a
+// failed TLS handshake - a worker presenting the wrong certificate, a
+// stranger probing the port - in a format nothing else on this node
+// uses, or loses it under a collector reading json. A PROTOCOL refusal
+// is answered inside the library before any backend hook runs, so this
+// is the only place the node can say it refused one.
 
 // smtpLogger adapts go-smtp's ErrorLog interface onto slog.
 type smtpLogger struct {

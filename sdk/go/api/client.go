@@ -44,8 +44,8 @@ type Client struct {
 
 // New builds a client for baseURL authenticating with apiKey.
 //
-// The key may be a project credential (myk_) or a platform one (mya_);
-// the transport is identical and the server decides what each reaches.
+// The key may be a project credential (myk_) or a platform one (mya_).
+// The transport is identical and the server decides what each reaches.
 func New(baseURL, apiKey string, opts ...ClientOption) *Client {
 	c := &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),

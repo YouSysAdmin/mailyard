@@ -148,8 +148,7 @@ func refuseSandboxCredential(c fiber.Ctx) error {
 // one token.
 //
 // Three actions rather than two, so a project can say "may edit but not
-// remove" in a role of its own. There is no built-in admin tier to
-// borrow for that anymore.
+// remove" in a role of its own. There is no built-in admin tier.
 //
 // The mapping is mechanical: a DELETE method takes permDelete. A POST
 // that erases has to say so itself, the same way /templates/preview has

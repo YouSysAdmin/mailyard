@@ -12,7 +12,7 @@
 // revoke calls Invalidate and is immediately consistent, which covers
 // the common single-node case exactly. TTL is deliberately short so
 // the multi-node lag stays in "seconds", not "until the token
-// expires" - which is where we were before sessions existed at all.
+// expires".
 package sessioncache
 
 import (
