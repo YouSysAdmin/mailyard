@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -400,7 +401,12 @@ func (s *Store) ClaimDue(ctx context.Context, now time.Time, leaseFor time.Durat
 // Messages
 // ----------------------------------------------------------------------------
 
-// BulkCreateMessages inserts the fan-out in one transaction.
+// fanOutChunk is how many messages one INSERT carries.
+const fanOutChunk = 5000
+
+// BulkCreateMessages inserts the fan-out in one transaction, a chunk of
+// rows per statement as parallel arrays rather than a round trip per
+// row.
 func (s *Store) BulkCreateMessages(ctx context.Context, msgs []*cmodel.Message) error {
 	tx, err := s.DB().BeginTx(ctx, nil)
 	if err != nil {
@@ -415,31 +421,33 @@ func (s *Store) BulkCreateMessages(ctx context.Context, msgs []*cmodel.Message) 
 			slog.Warn("store: rollback failed", "err", rerr)
 		}
 	}()
-	stmt, err := tx.PrepareContext(ctx, s.Q(`
+	insert := s.Q(`
         INSERT INTO campaign_messages (id, campaign_id, subscriber_id, status, error_message, variant, deliver_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        SELECT * FROM unnest(?::uuid[], ?::uuid[], ?::uuid[], ?::text[], ?::text[], ?::text[], ?::timestamptz[], ?::timestamptz[])
         ON CONFLICT(campaign_id, subscriber_id) DO NOTHING
-    `))
-	if err != nil {
-		return err
-	}
-
-	defer func() { _ = stmt.Close() }()
+    `)
 	now := time.Now().UTC()
-	for _, m := range msgs {
-		if m.ID == "" {
-			m.ID = ids.New()
+	for chunk := range slices.Chunk(msgs, fanOutChunk) {
+		n := len(chunk)
+		id, campaignID, subscriberID := make([]string, n), make([]string, n), make([]string, n)
+		status, errMsg, variant := make([]string, n), make([]string, n), make([]string, n)
+		deliverAt, createdAt := make([]*time.Time, n), make([]time.Time, n)
+		for i, m := range chunk {
+			if m.ID == "" {
+				m.ID = ids.New()
+			}
+
+			if m.CreatedAt.IsZero() {
+				m.CreatedAt = now
+			}
+
+			id[i], campaignID[i], subscriberID[i] = m.ID, m.CampaignID, m.SubscriberID
+			status[i], errMsg[i], variant[i] = m.Status, m.ErrorMessage, m.Variant
+			deliverAt[i], createdAt[i] = m.DeliverAt, m.CreatedAt
 		}
 
-		if m.CreatedAt.IsZero() {
-			m.CreatedAt = now
-		}
-
-		// A prepared statement: these are bind values, not SQL. The
-		// statement text was checked at PrepareContext above.
-		//sqlconst:allow bind values on a prepared statement, not a query
-		if _, err := stmt.ExecContext(ctx, m.ID, m.CampaignID, m.SubscriberID,
-			m.Status, m.ErrorMessage, m.Variant, database.NullTime(m.DeliverAt), m.CreatedAt); err != nil {
+		if _, err := tx.ExecContext(ctx, insert, id, campaignID, subscriberID,
+			status, errMsg, variant, deliverAt, createdAt); err != nil {
 			return err
 		}
 	}
