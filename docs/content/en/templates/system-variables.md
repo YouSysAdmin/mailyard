@@ -23,9 +23,13 @@ Anywhere a **template** is rendered: [campaigns](/docs/campaigns/overview),
 [`/emails/send-template`](/docs/email-sending/template-email), template-mode
 [batches](/docs/email-sending/batch-email), and a template test send.
 
-{{< callout type="info" title="A plain send does not render anything" >}}
-`POST /api/v1/emails/send` takes your HTML as given — there is no template step, so `{{ mailyard_web_view_url }}` in
-that body is not a variable, it is text, and it reaches the recipient as text. Use a template if you want these.
+And in the subject, `html` and `text` of a plain [`POST /api/v1/emails/send`](/docs/email-sending/single-email), which
+has no template step but still resolves these three names. Only these: any other `{{ ... }}` in that body is your text
+and goes out as written.
+
+{{< callout type="info" title="Not in SMTP submission or a raw batch" >}}
+A message submitted over SMTP arrives as finished MIME, often encoded and sometimes already signed by the client, so
+nothing in it is rewritten. A batch item without a template is not either. Use `/emails/send` or a template.
 {{< /callout >}}
 
 ## What each one needs
@@ -33,8 +37,8 @@ that body is not a variable, it is text, and it reaches the recipient as text. U
 A variable that cannot be resolved is **removed**, not left in place. So a message never ships a half-built link — it
 ships without one, and the surrounding markup is what a reader sees.
 
-**`mailyard_web_view_url`** needs `server.public_url`. With those set it resolves on every
-templated send. Without them there is no origin to build an absolute signed link from, and it comes out empty.
+**`mailyard_web_view_url`** needs `server.public_url`. With that set it resolves on every
+templated send and every `/emails/send`. Without them there is no origin to build an absolute signed link from, and it comes out empty.
 
 **`mailyard_unsubscribe_url`** needs something to unsubscribe *from*, and where that comes from depends on the send:
 
@@ -42,6 +46,7 @@ templated send. Without them there is no origin to build an absolute signed link
 |-----------------|--------------------------------------------------------------------------------------------------------------------------|
 | Campaign        | Always — the link is bound to the campaign's list and this recipient                                                     |
 | `send-template` | `unsubscribe_list_id` names an [opt-out scope](/docs/contacts/unsubscribe-lists), and there is exactly **one** recipient |
+| `send`          | The same as `send-template`                                                                                              |
 | Batch           | Never — a batch has no opt-out scope, so use `list_unsubscribe_url` per item instead                                     |
 
 The one-recipient rule is not an implementation limit. A one-click link identifies a person, so on a message addressed

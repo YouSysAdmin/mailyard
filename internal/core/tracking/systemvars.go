@@ -4,6 +4,8 @@ package tracking
 
 import (
 	"maps"
+	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -117,3 +119,38 @@ func SubstituteSystemLinks(s string, links Links) string {
 
 	return s
 }
+
+// MarkSystemVars turns the reserved {{ mailyard_* }} names written into
+// a body that is NOT rendered as a template into the placeholders a
+// render would have produced, so the per-message pass resolves them the
+// same way. Exactly the reserved names, whitespace inside the braces
+// allowed. Every other {{ ... }} is the caller's text and stays.
+func MarkSystemVars(s string) string {
+	if s == "" || !strings.Contains(s, "{{") {
+		return s
+	}
+
+	return systemVarRef.ReplaceAllStringFunc(s, func(m string) string {
+		name := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(m, "{{"), "}}"))
+		for _, link := range systemLinks {
+			if slices.Contains(link.names, name) {
+				return link.placeholder
+			}
+		}
+
+		return m
+	})
+}
+
+// systemVarRef matches a reference to any reserved name, built from the
+// table so a name added there is recognised here.
+var systemVarRef = func() *regexp.Regexp {
+	var names []string
+	for _, link := range systemLinks {
+		for _, name := range link.names {
+			names = append(names, regexp.QuoteMeta(name))
+		}
+	}
+
+	return regexp.MustCompile(`\{\{\s*(?:` + strings.Join(names, "|") + `)\s*\}\}`)
+}()

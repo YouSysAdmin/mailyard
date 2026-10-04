@@ -178,9 +178,9 @@ GET /tracking/view/{token}
 ```
 
 Mailyard hosts a "view this email in a browser" page for a sent message. The link is produced by the
-`{{ mailyard_web_view_url }}` system variable (and its `{{ mailyard_mail_web_link }}` alias), which resolves only where
-a **template** is rendered: campaigns, `/emails/send-template`, template-mode batches and a template test send. A plain
-`POST /api/v1/emails/send` takes its HTML as given, so the variable in that body reaches the recipient as text.
+`{{ mailyard_web_view_url }}` system variable (and its `{{ mailyard_mail_web_link }}` alias), which resolves in
+campaigns, `/emails/send`, `/emails/send-template`, template-mode batches and a template test send. Mail submitted over
+SMTP and a batch item without a template are sent as written, so there the variable reaches the recipient as text.
 
 The `{token}` is an HMAC-signed, **expiring**
 capability bound to the email's opaque UUID — it defaults to a 90-day lifetime, and an invalid or expired token renders

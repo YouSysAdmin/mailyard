@@ -100,10 +100,15 @@ with no text alternative scores worse with spam filters than one that has it.
 | `send_at`                                                                  | Hold until an RFC 3339 time — see [Scheduled Email](/docs/email-sending/scheduled-email)                                                                                            |
 | `dry_run`                                                                  | Run every validation and persist nothing                                                                                                                                            |
 | `disable_tracking`                                                         | Opt this message out of open and click tracking                                                                                                                                     |
-| `unsubscribe_list_id`                                                      | Send under a transactional [opt-out scope](/docs/contacts/unsubscribe-lists)                                                                                                        |
+| `unsubscribe_list_id`                                                      | Send under a transactional [opt-out scope](/docs/contacts/unsubscribe-lists), which is also what `{{ mailyard_unsubscribe_url }}` links to                                          |
 | `list_unsubscribe_url`, `list_unsubscribe_mailto`, `list_unsubscribe_post` | Carry your own opt-out targets. One of the two arrangements is part of what [Gmail and Yahoo require](/docs/getting-started/bulk-sender-requirements) of a domain sending at volume |
 | `smtp_group`, `smtp_server_id`                                             | Pin the [route out](/docs/smtp-domains/server-groups)                                                                                                                               |
 | `sandbox`, `sandbox_retention_days`                                        | Capture instead of delivering — see [Sandbox](/docs/email-sending/sandbox)                                                                                                          |
+
+The subject, `html` and `text` are sent as written with one exception: the reserved
+[system variables](/docs/templates/system-variables) `{{ mailyard_web_view_url }}`, `{{ mailyard_mail_web_link }}` and
+`{{ mailyard_unsubscribe_url }}` become this message's links, or are removed when the message has none. Any other
+`{{ ... }}` is left alone.
 
 `dry_run` is the cheapest way to check an integration: it validates the sender, the recipients, the headers, the
 attachment sizes and the routing, checks the plan's hourly and daily limits and the suppression list, then returns

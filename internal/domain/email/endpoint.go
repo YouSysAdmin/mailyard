@@ -18,6 +18,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/paging"
 	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	coretracking "github.com/yousysadmin/mailyard/internal/core/tracking"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
@@ -43,6 +44,12 @@ func (h *Handler) Send(c fiber.Ctx) error {
 		return response.BadRequest(c, err.Error())
 	}
 
+	// The reserved {{ mailyard_* }} names resolve here as they do in a
+	// template: marked now, and swapped for this message's links once
+	// Send has minted its id. Nothing else in the body is read as a
+	// variable.
+	markSystemVars(req)
+
 	// Before ResolveRoute and before Validate, and that ordering is
 	// the feature. Both of those ask questions about DELIVERY - is
 	// there a server, is the sender's domain verified, is the project
@@ -56,6 +63,10 @@ func (h *Handler) Send(c fiber.Ctx) error {
 		if denied := optInRefusal(rc); denied != "" {
 			return response.Forbidden(c, denied)
 		}
+
+		// A capture is not a delivery, so the links the reserved names
+		// stand for do not exist. Removed, as a template capture does.
+		stripSystemVars(req)
 
 		// The message half of Validate still applies: a capture is a
 		// message the builder is handed, and the sandbox is not a way
@@ -597,6 +608,22 @@ func callerAttachments(in []emailmodel.Attachment) []emailmodel.Attachment {
 	}
 
 	return out
+}
+
+// markSystemVars turns the reserved names in a plain send's subject and
+// bodies into the placeholders Send resolves.
+func markSystemVars(req *SendRequest) {
+	req.Subject = coretracking.MarkSystemVars(req.Subject)
+	req.HTML = coretracking.MarkSystemVars(req.HTML)
+	req.Text = coretracking.MarkSystemVars(req.Text)
+}
+
+// stripSystemVars removes the placeholders from a message that will
+// not be delivered.
+func stripSystemVars(req *SendRequest) {
+	req.Subject = coretracking.SubstituteSystemLinks(req.Subject, coretracking.Links{})
+	req.HTML = coretracking.SubstituteSystemLinks(req.HTML, coretracking.Links{})
+	req.Text = coretracking.SubstituteSystemLinks(req.Text, coretracking.Links{})
 }
 
 // toRequest converts the bound input into the service request, parsing send_at.
