@@ -202,16 +202,31 @@ func (h *Handler) ServeAsset(c fiber.Ctx) error {
 		return response.NotFound(c, "not found")
 	}
 
-	raw, err := blob.Load(c.Context(), h.Runtime.Blob, a.StorageKey, a.Content, a.Filename)
-	if err != nil {
-		return response.Internal(c, err)
-	}
-
 	c.Set(fiber.HeaderContentType, a.ContentType)
 	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
 	c.Set(fiber.HeaderCacheControl, "public, max-age=31536000, immutable")
 	c.Set(fiber.HeaderContentDisposition,
 		fmt.Sprintf("inline; filename=%q", blob.SanitizeFilename(a.Filename)))
+
+	// An offloaded image is STREAMED from the store, never read into
+	// memory first: the route is public and bounded only by the per-IP
+	// concurrency cap, so buffering would let one address hold that
+	// many whole images at once. fasthttp closes the reader when the
+	// response has been written. The inline form is a testing backend
+	// and stays small.
+	if a.StorageKey != "" && h.Runtime.Blob != nil {
+		rc, err := h.Runtime.Blob.Get(c.Context(), a.StorageKey)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+
+		return c.SendStream(rc, int(a.Size))
+	}
+
+	raw, err := blob.Load(c.Context(), h.Runtime.Blob, a.StorageKey, a.Content, a.Filename)
+	if err != nil {
+		return response.Internal(c, err)
+	}
 
 	return c.Send(raw)
 }
