@@ -86,3 +86,49 @@ func TestUpsertReturnsTheStoredRow(t *testing.T) {
 		t.Errorf("upsert reported id %s, the stored row is %s", sup.ID, stored)
 	}
 }
+
+// An import is one transaction: a row the database refuses takes the
+// rows before it back with it, so nothing is half applied.
+func TestUpsertAllLeavesNothingWhenOneRowIsRefused(t *testing.T) {
+	db := dbtest.Open(t)
+	dbtest.Migrate(t, db)
+	s := &Store{Base: database.NewBase(db)}
+	ctx := t.Context()
+
+	proj, _, _ := seedScopes(t, s, ctx, "seed@x.test")
+	block := func(email, id string) *supmodel.Suppression {
+		return &supmodel.Suppression{ID: id, ProjectID: proj, Email: email, Kind: supmodel.KindManual}
+	}
+
+	// The third row carries an id the uuid column will not take.
+	err := s.UpsertAll(ctx, []*supmodel.Suppression{
+		block("one@x.test", ""), block("two@x.test", ""), block("three@x.test", "banana"),
+	})
+	if err == nil {
+		t.Fatal("a malformed id was accepted")
+	}
+
+	for _, email := range []string{"one@x.test", "two@x.test"} {
+		rows, err := s.List(ctx, proj, store.SuppressionFilter{Email: email})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(rows) != 0 {
+			t.Errorf("%s was written although the import failed", email)
+		}
+	}
+
+	if err := s.UpsertAll(ctx, []*supmodel.Suppression{block("one@x.test", ""), block("two@x.test", "")}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := s.List(ctx, proj, store.SuppressionFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(rows) < 2 {
+		t.Errorf("a clean import wrote %d rows", len(rows))
+	}
+}

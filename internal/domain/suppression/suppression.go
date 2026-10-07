@@ -128,6 +128,33 @@ func listLimit(n int) int {
 
 // Upsert adds or refreshes the block for (project, email).
 func (s *Store) Upsert(ctx context.Context, sup *supmodel.Suppression) error {
+	return s.upsertWith(ctx, s.DB(), sup)
+}
+
+// UpsertAll writes every block in one transaction: all of them land,
+// or none.
+func (s *Store) UpsertAll(ctx context.Context, sups []*supmodel.Suppression) error {
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+	for _, sup := range sups {
+		if err := s.upsertWith(ctx, tx, sup); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// rowQuerier is what the upsert needs of a connection or a transaction.
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func (s *Store) upsertWith(ctx context.Context, db rowQuerier, sup *supmodel.Suppression) error {
 	if sup.ID == "" {
 		sup.ID = ids.New()
 	}
@@ -141,14 +168,14 @@ func (s *Store) Upsert(ctx context.Context, sup *supmodel.Suppression) error {
 	// RETURNING the row that holds the block, so on a refresh the
 	// caller sees the existing id and creation time, not the fresh ones
 	// that were never stored.
-	return s.QueryRow(ctx, `
+	return db.QueryRowContext(ctx, s.Q(`
         INSERT INTO suppressions (id, project_id, email, kind, reason, unsubscribe_list_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(project_id, email, unsubscribe_list_id) DO UPDATE SET
             kind   = excluded.kind,
             reason = excluded.reason
         RETURNING id, created_at
-    `, sup.ID, sup.ProjectID, sup.Email, sup.Kind, sup.Reason,
+    `), sup.ID, sup.ProjectID, sup.Email, sup.Kind, sup.Reason,
 		database.NullStr(sup.UnsubscribeListID), sup.CreatedAt).Scan(&sup.ID, &sup.CreatedAt)
 }
 
@@ -469,7 +496,8 @@ func (h *Handler) listNames(c fiber.Ctx, entries []createInput) (map[string]stri
 // Import blocks every address in the body, up to a thousand per
 // call, each written the way Create writes one. The same upsert, so
 // an address already on the list takes the kind and reason sent
-// rather than failing the import.
+// rather than failing the import, and all of them in one
+// transaction, so a refused row leaves nothing behind.
 func (h *Handler) Import(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	in, resp, ok := validation.Bind[importInput](c)
@@ -481,10 +509,13 @@ func (h *Handler) Import(c fiber.Ctx) error {
 		return err
 	}
 
+	sups := make([]*supmodel.Suppression, 0, len(in.Suppressions))
 	for _, item := range in.Suppressions {
-		if err := h.Runtime.Store.Suppression.Upsert(c.Context(), item.suppression(rc.Project.ID)); err != nil {
-			return response.Internal(c, err)
-		}
+		sups = append(sups, item.suppression(rc.Project.ID))
+	}
+
+	if err := h.Runtime.Store.Suppression.UpsertAll(c.Context(), sups); err != nil {
+		return response.Internal(c, err)
 	}
 
 	return response.Success(c, ImportResponse{Imported: len(in.Suppressions)})

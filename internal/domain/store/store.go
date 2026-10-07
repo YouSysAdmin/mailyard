@@ -914,6 +914,10 @@ type SuppressionStore interface {
 	List(ctx context.Context, projID string, f SuppressionFilter) ([]*suppression.Suppression, error)
 	Upsert(ctx context.Context, s *suppression.Suppression) error
 
+	// UpsertAll writes every block in ONE transaction, so an import
+	// refused on its tenth row leaves none of the first nine.
+	UpsertAll(ctx context.Context, sups []*suppression.Suppression) error
+
 	// Insert writes a new block and reports false, writing nothing,
 	// when the same (email, list) block already exists - the manual
 	// create answers 409 there, where Upsert refreshes kind and reason.

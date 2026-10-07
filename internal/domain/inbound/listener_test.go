@@ -138,6 +138,15 @@ func (f *fakeSuppressions) Upsert(_ context.Context, s *suppressionmodel.Suppres
 
 	return nil
 }
+func (f *fakeSuppressions) UpsertAll(ctx context.Context, sups []*suppressionmodel.Suppression) error {
+	for _, s := range sups {
+		if err := f.Upsert(ctx, s); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 func (f *fakeSuppressions) Insert(ctx context.Context, s *suppressionmodel.Suppression) (bool, error) {
 	return true, f.Upsert(ctx, s)
 }
