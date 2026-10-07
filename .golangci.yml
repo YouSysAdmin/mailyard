@@ -38,6 +38,15 @@ linters:
     - unconvert
     - wastedassign
 
+  # internal/third_party holds code carried in from elsewhere with one
+  # deliberate change each, read and tested as published. Linting it
+  # reports the upstream author's style, 25 findings on go-pkcs12
+  # alone, and every one fixed here is a line that drifts from the
+  # copy a cherry-pick has to land on.
+  exclusions:
+    paths:
+      - internal/third_party/
+
   settings:
     staticcheck:
       checks:

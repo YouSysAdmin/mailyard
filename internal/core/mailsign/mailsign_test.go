@@ -22,8 +22,10 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	"github.com/ProtonMail/go-crypto/openpgp/s2k"
 	"github.com/smallstep/pkcs7"
-	"software.sslmate.com/src/go-pkcs12"
+	"github.com/yousysadmin/mailyard/internal/third_party/pkcs12"
 
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
 )
@@ -457,5 +459,74 @@ func verifyWithGPG(t *testing.T, pubArmored, content string, sig []byte) {
 	ver.Env = env
 	if out, err := ver.CombinedOutput(); err != nil {
 		t.Fatalf("gpg does not verify the signature: %v\n%s", err, out)
+	}
+}
+
+// A protected key states its own passphrase derivation cost, and an
+// import refuses a cost above the cap before running it: an Argon2 key
+// asking for 128 MiB is refused, one asking for the 64 MiB the cap
+// allows opens, so the parameters are read from the right place.
+func TestPGPImportRefusesAProtectionAboveTheMemoryCap(t *testing.T) {
+	protect := func(memoryKiB uint32) string {
+		m, err := GeneratePGP("Billing", "billing@example.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(m.Private))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := &packet.Config{
+			AEADConfig: &packet.AEADConfig{DefaultMode: packet.AEADModeOCB},
+			S2KConfig: &s2k.Config{
+				S2KMode: s2k.Argon2S2K,
+				Argon2Config: &s2k.Argon2Config{
+					NumberOfPasses: 1, DegreeOfParallelism: 4, Memory: memoryKiB,
+				},
+			},
+		}
+		if err := ring[0].EncryptPrivateKeys([]byte("hunter2"), cfg); err != nil {
+			t.Fatal(err)
+		}
+
+		var out bytes.Buffer
+		w, _ := armor.Encode(&out, armorPrivate, nil)
+		if err := ring[0].SerializePrivateWithoutSigning(w, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		_ = w.Close()
+
+		return out.String()
+	}
+
+	if _, err := ImportPGP(protect(1<<(maxArgon2MemoryExp+1)), "hunter2", "billing@example.com"); !errors.Is(err, ErrKeyProtection) {
+		t.Errorf("a key above the cap: %v", err)
+	}
+
+	if _, err := ImportPGP(protect(1<<maxArgon2MemoryExp), "hunter2", "billing@example.com"); err != nil {
+		t.Errorf("a key at the cap: %v", err)
+	}
+}
+
+// A .p12 names its own KDF round count, and one above the cap is
+// refused by the decoder before a single round runs.
+func TestPKCS12ImportRefusesAnIterationCountAboveTheCap(t *testing.T) {
+	_, leafPEM, keyPEM := mintMailCertificate(t, "billing@example.com", time.Now(), true)
+	leaf, key := parsePair(t, leafPEM, keyPEM)
+	der, err := pkcs12.Modern.WithIterations(pkcs12.MaxIterations+1).Encode(key, leaf, nil, "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	started := time.Now()
+	if _, err := ImportPKCS12(der, "secret", "billing@example.com"); !errors.Is(err, ErrKeyProtection) {
+		t.Errorf("a file above the cap: %v", err)
+	}
+
+	if took := time.Since(started); took > time.Second {
+		t.Errorf("the refusal took %v, so the rounds were run before the count was read", took)
 	}
 }

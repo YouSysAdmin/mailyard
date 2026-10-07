@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -67,6 +68,10 @@ func ImportPGP(armored, passphrase, email string) (Material, error) {
 	}
 
 	if entity.PrivateKey.Encrypted {
+		if err := checkPGPProtection(armored); err != nil {
+			return Material{}, err
+		}
+
 		if err := entity.DecryptPrivateKeys([]byte(passphrase)); err != nil {
 			return Material{}, ErrPassphrase
 		}
@@ -81,6 +86,130 @@ func ImportPGP(armored, passphrase, email string) (Material, error) {
 	}
 
 	return pgpMaterial(entity)
+}
+
+// maxArgon2MemoryExp bounds the memory an Argon2-protected key may ask
+// for before it is opened: 2^16 KiB, 64 MiB, the memory-constrained
+// profile of RFC 9580. The cost is read from the key itself and
+// go-crypto accepts anything up to 2^31 KiB, two terabytes, which the
+// Argon2 implementation allocates in one piece before the first pass.
+// A key is imported by any project member, so the ceiling is what
+// keeps one of them from taking the node down with three bytes.
+const maxArgon2MemoryExp = 16
+
+// ErrKeyProtection is a protected key whose passphrase derivation asks
+// for more than an import may spend.
+var ErrKeyProtection = errors.New("mailsign: the key's passphrase protection is heavier than an import may run, export it with a lighter protection or without a passphrase")
+
+// Secret key packet tags, RFC 9580 section 5.5.1.3 and 5.5.1.4.
+const (
+	tagSecretKey    = 5
+	tagSecretSubkey = 7
+)
+
+// checkPGPProtection reads the string-to-key parameters of every
+// secret key packet in the block and refuses an Argon2 cost above
+// maxArgon2MemoryExp. go-crypto keeps those parameters to itself, so
+// they are read off the packet bytes: the public portion is sized by
+// serializing it, and what follows is the S2K usage octet, the cipher,
+// the AEAD mode where usage is 253, the v6 length octet, then the S2K
+// specifier whose fourth mode is Argon2 - salt, passes, parallelism,
+// memory exponent. Anything that cannot be read is refused, never
+// opened: a key this cannot parse is not one the decrypt may run on.
+func checkPGPProtection(armored string) error {
+	block, err := armor.Decode(strings.NewReader(armored))
+	if err != nil {
+		return fmt.Errorf("mailsign: not an armored openpgp key: %w", err)
+	}
+
+	r := packet.NewOpaqueReader(block.Body)
+	for {
+		op, err := r.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("mailsign: read key packet: %w", err)
+		}
+
+		if op.Tag != tagSecretKey && op.Tag != tagSecretSubkey {
+			continue
+		}
+
+		if err := checkSecretKeyPacket(op); err != nil {
+			return err
+		}
+	}
+}
+
+func checkSecretKeyPacket(op *packet.OpaquePacket) error {
+	parsed, err := op.Parse()
+	if err != nil {
+		return fmt.Errorf("mailsign: parse secret key packet: %w", err)
+	}
+
+	pk, ok := parsed.(*packet.PrivateKey)
+	if !ok {
+		return errors.New("mailsign: secret key packet did not parse as one")
+	}
+
+	if !pk.Encrypted {
+		return nil
+	}
+
+	// The public portion as the packet carries it, measured through
+	// the signature-hash form, which is a fixed prefix plus that body.
+	var prefix, hashed bytes.Buffer
+	if err := pk.SerializeSignaturePrefix(&prefix); err != nil {
+		return err
+	}
+
+	if err := pk.SerializeForHash(&hashed); err != nil {
+		return err
+	}
+
+	rest := op.Contents
+	i := hashed.Len() - prefix.Len()
+	if i < 0 || i >= len(rest) {
+		return ErrKeyProtection
+	}
+
+	usage := rest[i]
+	i++
+
+	// A v5 or v6 packet carries a count of the optional fields next.
+	if pk.Version >= 5 {
+		i++
+	}
+
+	// The cipher, then the AEAD mode when usage is 253.
+	i++
+	if usage == 253 {
+		i++
+	}
+
+	// A v6 packet carries the length of the S2K specifier.
+	if pk.Version == 6 {
+		i++
+	}
+
+	// The specifier: mode, and for Argon2 a 16 octet salt, passes,
+	// parallelism and the memory exponent.
+	const argon2Mode, argon2MemoryOffset = 4, 1 + 16 + 1 + 1
+	if i >= len(rest) {
+		return ErrKeyProtection
+	}
+
+	if rest[i] != argon2Mode {
+		return nil
+	}
+
+	if i+argon2MemoryOffset >= len(rest) || rest[i+argon2MemoryOffset] > maxArgon2MemoryExp {
+		return ErrKeyProtection
+	}
+
+	return nil
 }
 
 // readPGPPrivate parses an armored key ring and picks the first entity

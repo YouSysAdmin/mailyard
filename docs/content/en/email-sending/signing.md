@@ -37,7 +37,9 @@ client, which is worse than no signature at all. Get one from a public authority
 your organisation's own authority if your recipients' machines trust it.
 
 The dialog takes the `.p12` or `.pfx` file the authority hands over, with its password, or a PEM certificate chain plus
-an unencrypted PEM private key. A password-protected PEM key goes in as a `.p12` file instead.
+an unencrypted PEM private key. A password-protected PEM key goes in as a `.p12` file instead. A `.p12` whose
+password derivation asks for more than a million rounds is refused before any of them run, with a pointer to
+re-export the file with a lighter protection.
 
 The certificate is checked at import, because every one of these would otherwise be found by a recipient:
 
@@ -51,7 +53,9 @@ The certificate is checked at import, because every one of these would otherwise
 
 **Generate key** mints an Ed25519 signing key with a Curve25519 encryption subkey and the address as its single user id.
 **Import** takes an armored private key block, opened with its passphrase, as long as one of its user ids is the
-address. The passphrase is removed on import and the key is stored encrypted at rest, like every secret here.
+address. The passphrase is removed on import and the key is stored encrypted at rest, like every secret here. A key
+protected with Argon2 asking for more than 64 MiB of memory is refused before it is opened: export it with a lighter
+protection or without a passphrase, which costs nothing since the stored copy is sealed either way.
 
 With **Attach the public key** on, which is the default, every message carries an `Autocrypt` header and an
 `OpenPGP_0x....asc` file inside the signed body. Thunderbird and other Autocrypt clients learn the key from the first

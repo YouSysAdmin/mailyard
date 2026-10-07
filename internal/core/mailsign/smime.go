@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/smallstep/pkcs7"
-	"software.sslmate.com/src/go-pkcs12"
+	"github.com/yousysadmin/mailyard/internal/third_party/pkcs12"
 )
 
 const (
@@ -57,6 +57,10 @@ func ImportPKCS12(der []byte, password, email string) (Material, error) {
 	if err != nil {
 		if errors.Is(err, pkcs12.ErrIncorrectPassword) {
 			return Material{}, ErrPassphrase
+		}
+
+		if errors.Is(err, pkcs12.ErrTooManyIterations) {
+			return Material{}, ErrKeyProtection
 		}
 
 		return Material{}, fmt.Errorf("mailsign: not a pkcs12 file: %w", err)
