@@ -50,23 +50,31 @@ export interface DomainPayload {
   dns_records: DNSRecord[]
 }
 
+// A share is pending until the other project accepts it.
+export type ShareStatus = 'pending' | 'accepted'
+
 // DomainGrant is another project this project's domain is shared with.
-// The id is for the revoke call only, the console shows the name.
+// The id is for the revoke call only, the console shows the name - which
+// is empty while the grant is pending, so the slug is shown then.
 export interface DomainGrant {
   domain_id: string
   project_id: string
   project_name: string
   project_slug: string
   granted_by?: string
+  status: ShareStatus
+  accepted_at?: string
   created_at: string
 }
 
 // SharedDomain is a domain another project shared with this one: this
-// project may send as it, only the owner manages it.
+// project may send as it once it accepts, only the owner manages it.
 export interface SharedDomain {
   id: string
   domain: string
   owner_name: string
+  status: ShareStatus
+  accepted_at?: string
   created_at: string
 }
 
@@ -88,4 +96,9 @@ export const domainsApi = {
   share: (id: string, projectSlug: string) =>
     api.post<{ grants: DomainGrant[] }>(`/domains/${id}/grants`, { project_slug: projectSlug }),
   unshare: (id: string, projectId: string) => api.delete(`/domains/${id}/grants/${projectId}`),
+  // The grantee's side: the id is the OWNER's domain id, as shared
+  // carries it. Accept makes the domain usable, leave declines an offer
+  // or gives an accepted domain back.
+  acceptShare: (id: string) => api.post<{ shared: SharedDomain }>(`/domains/${id}/shares/accept`),
+  leaveShare: (id: string) => api.delete(`/domains/${id}/shares`),
 }

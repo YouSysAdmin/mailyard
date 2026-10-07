@@ -403,6 +403,14 @@ class API:
         "Unshare"
         return self._t.request("DELETE", f"/domains/{_esc(id)}/grants/{_esc(project_id)}", body=None, query=query)
 
+    def delete_domain_share(self, id, **query: Any) -> Any:
+        "Decline or leave a shared domain"
+        return self._t.request("DELETE", f"/domains/{_esc(id)}/shares", body=None, query=query)
+
+    def shares_accept_domain(self, id, **query: Any) -> Any:
+        "Accept a shared domain"
+        return self._t.request("POST", f"/domains/{_esc(id)}/shares/accept", body=None, query=query)
+
     def verify_domain(self, id, **query: Any) -> Any:
         "Verify"
         return self._t.request("POST", f"/domains/{_esc(id)}/verify", body=None, query=query)

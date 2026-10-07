@@ -8,7 +8,7 @@
 // warning (it should have moved). Merging them would have to pick one.
 
 export type StatusScope =
-  'email' | 'campaign' | 'campaignMessage' | 'subscriber' | 'inbound' | 'webhook'
+  'email' | 'campaign' | 'campaignMessage' | 'subscriber' | 'inbound' | 'webhook' | 'share'
 
 const scopes: Record<StatusScope, Record<string, string>> = {
   email: {
@@ -50,6 +50,12 @@ const scopes: Record<StatusScope, Record<string, string>> = {
   webhook: {
     active: 'badge-success',
     disabled: 'badge-danger',
+  },
+  // A domain share: pending is an offer waiting on the other project,
+  // a warning because nothing sends until somebody answers it.
+  share: {
+    pending: 'badge-warning',
+    accepted: 'badge-success',
   },
 }
 

@@ -496,6 +496,16 @@ module Mailyard
       @t.request("DELETE", "/domains/#{esc(id)}/grants/#{esc(project_id)}", body: nil, query: query)
     end
 
+    # Decline or leave a shared domain
+    def delete_domain_share(id, **query)
+      @t.request("DELETE", "/domains/#{esc(id)}/shares", body: nil, query: query)
+    end
+
+    # Accept a shared domain
+    def shares_accept_domain(id, **query)
+      @t.request("POST", "/domains/#{esc(id)}/shares/accept", body: nil, query: query)
+    end
+
     # Verify
     def verify_domain(id, **query)
       @t.request("POST", "/domains/#{esc(id)}/verify", body: nil, query: query)

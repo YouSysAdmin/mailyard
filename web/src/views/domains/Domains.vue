@@ -19,6 +19,7 @@ import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
 import SendersCard from './SendersCard.vue'
 import DomainShareModal from './DomainShareModal.vue'
+import StatusBadge from '../../components/StatusBadge.vue'
 import { useFieldErrors } from '../../composables/fieldErrors'
 
 const notify = useNotificationStore()
@@ -28,9 +29,50 @@ const { confirm } = useConfirm()
 const loading = ref(true)
 const domains = ref<InboundDomain[]>([])
 
-// Domains other projects shared with this one. Read-only here: this
-// project may send as them, their owner manages them.
+// Domains other projects shared with this one. Their owner manages
+// them, this project only answers the offer: accept, and it may send
+// as them, decline or leave, and it may not.
 const shared = ref<SharedDomain[]>([])
+const answeringId = ref<string | null>(null)
+
+async function acceptShare(s: SharedDomain) {
+  answeringId.value = s.id
+  try {
+    const res = await domainsApi.acceptShare(s.id)
+    shared.value = shared.value.map((x) => (x.id === s.id ? res.data.shared : x))
+    notify.success(`This project can now send as ${s.domain}`)
+    sendersCard.value?.reload()
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to accept the shared domain'))
+  } finally {
+    answeringId.value = null
+  }
+}
+
+async function leaveShare(s: SharedDomain) {
+  const pending = s.status === 'pending'
+  const ok = await confirm({
+    title: pending ? 'Decline the offer' : 'Leave the shared domain',
+    message: pending
+      ? `${s.owner_name} offered ${s.domain} to this project. Decline it?`
+      : `This project will no longer be able to send as ${s.domain}.`,
+    confirmText: pending ? 'Decline' : 'Leave',
+    variant: 'danger',
+  })
+  if (!ok) return
+
+  answeringId.value = s.id
+  try {
+    await domainsApi.leaveShare(s.id)
+    shared.value = shared.value.filter((x) => x.id !== s.id)
+    notify.success(pending ? `The offer of ${s.domain} was declined` : `${s.domain} was left`)
+    sendersCard.value?.reload()
+  } catch (e) {
+    notify.error(apiErrorMessage(e, 'Failed to answer the shared domain'))
+  } finally {
+    answeringId.value = null
+  }
+}
 
 // The domain whose share dialog is open.
 const sharing = ref<InboundDomain | null>(null)
@@ -326,8 +368,8 @@ async function deleteDomain(d: InboundDomain) {
       </div>
       <div class="card-body">
         <p class="dns-intro">
-          This project may send as these domains through its own SMTP servers. Their DNS records,
-          DKIM key and inbound mail are managed by the project that owns them.
+          This project may send as these domains through its own SMTP servers once it accepts them.
+          Their DNS records, DKIM key and inbound mail are managed by the project that owns them.
         </p>
         <div class="table-wrapper">
           <table>
@@ -335,7 +377,9 @@ async function deleteDomain(d: InboundDomain) {
               <tr>
                 <th>Domain</th>
                 <th>Owned by</th>
+                <th>Status</th>
                 <th>Shared</th>
+                <th v-if="projStore.can('domains:write')" class="col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -344,7 +388,27 @@ async function deleteDomain(d: InboundDomain) {
                   <code>{{ s.domain }}</code>
                 </td>
                 <td>{{ s.owner_name }}</td>
-                <td>{{ formatDate(s.created_at) }}</td>
+                <td><StatusBadge :status="s.status" scope="share" /></td>
+                <td>{{ formatDate(s.accepted_at ?? s.created_at) }}</td>
+                <td v-if="projStore.can('domains:write')" class="col-actions">
+                  <button
+                    v-if="s.status === 'pending'"
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    :disabled="answeringId === s.id"
+                    @click="acceptShare(s)"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger btn-sm"
+                    :disabled="answeringId === s.id"
+                    @click="leaveShare(s)"
+                  >
+                    {{ s.status === 'pending' ? 'Decline' : 'Leave' }}
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>

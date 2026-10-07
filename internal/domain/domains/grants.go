@@ -17,8 +17,17 @@ import (
 // inbound mail. A grant lets the other project SEND as the domain and
 // its subdomains, through its own servers, signed with the owner's key
 // - store.DomainStore.GetVerifiedCoveringFor is where that is decided.
-// Only the owner sees or changes grants, so every route here starts
-// from the owner-scoped Get.
+//
+// A SHARE IS AN OFFER UNTIL THE OTHER PROJECT ACCEPTS IT. The owner
+// names a slug, and nothing stops it naming any slug on the
+// installation, so before this a project could be made to send as a
+// stranger's domain with no say in it, and the stranger learned the
+// project's name from the grant list. A pending grant covers no
+// sending and shows the owner the slug it typed. The grantee sees the
+// offer under shared on its domain list, and answers it through
+// /domains/:id/shares, which is addressed by the OWNER's domain id and
+// scoped to the caller's project: the owner's grant routes start from
+// the owner-scoped Get, these two start from the caller's grant.
 
 // Grants serves GET /api/v1/domains/:id/grants.
 func (h *Handler) Grants(c fiber.Ctx) error {
@@ -75,6 +84,48 @@ func (h *Handler) Share(c fiber.Ctx) error {
 	}
 
 	return h.grantsResponse(c, rc, d)
+}
+
+// AcceptShare serves POST /api/v1/domains/:id/shares/accept, the grantee
+// accepting a domain offered to it. Accepting again changes nothing.
+func (h *Handler) AcceptShare(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	found, err := h.Runtime.Store.Domain.AcceptGrant(c.Context(), c.Params("id"), rc.Project.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !found {
+		return response.NotFound(c, "share not found")
+	}
+
+	sh, err := h.Runtime.Store.Domain.GetShared(c.Context(), rc.Project.ID, c.Params("id"))
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if sh == nil {
+		return response.NotFound(c, "share not found")
+	}
+
+	return response.Success(c, ShareResponse{Shared: sh})
+}
+
+// LeaveShare serves DELETE /api/v1/domains/:id/shares: the grantee
+// declining an offer, or giving up a domain it had accepted. The same
+// row goes either way.
+func (h *Handler) LeaveShare(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	gone, err := h.Runtime.Store.Domain.Revoke(c.Context(), c.Params("id"), rc.Project.ID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	if !gone {
+		return response.NotFound(c, "share not found")
+	}
+
+	return response.NoContent(c)
 }
 
 // Unshare serves DELETE /api/v1/domains/:id/grants/:project_id.

@@ -58,6 +58,12 @@ type GrantsResponse struct {
 	Grants []*dmodel.Grant `json:"grants"`
 }
 
+// ShareResponse is one domain shared with the caller's project, as
+// the grantee sees it.
+type ShareResponse struct {
+	Shared *dmodel.Shared `json:"shared"`
+}
+
 // DetailResponse is one domain plus every DNS record the operator has
 // to publish, each with its current state, so the console never has to
 // assemble them.

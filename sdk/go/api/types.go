@@ -610,10 +610,12 @@ type Domain struct {
 
 // DomainShared is the wire body.
 type DomainShared struct {
-	ID        string    `json:"id"`
-	Domain    string    `json:"domain"`
-	OwnerName string    `json:"owner_name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         string     `json:"id"`
+	Domain     string     `json:"domain"`
+	OwnerName  string     `json:"owner_name"`
+	Status     string     `json:"status"`
+	AcceptedAt *time.Time `json:"accepted_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 // DomainsCreateInput is the request body.
@@ -840,12 +842,14 @@ type GetResponse struct {
 
 // Grant is the wire body.
 type Grant struct {
-	DomainID    string    `json:"domain_id"`
-	ProjectID   string    `json:"project_id"`
-	ProjectName string    `json:"project_name"`
-	ProjectSlug string    `json:"project_slug"`
-	GrantedBy   string    `json:"granted_by,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	DomainID    string     `json:"domain_id"`
+	ProjectID   string     `json:"project_id"`
+	ProjectName string     `json:"project_name"`
+	ProjectSlug string     `json:"project_slug"`
+	GrantedBy   string     `json:"granted_by,omitempty"`
+	Status      string     `json:"status"`
+	AcceptedAt  *time.Time `json:"accepted_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 // GrantInput is the request body.

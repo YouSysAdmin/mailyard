@@ -86,21 +86,48 @@ func (d *Domain) CanSign() bool {
 // that project may send as the domain, signed with the owner's key.
 // ProjectName and ProjectSlug name the grantee, read with the grant.
 type Grant struct {
-	DomainID    string    `json:"domain_id"`
-	ProjectID   string    `json:"project_id"`
-	ProjectName string    `json:"project_name"`
-	ProjectSlug string    `json:"project_slug"`
-	GrantedBy   string    `json:"granted_by,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	DomainID  string `json:"domain_id"`
+	ProjectID string `json:"project_id"`
+
+	// ProjectName is empty while the grant is pending: the owner typed
+	// a slug, and learns the project's name once it accepts.
+	ProjectName string `json:"project_name"`
+	ProjectSlug string `json:"project_slug"`
+	GrantedBy   string `json:"granted_by,omitempty"`
+
+	// Status is pending until the other project accepts, accepted after.
+	Status     string     `json:"status"`
+	AcceptedAt *time.Time `json:"accepted_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// Grant and share statuses.
+const (
+	GrantPending  = "pending"
+	GrantAccepted = "accepted"
+)
+
+// GrantStatus names the state a grant row is in.
+func GrantStatus(acceptedAt *time.Time) string {
+	if acceptedAt == nil {
+		return GrantPending
+	}
+
+	return GrantAccepted
 }
 
 // Shared is a domain another project shared with this one, as the
 // grantee sees it: the name and who owns it, nothing of its records.
 type Shared struct {
-	ID        string    `json:"id"`
-	Domain    string    `json:"domain"`
-	OwnerName string    `json:"owner_name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string `json:"id"`
+	Domain    string `json:"domain"`
+	OwnerName string `json:"owner_name"`
+
+	// Status is pending until this project accepts the share. A
+	// pending share covers no sending.
+	Status     string     `json:"status"`
+	AcceptedAt *time.Time `json:"accepted_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 // Rotating reports whether a DKIM key rotation is pending.

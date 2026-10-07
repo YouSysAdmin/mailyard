@@ -1244,6 +1244,12 @@ type DomainStore interface {
 	Revoke(ctx context.Context, domainID, projID string) (bool, error)
 	ListGrants(ctx context.Context, ownerProjID, domainID string) ([]*domain.Grant, error)
 	ListShared(ctx context.Context, projID string) ([]*domain.Shared, error)
+
+	// A grant is PENDING until the project it names accepts it, and
+	// covers no sending before. AcceptGrant and GetShared are the
+	// grantee's side, Revoke serves both sides.
+	AcceptGrant(ctx context.Context, domainID, projID string) (bool, error)
+	GetShared(ctx context.Context, projID, domainID string) (*domain.Shared, error)
 }
 
 // InboundStore persists mail received by the MX listener.

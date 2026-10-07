@@ -870,6 +870,10 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	doms.Get("/:id/grants", permRead, dh.Grants)
 	doms.Post("/:id/grants", permWrite, dh.Share)
 	doms.Delete("/:id/grants/:project_id", permWrite, dh.Unshare)
+	// The grantee's side of a share, addressed by the owner's domain id
+	// and scoped to the caller's own grant.
+	doms.Post("/:id/shares/accept", permWrite, dh.AcceptShare)
+	doms.Delete("/:id/shares", permWrite, dh.LeaveShare)
 	doms.Delete("/:id", permDelete, dh.Delete)
 
 	// Inbound emails - mail received by the MX listener.

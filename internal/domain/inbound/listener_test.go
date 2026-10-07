@@ -86,6 +86,10 @@ func (f *fakeDomains) ListGrants(context.Context, string, string) ([]*dmodel.Gra
 func (f *fakeDomains) ListShared(context.Context, string) ([]*dmodel.Shared, error) {
 	return nil, nil
 }
+func (f *fakeDomains) AcceptGrant(context.Context, string, string) (bool, error) { return false, nil }
+func (f *fakeDomains) GetShared(context.Context, string, string) (*dmodel.Shared, error) {
+	return nil, nil
+}
 
 // fakeInbound stores rows in memory.
 type fakeInbound struct{ rows []*imodel.Email }

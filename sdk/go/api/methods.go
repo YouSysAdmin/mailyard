@@ -671,6 +671,21 @@ func (c *Client) DeleteDomainGrant(ctx context.Context, id string, projectId str
 	return err
 }
 
+// DeleteDomainShare Decline or leave a shared domain.
+//
+// DELETE /domains/:id/shares
+func (c *Client) DeleteDomainShare(ctx context.Context, id string, opts ...RequestOption) error {
+	_, err := do[struct{}](ctx, c, "DELETE", fmt.Sprintf("/domains/%s/shares", escape(id)), nil, opts)
+	return err
+}
+
+// SharesAcceptDomain Accept a shared domain.
+//
+// POST /domains/:id/shares/accept
+func (c *Client) SharesAcceptDomain(ctx context.Context, id string, opts ...RequestOption) (ShareResponse, error) {
+	return do[ShareResponse](ctx, c, "POST", fmt.Sprintf("/domains/%s/shares/accept", escape(id)), nil, opts)
+}
+
 // VerifyDomain Verify.
 //
 // POST /domains/:id/verify

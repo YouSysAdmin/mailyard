@@ -76,7 +76,20 @@ func TestAGrantLetsAnotherProjectSendAsTheDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A repeat is a no-op, not a conflict.
+	// An offer covers nothing until the other project accepts it.
+	if for_("example.com", granteeProj) != nil {
+		t.Fatal("a project sends as another's domain before it accepted the share")
+	}
+
+	if ok, err := s.AcceptGrant(ctx, apexID, thirdProj); err != nil || ok {
+		t.Fatalf("a project with no offer accepted one: %v %v", ok, err)
+	}
+
+	if ok, err := s.AcceptGrant(ctx, apexID, granteeProj); err != nil || !ok {
+		t.Fatalf("accept: %v %v", ok, err)
+	}
+
+	// A repeat is a no-op, not a conflict, and does not undo the acceptance.
 	if err := s.Grant(ctx, &dmodel.Grant{DomainID: apexID, ProjectID: granteeProj}); err != nil {
 		t.Fatalf("a repeat grant: %v", err)
 	}
@@ -162,6 +175,8 @@ func TestTheGrantsEndpoint(t *testing.T) {
 		a.Get("/domains/:id/grants", h.Grants)
 		a.Post("/domains/:id/grants", h.Share)
 		a.Delete("/domains/:id/grants/:project_id", h.Unshare)
+		a.Post("/domains/:id/shares/accept", h.AcceptShare)
+		a.Delete("/domains/:id/shares", h.LeaveShare)
 
 		return a
 	}
@@ -206,16 +221,67 @@ func TestTheGrantsEndpoint(t *testing.T) {
 		t.Errorf("the grantee listed the owner's grants: %d", code)
 	}
 
+	// Pending: the owner sees the slug it typed and no name, the
+	// grantee sees the offer.
 	_, body := call(owner, "GET", "/domains/"+apexID+"/grants", "")
 	var gr GrantsResponse
-	if err := json.Unmarshal([]byte(body), &gr); err != nil || len(gr.Grants) != 1 || gr.Grants[0].ProjectName != "Auth" {
-		t.Fatalf("grants = %s, want one for Auth", body)
+	if err := json.Unmarshal([]byte(body), &gr); err != nil || len(gr.Grants) != 1 ||
+		gr.Grants[0].Status != dmodel.GrantPending || gr.Grants[0].ProjectName != "" || gr.Grants[0].ProjectSlug != "auth" {
+		t.Fatalf("grants = %s, want one pending for the slug auth with no name", body)
 	}
 
 	_, body = call(grantee, "GET", "/domains", "")
 	var lr ListResponse
-	if err := json.Unmarshal([]byte(body), &lr); err != nil || len(lr.Domains) != 0 || len(lr.Shared) != 1 || lr.Shared[0].OwnerName != "Main" {
-		t.Fatalf("the grantee's list = %s, want no domains of its own and example.com shared by Main", body)
+	if err := json.Unmarshal([]byte(body), &lr); err != nil || len(lr.Domains) != 0 || len(lr.Shared) != 1 ||
+		lr.Shared[0].OwnerName != "Main" || lr.Shared[0].Status != dmodel.GrantPending {
+		t.Fatalf("the grantee's list = %s, want no domains of its own and example.com offered by Main", body)
+	}
+
+	// Only the project the offer names can answer it, and a stranger
+	// gets the same answer as for a domain that was never shared.
+	third := app(thirdProj)
+	if code, _ := call(third, "POST", "/domains/"+apexID+"/shares/accept", ""); code != 404 {
+		t.Errorf("a stranger accepted an offer not made to it: %d", code)
+	}
+
+	if code, _ := call(third, "DELETE", "/domains/"+apexID+"/shares", ""); code != 404 {
+		t.Errorf("a stranger declined an offer not made to it: %d", code)
+	}
+
+	if code, _ := call(grantee, "POST", "/domains/"+childID+"/shares/accept", ""); code != 404 {
+		t.Errorf("accepting a domain never offered: %d", code)
+	}
+
+	code, body := call(grantee, "POST", "/domains/"+apexID+"/shares/accept", "")
+	var sr ShareResponse
+	if err := json.Unmarshal([]byte(body), &sr); code != 200 || err != nil || sr.Shared == nil ||
+		sr.Shared.Status != dmodel.GrantAccepted || sr.Shared.AcceptedAt == nil {
+		t.Fatalf("accept = %d %s, want the share accepted", code, body)
+	}
+
+	// Accepted: the name is told, and the owner's list says so.
+	_, body = call(owner, "GET", "/domains/"+apexID+"/grants", "")
+	if err := json.Unmarshal([]byte(body), &gr); err != nil || len(gr.Grants) != 1 ||
+		gr.Grants[0].Status != dmodel.GrantAccepted || gr.Grants[0].ProjectName != "Auth" {
+		t.Fatalf("grants = %s, want one accepted for Auth", body)
+	}
+
+	if code, _ := call(grantee, "POST", "/domains/"+apexID+"/shares/accept", ""); code != 200 {
+		t.Errorf("accepting twice: %d, want 200", code)
+	}
+
+	// The grantee can give it back, after which the owner has nothing to revoke.
+	if code, _ := call(grantee, "DELETE", "/domains/"+apexID+"/shares", ""); code != 204 {
+		t.Errorf("leave: %d, want 204", code)
+	}
+
+	if code, _ := call(owner, "DELETE", "/domains/"+apexID+"/grants/"+granteeProj, ""); code != 404 {
+		t.Errorf("revoke after the grantee left: %d, want 404", code)
+	}
+
+	// Offered again and withdrawn by the owner before an answer.
+	if code, _ := call(owner, "POST", "/domains/"+apexID+"/grants", `{"project_slug":"auth"}`); code != 200 {
+		t.Errorf("share again: %d", code)
 	}
 
 	if code, _ := call(owner, "DELETE", "/domains/"+apexID+"/grants/"+granteeProj, ""); code != 204 {

@@ -16,6 +16,7 @@ import { formatDate } from '../../composables/formatDate'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
 import LoadingBlock from '../../components/LoadingBlock.vue'
+import StatusBadge from '../../components/StatusBadge.vue'
 
 const props = defineProps<{ domain: InboundDomain }>()
 const emit = defineEmits<{ close: [] }>()
@@ -59,11 +60,20 @@ async function share() {
   }
 }
 
+// The name arrives once the other project accepts. Until then the
+// owner sees the slug it typed, which is all it is entitled to.
+function grantName(g: DomainGrant) {
+  return g.project_name || g.project_slug
+}
+
 async function revoke(g: DomainGrant) {
+  const pending = g.status === 'pending'
   const ok = await confirm({
-    title: 'Stop sharing',
-    message: `${g.project_name} will no longer be able to send as ${props.domain.domain}.`,
-    confirmText: 'Stop sharing',
+    title: pending ? 'Withdraw the offer' : 'Stop sharing',
+    message: pending
+      ? `${grantName(g)} will no longer be offered ${props.domain.domain}.`
+      : `${grantName(g)} will no longer be able to send as ${props.domain.domain}.`,
+    confirmText: pending ? 'Withdraw' : 'Stop sharing',
     variant: 'danger',
   })
   if (!ok) return
@@ -72,7 +82,11 @@ async function revoke(g: DomainGrant) {
   try {
     await domainsApi.unshare(props.domain.id, g.project_id)
     grants.value = grants.value.filter((x) => x.project_id !== g.project_id)
-    notify.success(`${g.project_name} can no longer send as ${props.domain.domain}`)
+    notify.success(
+      pending
+        ? `The offer to ${grantName(g)} was withdrawn`
+        : `${grantName(g)} can no longer send as ${props.domain.domain}`,
+    )
   } catch (e) {
     notify.error(apiErrorMessage(e, 'Failed to stop sharing'))
   } finally {
@@ -93,8 +107,8 @@ onMounted(load)
   >
     <p class="share-intro">
       A project you share this domain with can send as it and its subdomains through its own SMTP
-      servers, signed with this domain's DKIM key. DNS records, the key and inbound mail stay with
-      this project.
+      servers, signed with this domain's DKIM key, once it accepts the offer. DNS records, the key
+      and inbound mail stay with this project.
     </p>
 
     <LoadingBlock v-if="loading" />
@@ -104,6 +118,7 @@ onMounted(load)
         <thead>
           <tr>
             <th>Project</th>
+            <th>Status</th>
             <th>Shared</th>
             <th class="col-actions"></th>
           </tr>
@@ -111,9 +126,11 @@ onMounted(load)
         <tbody>
           <tr v-for="g in grants" :key="g.project_id">
             <td>
-              {{ g.project_name }} <code>{{ g.project_slug }}</code>
+              <template v-if="g.project_name">{{ g.project_name }} </template>
+              <code>{{ g.project_slug }}</code>
             </td>
-            <td>{{ formatDate(g.created_at) }}</td>
+            <td><StatusBadge :status="g.status" scope="share" /></td>
+            <td>{{ formatDate(g.accepted_at ?? g.created_at) }}</td>
             <td class="col-actions">
               <button
                 type="button"
@@ -121,7 +138,7 @@ onMounted(load)
                 :disabled="revokingId === g.project_id"
                 @click="revoke(g)"
               >
-                Stop sharing
+                {{ g.status === 'pending' ? 'Withdraw' : 'Stop sharing' }}
               </button>
             </td>
           </tr>

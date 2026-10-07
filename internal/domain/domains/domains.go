@@ -163,10 +163,13 @@ func (s *Store) GetVerifiedCoveringFor(ctx context.Context, name, projID string)
 		}
 	}
 
+	// A pending grant covers nothing: the other project has not said yes.
 	var granted bool
-	if err := s.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM domain_grants WHERE project_id = ? AND domain_id = ANY(?::uuid[]))`,
-		projID, owned).Scan(&granted); err != nil {
+	if err := s.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1 FROM domain_grants
+            WHERE project_id = ? AND domain_id = ANY(?::uuid[]) AND accepted_at IS NOT NULL
+        )`, projID, owned).Scan(&granted); err != nil {
 		return nil, err
 	}
 
@@ -200,8 +203,9 @@ func (s *Store) ZoneTakenByAnother(ctx context.Context, name, projID string) (bo
 // project verified. One wording for both directions.
 const zoneTaken = "another project verified a domain in this zone - ask its owner to verify the name and share it with this project"
 
-// Grant shares a domain with another project. A repeat is a no-op,
-// so the caller does not have to ask first.
+// Grant offers a domain to another project, pending until that
+// project accepts. A repeat is a no-op, so the caller does not have to
+// ask first, and it does not reset an acceptance.
 func (s *Store) Grant(ctx context.Context, g *dmodel.Grant) error {
 	if g.CreatedAt.IsZero() {
 		g.CreatedAt = time.Now().UTC()
@@ -216,7 +220,24 @@ func (s *Store) Grant(ctx context.Context, g *dmodel.Grant) error {
 	return err
 }
 
-// Revoke takes a grant back and reports whether there was one.
+// AcceptGrant marks the grant offered to projID as accepted and
+// reports whether there was one. Accepting again changes nothing.
+func (s *Store) AcceptGrant(ctx context.Context, domainID, projID string) (bool, error) {
+	res, err := s.Exec(ctx, `
+        UPDATE domain_grants SET accepted_at = COALESCE(accepted_at, now())
+        WHERE domain_id = ? AND project_id = ?`, domainID, projID)
+	if err != nil {
+		return false, err
+	}
+
+	n, err := res.RowsAffected()
+
+	return n > 0, err
+}
+
+// Revoke takes a grant back and reports whether there was one. Either
+// side calls it: the owner to stop sharing, the grantee to decline or
+// leave, each naming its own project.
 func (s *Store) Revoke(ctx context.Context, domainID, projID string) (bool, error) {
 	res, err := s.Exec(ctx, `DELETE FROM domain_grants WHERE domain_id = ? AND project_id = ?`, domainID, projID)
 	if err != nil {
@@ -230,9 +251,14 @@ func (s *Store) Revoke(ctx context.Context, domainID, projID string) (bool, erro
 
 // ListGrants lists who one domain is shared with, scoped to its OWNER:
 // a domain id another project owns answers nothing.
+//
+// The name is withheld while the grant is pending: the owner typed a
+// slug, and what a slug stands for is the other project's to tell.
 func (s *Store) ListGrants(ctx context.Context, ownerProjID, domainID string) ([]*dmodel.Grant, error) {
 	rows, err := s.Query(ctx, `
-        SELECT g.domain_id, g.project_id, p.name, p.slug, g.granted_by, g.created_at
+        SELECT g.domain_id, g.project_id,
+               CASE WHEN g.accepted_at IS NULL THEN '' ELSE p.name END,
+               p.slug, g.granted_by, g.accepted_at, g.created_at
         FROM domain_grants g
         JOIN domains d ON d.id = g.domain_id
         JOIN projects p ON p.id = g.project_id
@@ -246,10 +272,14 @@ func (s *Store) ListGrants(ctx context.Context, ownerProjID, domainID string) ([
 	out := []*dmodel.Grant{}
 	for rows.Next() {
 		var g dmodel.Grant
-		if err := rows.Scan(&g.DomainID, &g.ProjectID, &g.ProjectName, &g.ProjectSlug, &g.GrantedBy, &g.CreatedAt); err != nil {
+		var accepted sql.NullTime
+		if err := rows.Scan(&g.DomainID, &g.ProjectID, &g.ProjectName, &g.ProjectSlug, &g.GrantedBy,
+			&accepted, &g.CreatedAt); err != nil {
 			return nil, err
 		}
 
+		g.AcceptedAt = timePtr(accepted)
+		g.Status = dmodel.GrantStatus(g.AcceptedAt)
 		out = append(out, &g)
 	}
 
@@ -257,13 +287,10 @@ func (s *Store) ListGrants(ctx context.Context, ownerProjID, domainID string) ([
 }
 
 // ListShared lists the verified domains other projects shared with
-// projID, with the owner's name and nothing of the records.
+// projID, pending offers included, with the owner's name and nothing
+// of the records.
 func (s *Store) ListShared(ctx context.Context, projID string) ([]*dmodel.Shared, error) {
-	rows, err := s.Query(ctx, `
-        SELECT d.id, d.domain, p.name, g.created_at
-        FROM domain_grants g
-        JOIN domains d ON d.id = g.domain_id
-        JOIN projects p ON p.id = d.project_id
+	rows, err := s.Query(ctx, sharedSelect+`
         WHERE g.project_id = ? AND d.verified = TRUE
         ORDER BY d.domain ASC`, projID)
 	if err != nil {
@@ -273,15 +300,54 @@ func (s *Store) ListShared(ctx context.Context, projID string) ([]*dmodel.Shared
 	defer func() { _ = rows.Close() }()
 	out := []*dmodel.Shared{}
 	for rows.Next() {
-		var sh dmodel.Shared
-		if err := rows.Scan(&sh.ID, &sh.Domain, &sh.OwnerName, &sh.CreatedAt); err != nil {
+		sh, err := scanShared(rows)
+		if err != nil {
 			return nil, err
 		}
 
-		out = append(out, &sh)
+		out = append(out, sh)
 	}
 
 	return out, rows.Err()
+}
+
+// GetShared is one domain shared with projID, as ListShared lists it,
+// or nil when there is no such grant.
+func (s *Store) GetShared(ctx context.Context, projID, domainID string) (*dmodel.Shared, error) {
+	sh, err := scanShared(s.QueryRow(ctx, sharedSelect+`
+        WHERE g.project_id = ? AND g.domain_id = ? AND d.verified = TRUE`, projID, domainID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	return sh, err
+}
+
+func timePtr(t sql.NullTime) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+
+	return &t.Time
+}
+
+const sharedSelect = `
+        SELECT d.id, d.domain, p.name, g.accepted_at, g.created_at
+        FROM domain_grants g
+        JOIN domains d ON d.id = g.domain_id
+        JOIN projects p ON p.id = d.project_id`
+
+func scanShared(r interface{ Scan(...any) error }) (*dmodel.Shared, error) {
+	var sh dmodel.Shared
+	var accepted sql.NullTime
+	if err := r.Scan(&sh.ID, &sh.Domain, &sh.OwnerName, &accepted, &sh.CreatedAt); err != nil {
+		return nil, err
+	}
+
+	sh.AcceptedAt = timePtr(accepted)
+	sh.Status = dmodel.GrantStatus(sh.AcceptedAt)
+
+	return &sh, nil
 }
 
 // VerifiedNames lists every verified domain in the installation.

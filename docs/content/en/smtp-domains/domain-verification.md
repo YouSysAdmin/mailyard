@@ -252,14 +252,26 @@ curl -X POST http://localhost:3000/api/v1/domains/{id}/grants \
 
 In the console it is the **Share** action on a verified domain. The other project is named by its slug.
 
-The project it is shared with may:
+A share is an **offer until the other project accepts it**. The grant is `pending` from the moment the owner names
+the slug, covers no sending, and shows the owner only the slug it typed. The other project sees the offer under
+**Shared with this project** with **Accept** and **Decline**, or answers it through the API:
+
+```
+POST   /api/v1/domains/{id}/shares/accept
+DELETE /api/v1/domains/{id}/shares
+```
+
+Both take the owner's domain id, the one `shared` on the domain list carries, and answer `404` unless the domain was
+offered to the calling project. The `DELETE` declines a pending offer or gives an accepted domain back.
+
+Once accepted, the project it is shared with may:
 
 - send as the domain and its subdomains, through **its own** SMTP servers, SES or relay nodes,
 - have that mail signed with the owner's DKIM key, so there is still one record to publish,
 - register its own sender addresses on the domain and use it for its bounce address.
 
 It may not change the domain's records, rotate its key, verify or delete it, and it does not receive its inbound mail.
-It sees the domain under **Shared with this project**, read-only, with the owner's name.
+It sees the domain under **Shared with this project** with the owner's name, and may leave it at any time.
 
 Sharing a domain shares its whole zone, including subdomains the owner verified separately. Sharing again is a no-op.
 
@@ -271,7 +283,8 @@ GET    /api/v1/domains/{id}/grants
 DELETE /api/v1/domains/{id}/grants/{project_id}
 ```
 
-Stopping the share refuses the other project's mail from that domain from then on. Deleting the domain ends every share.
+Stopping the share, pending or accepted, refuses the other project's mail from that domain from then on. Deleting
+the domain ends every share.
 
 ## List Domains
 
