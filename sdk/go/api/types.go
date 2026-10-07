@@ -384,13 +384,14 @@ type ContactListResponse struct {
 
 // Counts is the wire body.
 type Counts struct {
-	SandboxMessages int64 `json:"sandbox_messages"`
-	EmailsLastHour  int64 `json:"emails_last_hour"`
-	EmailsLastDay   int64 `json:"emails_last_day"`
-	APIKeys         int64 `json:"api_keys"`
-	SMTPServers     int64 `json:"smtp_servers"`
-	Domains         int64 `json:"domains"`
-	Subscribers     int64 `json:"subscribers"`
+	SandboxMessages    int64 `json:"sandbox_messages"`
+	EmailsLastHour     int64 `json:"emails_last_hour"`
+	EmailsLastDay      int64 `json:"emails_last_day"`
+	APIKeys            int64 `json:"api_keys"`
+	SMTPServers        int64 `json:"smtp_servers"`
+	Domains            int64 `json:"domains"`
+	Subscribers        int64 `json:"subscribers"`
+	TemplateAssetBytes int64 `json:"template_asset_bytes"`
 }
 
 // CreateInput is the request body.
@@ -411,6 +412,7 @@ type CreatePlanInput struct {
 	MaxSMTPServers          *int64 `json:"max_smtp_servers"`
 	MaxDomains              *int64 `json:"max_domains"`
 	MaxSubscribers          *int64 `json:"max_subscribers"`
+	MaxTemplateAssetBytes   *int64 `json:"max_template_asset_bytes"`
 	MaxSandboxMessages      *int64 `json:"max_sandbox_messages"`
 	MaxSandboxRetentionDays *int64 `json:"max_sandbox_retention_days"`
 }
@@ -1414,6 +1416,7 @@ type Plan struct {
 	MaxSMTPServers          int64      `json:"max_smtp_servers"`
 	MaxDomains              int64      `json:"max_domains"`
 	MaxSubscribers          int64      `json:"max_subscribers"`
+	MaxTemplateAssetBytes   int64      `json:"max_template_asset_bytes"`
 	MaxSandboxMessages      int64      `json:"max_sandbox_messages"`
 	MaxSandboxRetentionDays int64      `json:"max_sandbox_retention_days"`
 	CreatedAt               time.Time  `json:"created_at"`
@@ -1942,6 +1945,11 @@ type SettingsResponse struct {
 	RetentionDays int64          `json:"retention_days"`
 	MaxMessages   int64          `json:"max_messages"`
 	SandboxOnly   bool           `json:"sandbox_only"`
+}
+
+// ShareResponse is the response body.
+type ShareResponse struct {
+	Shared *DomainShared `json:"shared"`
 }
 
 // Shared is the wire body.
@@ -2537,6 +2545,7 @@ type UpdatePlanInput struct {
 	MaxSMTPServers          *int64  `json:"max_smtp_servers"`
 	MaxDomains              *int64  `json:"max_domains"`
 	MaxSubscribers          *int64  `json:"max_subscribers"`
+	MaxTemplateAssetBytes   *int64  `json:"max_template_asset_bytes"`
 	MaxSandboxMessages      *int64  `json:"max_sandbox_messages"`
 	MaxSandboxRetentionDays *int64  `json:"max_sandbox_retention_days"`
 }

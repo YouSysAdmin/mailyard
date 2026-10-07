@@ -29,6 +29,12 @@ type Plan struct {
 	MaxDomains     int `json:"max_domains"`
 	MaxSubscribers int `json:"max_subscribers"`
 
+	// MaxTemplateAssetBytes caps the builder images a project stores,
+	// summed in bytes over its template_assets rows. Bytes rather than
+	// a count: what the cap guards is the disk, and one image is 2 KB
+	// where another is 10 MiB.
+	MaxTemplateAssetBytes int64 `json:"max_template_asset_bytes"`
+
 	// MaxSandboxMessages is the ring buffer for captured mail, applied
 	// on every capture. It bounds the sandbox table, which is the one
 	// thing a developer under test can fill without limit.

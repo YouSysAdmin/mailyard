@@ -720,6 +720,11 @@ type TemplateStore interface {
 	GetAssetByToken(ctx context.Context, token string) (*template.Asset, error)
 	FindAssets(ctx context.Context, projID string, limit, offset int) ([]*template.Asset, int, error)
 
+	// AssetBytes is the project's builder image storage in use, the
+	// sum of size over its rows, which the plan's byte cap is judged
+	// against.
+	AssetBytes(ctx context.Context, projID string) (int64, error)
+
 	// AssetsByTokens answers the project's images among public tokens,
 	// without their bytes.
 	AssetsByTokens(ctx context.Context, projID string, tokens []string) ([]*template.Asset, error)

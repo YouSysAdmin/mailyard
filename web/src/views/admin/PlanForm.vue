@@ -32,6 +32,9 @@ const limits: { key: LimitKey; label: string }[] = [
   { key: 'max_smtp_servers', label: 'Max SMTP servers' },
   { key: 'max_domains', label: 'Max domains' },
   { key: 'max_subscribers', label: 'Max subscribers' },
+  // Bytes, not images: one image is 2 KB and another 10 MB, and the
+  // cap is on storage.
+  { key: 'max_template_asset_bytes', label: 'Max template image storage (bytes)' },
   // The sandbox belongs to a project, so what bounds it is sold here.
   // The second is a CEILING - the project chooses its own window under
   // it, which is why the label says so.
@@ -49,6 +52,7 @@ const form = ref<PlanPayload>({
   max_smtp_servers: props.plan?.max_smtp_servers ?? 0,
   max_domains: props.plan?.max_domains ?? 0,
   max_subscribers: props.plan?.max_subscribers ?? 0,
+  max_template_asset_bytes: props.plan?.max_template_asset_bytes ?? 0,
   max_sandbox_messages: props.plan?.max_sandbox_messages ?? 0,
   max_sandbox_retention_days: props.plan?.max_sandbox_retention_days ?? 0,
 })

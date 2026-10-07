@@ -319,7 +319,7 @@ func (h *Handler) ImportCSV(c fiber.Ctx) error {
 
 // runImport applies the upserts, tolerating per-row failures.
 func (h *Handler) runImport(c fiber.Ctx, projID string, items []upsertInput) error {
-	release, err := quota.HoldResource(c.Context(), h.Runtime.Store, projID, quota.ResSubscribers, len(items))
+	release, err := quota.HoldResource(c.Context(), h.Runtime.Store, projID, quota.ResSubscribers, int64(len(items)))
 	if err != nil {
 		if qe, ok := errors.AsType[*quota.Error](err); ok {
 			return response.TooManyRequests(c, qe.Error())

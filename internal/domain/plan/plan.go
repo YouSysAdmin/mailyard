@@ -41,7 +41,7 @@ func NewStore(db *sql.DB) *Store {
 const planSelect = `
 SELECT id, name, description, is_default, hourly_email_limit, daily_email_limit,
        max_api_keys, max_smtp_servers, max_domains, max_subscribers,
-       max_sandbox_messages, max_sandbox_retention_days,
+       max_template_asset_bytes, max_sandbox_messages, max_sandbox_retention_days,
        created_at, updated_at
 FROM plans`
 
@@ -118,9 +118,9 @@ func (s *Store) Put(ctx context.Context, p *pmodel.Plan) error {
 	if _, err := tx.ExecContext(ctx, s.Q(`
         INSERT INTO plans (id, name, description, is_default, hourly_email_limit,
             daily_email_limit, max_api_keys, max_smtp_servers, max_domains,
-            max_subscribers, max_sandbox_messages, max_sandbox_retention_days,
-            created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            max_subscribers, max_template_asset_bytes, max_sandbox_messages,
+            max_sandbox_retention_days, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name               = excluded.name,
             description        = excluded.description,
@@ -131,12 +131,13 @@ func (s *Store) Put(ctx context.Context, p *pmodel.Plan) error {
             max_smtp_servers   = excluded.max_smtp_servers,
             max_domains        = excluded.max_domains,
             max_subscribers    = excluded.max_subscribers,
+            max_template_asset_bytes = excluded.max_template_asset_bytes,
             max_sandbox_messages = excluded.max_sandbox_messages,
             max_sandbox_retention_days = excluded.max_sandbox_retention_days,
             updated_at         = excluded.updated_at
     `), p.ID, p.Name, p.Description, p.IsDefault, p.HourlyEmailLimit,
 		p.DailyEmailLimit, p.MaxAPIKeys, p.MaxSMTPServers, p.MaxDomains,
-		p.MaxSubscribers, p.MaxSandboxMessages, p.MaxSandboxRetentionDays,
+		p.MaxSubscribers, p.MaxTemplateAssetBytes, p.MaxSandboxMessages, p.MaxSandboxRetentionDays,
 		p.CreatedAt, database.NullTime(p.UpdatedAt)); err != nil {
 		return err
 	}
@@ -178,7 +179,7 @@ func scanPlan(r interface{ Scan(...any) error }) (*pmodel.Plan, error) {
 	var updated sql.NullTime
 	if err := r.Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
 		&p.HourlyEmailLimit, &p.DailyEmailLimit, &p.MaxAPIKeys, &p.MaxSMTPServers,
-		&p.MaxDomains, &p.MaxSubscribers, &p.MaxSandboxMessages,
+		&p.MaxDomains, &p.MaxSubscribers, &p.MaxTemplateAssetBytes, &p.MaxSandboxMessages,
 		&p.MaxSandboxRetentionDays, &p.CreatedAt, &updated); err != nil {
 		return nil, err
 	}
@@ -370,6 +371,10 @@ func apply(p *pmodel.Plan, in limitsInput) {
 
 	if in.MaxSubscribers != nil {
 		p.MaxSubscribers = *in.MaxSubscribers
+	}
+
+	if in.MaxTemplateAssetBytes != nil {
+		p.MaxTemplateAssetBytes = *in.MaxTemplateAssetBytes
 	}
 
 	if in.MaxSandboxMessages != nil {

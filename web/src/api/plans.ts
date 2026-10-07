@@ -13,6 +13,7 @@ export interface Plan {
   max_smtp_servers: number
   max_domains: number
   max_subscribers: number
+  max_template_asset_bytes: number
   max_sandbox_messages: number
   max_sandbox_retention_days: number
   created_at: string
@@ -29,12 +30,14 @@ export interface PlanPayload {
   max_smtp_servers: number
   max_domains: number
   max_subscribers: number
+  max_template_asset_bytes: number
   max_sandbox_messages: number
   max_sandbox_retention_days: number
 }
 
 export interface PlanUsage {
   sandbox_messages: number
+  template_asset_bytes: number
   emails_last_hour: number
   emails_last_day: number
   api_keys: number

@@ -27,10 +27,13 @@ A value of `0` means **unlimited** for every limit below.
 | `max_smtp_servers`   | `0`     | SMTP servers per project                        |
 | `max_domains`        | `0`     | Domains per project, pending ones included      |
 | `max_subscribers`    | `0`     | Subscribers per project                         |
+| `max_template_asset_bytes` | `0` | Builder image storage per project, in bytes summed over its images |
 
 The two send limits are checked when a message is accepted and refused with HTTP `429`
 (or `452` over SMTP submission). The resource caps are checked at create time, so you find out when adding the key or
-the domain, not later. Resource counts come from the primary tables rather than from counters, so nothing can drift out
+the domain, not later. The image cap is in bytes rather than images, because one image is 2 KB and another is 10 MB
+and what the cap protects is storage: an upload that would cross it is refused with `429`, and uploading bytes the
+project already holds costs nothing, since they are stored once. Resource counts come from the primary tables rather than from counters, so nothing can drift out
 of step with reality. A domain counts from the moment it is added, not from verification, so a cap cannot be stepped
 around by adding names and never verifying them.
 
@@ -52,7 +55,8 @@ POST /api/v1/admin/plans
     "max_api_keys": 20,
     "max_domains": 10,
     "max_smtp_servers": 5,
-    "max_subscribers": 50000
+    "max_subscribers": 50000,
+    "max_template_asset_bytes": 104857600
 }
 ```
 

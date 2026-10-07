@@ -55,6 +55,9 @@ type limitsInput struct {
 	MaxDomains       *int  `json:"max_domains"        validate:"omitzero,min=0"`
 	MaxSubscribers   *int  `json:"max_subscribers"    validate:"omitzero,min=0"`
 
+	// Builder image storage, in bytes summed over the project's images.
+	MaxTemplateAssetBytes *int64 `json:"max_template_asset_bytes" validate:"omitzero,min=0"`
+
 	// The sandbox is a project's, so what bounds it is sold by the plan:
 	// how many captures are kept, and how long a project may keep them.
 	// The project picks its own window under that ceiling.

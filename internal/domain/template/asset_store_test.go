@@ -20,6 +20,8 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/database/dbtest"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/plan"
+	"github.com/yousysadmin/mailyard/internal/domain/project"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
 	tmodel "github.com/yousysadmin/mailyard/internal/models/template"
@@ -29,6 +31,18 @@ const otherProjID = "1d7c2f0e-5b3a-4c8d-9e6f-7a1b2c3d4e5f"
 
 // A PNG signature followed by filler, which is all the sniffer reads.
 var pngBytes = append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), bytes.Repeat([]byte{1}, 64)...)
+
+// paddedPNG is a PNG header padded with fill to exactly size bytes, so
+// two sizes or two fills are two distinct images of a known size.
+func paddedPNG(t *testing.T, size int, fill byte) []byte {
+	t.Helper()
+	head := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+	if size < len(head) {
+		t.Fatalf("a png cannot be %d bytes", size)
+	}
+
+	return append(slices.Clone(head), bytes.Repeat([]byte{fill}, size-len(head))...)
+}
 
 func openAssetStore(t *testing.T) *Store {
 	t.Helper()
@@ -139,7 +153,12 @@ func TestTheAssetEndpoints(t *testing.T) {
 	cfg := &env.Config{}
 	cfg.Server.PublicURL = "https://mail.example.com/"
 	cfg.Sending.MaxAttachmentSize = 1024
-	h := &Handler{Runtime: &env.Runtime{Store: &store.Store{Template: s}, Config: cfg, Blob: files}}
+	// The upload asks the plan how much it may store, so the stores a
+	// plan is resolved through are wired in: no plan here means no cap.
+	h := &Handler{Runtime: &env.Runtime{
+		Store:  &store.Store{Template: s, Project: project.NewStore(s.DB()), Plan: plan.NewStore(s.DB())},
+		Config: cfg, Blob: files,
+	}}
 
 	app := func(projID string) *fiber.App {
 		a := fiber.New()
@@ -521,5 +540,75 @@ func TestThePurgeKeepsAnAssetAMessageEmbeds(t *testing.T) {
 	keys, err = s.PurgeUnreferencedAssets(ctx, now.AddDate(0, 0, -30))
 	if err != nil || !slices.Equal(keys, []string{"k-embedded"}) {
 		t.Fatalf("purge once the message went = %q, %v", keys, err)
+	}
+}
+
+// A plan caps builder images in BYTES across the project, judged when
+// an image is uploaded: the image that would cross the line is
+// refused, one that fits is stored, and the same bytes again cost
+// nothing because they are not stored twice.
+func TestAnUploadIsBoundedByThePlansBytes(t *testing.T) {
+	db := dbtest.Open(t)
+	dbtest.Migrate(t, db)
+	dbtest.Schema(t, db, `
+        INSERT INTO plans (id, name, is_default, max_template_asset_bytes, created_at)
+        VALUES ('0f1e2d3c-4b5a-4968-8776-655443322110', 'Small', TRUE, 200, now());
+        INSERT INTO projects (id, name, slug, default_language, created_at)
+        VALUES ('`+projID+`', 'Test', 'test', 'en', now())`)
+	s := NewStore(db)
+	files, err := blob.New(blob.Config{Backend: "fs", FSPath: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &env.Config{}
+	cfg.Server.PublicURL = "https://mail.example.com/"
+	cfg.Sending.MaxAttachmentSize = 1024
+	h := &Handler{Runtime: &env.Runtime{
+		Store:  &store.Store{Template: s, Project: project.NewStore(db), Plan: plan.NewStore(db)},
+		Config: cfg, Blob: files,
+	}}
+	a := fiber.New()
+	a.Use(func(c fiber.Ctx) error {
+		c.Locals(domain.ContextKey, &domain.RequestContext{Project: &projmodel.Project{ID: projID}})
+
+		return c.Next()
+	})
+	a.Post("/template-assets", h.UploadAsset)
+
+	upload := func(name string, raw []byte) (int, string) {
+		t.Helper()
+		body := `{"filename":"` + name + `","content":"` + base64.StdEncoding.EncodeToString(raw) + `"}`
+		req := httptest.NewRequest("POST", "/template-assets", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := a.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() { _ = res.Body.Close() }()
+		b, _ := io.ReadAll(res.Body)
+
+		return res.StatusCode, string(b)
+	}
+
+	// Two distinct images of 120 bytes each: the first fits under 200,
+	// the second would not.
+	first, second := paddedPNG(t, 120, 1), paddedPNG(t, 120, 2)
+	if code, body := upload("one.png", first); code != 201 {
+		t.Fatalf("the first image: %d %s", code, body)
+	}
+
+	if code, body := upload("two.png", second); code != 429 || !strings.Contains(body, "bytes of template images") {
+		t.Fatalf("an image past the cap: %d %s, want 429 naming the cap", code, body)
+	}
+
+	if code, _ := upload("one-again.png", first); code != 200 {
+		t.Errorf("the same bytes again: %d, want 200 and no second row", code)
+	}
+
+	used, err := s.AssetBytes(t.Context(), projID)
+	if err != nil || used != 120 {
+		t.Errorf("bytes in use = %d, %v, want 120", used, err)
 	}
 }

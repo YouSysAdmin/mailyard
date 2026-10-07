@@ -11,6 +11,7 @@
 // answer about the wrong one. It says to switch instead of showing
 // somebody else's numbers under this project's name.
 import { computed } from 'vue'
+import { humanSize } from '../../../composables/humanSize'
 import type { UsageReport } from '../../../api/plans'
 import FormField from '../../../components/FormField.vue'
 import LoadingBlock from '../../../components/LoadingBlock.vue'
@@ -39,10 +40,20 @@ const rows = computed<Figure[]>(() => {
     ['Subscribers', u.usage.subscribers, p?.max_subscribers ?? 0],
   ]
 
-  return pairs.map(([label, current, limit]) => ({
+  const counted = pairs.map(([label, current, limit]) => ({
     label,
     value: limit > 0 ? `${current} / ${limit}` : String(current),
   }))
+
+  // Storage is read in sizes, not in a count of bytes.
+  const used = u.usage.template_asset_bytes ?? 0
+  const cap = p?.max_template_asset_bytes ?? 0
+  counted.push({
+    label: 'Template images',
+    value: cap > 0 ? `${humanSize(used)} / ${humanSize(cap)}` : humanSize(used),
+  })
+
+  return counted
 })
 </script>
 

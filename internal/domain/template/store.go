@@ -915,6 +915,15 @@ func (s *Store) GetAssetByToken(ctx context.Context, token string) (*tmodel.Asse
 	return a, err
 }
 
+// AssetBytes sums the size of the project's images.
+func (s *Store) AssetBytes(ctx context.Context, projID string) (int64, error) {
+	var total int64
+	err := s.QueryRow(ctx, `SELECT COALESCE(SUM(size), 0) FROM template_assets WHERE project_id = ?`,
+		projID).Scan(&total)
+
+	return total, err
+}
+
 // FindAssets lists the project's images, newest first, with the count.
 // Content is not read.
 func (s *Store) FindAssets(ctx context.Context, projID string, limit, offset int) ([]*tmodel.Asset, int, error) {

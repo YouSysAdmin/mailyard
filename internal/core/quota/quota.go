@@ -38,12 +38,16 @@ func errf(format string, args ...any) *Error {
 	return &Error{msg: fmt.Sprintf(format, args...)}
 }
 
-// Resource names for CheckResource.
+// Resource names for HoldResource.
 const (
 	ResAPIKeys     = "api keys"
 	ResSMTPServers = "smtp servers"
 	ResDomains     = "domains"
 	ResSubscribers = "subscribers"
+
+	// ResTemplateAssetBytes is measured in bytes, not rows: adding is
+	// the size of the image about to be stored.
+	ResTemplateAssetBytes = "bytes of template images"
 )
 
 // planFor resolves the project's effective plan: explicit
@@ -155,15 +159,15 @@ func CheckSend(ctx context.Context, st *store.Store, projID string, obs Observer
 
 // HoldResource enforces a resource cap before creating adding more of
 // the named resource, and keeps the cap held until release is called.
-// adding is how many the caller is about to create (1 for single
-// creates, N for imports).
+// adding is how much the caller is about to create: 1 for a single
+// create, N for an import, the size for a resource counted in bytes.
 //
 // The count and the create are two statements in two places, so on a
 // bounded plan the count is taken under a per-project lock for that
 // resource and the caller creates BEFORE releasing it - otherwise
 // concurrent creates each see room for one more. release is never nil
 // and is safe to call on every path, refusal included.
-func HoldResource(ctx context.Context, st *store.Store, projID string, resource string, adding int) (func(), error) {
+func HoldResource(ctx context.Context, st *store.Store, projID string, resource string, adding int64) (func(), error) {
 	noop := func() {}
 
 	p, err := planFor(ctx, st, projID)
@@ -175,17 +179,19 @@ func HoldResource(ctx context.Context, st *store.Store, projID string, resource 
 		return noop, nil
 	}
 
-	var limit int
-	var count func(context.Context, string) (int, error)
+	var limit int64
+	var count func(context.Context, string) (int64, error)
 	switch resource {
 	case ResAPIKeys:
-		limit, count = p.MaxAPIKeys, st.APIKey.Count
+		limit, count = int64(p.MaxAPIKeys), counting(st.APIKey.Count)
 	case ResSMTPServers:
-		limit, count = p.MaxSMTPServers, st.SMTPServer.Count
+		limit, count = int64(p.MaxSMTPServers), counting(st.SMTPServer.Count)
 	case ResDomains:
-		limit, count = p.MaxDomains, st.Domain.Count
+		limit, count = int64(p.MaxDomains), counting(st.Domain.Count)
 	case ResSubscribers:
-		limit, count = p.MaxSubscribers, st.Subscriber.Count
+		limit, count = int64(p.MaxSubscribers), counting(st.Subscriber.Count)
+	case ResTemplateAssetBytes:
+		limit, count = p.MaxTemplateAssetBytes, st.Template.AssetBytes
 	default:
 		return noop, fmt.Errorf("unknown quota resource %q", resource)
 	}
@@ -218,6 +224,15 @@ func HoldResource(ctx context.Context, st *store.Store, projID string, resource 
 	}
 
 	return release, nil
+}
+
+// counting widens a row counter to the type a byte counter already has.
+func counting(fn func(context.Context, string) (int, error)) func(context.Context, string) (int64, error) {
+	return func(ctx context.Context, projID string) (int64, error) {
+		n, err := fn(ctx, projID)
+
+		return int64(n), err
+	}
 }
 
 // Sandbox is what a project's plan allows its sandbox: the ring buffer,
@@ -255,6 +270,9 @@ type Counts struct {
 	SMTPServers     int `json:"smtp_servers"`
 	Domains         int `json:"domains"`
 	Subscribers     int `json:"subscribers"`
+
+	// TemplateAssetBytes is the builder image storage in use, in bytes.
+	TemplateAssetBytes int64 `json:"template_asset_bytes"`
 }
 
 // Usage is the read model behind GET /api/usage: what the project has
@@ -307,14 +325,20 @@ func Usage(ctx context.Context, st *store.Store, projID string) (Counts, *pmodel
 		return out, nil, err
 	}
 
+	assetBytes, err := st.Template.AssetBytes(ctx, projID)
+	if err != nil {
+		return out, nil, err
+	}
+
 	out = Counts{
-		SandboxMessages: sandboxKept,
-		EmailsLastHour:  hourly,
-		EmailsLastDay:   daily,
-		APIKeys:         keys,
-		SMTPServers:     servers,
-		Domains:         domains,
-		Subscribers:     subs,
+		SandboxMessages:    sandboxKept,
+		EmailsLastHour:     hourly,
+		EmailsLastDay:      daily,
+		APIKeys:            keys,
+		SMTPServers:        servers,
+		Domains:            domains,
+		Subscribers:        subs,
+		TemplateAssetBytes: assetBytes,
 	}
 
 	return out, p, nil

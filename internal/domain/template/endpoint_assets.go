@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/blob"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
+	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
@@ -94,6 +96,19 @@ func (h *Handler) UploadAsset(c fiber.Ctx) error {
 	if existing != nil {
 		return response.Success(c, AssetResponse{Asset: h.assetView(existing)})
 	}
+
+	// The plan's cap is on bytes stored, held until the row is written
+	// so two uploads arriving together cannot both fit the last slot.
+	release, err := quota.HoldResource(ctx, h.Runtime.Store, rc.Project.ID, quota.ResTemplateAssetBytes, int64(len(raw)))
+	if err != nil {
+		if qe, ok := errors.AsType[*quota.Error](err); ok {
+			return response.TooManyRequests(c, qe.Error())
+		}
+
+		return response.Internal(c, err)
+	}
+
+	defer release()
 
 	a := &tmodel.Asset{
 		ID:          ids.New(),

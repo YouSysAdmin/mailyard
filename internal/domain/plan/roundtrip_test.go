@@ -121,6 +121,7 @@ func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {
 		MaxSMTPServers:          2,
 		MaxDomains:              3,
 		MaxSubscribers:          10000,
+		MaxTemplateAssetBytes:   52428800,
 		MaxSandboxMessages:      50,
 		MaxSandboxRetentionDays: 7,
 	}
@@ -140,6 +141,7 @@ func TestAPartialUpdateKeepsTheLimitsItDoesNotName(t *testing.T) {
 		{"max_domains", stored.MaxDomains, 3},
 		{"max_subscribers", stored.MaxSubscribers, 10000},
 		{"max_sandbox_messages", stored.MaxSandboxMessages, 50},
+		{"max_template_asset_bytes", int(stored.MaxTemplateAssetBytes), 52428800},
 		{"max_sandbox_retention_days", stored.MaxSandboxRetentionDays, 7},
 	} {
 		if tc.got != tc.want {
