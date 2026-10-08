@@ -5,6 +5,8 @@ watch what happened to every message from a built-in console.
 
 One Go binary and a PostgreSQL. The binary carries the console, the documentation and its own migrations.
 
+![screenshot](/docs/screenshot.png)
+
 ## Features
 
 | Feature           | Status | Notes                                                                                                                                                                                                                                                                                                                                                                                                                    |
