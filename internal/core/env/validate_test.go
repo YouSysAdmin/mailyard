@@ -123,3 +123,26 @@ func TestTheAttachmentCacheSize(t *testing.T) {
 		t.Fatalf("negative: got %v, want it refused", err)
 	}
 }
+
+// A value the repository publishes as an example is known to everyone
+// and is refused as either secret, whatever its length.
+func TestAPublishedExampleSecretIsRefused(t *testing.T) {
+	const published = "change-me-to-a-long-random-string-32b"
+
+	_, err := load(t, `
+database:
+  dsn: postgres://u:p@localhost:5432/mailyard
+  crypto:
+    encryption_key: `+published+`
+auth:
+  jwt_secret: 0123456789abcdef0123456789abcdef
+`)
+	if err == nil || !strings.Contains(err.Error(), "database.crypto.encryption_key") {
+		t.Fatalf("published encryption_key must be refused, got %v", err)
+	}
+
+	_, err = load(t, minimalConfig+"auth:\n  jwt_secret: "+published+"\n")
+	if err == nil || !strings.Contains(err.Error(), "auth.jwt_secret") {
+		t.Fatalf("published jwt_secret must be refused, got %v", err)
+	}
+}

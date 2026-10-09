@@ -1145,6 +1145,12 @@ func bindEnvKeys(v *viper.Viper, t reflect.Type, prefix string) {
 	}
 }
 
+// publishedSecrets are placeholder values the repository publishes in
+// its examples and docs. A node refuses them as a secret.
+var publishedSecrets = map[string]bool{
+	"change-me-to-a-long-random-string-32b": true,
+}
+
 // Validate checks required fields. Defaults handle the rest.
 func (c *Config) Validate() error {
 	if c.Database.DSN == "" {
@@ -1344,10 +1350,18 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("database.crypto.encryption_key must be at least 32 characters (generate with `openssl rand -hex 32`)")
 	}
 
+	if publishedSecrets[c.Database.Crypto.EncryptionKey] {
+		return fmt.Errorf("database.crypto.encryption_key is the value published in the example config - generate one with `openssl rand -hex 32`")
+	}
+
 	// The tracking signer keys on the encryption key, so a node with
 	// auth disabled needs no jwt_secret for its public links.
 	if c.Auth.JWTSecret != "" && len(c.Auth.JWTSecret) < 32 {
 		return fmt.Errorf("auth.jwt_secret must be at least 32 characters (generate with `openssl rand -hex 32`)")
+	}
+
+	if publishedSecrets[c.Auth.JWTSecret] {
+		return fmt.Errorf("auth.jwt_secret is the value published in the example config - generate one with `openssl rand -hex 32`")
 	}
 
 	if !c.Auth.Disabled {

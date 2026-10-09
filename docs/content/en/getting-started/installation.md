@@ -43,10 +43,11 @@ services:
             - "25:25"
         environment:
             MAILYARD_DATABASE_DSN: postgres://mailyard:change-me@postgres:5432/mailyard?sslmode=disable
-            # Both from `openssl rand -hex 32`. The encryption key is what
-            # seals stored secrets - losing it means losing them.
-            MAILYARD_AUTH_JWT_SECRET: change-me
-            MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: change-me-to-a-long-random-string-32b
+            # Both REQUIRED, each from `openssl rand -hex 32`. Mailyard refuses
+            # to start until they are set. The encryption key is what seals
+            # stored secrets - losing it means losing them.
+            MAILYARD_AUTH_JWT_SECRET: ""
+            MAILYARD_DATABASE_CRYPTO_ENCRYPTION_KEY: ""
             MAILYARD_AUTH_LOCAL_ENABLED: "true"
             MAILYARD_AUTH_LOCAL_EMAIL: admin@example.com
             MAILYARD_SERVER_PUBLIC_URL: https://mail.example.com

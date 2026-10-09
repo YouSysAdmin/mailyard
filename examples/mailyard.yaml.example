@@ -171,7 +171,8 @@ database:
     # IMPORTANT:
     #   DON'T LOSE THIS KEY, IF YOU LOSE THIS KEY, YOU WILL LOSE ALL
     #   SMTP, TOTP, DKIM, OAuth secrets.
-    encryption_key: "change-me-to-a-long-random-string-32b"
+    # Empty on purpose: a node refuses to boot until it is set.
+    encryption_key: ""
 
   # Read-only followers, round-robined. Empty sends every query to the
   # primary, which is always correct.
@@ -227,8 +228,9 @@ auth:
   # Run without any authentication. Single trusted user, trusted
   # network only.
   disabled: false
-  # Generate with: openssl rand -hex 32
-  jwt_secret: "change-me-to-a-long-random-string-32b"
+  # REQUIRED unless auth is disabled. Generate with: openssl rand -hex 32
+  # Empty on purpose: a node refuses to boot until it is set.
+  jwt_secret: ""
   session_ttl: 12h
   # Public self-signup. Off by default: this is an operator console, and
   # open signup on an internet-facing install means strangers with
