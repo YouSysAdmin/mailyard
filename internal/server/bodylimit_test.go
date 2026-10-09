@@ -5,6 +5,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -14,7 +15,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/valyala/fasthttp"
 
+	"github.com/yousysadmin/mailyard/internal/core/authenticator"
+	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
+	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 )
 
 // The body ceiling is decided per request, from the path alone, and in
@@ -52,33 +57,150 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 		}
 	}
 
-	// The hook sees the raw request target, query string included.
+	// Off the attachment routes nothing is verified: the ceiling is the
+	// path's, and naming a credential keeps the server's read timeout.
+	limits := perRequestLimits(unverified)
 	var h fasthttp.RequestHeader
-	h.SetRequestURI("/api/v1/emails/send?sandbox=true")
-	h.Set(fiber.HeaderAuthorization, "Bearer myk_x")
-	if got := perRequestLimits(&h).MaxRequestBodySize; got != 0 {
-		t.Errorf("perRequestLimits with a query string = %d, want the server's limit", got)
+	h.SetRequestURI("/api/v1/templates")
+	h.Set(fiber.HeaderAuthorization, "Bearer x")
+	if got := limits(&h); got.MaxRequestBodySize != apiBodyLimit || got.ReadTimeout != 0 {
+		t.Errorf("templates with a credential = %d, %v, want apiBodyLimit and the server's timeout", got.MaxRequestBodySize, got.ReadTimeout)
 	}
 
-	// The attachment ceiling is only for a request naming a credential.
 	h.Del(fiber.HeaderAuthorization)
-	if got := perRequestLimits(&h).MaxRequestBodySize; got != apiBodyLimit {
-		t.Errorf("perRequestLimits with no credential = %d, want apiBodyLimit", got)
-	}
-
-	// A stranger's request may not trickle in for the full server read
-	// timeout.
-	if got := perRequestLimits(&h).ReadTimeout; got != uncredentialedReadTimeout {
+	if got := limits(&h).ReadTimeout; got != uncredentialedReadTimeout {
 		t.Errorf("read timeout with no credential = %v, want %v", got, uncredentialedReadTimeout)
 	}
+}
 
-	h.SetCookie("mailyard_session", "x")
-	if got := perRequestLimits(&h).MaxRequestBodySize; got != 0 {
-		t.Errorf("perRequestLimits with a session cookie = %d, want the server's limit", got)
+// unverified is a verifier no credential passes.
+func unverified(*fasthttp.RequestHeader) bool { return false }
+
+// apiKeys answers one project key.
+type apiKeys struct {
+	store.APIKeyStore
+	key *akmodel.Key
+}
+
+func (s apiKeys) GetByPrefix(_ context.Context, prefix string) (*akmodel.Key, error) {
+	if s.key.KeyPrefix == prefix {
+		return s.key, nil
 	}
 
-	if got := perRequestLimits(&h).ReadTimeout; got != 0 {
-		t.Errorf("read timeout with a credential = %v, want the server's own", got)
+	return nil, nil
+}
+
+// credentials is a runtime holding one working key of each kind, one
+// wrong secret for that key, and a working session token.
+type credentials struct {
+	rt                       *env.Runtime
+	key, wrong, admin, token string
+}
+
+func newCredentials(t *testing.T) credentials {
+	t.Helper()
+
+	key, keyPrefix, keyHash, err := akmodel.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	admin, adminPrefix, adminHash, err := akmodel.GenerateAdmin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wrong := key[:len(key)-1] + "x"
+	if wrong == key {
+		wrong = key[:len(key)-1] + "y"
+	}
+
+	const secret = "0123456789abcdef0123456789abcdef"
+	token, err := authenticator.CreateToken(crypto.DeriveKey(secret, crypto.KeySession),
+		"0195d1a2-7c3e-7f00-8000-0123456789ab", "a@example.test", "", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rt := &env.Runtime{
+		Config: &env.Config{Auth: env.AuthConfig{JWTSecret: secret}},
+		Store: &store.Store{
+			APIKey:      apiKeys{key: &akmodel.Key{ID: "k1", KeyPrefix: keyPrefix, KeyHash: keyHash}},
+			AdminAPIKey: adminKeys{key: &akmodel.Admin{ID: "a1", KeyPrefix: adminPrefix, KeyHash: adminHash}},
+		},
+	}
+
+	return credentials{rt: rt, key: key, wrong: wrong, admin: admin, token: token}
+}
+
+// fasthttp allocates the body buffer from the declared Content-Length
+// before reading a byte, so the attachment ceiling and the long read
+// timeout go only to a credential that VERIFIES. Naming one is not
+// enough.
+func TestOnlyAVerifiedCredentialLiftsTheAttachmentCeiling(t *testing.T) {
+	cr := newCredentials(t)
+	limits := perRequestLimits(credentialVerifier(cr.rt))
+
+	revoked := &akmodel.Key{ID: "k2", Revoked: true}
+	revokedToken, revokedPrefix, revokedHash, err := akmodel.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revoked.KeyPrefix, revoked.KeyHash = revokedPrefix, revokedHash
+
+	forged, err := authenticator.CreateToken(crypto.DeriveKey("another-secret-of-at-least-32-chars", crypto.KeySession),
+		"0195d1a2-7c3e-7f00-8000-0123456789ab", "a@example.test", "", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name, header, cookie string
+		verified             bool
+	}{
+		{"a project key", "Bearer " + cr.key, "", true},
+		{"a platform key", "Bearer " + cr.admin, "", true},
+		{"a session bearer", "Bearer " + cr.token, "", true},
+		{"a session cookie", "", cr.token, true},
+
+		{"no credential", "", "", false},
+		{"a made-up project key", "Bearer myk_madeup", "", false},
+		{"a project key with a wrong secret", "Bearer " + cr.wrong, "", false},
+		{"a made-up platform key", "Bearer mya_madeup", "", false},
+		{"a made-up bearer", "Bearer x", "", false},
+		{"a forged session bearer", "Bearer " + forged, "", false},
+		{"a made-up session cookie", "", "x", false},
+		{"a made-up bearer beside a working cookie", "Bearer x", cr.token, false},
+	} {
+		var h fasthttp.RequestHeader
+		h.SetRequestURI("/api/v1/emails/send?sandbox=true")
+		if tc.header != "" {
+			h.Set(fiber.HeaderAuthorization, tc.header)
+		}
+
+		if tc.cookie != "" {
+			h.SetCookie("mailyard_session", tc.cookie)
+		}
+
+		got := limits(&h)
+		wantLimit, wantTimeout := apiBodyLimit, uncredentialedReadTimeout
+		if tc.verified {
+			wantLimit, wantTimeout = 0, 0
+		}
+
+		if got.MaxRequestBodySize != wantLimit || got.ReadTimeout != wantTimeout {
+			t.Errorf("%s: limit %d, timeout %v, want %d, %v", tc.name, got.MaxRequestBodySize, got.ReadTimeout, wantLimit, wantTimeout)
+		}
+	}
+
+	// A revoked key is a key that does not verify.
+	cr.rt.Store.APIKey = apiKeys{key: revoked}
+	var h fasthttp.RequestHeader
+	h.SetRequestURI("/api/v1/emails/send")
+	h.Set(fiber.HeaderAuthorization, "Bearer "+revokedToken)
+	if got := limits(&h).MaxRequestBodySize; got != apiBodyLimit {
+		t.Errorf("a revoked key: limit %d, want apiBodyLimit", got)
 	}
 }
 
@@ -93,7 +215,8 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 	const serverLimit = 4 * apiBodyLimit
 	app := fiber.New(fiber.Config{BodyLimit: serverLimit, ErrorHandler: errorHandler})
-	app.Server().HeaderReceived = perRequestLimits
+	cr := newCredentials(t)
+	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(cr.rt))
 	ok := func(c fiber.Ctx) error { return c.SendString("ok") }
 	app.Post("/api/v1/emails/send", ok)
 	app.Post("/api/v1/templates", ok)
@@ -118,19 +241,22 @@ func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 		{env.ConsolePath + "/api/auth/login", 2 * baseBodyLimit, fiber.StatusRequestEntityTooLarge},
 		{env.ConsolePath + "/api/auth/login", baseBodyLimit / 2, fiber.StatusOK},
 	} {
-		if got := post(t, ln.Addr(), tc.path, tc.size, "Authorization: Bearer myk_x"); got != tc.want {
+		if got := post(t, ln.Addr(), tc.path, tc.size, "Authorization: Bearer "+cr.key); got != tc.want {
 			t.Errorf("%s with %d bytes answered %d, want %d", tc.path, tc.size, got, tc.want)
 		}
 	}
 
-	// The attachment ceiling is for a request that names a credential.
-	// One naming none gets the ordinary API ceiling, on the same path.
-	if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit); got != fiber.StatusRequestEntityTooLarge {
-		t.Errorf("send with no credential and %d bytes answered %d, want 413", 2*apiBodyLimit, got)
+	// The attachment ceiling is for a request whose credential verifies.
+	// One naming none, or one that does not verify, gets the ordinary API
+	// ceiling on the same path.
+	for _, header := range [][]string{nil, {"Authorization: Bearer myk_madeup"}, {"Cookie: mailyard_session=x"}} {
+		if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit, header...); got != fiber.StatusRequestEntityTooLarge {
+			t.Errorf("send with %q and %d bytes answered %d, want 413", header, 2*apiBodyLimit, got)
+		}
 	}
 
-	if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit, "Cookie: mailyard_session=x"); got != fiber.StatusOK {
-		t.Errorf("send with a session cookie and %d bytes answered %d, want 200", 2*apiBodyLimit, got)
+	if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit, "Cookie: mailyard_session="+cr.token); got != fiber.StatusOK {
+		t.Errorf("send with a working session cookie and %d bytes answered %d, want 200", 2*apiBodyLimit, got)
 	}
 }
 

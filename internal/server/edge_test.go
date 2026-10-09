@@ -43,7 +43,7 @@ func edgeApp(t *testing.T, cfg fiber.Config, withReader bool) net.Addr {
 	t.Helper()
 
 	app := fiber.New(cfg)
-	app.Server().HeaderReceived = perRequestLimits
+	app.Server().HeaderReceived = perRequestLimits(unverified)
 
 	if withReader {
 		// Stands in for slog-fiber at the one point that matters: it

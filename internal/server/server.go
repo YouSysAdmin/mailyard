@@ -22,11 +22,14 @@ import (
 	slogfiber "github.com/samber/slog-fiber"
 	"github.com/valyala/fasthttp"
 
+	"github.com/yousysadmin/mailyard/internal/core/authenticator"
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
+	"github.com/yousysadmin/mailyard/internal/core/crypto"
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	authdomain "github.com/yousysadmin/mailyard/internal/domain/auth"
 	"github.com/yousysadmin/mailyard/internal/domain/eventstream"
+	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 )
 
 // Server is the HTTP listener and the routes mounted on it. New builds
@@ -190,7 +193,7 @@ func New(opts Options) (*Server, error) {
 	}
 
 	app := fiber.New(fiberCfg)
-	app.Server().HeaderReceived = perRequestLimits
+	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(opts.Runtime))
 
 	app.Use(safeRecover)
 
@@ -262,51 +265,114 @@ var LargeBodyPaths = []string{
 	"/api/relay-nodes/inbound",
 }
 
-// perRequestLimits raises the write deadline for the streaming endpoints
-// and lowers the body ceiling for every route that does not carry
-// attachments.
+// perRequestLimits builds the HeaderReceived hook, which raises the
+// write deadline for the streaming endpoints and lowers the body ceiling
+// for every route that does not carry attachments.
 //
 // A zero field in the returned config means "honor the server's own
-// value", so the read timeout is untouched everywhere and the body
-// limit only where LargeBodyPaths says so. The URI here is the RAW
-// request target, so the path is normalized the same way the router
-// normalizes it before matching - see normalizePath.
-func perRequestLimits(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
-	uri := string(h.RequestURI())
-	if i := strings.IndexAny(uri, "?#"); i >= 0 {
-		uri = uri[:i]
-	}
+// value". The URI here is the RAW request target, so the path is
+// normalized the same way the router normalizes it before matching -
+// see normalizePath.
+//
+// On LargeBodyPaths the server's ceiling and read timeout go only to a
+// request whose credential verifies, because fasthttp allocates the body
+// buffer from the declared Content-Length before reading any of it.
+// Elsewhere the ceiling is apiBodyLimit or less, and naming a credential
+// is enough to keep the server's read timeout.
+func perRequestLimits(verified func(*fasthttp.RequestHeader) bool) func(*fasthttp.RequestHeader) fasthttp.RequestConfig {
+	return func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
+		uri := string(h.RequestURI())
+		if i := strings.IndexAny(uri, "?#"); i >= 0 {
+			uri = uri[:i]
+		}
 
-	credential := carriesCredential(h)
-	limit := bodyLimitForPath(uri)
-	if limit == 0 && !credential {
-		limit = apiBodyLimit
-	}
+		limit := bodyLimitForPath(uri)
+		var credential bool
+		if limit == 0 {
+			credential = verified(h)
+			if !credential {
+				limit = apiBodyLimit
+			}
+		} else {
+			credential = carriesCredential(h)
+		}
 
-	cfg := fasthttp.RequestConfig{MaxRequestBodySize: limit}
-	if !credential {
-		cfg.ReadTimeout = uncredentialedReadTimeout
-	}
+		cfg := fasthttp.RequestConfig{MaxRequestBodySize: limit}
+		if !credential {
+			cfg.ReadTimeout = uncredentialedReadTimeout
+		}
 
-	if isStreamingPath(uri) {
-		cfg.WriteTimeout = streamWriteTimeout
-	}
+		if isStreamingPath(uri) {
+			cfg.WriteTimeout = streamWriteTimeout
+		}
 
-	return cfg
+		return cfg
+	}
 }
 
 // carriesCredential reports whether the request names any credential
-// at all: an Authorization header or the session cookie. The body is
-// buffered before the handler chain runs, so nothing can verify it
-// first, but a request naming none gets the ordinary ceiling. A
-// made-up bearer still costs the per-IP failure budget, and a reverse
-// proxy's body limit is the operator's half.
+// at all: an Authorization header or the session cookie. Nothing is
+// verified, so it decides only the read timeout off the attachment
+// routes.
 func carriesCredential(h *fasthttp.RequestHeader) bool {
 	if len(h.Peek(fiber.HeaderAuthorization)) > 0 {
 		return true
 	}
 
 	return len(h.Cookie(authdomain.SessionCookieHost)) > 0 || len(h.Cookie(authdomain.SessionCookie)) > 0
+}
+
+// credentialCheckTimeout bounds the key lookup made from the
+// HeaderReceived hook, which has no request context of its own.
+const credentialCheckTimeout = 5 * time.Second
+
+// credentialVerifier reports whether the request carries a credential
+// that verifies, checked the way the gates check it: an API key or a
+// platform key by prefix lookup, constant-time hash and IsValid, a
+// session token by its signature and claims. Session liveness and a
+// key's IP list are left to the gates, this decides only how much body
+// to accept. A bearer is judged alone, as extractToken judges it.
+func credentialVerifier(rt *env.Runtime) func(*fasthttp.RequestHeader) bool {
+	sessionKey := crypto.DeriveKey(rt.Config.Auth.JWTSecret, crypto.KeySession)
+	sessionVerifies := func(raw string) bool {
+		_, err := authenticator.ParseToken(sessionKey, raw)
+
+		return err == nil
+	}
+
+	return func(h *fasthttp.RequestHeader) bool {
+		if rt.Config.Auth.Disabled {
+			return true
+		}
+
+		raw, _ := strings.CutPrefix(string(h.Peek(fiber.HeaderAuthorization)), "Bearer ")
+		if raw == "" {
+			for _, name := range []string{authdomain.SessionCookieHost, authdomain.SessionCookie} {
+				if v := h.Cookie(name); len(v) > 0 && sessionVerifies(string(v)) {
+					return true
+				}
+			}
+
+			return false
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), credentialCheckTimeout)
+		defer cancel()
+
+		now := time.Now().UTC()
+		switch {
+		case strings.HasPrefix(raw, akmodel.AdminPrefix):
+			k, err := rt.Store.AdminAPIKey.GetByPrefix(ctx, akmodel.TokenPrefix(raw))
+
+			return err == nil && k != nil && akmodel.HashEquals(raw, k.KeyHash) && k.IsValid(now)
+		case strings.HasPrefix(raw, akmodel.Prefix):
+			k, err := rt.Store.APIKey.GetByPrefix(ctx, akmodel.TokenPrefix(raw))
+
+			return err == nil && k != nil && akmodel.HashEquals(raw, k.KeyHash) && k.IsValid(now)
+		}
+
+		return sessionVerifies(raw)
+	}
 }
 
 // bodyLimitForPath is the body ceiling one request gets, where 0 means
