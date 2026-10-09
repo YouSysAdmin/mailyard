@@ -103,10 +103,8 @@ func stampSession(c fiber.Ctx, rt *env.Runtime) (bool, error) {
 	}
 
 	// Tokens carry a jti naming a row in the sessions table, which
-	// is what makes them revocable. A token without one predates
-	// session tracking: resolveSession accepts it rather than
-	// logging every existing operator out on upgrade. It simply is
-	// not revocable, exactly as before.
+	// is what makes them revocable. resolveSession refuses a token
+	// without one.
 	claims, ok := resolveSession(c, rt)
 	if !ok {
 		// One message for "no token", "bad token" and "revoked
@@ -231,14 +229,8 @@ func pageSessionIsLive(c fiber.Ctx, rt *env.Runtime) bool {
 // verified session: parse the token, then confirm the row behind its
 // jti is still live, warming the cache on the way.
 //
-// It exists because three call sites - the API gate, the docs page
-// gate, and logout - each carried their own copy, and they had
-// already drifted on the case that matters most: what an empty jti
-// means. A token minted before session tracking has none and is
-// therefore unrevocable, which every copy has to treat as "accept" or
-// an upgrade signs everybody out. One copy getting that backwards is
-// a lockout, and one copy getting it backwards the other way is an
-// unrevocable session nobody can kill.
+// A token with no jti names no session row, so nothing could revoke
+// it, and it is refused.
 //
 // ok=false means the caller must reject. claims is returned even then
 // when the token itself parsed, so a caller can log who was refused.
@@ -255,7 +247,7 @@ func resolveSession(c fiber.Ctx, rt *env.Runtime) (claims *authenticator.Claims,
 	}
 
 	if claims.SessionID == "" {
-		return claims, true
+		return claims, false
 	}
 
 	now := time.Now().UTC()

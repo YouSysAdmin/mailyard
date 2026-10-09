@@ -51,7 +51,7 @@ func liveCount(t *testing.T, s *Store, ctx context.Context, userID string) int {
 	return len(rows)
 }
 
-// RevokeOthers with no session to keep, which is a REACHABLE state.
+// RevokeOthers with no session to keep.
 //
 // The empty path, taken on purpose - the rule tests/nulluuid_test.go
 // settled on rather than a static allowlist, because nothing static
@@ -59,13 +59,9 @@ func liveCount(t *testing.T, s *Store, ctx context.Context, userID string) int {
 // is satisfied, and it is a non-null primary key so the null-uuid guard
 // does not cover it either.
 //
-// Reachable because a token with no jti predates session tracking and is
-// deliberately ACCEPTED - which leaves rc.SessionID empty. So an
-// operator holding one of those cookies pressed "sign out everywhere",
-// the statement answered 22P02, MalformedID softened it to a 404, and the
-// page reported that there was nothing to revoke while every other
-// session stayed live. The exact person most likely to want it, and the
-// one control they most needed to work.
+// An empty keepID names no session to keep. Bound as an empty string
+// the statement answered 22P02, MalformedID softened it to a 404, and
+// every other session stayed live.
 func TestRevokingOtherSessionsWithNoSessionToKeep(t *testing.T) {
 	db := dbtest.Open(t)
 	dbtest.Migrate(t, db)
@@ -77,14 +73,14 @@ func TestRevokingOtherSessionsWithNoSessionToKeep(t *testing.T) {
 		t.Fatalf("%d live sessions, want 3", got)
 	}
 
-	// No jti to keep: every one of them goes.
+	// No session to keep: every one of them goes.
 	n, err := s.RevokeOthers(ctx, userID, "")
 	if err != nil {
 		t.Fatalf("with no session to keep: %v", err)
 	}
 
 	if n != 3 {
-		t.Errorf("revoked %d, want all 3 - a caller whose token carries no jti got "+
+		t.Errorf("revoked %d, want all 3 - an empty keepID got "+
 			"a 404 and kept every session", n)
 	}
 

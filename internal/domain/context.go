@@ -36,8 +36,7 @@ type RequestContext struct {
 	User       *usermodel.User `json:"user,omitempty"`
 
 	// SessionID is the jti of the session that authenticated this
-	// request. Empty for API-key callers and for tokens minted before
-	// session tracking existed.
+	// request. Empty for API-key callers.
 	SessionID string `json:"-"`
 	Path      string `json:"path"`
 	RequestID string `json:"request_id"`

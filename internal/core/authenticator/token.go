@@ -19,9 +19,7 @@ type Claims struct {
 	Expiry time.Time `json:"expiry"`
 
 	// SessionID is the jti claim, naming the row in the sessions
-	// table. Empty on tokens minted before session tracking existed -
-	// callers must treat that as "not revocable" rather than
-	// "invalid", so an in-flight cookie survives the upgrade.
+	// table. A token without one is refused by the session gate.
 	SessionID string `json:"session_id"`
 }
 
@@ -39,8 +37,8 @@ const (
 
 // CreateToken signs a session JWT for the given user. sessionID
 // becomes the jti claim and names the row in the sessions table that
-// makes the token revocable - pass an empty string for a token that
-// is not tracked.
+// makes the token revocable. The session gate refuses a token minted
+// with an empty one.
 // TTL is the lifetime - a sensible value is 12h-24h for an operator console.
 // The secret comes from auth.jwt_secret in YAML (HS256).
 func CreateToken(secret, userID, email, sessionID string, ttl time.Duration) (string, error) {

@@ -112,15 +112,9 @@ func (s *Store) Revoke(ctx context.Context, userID, id string) (bool, error) {
 // RevokeOthers kills every session for a user except the one named,
 // the "sign out everywhere else" action.
 //
-// IS DISTINCT FROM over a NULL rather than a comparison against an
-// empty string, because keepID CAN
-// be empty: a token minted before session tracking carries no jti and is
-// deliberately accepted, so rc.SessionID is "" for it. Comparing that to
-// the uuid column answered 22P02, which MalformedID turns into a 404 -
-// the one caller who most wants this to work would have been told the
-// endpoint does not exist. A NULL is distinct from every id, so such a
-// caller revokes all their sessions, which is the honest reading of
-// "everywhere else" when we cannot tell which one is theirs.
+// An empty keepID names no session to keep, so every session goes.
+// It is bound as a NULL, which is distinct from every id, because an
+// empty string compared against the uuid column fails the statement.
 func (s *Store) RevokeOthers(ctx context.Context, userID, keepID string) (int64, error) {
 	res, err := s.Exec(ctx, `
         UPDATE sessions SET revoked = TRUE
