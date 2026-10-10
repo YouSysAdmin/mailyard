@@ -480,14 +480,11 @@ func newToken() (string, error) {
 	return "rnt_" + hex.EncodeToString(buf), nil
 }
 
-// validHost checks the name a node wants to be reached at.
-//
-// It becomes a certificate SAN and a host workers dial, so the
-// characters that would end up in either are rejected here rather
-// than discovered at handshake time.
 // hostTaken reports whether any enrolled node, in any project or the
 // pool, already answers to host. The fleet is small enough to read
-// whole: an installation runs tens of nodes, not thousands.
+// whole: an installation runs tens of nodes, not thousands. Both sides
+// are compared canonical, so an address is one host however a stored
+// row spells it.
 func (h *Handler) hostTaken(ctx context.Context, host string) (bool, error) {
 	nodes, err := h.Runtime.Store.RelayNode.ListAll(ctx)
 	if err != nil {
@@ -500,7 +497,7 @@ func (h *Handler) hostTaken(ctx context.Context, host string) (bool, error) {
 			return false, err
 		}
 
-		if srv != nil && strings.EqualFold(srv.Host, host) {
+		if srv != nil && canonicalHost(srv.Host) == canonicalHost(host) {
 			return true, nil
 		}
 	}
@@ -508,8 +505,24 @@ func (h *Handler) hostTaken(ctx context.Context, host string) (bool, error) {
 	return false, nil
 }
 
-func validHost(in string) (string, error) {
+// canonicalHost is the one spelling of a host: lowercase, no trailing
+// dot, and an IP literal in the form the certificate SAN carries.
+func canonicalHost(in string) string {
 	host := strings.TrimSuffix(strings.TrimSpace(strings.ToLower(in)), ".")
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.String()
+	}
+
+	return host
+}
+
+// validHost checks the name a node wants to be reached at.
+//
+// It becomes a certificate SAN and a host workers dial, so the
+// characters that would end up in either are rejected here rather
+// than discovered at handshake time.
+func validHost(in string) (string, error) {
+	host := canonicalHost(in)
 	if host == "" {
 		return "", fmt.Errorf("hostname is required")
 	}
@@ -518,7 +531,7 @@ func validHost(in string) (string, error) {
 		return "", fmt.Errorf("hostname is too long")
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if net.ParseIP(host) != nil {
 		return host, nil
 	}
 
