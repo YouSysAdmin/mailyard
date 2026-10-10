@@ -22,6 +22,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	emailmodel "github.com/yousysadmin/mailyard/internal/models/email"
+	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 )
 
 // Handler owns the /api/emails surface. Mounted behind requireAuth +
@@ -234,6 +235,12 @@ func (h *Handler) replay(c fiber.Ctx, rc *domain.RequestContext, held emailmodel
 		return response.Conflict(c, fmt.Sprintf("a request with Idempotency-Key %q is still being processed", key))
 	}
 
+	if !mayReadHeld(rc, held) {
+		key := strings.TrimSpace(c.Get("Idempotency-Key"))
+
+		return response.Conflict(c, fmt.Sprintf("Idempotency-Key %q was already used", key))
+	}
+
 	if held.SandboxEmailID != "" {
 		sb, err := h.Runtime.Store.Sandbox.Get(c.Context(), rc.Project.ID, held.SandboxEmailID)
 		if err != nil {
@@ -257,6 +264,18 @@ func (h *Handler) replay(c fiber.Ctx, rc *domain.RequestContext, held emailmodel
 	}
 
 	return response.Success(c, SendResponse{Email: e, Suppressed: emptyIfNil(nil), Replayed: true})
+}
+
+// mayReadHeld reports whether the caller may be handed the record a
+// key produced. The ledger is per project, so the record is handed back
+// only to a caller allowed to read it: a capture needs sandbox:read, a
+// message needs emails:read and is never shown to a sandbox credential.
+func mayReadHeld(rc *domain.RequestContext, held emailmodel.KeyHolder) bool {
+	if held.SandboxEmailID != "" {
+		return rc.Permissions.Has(perm.ResourceSandbox, perm.ActionRead)
+	}
+
+	return !rc.IsSandboxCredential() && rc.Permissions.Has(perm.ResourceEmails, perm.ActionRead)
 }
 
 // releaseKey gives a reserved key back after a failed send.

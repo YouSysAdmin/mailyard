@@ -39,7 +39,9 @@ func APIDocs() []apidoc.Route {
 				"An `Idempotency-Key` header, up to 255 characters and scoped to the project, " +
 				"makes a retry safe: a second request carrying the same key answers 200 with " +
 				"what the first one produced - the message it queued, or the capture it stored - " +
-				"and `replayed: true`, a duplicate arriving " +
+				"and `replayed: true`, to a caller allowed to read it (`emails:read`, " +
+				"`sandbox:read` for a capture, never a real message to a sandbox " +
+				"credential) and 409 to anyone else, a duplicate arriving " +
 				"while the first is still running answers 409, and the key is forgotten after " +
 				"a day. A request that fails releases its key.",
 			Request: sendInput{},

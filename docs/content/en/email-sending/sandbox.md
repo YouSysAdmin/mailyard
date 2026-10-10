@@ -243,7 +243,8 @@ stored as `noreply@example.com`, exactly as a submission over SMTP would be, so 
 The display name is in the `From` header of the raw message.
 
 An `Idempotency-Key` header works as on a real send: a retry carrying the same key answers `200` with the capture the
-first request stored and `replayed: true`, instead of storing a second one.
+first request stored and `replayed: true`, instead of storing a second one. The capture is handed back only to a
+caller holding `sandbox:read`, and a key that produced a real message answers a sandbox credential `409`.
 
 A template send is **rendered first** and then captured, so what you read is what the template produced for that data -
 placeholders resolved, template attachments included.
