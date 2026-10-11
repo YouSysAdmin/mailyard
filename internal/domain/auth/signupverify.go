@@ -30,13 +30,13 @@ const maxVerifyMailsPerHour = 3
 // for the reason on maxResetsPerHourPerAccount.
 const maxVerifyMailsPerHourPerAccount = 15
 
-// sendVerificationMail mints a token and mails the confirm link.
-// Shared by Register and VerifyEmailResend so the two cannot drift on
-// TTL or link shape.
-func (h *Handler) sendVerificationMail(ctx context.Context, u *usermodel.User, clientIP string) error {
+// sendVerificationMail mints a token within the mail budget and mails
+// the confirm link, reporting whether it did. Shared by Register and
+// VerifyEmailResend so the two cannot drift on TTL or link shape.
+func (h *Handler) sendVerificationMail(ctx context.Context, u *usermodel.User, clientIP string) (bool, error) {
 	plaintext, hash, err := svmodel.Generate()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	now := time.Now().UTC()
@@ -48,8 +48,10 @@ func (h *Handler) sendVerificationMail(ctx context.Context, u *usermodel.User, c
 		CreatedAt: now,
 		RequestIP: clientIP,
 	}
-	if err := h.Runtime.Store.SignupVerify.Put(ctx, tok); err != nil {
-		return err
+	issued, err := h.Runtime.Store.SignupVerify.PutWithin(ctx, tok, now.Add(-time.Hour),
+		mailBudget(clientIP, maxVerifyMailsPerHour, maxVerifyMailsPerHourPerAccount))
+	if err != nil || !issued {
+		return false, err
 	}
 
 	link := strings.TrimRight(h.Runtime.Config.Server.PublicURL, "/") +
@@ -59,7 +61,7 @@ func (h *Handler) sendVerificationMail(ctx context.Context, u *usermodel.User, c
 	// learn from response timing whether a mail was dispatched.
 	h.Runtime.SystemMail.SendAsync([]string{u.Email}, subject, htmlBody, textBody)
 
-	return nil
+	return true, nil
 }
 
 // VerifyEmailConfirm redeems a verification token and marks the
@@ -174,21 +176,15 @@ func (h *Handler) VerifyEmailResend(c fiber.Ctx) error {
 		return accepted()
 	}
 
-	now := time.Now().UTC()
-	throttled, err := h.mailBudgetSpent(c, u.ID, now, maxVerifyMailsPerHour, maxVerifyMailsPerHourPerAccount,
-		h.Runtime.Store.SignupVerify.RecentRequestIPs)
+	sent, err := h.sendVerificationMail(c.Context(), u, clientip.From(c))
 	if err != nil {
 		return response.Internal(c, err)
 	}
 
-	if throttled {
+	if !sent {
 		slog.Warn("auth: verification resend throttled", "user_id", u.ID, "client_ip", clientip.From(c))
 
 		return accepted()
-	}
-
-	if err := h.sendVerificationMail(c.Context(), u, clientip.From(c)); err != nil {
-		return response.Internal(c, err)
 	}
 
 	slog.Info("auth: verification link resent", "user_id", u.ID, "client_ip", clientip.From(c))

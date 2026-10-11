@@ -3,6 +3,7 @@
 package signupverify
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -135,5 +136,66 @@ func TestInvalidateForUserBurnsEverything(t *testing.T) {
 		if ok {
 			t.Errorf("token %s survived InvalidateForUser", id)
 		}
+	}
+}
+
+// Concurrent requests for one account and address must not all pass
+// one budget: the judgement and the insert are one step per account,
+// so exactly the budget is issued. Each racer has a connection of its
+// own, or they would queue behind one and prove nothing.
+func TestPutWithinIssuesExactlyTheBudget(t *testing.T) {
+	s := newTestStore(t)
+	const (
+		budget  = 3
+		racers  = 12
+		account = "1ce81574-b36f-4f3e-8e6e-dabcaaf8f5b1"
+	)
+
+	stores := make([]*Store, racers)
+	for i := range stores {
+		stores[i] = &Store{Base: database.NewBase(dbtest.Peer(t))}
+	}
+
+	now := time.Now().UTC()
+	spent := func(ips []string) bool { return len(ips) >= budget }
+
+	var wg sync.WaitGroup
+	issued := make([]bool, racers)
+	for i := range racers {
+		wg.Go(func() {
+			ok, err := stores[i].PutWithin(t.Context(), &svmodel.Token{
+				ID:        fmt.Sprintf("tok-%d", i),
+				UserID:    account,
+				TokenHash: svmodel.Hash(fmt.Sprintf("tok-%d", i)),
+				ExpiresAt: now.Add(time.Hour),
+				CreatedAt: now,
+				RequestIP: "203.0.113.5",
+			}, now.Add(-time.Hour), spent)
+			if err != nil {
+				t.Errorf("racer %d: %v", i, err)
+
+				return
+			}
+
+			issued[i] = ok
+		})
+	}
+
+	wg.Wait()
+
+	won := 0
+	for _, ok := range issued {
+		if ok {
+			won++
+		}
+	}
+
+	var rows int
+	if err := s.QueryRow(t.Context(), `SELECT count(*) FROM signup_verifications WHERE user_id = ?`, account).Scan(&rows); err != nil {
+		t.Fatal(err)
+	}
+
+	if won != budget || rows != budget {
+		t.Errorf("%d reported issued and %d stored of %d racers, want exactly %d", won, rows, racers, budget)
 	}
 }

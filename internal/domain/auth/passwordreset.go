@@ -98,23 +98,12 @@ const resetIssueTimeout = 30 * time.Second
 
 // issueReset spends the mail budget, stores a token and mails the link.
 func (h *Handler) issueReset(ctx context.Context, u *usermodel.User, ip string) error {
-	now := time.Now().UTC()
-	ips, err := h.Runtime.Store.PasswordReset.RecentRequestIPs(ctx, u.ID, now.Add(-time.Hour))
-	if err != nil {
-		return err
-	}
-
-	if budgetSpent(ips, ip, maxResetsPerHour, maxResetsPerHourPerAccount) {
-		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", ip)
-
-		return nil
-	}
-
 	plaintext, hash, err := prmodel.Generate()
 	if err != nil {
 		return err
 	}
 
+	now := time.Now().UTC()
 	tok := &prmodel.Token{
 		ID:        ids.New(),
 		UserID:    u.ID,
@@ -123,8 +112,16 @@ func (h *Handler) issueReset(ctx context.Context, u *usermodel.User, ip string) 
 		CreatedAt: now,
 		RequestIP: ip,
 	}
-	if err := h.Runtime.Store.PasswordReset.Put(ctx, tok); err != nil {
+	issued, err := h.Runtime.Store.PasswordReset.PutWithin(ctx, tok, now.Add(-time.Hour),
+		mailBudget(ip, maxResetsPerHour, maxResetsPerHourPerAccount))
+	if err != nil {
 		return err
+	}
+
+	if !issued {
+		slog.Warn("auth: password reset throttled", "user_id", u.ID, "client_ip", ip)
+
+		return nil
 	}
 
 	link := strings.TrimRight(h.Runtime.Config.Server.PublicURL, "/") +
@@ -326,22 +323,18 @@ func (h *Handler) ChangePassword(c fiber.Ctx) error {
 	})
 }
 
-// mailBudgetSpent decides whether one more link may be mailed for the
-// account: the calling address has its own budget, and the account a
-// larger one over all addresses. An IPv6 address is judged by its /64,
-// the way the login lock judges it.
-func (h *Handler) mailBudgetSpent(c fiber.Ctx, userID string, now time.Time, perIP, perAccount int,
-	recent func(context.Context, string, time.Time) ([]string, error),
-) (bool, error) {
-	ips, err := recent(c.Context(), userID, now.Add(-time.Hour))
-	if err != nil {
-		return false, err
+// mailBudget is the judgement a budgeted token insert makes: the
+// calling address has its own budget, and the account a larger one
+// over all addresses.
+func mailBudget(caller string, perIP, perAccount int) func(ips []string) bool {
+	return func(ips []string) bool {
+		return budgetSpent(ips, caller, perIP, perAccount)
 	}
-
-	return budgetSpent(ips, clientip.From(c), perIP, perAccount), nil
 }
 
-// budgetSpent is mailBudgetSpent over the addresses already charged.
+// budgetSpent decides whether one more link may be mailed for the
+// account, over the addresses already charged. An IPv6 address is
+// judged by its /64, the way the login lock judges it.
 func budgetSpent(ips []string, caller string, perIP, perAccount int) bool {
 	if len(ips) >= perAccount {
 		return true

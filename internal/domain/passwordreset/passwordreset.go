@@ -91,30 +91,65 @@ func (s *Store) InvalidateForUser(ctx context.Context, userID string, at time.Ti
 	return err
 }
 
-// RecentRequestIPs returns the address behind each reset link the
-// account was issued since a moment. The caller judges the addresses,
-// because an IPv6 one is judged by its /64 and that is not a string
-// comparison. Bounded by the per-account budget, since nothing past it
-// is issued.
-func (s *Store) RecentRequestIPs(ctx context.Context, userID string, since time.Time) ([]string, error) {
-	rows, err := s.Query(ctx, `SELECT request_ip FROM password_resets WHERE user_id = ? AND created_at >= ?`, userID, since)
+// PutWithin inserts the token unless spent refuses it, and reports
+// whether it did. spent is judged over the address behind every link
+// the account was issued since a moment, under a per-account lock held
+// to the insert, so concurrent requests cannot all pass one budget.
+func (s *Store) PutWithin(ctx context.Context, t *prmodel.Token, since time.Time,
+	spent func(ips []string) bool,
+) (bool, error) {
+	if t.CreatedAt.IsZero() {
+		t.CreatedAt = time.Now().UTC()
+	}
+
+	tx, err := s.DB().BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return false, err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		s.Q(`SELECT pg_advisory_xact_lock(hashtext('password_resets'), hashtext(?::text))`), t.UserID); err != nil {
+		return false, err
+	}
+
+	rows, err := tx.QueryContext(ctx,
+		s.Q(`SELECT request_ip FROM password_resets WHERE user_id = ? AND created_at >= ?`), t.UserID, since)
+	if err != nil {
+		return false, err
 	}
 
 	defer func() { _ = rows.Close() }()
 
-	var out []string
+	var ips []string
 	for rows.Next() {
 		var ip string
 		if err := rows.Scan(&ip); err != nil {
-			return nil, err
+			return false, err
 		}
 
-		out = append(out, ip)
+		ips = append(ips, ip)
 	}
 
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	if spent(ips) {
+		return false, nil
+	}
+
+	if _, err := tx.ExecContext(ctx, s.Q(`
+        INSERT INTO password_resets (
+            id, user_id, token_hash, expires_at, used_at, created_at, request_ip
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `), t.ID, t.UserID, t.TokenHash, t.ExpiresAt,
+		database.NullTime(t.UsedAt), t.CreatedAt, t.RequestIP); err != nil {
+		return false, err
+	}
+
+	return true, tx.Commit()
 }
 
 // DeleteExpired purges spent and stale rows. Called by the retention

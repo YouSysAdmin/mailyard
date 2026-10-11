@@ -234,7 +234,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	})
 
 	if needsVerify {
-		if err := h.sendVerificationMail(c.Context(), u, clientip.From(c)); err != nil {
+		if _, err := h.sendVerificationMail(c.Context(), u, clientip.From(c)); err != nil {
 			return response.Internal(c, err)
 		}
 

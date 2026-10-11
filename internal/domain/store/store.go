@@ -294,7 +294,11 @@ type PasswordResetStore interface {
 	// proceeding on a token somebody else already spent.
 	MarkUsed(ctx context.Context, id string, at time.Time) (bool, error)
 	InvalidateForUser(ctx context.Context, userID string, at time.Time) error
-	RecentRequestIPs(ctx context.Context, userID string, since time.Time) ([]string, error)
+
+	// PutWithin is the budgeted insert: spent judges the addresses
+	// behind the account's links since a moment, and the judgement and
+	// the insert are one step per account. Reports whether it inserted.
+	PutWithin(ctx context.Context, t *passwordreset.Token, since time.Time, spent func(ips []string) bool) (bool, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
@@ -308,7 +312,9 @@ type SignupVerifyStore interface {
 	// token - see PasswordResetStore.MarkUsed.
 	MarkUsed(ctx context.Context, id string, at time.Time) (bool, error)
 	InvalidateForUser(ctx context.Context, userID string, at time.Time) error
-	RecentRequestIPs(ctx context.Context, userID string, since time.Time) ([]string, error)
+
+	// PutWithin - see PasswordResetStore.PutWithin.
+	PutWithin(ctx context.Context, t *signupverify.Token, since time.Time, spent func(ips []string) bool) (bool, error)
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
