@@ -175,3 +175,40 @@ func TestAnUnclosedActionNamesTheRealMistake(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+// fmt builds a printf result whole, padding included, before it can be
+// charged. A format whose verbs each stay under the width limit, or
+// that prints one argument many times, is refused before fmt runs.
+func TestAPrintfIsRefusedBeforeItAllocates(t *testing.T) {
+	big := strings.Repeat("x", 1<<20)
+	for name, tc := range map[string]struct {
+		src  string
+		data map[string]any
+	}{
+		"width before index": {`{{printf "` + strings.Repeat("%9999[1]d", 10000) + `" 1}}`, nil},
+		"index before width": {`{{printf "` + strings.Repeat("%[1]9999d", 10000) + `" 1}}`, nil},
+		"precision":          {`{{printf "` + strings.Repeat("%.9999[1]f", 10000) + `" 1.5}}`, nil},
+		"repeated argument":  {`{{printf "` + strings.Repeat("%[1]s", 1000) + `" big}}`, map[string]any{"big": big}},
+		"padded elements":    {`{{printf "%9999d" items}}`, map[string]any{"items": make([]int64, 100000)}},
+	} {
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		_, err := (&Renderer{MissingKeyBehavior: MissingKeyZero}).Render(&Input{Subject: "s", Text: tc.src}, tc.data)
+		runtime.ReadMemStats(&after)
+
+		if !errors.Is(err, ErrTooMuchText) {
+			t.Errorf("%s: got %v, want ErrTooMuchText", name, err)
+		}
+
+		if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 32<<20 {
+			t.Errorf("%s: allocated %d MiB", name, alloc>>20)
+		}
+	}
+
+	out, err := (&Renderer{}).Render(&Input{Subject: `{{printf "%-4s|%3d|%.1f|%[1]s" name items 2.25}}`},
+		map[string]any{"name": "ab", "items": []any{int64(1), int64(2)}})
+	if err != nil || out.Subject != "ab  |[  1   2]|2.2|ab" {
+		t.Errorf("ordinary printf: %q, %v", out.Subject, err)
+	}
+}

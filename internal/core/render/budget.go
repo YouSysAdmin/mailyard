@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -148,17 +149,26 @@ func (b *budget) stringer(fn func(...any) string) func(...any) (string, error) {
 	}
 }
 
-// printf is printfFunc under the same charging as stringer.
+// printf charges like stringer, and refuses before fmt runs when the
+// most the call can produce does not fit what is left: fmt builds the
+// whole result, padding included, before it can be charged.
 func (b *budget) printf(format string, args ...any) (string, error) {
 	if err := b.spend(len(format) + textLen(args...)); err != nil {
 		return "", err
 	}
 
-	out, err := printfFunc(format, b.blanks(args)...)
-	if err != nil {
+	if err := checkFormat(format); err != nil {
 		return "", err
 	}
 
+	args = b.blanks(args)
+	if printfBound(format, args) > b.text {
+		b.text = 0
+
+		return "", ErrTooMuchText
+	}
+
+	out := fmt.Sprintf(format, floatArgs(format, args)...)
 	if err := b.spend(len(out)); err != nil {
 		return "", err
 	}
@@ -234,16 +244,163 @@ func plant(trees map[string]*parse.Tree, lenient bool) (map[string]any, error) {
 	return b.funcs(), nil
 }
 
-// printfFunc applies the width check at execution, so a format
+// checkFormat applies the width check at execution, so a format
 // assembled at run time - a variable, a print concatenation, a
 // pipeline - meets the same check as a literal one. The parse check
 // stays for the error to name the template line.
-func printfFunc(format string, a ...any) (string, error) {
+func checkFormat(format string) error {
 	if wideVerb.MatchString(format) {
-		return "", fmt.Errorf("%w: %s", ErrFormatWidth, format)
+		return fmt.Errorf("%w: %s", ErrFormatWidth, format)
 	}
 
-	return fmt.Sprintf(format, floatArgs(format, a)...), nil
+	return nil
+}
+
+// boundCap is where printfBound saturates. Anything past it is refused
+// whatever the budget holds, and it keeps the sums from overflowing.
+const boundCap = 1 << 40
+
+// satAdd and satMul are addition and multiplication clamped to boundCap.
+func satAdd(a, b int) int {
+	return min(a+b, boundCap)
+}
+
+func satMul(a, b int) int {
+	if a != 0 && b > boundCap/a {
+		return boundCap
+	}
+
+	return min(a*b, boundCap)
+}
+
+// printfBound is the most text fmt.Sprintf can produce for the call.
+// Every verb, or the one listing extra arguments, may print every
+// argument in full, and every width and precision may pad every
+// element of every argument, since fmt applies them per element of a
+// slice or map.
+func printfBound(format string, args []any) int {
+	verbs, pad := formatVerbs(format)
+	leaves, size := 0, 0
+	for _, a := range args {
+		l, s := printedSize(reflect.ValueOf(a), 0)
+		leaves = satAdd(leaves, l)
+		size = satAdd(size, s)
+	}
+
+	bound := satAdd(len(format), satMul(max(verbs, 1), satAdd(size, 16)))
+
+	return satAdd(bound, satMul(pad, max(leaves, 1)))
+}
+
+// formatVerbs counts the verbs of a format and sums the literal widths
+// and precisions they ask for. Digits inside an argument index are not
+// padding.
+func formatVerbs(format string) (verbs, pad int) {
+	for i := 0; i < len(format); i++ {
+		if format[i] != '%' {
+			continue
+		}
+
+		verbs++
+		i++
+		for i < len(format) && strings.IndexByte("+-# .*[0123456789", format[i]) >= 0 {
+			switch c := format[i]; {
+			case c == '[':
+				end := strings.IndexByte(format[i:], ']')
+				if end < 0 {
+					return verbs, pad
+				}
+
+				i += end + 1
+			case c >= '0' && c <= '9':
+				n := 0
+				for i < len(format) && format[i] >= '0' && format[i] <= '9' {
+					n = satAdd(satMul(n, 10), int(format[i]-'0'))
+					i++
+				}
+
+				pad = satAdd(pad, n)
+			default:
+				i++
+			}
+		}
+	}
+
+	return verbs, pad
+}
+
+// printedSize is how many elements fmt formats one at a time in v and
+// how many bytes it can print for v under any verb, flags included but
+// widths and precisions left to printfBound. fmt prints a pointer below
+// the top level as an address, so the walk does not follow one.
+func printedSize(v reflect.Value, depth int) (leaves, size int) {
+	if !v.IsValid() {
+		return 1, 16
+	}
+
+	typ := len(v.Type().String()) + 8
+	switch v.Kind() {
+	case reflect.String:
+		return 1, satAdd(satMul(len(v.String()), 6), typ)
+	case reflect.Bool:
+		return 1, typ
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return 1, 70 + typ
+	case reflect.Float32, reflect.Float64:
+		return 1, 330 + typ
+	case reflect.Complex64, reflect.Complex128:
+		return 1, 700 + typ
+	case reflect.Interface:
+		if v.IsNil() {
+			return 1, 16 + typ
+		}
+
+		return printedSize(v.Elem(), depth)
+	case reflect.Pointer:
+		if v.IsNil() || depth > 0 {
+			return 1, 32 + typ
+		}
+
+		l, s := printedSize(v.Elem(), depth+1)
+
+		return l, satAdd(s, typ)
+	case reflect.Slice, reflect.Array:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return v.Len(), satAdd(satMul(v.Len(), 6), typ)
+		}
+
+		size = typ
+		for i := range v.Len() {
+			l, s := printedSize(v.Index(i), depth+1)
+			leaves = satAdd(leaves, l)
+			size = satAdd(size, satAdd(s, 2))
+		}
+
+		return max(leaves, 1), size
+	case reflect.Map:
+		size = typ
+		iter := v.MapRange()
+		for iter.Next() {
+			kl, ks := printedSize(iter.Key(), depth+1)
+			vl, vs := printedSize(iter.Value(), depth+1)
+			leaves = satAdd(leaves, satAdd(kl, vl))
+			size = satAdd(size, satAdd(satAdd(ks, vs), 4))
+		}
+
+		return max(leaves, 1), size
+	case reflect.Struct:
+		size = typ
+		for i := range v.NumField() {
+			l, s := printedSize(v.Field(i), depth+1)
+			leaves = satAdd(leaves, l)
+			size = satAdd(size, satAdd(s, len(v.Type().Field(i).Name)+2))
+		}
+
+		return max(leaves, 1), size
+	}
+
+	return 1, 32 + typ
 }
 
 // floatArgs hands a float verb a float. Whole numbers in the data are
@@ -374,7 +531,7 @@ var wideVerb = regexp.MustCompile(
 	`%[-+# 0]*(\[\d+\])?(\d{5,}|\*)|%[-+# 0]*(\[\d+\])?\d*\.(\[\d+\])?(\d{5,}|\*)`)
 
 // checkPipe refuses a printf whose format asks for absurd padding.
-// Only a literal format is checked here, printfFunc covers the rest.
+// Only a literal format is checked here, checkFormat covers the rest.
 func checkPipe(p *parse.PipeNode) error {
 	if p == nil {
 		return nil
