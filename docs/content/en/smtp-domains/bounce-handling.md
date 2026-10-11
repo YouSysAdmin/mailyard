@@ -138,6 +138,10 @@ channels are equally untrusted and both go through the same two rules:
 A report with no id is logged as unattributed and nothing is written. Nothing is guessed from the reported address
 alone - that would let anyone who can reach either channel suppress an address just by describing it.
 
+A report arriving at the MX about a message that went to **more than one recipient** is recorded under *Bounces* but
+suppresses nobody. Every recipient of that message holds its id, so one of them could report on another. A message
+with a single recipient is suppressed as usual, and SES feedback and a tenant relay node's reports are not affected.
+
 A relay node forwarding what its own MX received is a third channel and gets the same two rules. A node a **tenant**
 enrolled gets one more: it may only attribute to its own project's mail. The unscoped rule is right where the report
 lands on the operator's domain and the sending project is somebody else's - it is wrong for a machine on a tenant's own

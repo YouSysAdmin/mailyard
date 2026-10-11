@@ -544,6 +544,10 @@ func (s *Service) processReport(ctx context.Context, rec *imodel.Email, raw []by
 
 			return false, "the reporting node belongs to a different project than the message"
 		}
+	} else {
+		// Nothing vouches for an unscoped reporter, so a co-recipient
+		// of a shared message cannot suppress the others.
+		intake.SoleRecipientSuppresses = true
 	}
 
 	intake.Record(ctx, out)

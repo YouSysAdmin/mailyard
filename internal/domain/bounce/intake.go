@@ -95,6 +95,12 @@ type Intake struct {
 	// It is a hook rather than a field on Report because the rule is
 	// about the REPORTER's authority, not about what was reported.
 	Allow func(sent *emailmodel.Email) (ok bool, why string)
+
+	// SoleRecipientSuppresses limits suppression to a message with one
+	// recipient, for a channel whose reporter is not authenticated.
+	// Every recipient of a shared message holds its id, so a report on
+	// one of them may come from another and files history only.
+	SoleRecipientSuppresses bool
 }
 
 // Record files one feedback report and returns how many bounces it
@@ -145,6 +151,8 @@ func (i *Intake) Record(ctx context.Context, r Report) int {
 		recipients = recipients[:maxReportRecipients]
 	}
 
+	historyOnly := i.SoleRecipientSuppresses && len(sent.Recipients) > 1
+
 	acted := 0
 	for _, rec := range recipients {
 		if !addressedTo(sent.Recipients, rec.Address) {
@@ -170,7 +178,8 @@ func (i *Intake) Record(ctx context.Context, r Report) int {
 			continue
 		}
 
-		if rec.Suppress && i.Suppressions != nil {
+		suppress := rec.Suppress && !historyOnly
+		if suppress && i.Suppressions != nil {
 			kind := supmodel.KindBounce
 			if rec.Type == bmodel.TypeComplaint {
 				kind = supmodel.KindComplaint
@@ -190,7 +199,7 @@ func (i *Intake) Record(ctx context.Context, r Report) int {
 		acted++
 		i.Log.Info("bounce: report processed",
 			"project_id", sent.ProjectID, "email_id", sent.ID, "recipient", rec.Address,
-			"type", rec.Type, "suppressed", rec.Suppress, "source", r.Source)
+			"type", rec.Type, "suppressed", suppress, "source", r.Source)
 	}
 
 	return acted
