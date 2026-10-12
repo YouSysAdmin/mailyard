@@ -19,6 +19,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/safego"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/models/permission"
 )
 
 // Handler owns GET /api/events/stream.
@@ -64,6 +65,7 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 	}
 
 	projectID := rc.Project.ID
+	perms := rc.Permissions
 
 	c.Set(fiber.HeaderContentType, "text/event-stream")
 	c.Set(fiber.HeaderCacheControl, "no-cache")
@@ -107,6 +109,10 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 					return
 				}
 
+				if !visible(perms, e.Type) {
+					continue
+				}
+
 				if !writeEvent(w, e.Type, fiber.Map{"at": e.At, "data": e.Data}) {
 					return
 				}
@@ -129,6 +135,25 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 			}
 		}
 	})
+}
+
+// eventResource names the resource whose read permission an event
+// type needs. A type missing here is never forwarded.
+var eventResource = map[string]permission.Resource{
+	eventbus.TypeEmailQueued:      permission.ResourceEmails,
+	eventbus.TypeEmailSent:        permission.ResourceEmails,
+	eventbus.TypeEmailFailed:      permission.ResourceEmails,
+	eventbus.TypeInboundReceived:  permission.ResourceInbound,
+	eventbus.TypeCampaignProgress: permission.ResourceCampaigns,
+	eventbus.TypeNotification:     permission.ResourceNotifications,
+}
+
+// visible reports whether perms may read what an event of this type
+// describes.
+func visible(perms permission.Set, eventType string) bool {
+	res, ok := eventResource[eventType]
+
+	return ok && perms.Has(res, permission.ActionRead)
 }
 
 // writeEvent emits one SSE frame. Returns false when the connection
