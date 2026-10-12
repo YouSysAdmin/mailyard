@@ -183,7 +183,8 @@ POST /api/v1/api-keys
 Needs `apikeys:write`, and a key may only carry what the caller holds: a permission you lack, or `*` when you do not
 hold it, answers `403` naming what is missing. A `sandbox` key carries `sandbox:read`, `sandbox:write` and
 `sandbox:delete` on top of its list, so minting one needs those three as well. A key holding `apikeys:write` mints other
-keys under the same rule, and nothing on this route asks how you authenticated.
+keys under the same rule. A `sandbox` key is refused here whatever it holds, so it can never mint a key that sends real
+mail.
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/api-keys \

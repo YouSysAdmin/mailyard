@@ -288,16 +288,19 @@ and `sandbox:delete` by itself - send, read back what was sent, clear between ru
 permission list and `"sandbox": true` works. Add permissions only if the application under test needs something beyond
 sending.
 
-| Permissions                     | carried by the flag, plus whatever else you tick |
-|---------------------------------|--------------------------------------------------|
-| `POST /emails/send`             | captured                                         |
-| `POST /emails/send-template`    | captured                                         |
-| `/sandbox`                      | read, clear, delete                              |
-| everything else under `/emails` | **403**                                          |
-| every other resource            | only if you granted it                           |
+| Permissions                      | carried by the flag, plus whatever else you tick |
+|----------------------------------|--------------------------------------------------|
+| `POST /emails/send`              | captured                                         |
+| `POST /emails/send-template`     | captured                                         |
+| `/sandbox`                       | read, clear, delete                              |
+| everything else under `/emails`  | **403**                                          |
+| `/api-keys`, `/smtp-credentials` | **403**                                          |
+| every other resource             | only if you granted it                           |
 
 The delivery log, one message's detail, batch and retry all describe or touch real mail, so a credential whose whole
-purpose is that its mail is not real is turned away from them by name.
+purpose is that its mail is not real is turned away from them by name. The same goes for the credential routes, where
+it could otherwise mint a credential that is not a sandbox one. It mints through `/sandbox/credentials`, which makes
+only sandbox credentials.
 
 {{< callout type="note" title="A sandbox key holds nothing on emails" >}}
 `emails:write` also grants `POST /emails/{id}/retry`, which re-queues an **existing** message - one already composed and

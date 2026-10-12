@@ -674,9 +674,12 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	tpl.Post("/:id/send-test", refuseSandboxCredential, permWrite, eh.SendTest)
 
 	// API keys - the machine credential management surface. Creating
-	// or revoking a credential is project-admin tier.
+	// or revoking a credential is project-admin tier. A sandbox
+	// credential is refused here and on /smtp-credentials, so it can
+	// mint only through /sandbox/credentials and never obtain one that
+	// sends real mail.
 	kh := &apikey.Handler{Runtime: rt}
-	keys := v1.Group("/api-keys", permOn(perm.ResourceAPIKeys))
+	keys := v1.Group("/api-keys", refuseSandboxCredential, permOn(perm.ResourceAPIKeys))
 	keys.Get("/", permRead, kh.List)
 	keys.Post("/", permWrite, kh.Create)
 	keys.Get("/:id", permRead, kh.Get)
@@ -686,7 +689,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 
 	// SMTP relay credentials - the submission credential management
 	// surface, same tier as API keys.
-	creds := v1.Group("/smtp-credentials", permOn(perm.ResourceAPIKeys))
+	creds := v1.Group("/smtp-credentials", refuseSandboxCredential, permOn(perm.ResourceAPIKeys))
 	sch := &smtpcredential.Handler{Runtime: rt}
 	creds.Get("/", permRead, sch.List)
 	creds.Post("/", permWrite, sch.Create)

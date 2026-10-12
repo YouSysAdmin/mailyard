@@ -128,8 +128,10 @@ func permOnResolved(resolve func(*domain.RequestContext) permission.Resource) fi
 // It guards the rest of the emails surface: the delivery log, message
 // detail, attachments, stats, batch and retry all describe or touch
 // real mail, and a credential whose entire purpose is that its mail is
-// not real has no business there. Saying so beats a bare 403 on a
-// permission the holder was never meant to be given.
+// not real has no business there. It also guards credential
+// management, where a sandbox credential could mint one that is not.
+// Saying so beats a bare 403 on a permission the holder was never
+// meant to be given.
 func refuseSandboxCredential(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc != nil && rc.IsSandboxCredential() {

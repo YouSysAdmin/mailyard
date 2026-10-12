@@ -3,12 +3,18 @@
 package server
 
 import (
+	"context"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/clientip"
+	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	"github.com/yousysadmin/mailyard/internal/domain/store"
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 	"github.com/yousysadmin/mailyard/internal/models/permission"
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
@@ -117,5 +123,66 @@ func TestAnActionWithoutAResourceIsRefused(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode == fiber.StatusNoContent {
 		t.Fatal("an action with no declared resource was allowed")
+	}
+}
+
+// keyStore answers the one lookup machineAuth makes for a key.
+type keyStore struct {
+	store.APIKeyStore
+	key *akmodel.Key
+}
+
+func (s keyStore) GetByPrefix(context.Context, string) (*akmodel.Key, error) { return s.key, nil }
+func (s keyStore) TouchLastUsed(context.Context, string, time.Time) error    { return nil }
+
+// projectStore answers the project a key names.
+type projectStore struct{ store.ProjectStore }
+
+func (projectStore) Get(_ context.Context, id string) (*projmodel.Project, error) {
+	return &projmodel.Project{ID: id}, nil
+}
+
+// A sandbox key never reaches the credential routes, whatever it
+// holds, so it cannot mint a credential that sends real mail. Driven
+// through the real router, since the refusal is a property of the
+// groups registered there.
+func TestASandboxKeyCannotMintACredential(t *testing.T) {
+	const raw = "myk_sandboxsandboxsandboxsandboxsandbox"
+
+	resolver, err := clientip.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	call := func(sandbox bool, path string) int {
+		key := &akmodel.Key{ID: "k1", ProjectID: "p1", KeyHash: akmodel.Hash(raw), Sandbox: sandbox,
+			Permissions: []string{"*"}}
+		rt := &env.Runtime{Config: &env.Config{},
+			Store: &store.Store{APIKey: keyStore{key: key}, Project: projectStore{}}}
+		app := fiber.New()
+		app.Use(requestContext(rt, resolver))
+		registerRoutes(app, rt, false)
+
+		req := httptest.NewRequest("POST", path, strings.NewReader(`{"sandbox":false}`))
+		req.Header.Set("Authorization", "Bearer "+raw)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+
+		_ = resp.Body.Close()
+
+		return resp.StatusCode
+	}
+
+	for _, path := range []string{"/api/v1/api-keys", "/api/v1/smtp-credentials"} {
+		if got := call(true, path); got != fiber.StatusForbidden {
+			t.Errorf("sandbox key POST %s: %d, want 403", path, got)
+		}
+
+		if got := call(false, path); got == fiber.StatusForbidden {
+			t.Errorf("ordinary key POST %s: 403, want it past the gate", path)
+		}
 	}
 }
