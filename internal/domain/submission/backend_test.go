@@ -28,7 +28,13 @@ type fakeKeys struct {
 	key *akmodel.Key
 }
 
-func (f *fakeKeys) Get(context.Context, string, string) (*akmodel.Key, error) { return nil, nil }
+func (f *fakeKeys) Get(_ context.Context, projID, id string) (*akmodel.Key, error) {
+	if f.key != nil && f.key.ProjectID == projID && f.key.ID == id {
+		return f.key, nil
+	}
+
+	return nil, nil
+}
 func (f *fakeKeys) GetByPrefix(_ context.Context, prefix string) (*akmodel.Key, error) {
 	if f.key != nil && f.key.KeyPrefix == prefix {
 		return f.key, nil
@@ -49,7 +55,11 @@ type fakeCreds struct {
 	cred *scmodel.Credential
 }
 
-func (f *fakeCreds) Get(context.Context, string, string) (*scmodel.Credential, error) {
+func (f *fakeCreds) Get(_ context.Context, projID, id string) (*scmodel.Credential, error) {
+	if f.cred != nil && f.cred.ProjectID == projID && f.cred.ID == id {
+		return f.cred, nil
+	}
+
 	return nil, nil
 }
 func (f *fakeCreds) GetByUsername(_ context.Context, username string) (*scmodel.Credential, error) {

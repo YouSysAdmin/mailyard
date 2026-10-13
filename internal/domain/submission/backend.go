@@ -216,9 +216,9 @@ type principal struct {
 	maySandbox bool
 }
 
-// session carries one SMTP connection. The principal stays set for
-// the connection lifetime once AUTH succeeds - Reset only clears the
-// per-message envelope.
+// session carries one SMTP connection. The principal is set by AUTH
+// and judged again at every MAIL - Reset only clears the per-message
+// envelope.
 type session struct {
 	backend *Backend
 	ip      string
@@ -314,8 +314,12 @@ func (s *session) authCredential(ctx context.Context, username, password string)
 	}
 
 	now := time.Now().UTC()
-	if cred == nil || !scmodel.HashEquals(password, cred.PasswordHash) ||
-		!cred.IsValid() || !cred.AllowsIP(s.ip) {
+	var p *principal
+	if cred != nil && scmodel.HashEquals(password, cred.PasswordHash) {
+		p = credentialPrincipal(cred, s.ip)
+	}
+
+	if p == nil {
 		s.backend.Log.Warn("submission: auth rejected", "client_ip", s.ip, "username", username)
 
 		return nil, smtp.ErrAuthFailed
@@ -327,6 +331,17 @@ func (s *session) authCredential(ctx context.Context, username, password string)
 		}
 	}
 
+	return p, nil
+}
+
+// credentialPrincipal is the principal a submission credential grants
+// from ip, or nil when it may not send. Asked at AUTH and again at
+// every MAIL.
+func credentialPrincipal(cred *scmodel.Credential, ip string) *principal {
+	if cred == nil || !cred.IsValid() || !cred.AllowsIP(ip) {
+		return nil
+	}
+
 	return &principal{
 		projectID:    cred.ProjectID,
 		createdBy:    cred.CreatedBy,
@@ -335,7 +350,7 @@ func (s *session) authCredential(ctx context.Context, username, password string)
 		credentialID: cred.ID,
 		sandbox:      cred.Sandbox,
 		maySandbox:   true,
-	}, nil
+	}
 }
 
 // authAPIKey resolves the legacy api-key login (key as the password).
@@ -352,24 +367,12 @@ func (s *session) authAPIKey(ctx context.Context, password string) (*principal, 
 	}
 
 	now := time.Now().UTC()
-	// emails:write is what sending is called everywhere else now. The
-	// send scope this replaces was the same grant under a word that
-	// could only ever mean one thing.
-	//
-	// Except on a SANDBOX key, which is judged on the sandbox instead -
-	// the same rule the HTTP accepting routes apply, because it is the
-	// same question. A sandbox key holds nothing on emails by design,
-	// so asking for emails:write here would refuse the AUTH of the one
-	// credential a developer was handed to test with, and an SMTP
-	// client reports that as a bad password.
-	sending := perm.ResourceEmails
-	if k != nil && k.Sandbox {
-		sending = perm.ResourceSandbox
+	var p *principal
+	if k != nil && akmodel.HashEquals(password, k.KeyHash) {
+		p = keyPrincipal(k, s.ip, now)
 	}
 
-	if k == nil || !akmodel.HashEquals(password, k.KeyHash) || !k.IsValid(now) ||
-		!k.AllowsIP(s.ip) ||
-		!perm.ForKey(k.Permissions, k.Sandbox).Has(sending, perm.ActionWrite) {
+	if p == nil {
 		s.backend.Log.Warn("submission: auth rejected", "client_ip", s.ip)
 
 		return nil, smtp.ErrAuthFailed
@@ -381,14 +384,78 @@ func (s *session) authAPIKey(ctx context.Context, password string) (*principal, 
 		}
 	}
 
+	return p, nil
+}
+
+// keyPrincipal is the principal an api key grants from ip at now, or
+// nil when it may not send. Asked at AUTH and again at every MAIL.
+func keyPrincipal(k *akmodel.Key, ip string, now time.Time) *principal {
+	if k == nil || !k.IsValid(now) || !k.AllowsIP(ip) {
+		return nil
+	}
+
+	// Sending is emails:write, except on a SANDBOX key, which is judged
+	// on the sandbox instead, as the HTTP accepting routes do. A sandbox
+	// key holds nothing on emails by design.
+	sending := perm.ResourceEmails
+	if k.Sandbox {
+		sending = perm.ResourceSandbox
+	}
+
+	grants := perm.ForKey(k.Permissions, k.Sandbox)
+	if !grants.Has(sending, perm.ActionWrite) {
+		return nil
+	}
+
 	return &principal{
 		projectID:  k.ProjectID,
 		createdBy:  k.CreatedBy,
 		apiKeyID:   k.ID,
 		label:      "api key " + k.ID,
 		sandbox:    k.Sandbox,
-		maySandbox: perm.ForKey(k.Permissions, k.Sandbox).Has(perm.ResourceSandbox, perm.ActionWrite),
-	}, nil
+		maySandbox: grants.Has(perm.ResourceSandbox, perm.ActionWrite),
+	}
+}
+
+// recheck reloads the credential behind the session and judges it
+// again, so a revoked, expired, narrowed or IP-restricted credential
+// stops authorizing a held connection. A refusal ends the session's
+// authentication.
+func (s *session) recheck(ctx context.Context) error {
+	var (
+		p   *principal
+		err error
+	)
+	if s.auth.apiKeyID != "" {
+		var k *akmodel.Key
+		k, err = s.backend.Keys.Get(ctx, s.auth.projectID, s.auth.apiKeyID)
+		if err == nil {
+			p = keyPrincipal(k, s.ip, time.Now().UTC())
+		}
+	} else if s.backend.Credentials != nil {
+		var cred *scmodel.Credential
+		cred, err = s.backend.Credentials.Get(ctx, s.auth.projectID, s.auth.credentialID)
+		if err == nil {
+			p = credentialPrincipal(cred, s.ip)
+		}
+	}
+
+	if err != nil {
+		s.backend.Log.Error("submission: credential recheck failed", "auth", s.auth.label, "err", err)
+
+		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "temporary failure"}
+	}
+
+	if p == nil {
+		s.backend.Log.Warn("submission: credential no longer valid", "client_ip", s.ip, "auth", s.auth.label)
+		s.auth = nil
+
+		return smtp.ErrAuthFailed
+	}
+
+	s.auth = p
+
+	return nil
 }
 
 // Reset implements smtp.Session, clearing the envelope between
@@ -409,6 +476,13 @@ func (s *session) Mail(from string, _ *smtp.MailOptions) error {
 
 	if s.backend.parked() {
 		return errMaintenance
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := s.recheck(ctx); err != nil {
+		return err
 	}
 
 	if from != "" {
