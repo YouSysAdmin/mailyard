@@ -74,8 +74,9 @@ A project's server cannot point at loopback, RFC 1918 or other reserved address 
 without that guard the button is a scanner of the network Mailyard runs in. The check happens when the row is written
 and again at every dial, after the name has resolved.
 
-`sending.allow_private_smtp_targets` lifts it, for a relay that genuinely is on the same network. The shared pool and
-relay nodes are never subject to it - an operator placed those.
+A relay node enrolled into a project is a project server like any other: a private hostname is refused at enrolment
+and at every dial. `sending.allow_private_smtp_targets` lifts it, for a relay that genuinely is on the same network.
+The shared pool, its relay nodes included, is never subject to it - an operator placed those.
 {{< /callout >}}
 
 ## Sender Restrictions

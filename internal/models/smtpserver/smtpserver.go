@@ -211,11 +211,12 @@ func (s *Server) Normalize() {
 // cannot reach.
 //
 // GuardPrivate is decided HERE, from tenancy, because this is the one
-// place a row becomes a dial target: a project's own server gets the
-// guard, since its host is whatever a member typed. A shared server
-// (no ProjectID - resolveShared hands back the embedded value) and a
-// relay node were placed by an operator and frequently sit on this
-// very network, so they do not. The operator's global override is
+// place a row becomes a dial target: every project row gets the guard,
+// a relay node included, since its host is whatever a member typed or
+// a project API key enrolled. A shared server (no ProjectID -
+// resolveShared hands back the embedded value), shared pool nodes
+// included, was placed by the operator and frequently sits on this
+// very network, so it does not. The operator's global override is
 // applied by the caller, which is where the config is.
 func (s *Server) Spec(nodeTLS *tls.Config) transport.Spec {
 	return transport.Spec{
@@ -227,7 +228,7 @@ func (s *Server) Spec(nodeTLS *tls.Config) transport.Spec {
 		Encryption:   s.Encryption,
 		TLS:          nodeTLS,
 		Options:      s.ProviderConfig,
-		GuardPrivate: s.ProjectID != "" && !s.IsNode(),
+		GuardPrivate: s.ProjectID != "",
 
 		// The shared pool is the operator's own. A project row gets it
 		// only from a caller that knows it is the platform mail project.

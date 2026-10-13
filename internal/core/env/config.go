@@ -427,13 +427,14 @@ type SendingConfig struct {
 	// permanently rejects a recipient (5xx at RCPT TO). Default true.
 	AutoSuppressOnReject bool `mapstructure:"auto_suppress_on_reject"`
 
-	// AllowPrivateSMTPTargets lets a PROJECT's smtp server point at
-	// loopback, RFC 1918 and other reserved addresses. Off by default,
-	// for the reason webhook.allow_private_targets is: host and port
-	// are a project member's choice, and the connection test returns
-	// the peer's banner, which makes it a scanner of this network.
-	// The shared pool and relay nodes are not subject to the guard at
-	// all - an operator placed those, and they often are private.
+	// AllowPrivateSMTPTargets lets a PROJECT's smtp server, its relay
+	// nodes included, point at loopback, RFC 1918 and other reserved
+	// addresses. Off by default, for the reason
+	// webhook.allow_private_targets is: host and port are a project's
+	// choice, and the connection test returns the peer's banner, which
+	// makes it a scanner of this network. The shared pool, its relay
+	// nodes included, is not subject to the guard at all - an operator
+	// placed those, and they often are private.
 	AllowPrivateSMTPTargets bool `mapstructure:"allow_private_smtp_targets"`
 
 	// SPFInclude is the host tenants name in their SPF record, e.g.

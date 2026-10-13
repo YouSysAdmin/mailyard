@@ -20,6 +20,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/ids"
 	"github.com/yousysadmin/mailyard/internal/core/relayca"
 	"github.com/yousysadmin/mailyard/internal/core/response"
+	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
@@ -87,6 +88,15 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	host, herr := validHost(in.Hostname)
 	if herr != nil {
 		return response.BadRequest(c, herr.Error())
+	}
+
+	// A project node is dialled under the private-address guard, so a
+	// private host is refused here where the enrolling side can read
+	// why. The dialer is what enforces it.
+	if projID != "" && !h.Runtime.Config.Sending.AllowPrivateSMTPTargets &&
+		!safedial.HostAllowed(c.Context(), host) {
+		return response.BadRequest(c, "the hostname is a private or reserved address, which is refused "+
+			"for a project node (the operator can set sending.allow_private_smtp_targets to permit it)")
 	}
 
 	// ONE node per hostname, across every project and the pool. The
