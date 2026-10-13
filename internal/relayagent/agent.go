@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/certgen"
@@ -77,8 +78,14 @@ type Agent struct {
 
 	nodeID string
 	token  string
-	peerCN string
-	tlsCfg *tls.Config
+
+	// worker is the identity the worker listener serves, read on every
+	// handshake so a renewal or rotation reaches the running listener.
+	worker atomic.Pointer[workerIdentity]
+
+	// confirmed is true while the control plane accepts this node. The
+	// worker listener takes no session without it.
+	confirmed atomic.Bool
 
 	// accept is the recipient domain list this node answers RCPT from,
 	// refreshed on the heartbeat and cached in the spool.
@@ -89,6 +96,12 @@ type Agent struct {
 	forwardWake chan struct{}
 
 	Deliverer *Deliverer
+}
+
+// workerIdentity is what the worker listener trusts and presents.
+type workerIdentity struct {
+	tls  *tls.Config
+	peer string
 }
 
 // New opens the spool and enrols if this is a first run.
@@ -175,10 +188,9 @@ func (a *Agent) identify(ctx context.Context) error {
 	cert, _ := a.spool.Meta(metaCert)
 	key, _ := a.spool.Meta(metaKey)
 	ca, _ := a.spool.Meta(metaCA)
-	peer, _ := a.spool.Meta(metaPeerCN)
 
 	if nodeID != "" && token != "" && cert != "" && key != "" && ca != "" {
-		a.nodeID, a.token, a.peerCN = nodeID, token, peer
+		a.nodeID, a.token = nodeID, token
 		a.log.Info("relay node: using stored identity", "node_id", nodeID)
 		if err := a.renewIfDue(ctx, cert); err != nil {
 			// Renewal failing is not fatal while the current
@@ -227,7 +239,7 @@ func (a *Agent) enrol(ctx context.Context) error {
 		}
 	}
 
-	a.nodeID, a.token, a.peerCN = res.NodeID, res.Token, res.ClientName
+	a.nodeID, a.token = res.NodeID, res.Token
 
 	a.log.Info("relay node: enrolled", "node_id", res.NodeID, "status", res.Status)
 	if res.Status != "enabled" {
@@ -270,7 +282,6 @@ func (a *Agent) renewIfDue(ctx context.Context, certPEM string) error {
 		}
 	}
 
-	a.peerCN = res.ClientName
 	a.log.Info("relay node: certificate renewed", "expires", crt.NotAfter.Format(time.RFC3339))
 
 	// Rebuild so the listener serves the new pair without a restart.
@@ -281,6 +292,7 @@ func (a *Agent) buildTLS() error {
 	cert, _ := a.spool.Meta(metaCert)
 	key, _ := a.spool.Meta(metaKey)
 	ca, _ := a.spool.Meta(metaCA)
+	peer, _ := a.spool.Meta(metaPeerCN)
 
 	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
 	if err != nil {
@@ -291,17 +303,35 @@ func (a *Agent) buildTLS() error {
 		return err
 	}
 
-	a.tlsCfg = &tls.Config{
-		Certificates: []tls.Certificate{pair},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    pool,
-		// TLS 1.3 on a link whose only participants are our own
-		// processes. There is nothing old to be compatible with.
-		MinVersion: tls.VersionTLS13,
-	}
+	a.worker.Store(&workerIdentity{
+		tls: &tls.Config{
+			Certificates: []tls.Certificate{pair},
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			ClientCAs:    pool,
+			// TLS 1.3 on a link whose only participants are our own
+			// processes. There is nothing old to be compatible with.
+			MinVersion: tls.VersionTLS13,
+		},
+		peer: peer,
+	})
 
 	return nil
 }
+
+// workerTLS hands each worker handshake the identity held now, and
+// refuses it while the control plane has not accepted this node. A
+// restarted node is unconfirmed until its first heartbeat, so a stored
+// identity the platform has retired never opens the listener again.
+func (a *Agent) workerTLS(*tls.ClientHelloInfo) (*tls.Config, error) {
+	if !a.confirmed.Load() {
+		return nil, errors.New("relay node: the control plane has not accepted this node, refusing worker sessions")
+	}
+
+	return a.worker.Load().tls, nil
+}
+
+// workerPeer is the certificate name a worker must carry, as of now.
+func (a *Agent) workerPeer() string { return a.worker.Load().peer }
 
 // recordOutcome writes a terminal result down before anything tries
 // to send it.
@@ -400,12 +430,20 @@ func (a *Agent) flushOutcomes(ctx context.Context) {
 }
 
 // Listener builds the SMTP server workers connect to.
+//
+// The returned config carries no identity of its own: every handshake
+// reads the agent's current one through workerTLS.
 func (a *Agent) Listener() (addr string, tlsCfg *tls.Config, backend *Backend) {
-	return a.cfg.Addr, a.tlsCfg, &Backend{
+	tlsCfg = &tls.Config{
+		MinVersion:         tls.VersionTLS13,
+		GetConfigForClient: a.workerTLS,
+	}
+
+	return a.cfg.Addr, tlsCfg, &Backend{
 		Spool:          a.spool,
 		Log:            a.log,
 		MaxMessageSize: a.cfg.MaxMessageSize,
-		PeerName:       a.peerCN,
+		PeerName:       a.workerPeer,
 		Wake:           a.Deliverer.Wake,
 	}
 }
@@ -468,6 +506,7 @@ func (a *Agent) heartbeatLoop(ctx context.Context) {
 		})
 		switch err {
 		case nil:
+			a.confirmed.Store(true)
 			if res.Status != lastStatus {
 				// Say it once per change, not every two minutes. A
 				// node waiting for approval is otherwise silent, and a
@@ -481,6 +520,7 @@ func (a *Agent) heartbeatLoop(ctx context.Context) {
 				// The control plane has forgotten us, or the token is
 				// wrong. Retrying cannot fix either, and a node that
 				// keeps trying buries the reason in a log.
+				a.confirmed.Store(false)
 				a.log.Error("relay node: the control plane no longer accepts this node - it will deliver what it has and take nothing new",
 					"err", err)
 

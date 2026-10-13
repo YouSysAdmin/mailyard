@@ -36,12 +36,13 @@ type Backend struct {
 	Log            *slog.Logger
 	MaxMessageSize int64
 
-	// PeerName is the certificate name an inbound peer must carry.
-	// Verified again here, per session, because the TLS layer proves
+	// PeerName answers the certificate name an inbound peer must
+	// carry, read per session so it follows the node's current
+	// identity. Verified again here because the TLS layer proves
 	// the certificate is OURS and this proves it is a worker's - a
 	// node certificate is also ours and must not be able to connect
 	// into another node.
-	PeerName string
+	PeerName func() string
 
 	// Wake nudges the delivery loop when something arrives, so a
 	// message is not waiting out a poll interval for no reason.
@@ -73,7 +74,12 @@ func (b *Backend) checkPeer(state tls.ConnectionState) error {
 		return errors.New("no client certificate")
 	}
 
-	if b.PeerName == "" {
+	want := ""
+	if b.PeerName != nil {
+		want = b.PeerName()
+	}
+
+	if want == "" {
 		// Refuse rather than accept anything the CA signed. An empty
 		// expected name is a misconfigured node, and the failure mode
 		// of guessing here is admitting another node.
@@ -81,18 +87,18 @@ func (b *Backend) checkPeer(state tls.ConnectionState) error {
 	}
 
 	leaf := state.PeerCertificates[0]
-	if leaf.Subject.CommonName == b.PeerName {
+	if leaf.Subject.CommonName == want {
 		return nil
 	}
 
-	if slices.Contains(leaf.DNSNames, b.PeerName) {
+	if slices.Contains(leaf.DNSNames, want) {
 		return nil
 	}
 
 	// A node certificate carries ServerAuth only, so this is belt and
 	// braces - but it is the check that stops one node connecting
 	// into another if the key usages are ever loosened.
-	return fmt.Errorf("peer certificate %q is not %q", leaf.Subject.CommonName, b.PeerName)
+	return fmt.Errorf("peer certificate %q is not %q", leaf.Subject.CommonName, want)
 }
 
 type session struct {
