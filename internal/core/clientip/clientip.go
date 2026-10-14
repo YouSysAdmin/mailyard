@@ -27,6 +27,7 @@
 package clientip
 
 import (
+	"bytes"
 	"net/netip"
 	"strings"
 
@@ -93,7 +94,10 @@ func (r *Resolver) Resolve(c fiber.Ctx) string {
 		return peer
 	}
 
-	forwarded := c.Get(fiber.HeaderXForwardedFor)
+	// Every field line, in order: a proxy may append a line of its own
+	// rather than extend the caller's, and the last line is then the one
+	// we trust.
+	forwarded := string(bytes.Join(c.Request().Header.PeekAll(fiber.HeaderXForwardedFor), []byte(", ")))
 	for i := len(forwarded); i > 0; {
 		start := strings.LastIndexByte(forwarded[:i], ',') + 1
 

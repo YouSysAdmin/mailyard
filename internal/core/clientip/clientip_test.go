@@ -122,6 +122,35 @@ func TestTheCallerIsTheFirstAddressWeDidNotWrite(t *testing.T) {
 	}
 }
 
+// TestEveryForwardedLineIsRead sends the caller's own X-Forwarded-For and
+// a second line appended by the proxy. The chain is every line in order,
+// so the answer is what the proxy observed, not what the caller wrote.
+func TestEveryForwardedLineIsRead(t *testing.T) {
+	r, err := New([]string{"0.0.0.0/32"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	var got string
+	app := fiber.New()
+	app.Get("/", func(c fiber.Ctx) error {
+		got = r.Stamp(c)
+
+		return c.SendString("ok")
+	})
+
+	req := httptest.NewRequest(fiber.MethodGet, "/", nil)
+	req.Header.Add(fiber.HeaderXForwardedFor, "8.8.8.8")
+	req.Header.Add(fiber.HeaderXForwardedFor, "203.0.113.9")
+	if _, err := app.Test(req); err != nil {
+		t.Fatalf("Test: %v", err)
+	}
+
+	if got != "203.0.113.9" {
+		t.Errorf("caller is %q, want the address the proxy appended", got)
+	}
+}
+
 // TestAnUnstampedRequestFallsBackToThePeer pins the fallback, which is
 // what a package standing up its own app in a test gets.
 func TestAnUnstampedRequestFallsBackToThePeer(t *testing.T) {
