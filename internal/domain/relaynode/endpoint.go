@@ -459,8 +459,9 @@ func (h *Handler) projectForKey(c fiber.Ctx, token string) (string, bool) {
 	}
 	now := time.Now().UTC()
 	// relay:write, apart from smtp, because a machine holding it
-	// receives the CONTENT of the project's outbound mail.
-	if k == nil || !akmodel.HashEquals(token, k.KeyHash) || !k.IsValid(now) ||
+	// receives the CONTENT of the project's outbound mail. A sandbox key
+	// enrols nothing, since a node carries real mail.
+	if k == nil || k.Sandbox || !akmodel.HashEquals(token, k.KeyHash) || !k.IsValid(now) ||
 		!k.AllowsIP(clientip.From(c)) || !perm.ForKey(k.Permissions, k.Sandbox).Has(perm.ResourceRelay, perm.ActionWrite) {
 		return "", false
 	}

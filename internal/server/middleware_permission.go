@@ -4,6 +4,7 @@ package server
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -122,25 +123,51 @@ func permOnResolved(resolve func(*domain.RequestContext) permission.Resource) fi
 	}
 }
 
+// sandboxOnly is the refusal both sandbox gates answer with.
+const sandboxOnly = "a sandbox key reaches only the sandbox, captured sends and reads"
+
 // refuseSandboxCredential turns a sandbox credential away from a route
-// it must never reach.
+// it must never reach, reads included.
 //
-// It guards the rest of the emails surface: the delivery log, message
-// detail, attachments, stats, batch and retry all describe or touch
-// real mail, and a credential whose entire purpose is that its mail is
-// not real has no business there. It also guards credential
-// management, where a sandbox credential could mint one that is not.
-// Saying so beats a bare 403 on a permission the holder was never
-// meant to be given.
+// It guards the rest of the emails surface, which describes real mail,
+// and credential management, where a sandbox credential could read or
+// mint one that is not.
 func refuseSandboxCredential(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
 	if rc != nil && rc.IsSandboxCredential() {
-		return response.Forbidden(c,
-			"this is a sandbox credential, so it reaches only /emails/send and "+
-				"/emails/send-template - the delivery log and retries are real mail")
+		return response.Forbidden(c, sandboxOnly)
 	}
 
 	return c.Next()
+}
+
+// confineSandboxCredential is the one rule for what a sandbox
+// credential may write on /api/v1: the sandbox itself and the two
+// accepting routes, whose mail is captured. Anything but GET or HEAD
+// elsewhere is refused, whatever permissions the key carries, and the
+// reads still answer to their own gates.
+//
+// The path is folded the way the router folds it, so a spelling that
+// reaches a handler is the spelling judged here.
+func confineSandboxCredential(c fiber.Ctx) error {
+	rc := domain.GetRequestContext(c)
+	if rc == nil || !rc.IsSandboxCredential() {
+		return c.Next()
+	}
+
+	if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
+		return c.Next()
+	}
+
+	switch path := normalizePath(c.Path()); {
+	case path == "/api/v1/emails/send",
+		path == "/api/v1/emails/send-template",
+		path == "/api/v1/sandbox",
+		strings.HasPrefix(path, "/api/v1/sandbox/"):
+		return c.Next()
+	}
+
+	return response.Forbidden(c, sandboxOnly)
 }
 
 // permRead, permWrite and permDelete gate one route against the

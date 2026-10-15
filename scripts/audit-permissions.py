@@ -62,7 +62,8 @@ REFUSAL = re.compile(
     r"|insufficient permissions"
     r"|only a project owner"
     r"|the members:delete"
-    r"|this is a sandbox credential)"
+    r"|this is a sandbox credential"
+    r"|a sandbox key reaches only)"
 )
 
 

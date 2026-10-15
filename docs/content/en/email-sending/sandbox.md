@@ -285,22 +285,29 @@ A sandbox key is judged on the **sandbox** resource, not on emails, and that is 
 
 **Ticking the flag is the whole thing.** The key carries `sandbox:read`, `sandbox:write`
 and `sandbox:delete` by itself - send, read back what was sent, clear between runs - so a key created with an empty
-permission list and `"sandbox": true` works. Add permissions only if the application under test needs something beyond
-sending.
+permission list and `"sandbox": true` works. Add permissions only if the application under test needs to read something
+beyond the sandbox.
 
-| Permissions                      | carried by the flag, plus whatever else you tick |
-|----------------------------------|--------------------------------------------------|
-| `POST /emails/send`              | captured                                         |
-| `POST /emails/send-template`     | captured                                         |
-| `/sandbox`                       | read, clear, delete                              |
-| everything else under `/emails`  | **403**                                          |
-| `/api-keys`, `/smtp-credentials` | **403**                                          |
-| every other resource             | only if you granted it                           |
+| Route                                    | A sandbox key                                     |
+|------------------------------------------|---------------------------------------------------|
+| `POST /emails/send`                      | captured                                          |
+| `POST /emails/send-template`             | captured                                          |
+| `/sandbox`                               | read, clear, delete, inboxes, sandbox credentials |
+| everything else under `/emails`          | **403**, reads included                           |
+| `/api-keys`, `/smtp-credentials`         | **403**, reads included                           |
+| any other `GET` on `/api/v1`             | only if you granted the permission                |
+| any other write on `/api/v1`             | **403**, whatever it holds                        |
+| `POST /api/relay-nodes/register`         | **401**, a sandbox key enrols no relay node       |
 
-The delivery log, one message's detail, batch and retry all describe or touch real mail, so a credential whose whole
-purpose is that its mail is not real is turned away from them by name. The same goes for the credential routes, where
-it could otherwise mint a credential that is not a sandbox one. It mints through `/sandbox/credentials`, which makes
-only sandbox credentials.
+A sandbox key writes nowhere but the sandbox and the two accepting routes. Members, invitations, roles, webhooks and
+their tests, SMTP servers, relay nodes, domains, senders, templates, campaigns, subscribers, suppressions, project
+settings, erasure and imports are all refused with `403 a sandbox key reaches only the sandbox, captured sends and
+reads`, even when the key was given those permissions. A `POST` that only renders, such as a template preview, is a
+write here too. The permissions you add can widen what it reads, never what it changes.
+
+The delivery log, one message's detail, batch and retry all describe or touch real mail, so it is turned away from them
+by name, reads included. The same goes for the credential routes, where it could otherwise mint a credential that is not
+a sandbox one. It mints through `/sandbox/credentials`, which makes only sandbox credentials.
 
 {{< callout type="note" title="A sandbox key holds nothing on emails" >}}
 `emails:write` also grants `POST /emails/{id}/retry`, which re-queues an **existing** message - one already composed and

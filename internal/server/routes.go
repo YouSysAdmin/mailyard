@@ -318,7 +318,7 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// the budget is the IP's and not the route's.
 	v1AuthFailures := iplimit.New(rt.Config.RateLimit.LoginPerMinute, time.Minute)
 	v1 := app.Group("/api/v1", v1Limiter, refuseCrossSite(rt),
-		machineAuth(rt, v1AuthFailures), maintenanceMode(rt), auditWrites(rt))
+		machineAuth(rt, v1AuthFailures), confineSandboxCredential, maintenanceMode(rt), auditWrites(rt))
 
 	// The machine surface is gated by the same two tokens as the
 	// console: permOn(resource) on the group, permRead/permWrite on the
@@ -665,13 +665,10 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	emails.Post("/:id/cancel", permWrite, eh.Cancel)
 
 	// Send-test lives on the templates surface but is a send, so the
-	// email handler owns it. refuseSandboxCredential is on the ROUTE
-	// because this is not under the /emails group that carries it: a
-	// sandbox key can hold templates:write (ForKey ADDS the sandbox
-	// grants to whatever the key carries), and SendTest calls the
-	// service directly, past both sandbox apply points - so without
-	// this a sandbox credential sent real mail here.
-	tpl.Post("/:id/send-test", refuseSandboxCredential, permWrite, eh.SendTest)
+	// email handler owns it. It calls the service directly, past both
+	// sandbox apply points, and confineSandboxCredential is what keeps
+	// a sandbox key off it.
+	tpl.Post("/:id/send-test", permWrite, eh.SendTest)
 
 	// API keys - the machine credential management surface. Creating
 	// or revoking a credential is project-admin tier. A sandbox
@@ -939,9 +936,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	// A campaign send is real mail to a whole list, and nothing on the
 	// campaign path consults the credential's sandbox flag - see the
 	// note on send-test.
-	camps.Post("/:id/send", refuseSandboxCredential, permWrite, ch.Send)
+	camps.Post("/:id/send", permWrite, ch.Send)
 	camps.Post("/:id/pause", permWrite, ch.Pause)
-	camps.Post("/:id/resume", refuseSandboxCredential, permWrite, ch.Resume)
+	camps.Post("/:id/resume", permWrite, ch.Resume)
 	camps.Post("/:id/cancel", permWrite, ch.Cancel)
 	camps.Post("/:id/duplicate", permWrite, ch.Duplicate)
 	camps.Get("/:id/messages", permRead, ch.Messages)

@@ -4,12 +4,14 @@ package server
 
 import (
 	"context"
+	"io"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/recover"
 
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/env"
@@ -184,5 +186,90 @@ func TestASandboxKeyCannotMintACredential(t *testing.T) {
 		if got := call(false, path); got == fiber.StatusForbidden {
 			t.Errorf("ordinary key POST %s: 403, want it past the gate", path)
 		}
+	}
+}
+
+// A sandbox key writes only to the sandbox and the two accepting
+// routes, and reads what its permissions allow. Every other write on
+// /api/v1 is refused however broad the key, and an ordinary key with
+// the same permissions is let through.
+func TestASandboxKeyWritesOnlyToTheSandbox(t *testing.T) {
+	const (
+		raw = "myk_sandboxsandboxsandboxsandboxsandbox"
+		id  = "0190a0b0-0000-7000-8000-000000000001"
+	)
+
+	resolver, err := clientip.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	call := func(sandbox bool, method, path string) (int, string) {
+		key := &akmodel.Key{ID: "k1", ProjectID: "p1", KeyHash: akmodel.Hash(raw), Sandbox: sandbox,
+			Permissions: []string{"*"}}
+		rt := &env.Runtime{Config: &env.Config{},
+			Store: &store.Store{APIKey: keyStore{key: key}, Project: projectStore{}}}
+		app := fiber.New()
+		// A route past the gates reaches a handler over empty stores,
+		// which is all this asks.
+		app.Use(recover.New())
+		app.Use(requestContext(rt, resolver))
+		registerRoutes(app, rt, false)
+
+		req := httptest.NewRequest(method, path, strings.NewReader(`{}`))
+		req.Header.Set("Authorization", "Bearer "+raw)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		return resp.StatusCode, string(body)
+	}
+
+	refused := [][2]string{
+		{"POST", "/api/v1/projects/p1/invitations"},
+		{"POST", "/api/v1/projects/p1/roles"},
+		{"POST", "/api/v1/webhooks"},
+		{"POST", "/api/v1/webhooks/" + id + "/test"},
+		{"PATCH", "/api/v1/templates/" + id},
+		{"POST", "/api/v1/templates/" + id + "/send-test"},
+		{"POST", "/api/v1/campaigns/" + id + "/send"},
+		{"POST", "/api/v1/smtp-servers/" + id + "/test"},
+		{"POST", "/api/v1/domains"},
+		{"DELETE", "/api/v1/suppressions"},
+		{"POST", "/api/v1/data/delete-contacts"},
+		{"POST", "/api/v1/Webhooks/"},
+	}
+	for _, r := range refused {
+		status, body := call(true, r[0], r[1])
+		if status != fiber.StatusForbidden || !strings.Contains(body, sandboxOnly) {
+			t.Errorf("sandbox key %s %s: %d %s, want 403 naming the sandbox", r[0], r[1], status, body)
+		}
+
+		if status, _ := call(false, r[0], r[1]); status == fiber.StatusForbidden {
+			t.Errorf("ordinary key %s %s: 403, want it past the gate", r[0], r[1])
+		}
+	}
+
+	allowed := [][2]string{
+		{"POST", "/api/v1/emails/send"},
+		{"POST", "/api/v1/emails/send-template"},
+		{"POST", "/api/v1/sandbox/inboxes"},
+		{"POST", "/api/v1/sandbox/clear"},
+		{"GET", "/api/v1/templates"},
+	}
+	for _, r := range allowed {
+		if status, body := call(true, r[0], r[1]); status == fiber.StatusForbidden {
+			t.Errorf("sandbox key %s %s: 403 %s, want it past the gate", r[0], r[1], body)
+		}
+	}
+
+	// A read of real mail stays refused.
+	if status, _ := call(true, "GET", "/api/v1/emails"); status != fiber.StatusForbidden {
+		t.Errorf("sandbox key GET /api/v1/emails: %d, want 403", status)
 	}
 }
