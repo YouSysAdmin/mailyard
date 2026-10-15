@@ -340,7 +340,8 @@ Caps applied to every send, on both the console API and the machine API.
 Attachments travel base64-encoded, which inflates them by 4/3, so the request body cap is computed from
 `max_total_attachment_size` at startup rather than configured separately. That cap applies only to the routes that
 carry attachments (`/api/v1/emails/send`, `/send-template`, `/batch`, template attachment uploads and template import).
-Every other API route takes 8 MiB, and everything outside the API - login, webhooks, tracking - takes 1 MiB. Lower
+Every other API route takes 8 MiB, and everything outside the API - login, webhooks, tracking - takes 1 MiB. Anything
+above 1 MiB goes only to a request whose API key or session verifies. Lower
 these values if the deployment does not send large files.
 
 Two configurations are refused at startup: a `max_attachment_size` larger than

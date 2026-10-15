@@ -20,7 +20,7 @@ import (
 const refusalLogEvery = 10 * time.Second
 
 // uncredentialedReadTimeout is how long a request naming no credential
-// may take to arrive, body included. Its body is capped at
+// may take to arrive, body included. Its body is held to at most
 // apiBodyLimit, so this is minutes of margin on any real link, and it
 // is what stops a stranger holding a connection open by trickling a
 // body for the full server ReadTimeout.

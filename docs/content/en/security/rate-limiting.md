@@ -92,8 +92,10 @@ Separate from the per-minute budgets above, two settings bound how many requests
 `server.max_concurrent_per_ip` (default `256`) for one caller, answered `429`. Both refusals use the JSON error envelope
 and carry `Retry-After: 1`. The probes, `/healthz` and `/readyz`, are never refused, so a node at its ceiling still
 answers its orchestrator. A request naming no credential has 30 seconds to arrive, body included, so a stranger cannot
-hold a slot by sending a body a byte at a time. On the routes that carry attachments the credential must also be valid:
-a key or session that does not verify gets the same 30 seconds and the ordinary 8 MiB body ceiling. See [Configuration](/docs/getting-started/configuration#server).
+hold a slot by sending a body a byte at a time. A body above 1 MiB needs a credential that is valid, not merely named:
+a request whose key or session does not verify is held to 1 MiB on every route, and on the routes that carry
+attachments it also gets the same 30 seconds. The one exception is `/api/relay-nodes/inbound`, which keeps 8 MiB because
+a relay node's token travels inside the body. See [Configuration](/docs/getting-started/configuration#server).
 
 ## SMTP Listener Limits
 

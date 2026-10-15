@@ -57,14 +57,25 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 		}
 	}
 
-	// Off the attachment routes nothing is verified: the ceiling is the
-	// path's, and naming a credential keeps the server's read timeout.
+	// Off the attachment routes naming a credential keeps the server's
+	// read timeout, but a body above baseBodyLimit still needs it to
+	// verify. One declared within baseBodyLimit is not checked at all.
 	limits := perRequestLimits(unverified)
 	var h fasthttp.RequestHeader
 	h.SetRequestURI("/api/v1/templates")
 	h.Set(fiber.HeaderAuthorization, "Bearer x")
-	if got := limits(&h); got.MaxRequestBodySize != apiBodyLimit || got.ReadTimeout != 0 {
-		t.Errorf("templates with a credential = %d, %v, want apiBodyLimit and the server's timeout", got.MaxRequestBodySize, got.ReadTimeout)
+	h.SetContentLength(2 * baseBodyLimit)
+	if got := limits(&h); got.MaxRequestBodySize != baseBodyLimit || got.ReadTimeout != 0 {
+		t.Errorf("templates with an unverified credential = %d, %v, want baseBodyLimit and the server's timeout", got.MaxRequestBodySize, got.ReadTimeout)
+	}
+
+	h.SetContentLength(-1)
+	if got := limits(&h).MaxRequestBodySize; got != baseBodyLimit {
+		t.Errorf("a chunked body with an unverified credential = %d, want baseBodyLimit", got)
+	}
+
+	if got := perRequestLimits(verifiedAlways)(&h).MaxRequestBodySize; got != apiBodyLimit {
+		t.Errorf("templates with a verified credential = %d, want apiBodyLimit", got)
 	}
 
 	h.Del(fiber.HeaderAuthorization)
@@ -75,6 +86,9 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 
 // unverified is a verifier no credential passes.
 func unverified(*fasthttp.RequestHeader) bool { return false }
+
+// verifiedAlways is a verifier every request passes.
+func verifiedAlways(*fasthttp.RequestHeader) bool { return true }
 
 // apiKeys answers one project key.
 type apiKeys struct {
@@ -134,10 +148,10 @@ func newCredentials(t *testing.T) credentials {
 }
 
 // fasthttp allocates the body buffer from the declared Content-Length
-// before reading a byte, so the attachment ceiling and the long read
-// timeout go only to a credential that VERIFIES. Naming one is not
+// before reading a byte, so any ceiling above baseBodyLimit and the long
+// read timeout go only to a credential that VERIFIES. Naming one is not
 // enough.
-func TestOnlyAVerifiedCredentialLiftsTheAttachmentCeiling(t *testing.T) {
+func TestOnlyAVerifiedCredentialLiftsTheBodyCeiling(t *testing.T) {
 	cr := newCredentials(t)
 	limits := perRequestLimits(credentialVerifier(cr.rt))
 
@@ -173,25 +187,53 @@ func TestOnlyAVerifiedCredentialLiftsTheAttachmentCeiling(t *testing.T) {
 		{"a made-up session cookie", "", "x", false},
 		{"a made-up bearer beside a working cookie", "Bearer x", cr.token, false},
 	} {
-		var h fasthttp.RequestHeader
-		h.SetRequestURI("/api/v1/emails/send?sandbox=true")
-		if tc.header != "" {
-			h.Set(fiber.HeaderAuthorization, tc.header)
-		}
+		for path, verifiedLimit := range map[string]int{"/api/v1/emails/send?sandbox=true": 0, "/api/v1/templates": apiBodyLimit} {
+			var h fasthttp.RequestHeader
+			h.SetRequestURI(path)
+			h.SetContentLength(2 * baseBodyLimit)
+			if tc.header != "" {
+				h.Set(fiber.HeaderAuthorization, tc.header)
+			}
 
-		if tc.cookie != "" {
-			h.SetCookie("mailyard_session", tc.cookie)
-		}
+			if tc.cookie != "" {
+				h.SetCookie("mailyard_session", tc.cookie)
+			}
 
-		got := limits(&h)
-		wantLimit, wantTimeout := apiBodyLimit, uncredentialedReadTimeout
-		if tc.verified {
-			wantLimit, wantTimeout = 0, 0
-		}
+			got := limits(&h)
+			wantLimit := baseBodyLimit
+			if tc.verified {
+				wantLimit = verifiedLimit
+			}
 
-		if got.MaxRequestBodySize != wantLimit || got.ReadTimeout != wantTimeout {
-			t.Errorf("%s: limit %d, timeout %v, want %d, %v", tc.name, got.MaxRequestBodySize, got.ReadTimeout, wantLimit, wantTimeout)
+			if got.MaxRequestBodySize != wantLimit {
+				t.Errorf("%s on %s: limit %d, want %d", tc.name, path, got.MaxRequestBodySize, wantLimit)
+			}
+
+			if path != "/api/v1/templates" {
+				wantTimeout := uncredentialedReadTimeout
+				if tc.verified {
+					wantTimeout = 0
+				}
+
+				if got.ReadTimeout != wantTimeout {
+					t.Errorf("%s on %s: timeout %v, want %v", tc.name, path, got.ReadTimeout, wantTimeout)
+				}
+			}
 		}
+	}
+
+	// A relay node proves itself in the body, so the inbound route keeps
+	// apiBodyLimit without a header credential.
+	var relay fasthttp.RequestHeader
+	relay.SetRequestURI("/api/relay-nodes/inbound")
+	relay.SetContentLength(2 * baseBodyLimit)
+	if got := limits(&relay).MaxRequestBodySize; got != apiBodyLimit {
+		t.Errorf("relay inbound with no credential: limit %d, want apiBodyLimit", got)
+	}
+
+	relay.SetRequestURI("/api/relay-nodes/report")
+	if got := limits(&relay).MaxRequestBodySize; got != baseBodyLimit {
+		t.Errorf("relay report with no credential: limit %d, want baseBodyLimit", got)
 	}
 
 	// A revoked key is a key that does not verify.
@@ -199,8 +241,8 @@ func TestOnlyAVerifiedCredentialLiftsTheAttachmentCeiling(t *testing.T) {
 	var h fasthttp.RequestHeader
 	h.SetRequestURI("/api/v1/emails/send")
 	h.Set(fiber.HeaderAuthorization, "Bearer "+revokedToken)
-	if got := limits(&h).MaxRequestBodySize; got != apiBodyLimit {
-		t.Errorf("a revoked key: limit %d, want apiBodyLimit", got)
+	if got := limits(&h).MaxRequestBodySize; got != baseBodyLimit {
+		t.Errorf("a revoked key: limit %d, want baseBodyLimit", got)
 	}
 }
 
@@ -221,6 +263,7 @@ func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 	app.Post("/api/v1/emails/send", ok)
 	app.Post("/api/v1/templates", ok)
 	app.Post(env.ConsolePath+"/api/auth/login", ok)
+	app.Post(relayInboundPath, ok)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -246,13 +289,29 @@ func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 		}
 	}
 
-	// The attachment ceiling is for a request whose credential verifies.
-	// One naming none, or one that does not verify, gets the ordinary API
-	// ceiling on the same path.
+	// Anything above baseBodyLimit is for a request whose credential
+	// verifies. One naming none, or one that does not verify, gets
+	// baseBodyLimit on every API path.
 	for _, header := range [][]string{nil, {"Authorization: Bearer myk_madeup"}, {"Cookie: mailyard_session=x"}} {
-		if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit, header...); got != fiber.StatusRequestEntityTooLarge {
-			t.Errorf("send with %q and %d bytes answered %d, want 413", header, 2*apiBodyLimit, got)
+		for _, path := range []string{"/api/v1/emails/send", "/api/v1/templates"} {
+			if got := post(t, ln.Addr(), path, 2*baseBodyLimit, header...); got != fiber.StatusRequestEntityTooLarge {
+				t.Errorf("%s with %q and %d bytes answered %d, want 413", path, header, 2*baseBodyLimit, got)
+			}
+
+			if got := post(t, ln.Addr(), path, baseBodyLimit/2, header...); got != fiber.StatusOK {
+				t.Errorf("%s with %q and %d bytes answered %d, want 200", path, header, baseBodyLimit/2, got)
+			}
 		}
+	}
+
+	// A relay node carries its token in the body, so the inbound route
+	// keeps apiBodyLimit with no header credential at all.
+	if got := post(t, ln.Addr(), relayInboundPath, 2*baseBodyLimit); got != fiber.StatusOK {
+		t.Errorf("relay inbound with %d bytes answered %d, want 200", 2*baseBodyLimit, got)
+	}
+
+	if got := post(t, ln.Addr(), relayInboundPath, 2*apiBodyLimit); got != fiber.StatusRequestEntityTooLarge {
+		t.Errorf("relay inbound with %d bytes answered %d, want 413", 2*apiBodyLimit, got)
 	}
 
 	if got := post(t, ln.Addr(), "/api/v1/emails/send", 2*apiBodyLimit, "Cookie: mailyard_session="+cr.token); got != fiber.StatusOK {

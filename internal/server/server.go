@@ -237,9 +237,15 @@ const streamWriteTimeout = eventstream.MaxStreamLife + 5*time.Minute
 // surfaces, /api/v1 and /app/api, for every route that does not carry
 // attachments. Sized from what the biggest ordinary body actually is:
 // a template version is two 1 MiB fields plus sample data, a
-// subscriber import is 10 000 rows. Well under the attachment ceiling,
-// which is what a stranger otherwise gets to make us buffer.
+// subscriber import is 10 000 rows. It goes only to a credential that
+// verifies, like the attachment ceiling above it.
 const apiBodyLimit = 8 * 1024 * 1024
+
+// relayInboundPath forwards a whole received message, and a node proves
+// itself by a token in the BODY, which the HeaderReceived hook cannot
+// read. An unverified request there keeps apiBodyLimit rather than
+// baseBodyLimit.
+const relayInboundPath = "/api/relay-nodes/inbound"
 
 // LargeBodyPaths are the routes whose body may legitimately be as big
 // as the server's limit (bodyLimitFor): attachments travel inside the
@@ -262,23 +268,24 @@ var LargeBodyPaths = []string{
 	// Mounted only where relay_nodes.enabled is set, but a path is a
 	// string and an installation with no route here pays nothing for
 	// the entry.
-	"/api/relay-nodes/inbound",
+	relayInboundPath,
 }
 
 // perRequestLimits builds the HeaderReceived hook, which raises the
-// write deadline for the streaming endpoints and lowers the body ceiling
-// for every route that does not carry attachments.
+// write deadline for the streaming endpoints and sets the body ceiling
+// per request.
 //
 // A zero field in the returned config means "honor the server's own
 // value". The URI here is the RAW request target, so the path is
 // normalized the same way the router normalizes it before matching -
 // see normalizePath.
 //
-// On LargeBodyPaths the server's ceiling and read timeout go only to a
-// request whose credential verifies, because fasthttp allocates the body
-// buffer from the declared Content-Length before reading any of it.
-// Elsewhere the ceiling is apiBodyLimit or less, and naming a credential
-// is enough to keep the server's read timeout.
+// Anything above baseBodyLimit goes only to a request whose credential
+// verifies, because fasthttp allocates the body buffer from the declared
+// Content-Length before reading any of it. A body declared within
+// baseBodyLimit is not checked, since the ceiling cannot refuse it. On
+// LargeBodyPaths the server's read timeout also waits on a verified
+// credential, and elsewhere naming one is enough to keep it.
 func perRequestLimits(verified func(*fasthttp.RequestHeader) bool) func(*fasthttp.RequestHeader) fasthttp.RequestConfig {
 	return func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		uri := string(h.RequestURI())
@@ -287,14 +294,15 @@ func perRequestLimits(verified func(*fasthttp.RequestHeader) bool) func(*fasthtt
 		}
 
 		limit := bodyLimitForPath(uri)
-		var credential bool
-		if limit == 0 {
+		credential := carriesCredential(h)
+		switch {
+		case limit == 0:
 			credential = verified(h)
 			if !credential {
-				limit = apiBodyLimit
+				limit = unverifiedBodyLimit(uri)
 			}
-		} else {
-			credential = carriesCredential(h)
+		case limit > baseBodyLimit && declaresMoreThan(h, baseBodyLimit) && !verified(h):
+			limit = unverifiedBodyLimit(uri)
 		}
 
 		cfg := fasthttp.RequestConfig{MaxRequestBodySize: limit}
@@ -308,6 +316,25 @@ func perRequestLimits(verified func(*fasthttp.RequestHeader) bool) func(*fasthtt
 
 		return cfg
 	}
+}
+
+// unverifiedBodyLimit is the ceiling for a request whose credential does
+// not verify: baseBodyLimit, except on the relay inbound route.
+func unverifiedBodyLimit(path string) int {
+	if normalizePath(path) == relayInboundPath {
+		return apiBodyLimit
+	}
+
+	return baseBodyLimit
+}
+
+// declaresMoreThan reports whether the body may exceed n bytes: a
+// chunked body or a Content-Length above n. A request with neither
+// header has no body.
+func declaresMoreThan(h *fasthttp.RequestHeader, n int) bool {
+	cl := h.ContentLength()
+
+	return cl == -1 || cl > n
 }
 
 // carriesCredential reports whether the request names any credential
@@ -375,8 +402,8 @@ func credentialVerifier(rt *env.Runtime) func(*fasthttp.RequestHeader) bool {
 	}
 }
 
-// bodyLimitForPath is the body ceiling one request gets, where 0 means
-// the server's own. Three tiers: the attachment routes take the
+// bodyLimitForPath is the body ceiling a verified request gets, where 0
+// means the server's own. Three tiers: the attachment routes take the
 // server's, the two API prefixes take apiBodyLimit, and everything
 // else - login, the SES webhook, tracking, health, the console shell -
 // takes baseBodyLimit. The auth routes are carved out of the API tier
