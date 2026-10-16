@@ -200,9 +200,9 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 // a key that no longer exists: still heartbeating, still listed as
 // alive, and impossible to deliver through.
 //
-// A node does not come back on its own. It holds a stored identity and
-// never re-enrols, so the operator has to hand it the token again or
-// clear its spool.
+// A node does not come back on its own. It keeps the identity stored in
+// its spool and never re-enrols while that identity is there, whatever
+// token its config carries, so it has to start on an empty spool.
 func (h *Handler) ResetAuthority(c fiber.Ctx) error {
 	if h.CA == nil {
 		return response.BadRequest(c, "relay nodes are not enabled on this installation")
@@ -242,10 +242,12 @@ func (h *Handler) ResetAuthority(c fiber.Ctx) error {
 	return response.Success(c, ResetAuthorityResponse{
 		NodesUnenrolled: len(nodes),
 		Message: "The relay authority and every node identity are gone. A new authority is " +
-			"created the moment something enrols. Each node has to enrol AGAIN, which " +
-			"means giving it its enrolment token - a node holding a stored identity does " +
-			"not re-enrol by itself. Other API nodes keep the old authority cached until " +
-			"they restart.",
+			"created the moment something enrols. No node comes back by itself: one still " +
+			"holding its stored identity is refused by the control plane and takes no new " +
+			"mail, and setting an enrolment token does not change that. For each node, stop " +
+			"it, point relay_node.spool_dir at an empty directory (or empty the one it uses), " +
+			"set relay_node.enroll_token and start it. It enrols as a new node and goes " +
+			"through approval. Other API nodes keep the old authority cached until they restart.",
 	})
 }
 

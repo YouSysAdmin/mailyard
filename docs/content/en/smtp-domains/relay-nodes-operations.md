@@ -135,9 +135,14 @@ Afterwards:
 
 - A new authority is minted the moment anything enrols. There is nothing to set
   up.
-- **Each node has to enrol again, and will not do it by itself.** A node holding
-  a stored identity keeps using it, so give it `relay_node.enroll_token` again -
-  or clear its `spool_dir`, which is what "enrol as a new node" means.
+- **Each node has to enrol again, and will not do it by itself.** The identity
+  lives in the node's `spool_dir`, and a node that still has one keeps using it
+  and never enrols, even with `relay_node.enroll_token` set. The control plane
+  refuses that identity, so the node delivers what it already holds and accepts
+  nothing new. For each node: stop it, point `spool_dir` at an empty directory
+  (or empty the one it uses), set `relay_node.enroll_token`, and start it. It
+  enrols as a new node and goes through approval like any other. Mail left in the
+  old spool is not picked up by the new one.
 - Other API nodes keep the old authority cached until they restart.
 
 ## Why there is no password
