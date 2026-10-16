@@ -108,8 +108,9 @@ type PullAssigner interface {
 // and so a test can supply a pair without a database.
 type RelayClientSource interface {
 	// WorkerTLS returns a config carrying our client certificate and
-	// trusting the relay authority, with ServerName set to host.
-	WorkerTLS(ctx context.Context, host string) (*tls.Config, error)
+	// trusting the relay authority, with ServerName set to host, that
+	// accepts only the certificate issued to nodeID.
+	WorkerTLS(ctx context.Context, nodeID, host string) (*tls.Config, error)
 }
 
 // nodeTLS answers how to reach this candidate.
@@ -132,7 +133,7 @@ func (p *Processor) nodeTLS(ctx context.Context, srv *ssmodel.Server) (*tls.Conf
 		return nil, fmt.Errorf("server %s is a relay node but no client identity is configured", srv.Name)
 	}
 
-	return p.RelayClient.WorkerTLS(ctx, srv.Host)
+	return p.RelayClient.WorkerTLS(ctx, srv.NodeID, srv.Host)
 }
 
 // deliver hands the message to whichever provider this candidate names.

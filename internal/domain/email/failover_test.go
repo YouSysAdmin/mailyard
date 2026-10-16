@@ -190,7 +190,7 @@ func (f *fakeNotes) Create(_ context.Context, n *nmodel.Notification) (bool, err
 // anyRelayClient lets a node candidate reach the send leg.
 type anyRelayClient struct{}
 
-func (anyRelayClient) WorkerTLS(context.Context, string) (*tls.Config, error) {
+func (anyRelayClient) WorkerTLS(context.Context, string, string) (*tls.Config, error) {
 	return &tls.Config{}, nil
 }
 

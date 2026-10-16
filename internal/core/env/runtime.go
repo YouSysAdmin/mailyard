@@ -62,8 +62,9 @@ type Runtime struct {
 	CampaignEmailCancelled func(ctx context.Context, projID, emailID string)
 
 	// RelayNodeTLS builds the transport for dialling one relay node:
-	// our client certificate, the relay authority as the root, and
-	// ServerName set to the host. A plain func for the same reason as
+	// our client certificate, the relay authority as the root,
+	// ServerName set to the host, and only the certificate issued to
+	// nodeID accepted. A plain func for the same reason as
 	// CampaignWake above - env cannot import the email domain, which
 	// imports env.
 	//
@@ -72,7 +73,7 @@ type Runtime struct {
 	// builder must REFUSE rather than dial with the default config:
 	// a node's certificate is signed by our own authority and can
 	// never verify against the system roots.
-	RelayNodeTLS func(ctx context.Context, host string) (*tls.Config, error)
+	RelayNodeTLS func(ctx context.Context, nodeID, host string) (*tls.Config, error)
 
 	// RelayBell wakes the long-poll a pull relay node parks on the
 	// claim route when a message is assigned to it. Always set. Rung

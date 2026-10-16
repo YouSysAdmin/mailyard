@@ -255,19 +255,21 @@ func (a *Authority) ForgetNode(ctx context.Context, nodeID string) error {
 	return a.Store.Delete(ctx, certmodel.ScopeRelayNode, nodeID)
 }
 
-// Issued returns the SHA-256 fingerprints of every node certificate on
-// record. A certificate that verifies against the CA but is not here was
-// issued to a node that has since been removed, and a worker refuses it.
-// There is no CRL and no OCSP on this private authority, so the record of
-// issuance IS the revocation list, read fresh by each worker on the same
-// schedule it reloads its own pair.
-func (a *Authority) Issued(ctx context.Context) (map[[sha256.Size]byte]bool, error) {
+// Issued returns the SHA-256 fingerprint of the certificate on record
+// for each node, keyed by node id. One leaf per node: a renewal replaces
+// the record. A worker dialling a node accepts that node's leaf alone,
+// so a certificate that verifies against the CA but is not the one
+// recorded for the dialled node - another node's, or a removed one's -
+// is refused. There is no CRL and no OCSP on this private authority, so
+// the record of issuance IS the revocation list, read fresh by each
+// worker on the same schedule it reloads its own pair.
+func (a *Authority) Issued(ctx context.Context) (map[string][sha256.Size]byte, error) {
 	rows, err := a.Store.ListScope(ctx, certmodel.ScopeRelayNode)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[[sha256.Size]byte]bool, len(rows))
+	out := make(map[string][sha256.Size]byte, len(rows))
 	for _, row := range rows {
 		crt, err := relayca.ParseCertificate(row.CertPEM)
 		if err != nil {
@@ -278,7 +280,7 @@ func (a *Authority) Issued(ctx context.Context) (map[[sha256.Size]byte]bool, err
 			continue
 		}
 
-		out[sha256.Sum256(crt.Raw)] = true
+		out[row.Name] = sha256.Sum256(crt.Raw)
 	}
 
 	return out, nil

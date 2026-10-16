@@ -470,7 +470,7 @@ func (h *Handler) invalidateSESTopics() {
 // the platform_mail_project setting, whose rows may use the machine's
 // own credentials as the delivery worker lets them.
 func testTransport(ctx context.Context, srv *ssmodel.Server,
-	nodeTLS func(context.Context, string) (*tls.Config, error), allowPrivate bool, platformProject string) error {
+	nodeTLS func(context.Context, string, string) (*tls.Config, error), allowPrivate bool, platformProject string) error {
 	var dialTLS *tls.Config
 	if srv.IsNode() {
 		if nodeTLS == nil {
@@ -480,7 +480,7 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 			return fmt.Errorf("server %s is a relay node but no client identity is configured", srv.Name)
 		}
 
-		built, err := nodeTLS(ctx, srv.Host)
+		built, err := nodeTLS(ctx, srv.NodeID, srv.Host)
 		if err != nil {
 			return err
 		}

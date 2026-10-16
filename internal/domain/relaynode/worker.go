@@ -27,7 +27,7 @@ type WorkerIdentity struct {
 	mu     sync.Mutex
 	pair   *tls.Certificate
 	roots  *x509.CertPool
-	issued map[[sha256.Size]byte]bool
+	issued map[string][sha256.Size]byte
 	loaded time.Time
 
 	// recheckedAt is when the issued set was last re-read on a miss.
@@ -51,9 +51,10 @@ const recheckAfter = 5 * time.Second
 // WorkerTLS builds the config for dialling one node.
 //
 // ServerName is the node's host, so the node's certificate is checked
-// against the name we actually dialled - which is what stops a node
-// certificate being usable for any node other than the one it names.
-func (w *WorkerIdentity) WorkerTLS(ctx context.Context, host string) (*tls.Config, error) {
+// against the name we actually dialled, and the leaf must be the one on
+// record for nodeID, so a certificate issued to another node is refused
+// even where its name would verify.
+func (w *WorkerIdentity) WorkerTLS(ctx context.Context, nodeID, host string) (*tls.Config, error) {
 	pair, roots, issued, err := w.load(ctx)
 	if err != nil {
 		return nil, err
@@ -67,10 +68,10 @@ func (w *WorkerIdentity) WorkerTLS(ctx context.Context, host string) (*tls.Confi
 		// processes. There is nothing old to be compatible with.
 		MinVersion: tls.VersionTLS13,
 		// Runs AFTER the chain and the name were verified, and asks the
-		// one thing those cannot: is this certificate still on the
-		// authority's record. A removed node keeps a leaf that verifies
-		// for up to 90 days, and this is what makes removal mean
-		// something before then - see Authority.Issued.
+		// one thing those cannot: is this the certificate on the
+		// authority's record for THIS node. A removed node keeps a leaf
+		// that verifies for up to 90 days, and this is what makes
+		// removal mean something before then - see Authority.Issued.
 		//
 		// VerifyConnection, not VerifyPeerCertificate: the latter is
 		// skipped on a resumed session.
@@ -80,21 +81,21 @@ func (w *WorkerIdentity) WorkerTLS(ctx context.Context, host string) (*tls.Confi
 			}
 
 			sum := sha256.Sum256(cs.PeerCertificates[0].Raw)
-			if issued[sum] || w.issuedNow(ctx, sum) {
+			if issued[nodeID] == sum || w.issuedNow(ctx, nodeID, sum) {
 				return nil
 			}
 
-			return errors.New("relay node certificate is not on the authority's record - the node was removed")
+			return errors.New("relay node certificate is not the one on the authority's record for this node")
 		},
 	}, nil
 }
 
 // issuedNow re-reads the authority's record for a certificate the
 // cached set missed, at most once per recheckAfter.
-func (w *WorkerIdentity) issuedNow(ctx context.Context, sum [sha256.Size]byte) bool {
+func (w *WorkerIdentity) issuedNow(ctx context.Context, nodeID string, sum [sha256.Size]byte) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.issued[sum] {
+	if w.issued[nodeID] == sum {
 		return true
 	}
 
@@ -110,10 +111,10 @@ func (w *WorkerIdentity) issuedNow(ctx context.Context, sum [sha256.Size]byte) b
 
 	w.issued = issued
 
-	return issued[sum]
+	return issued[nodeID] == sum
 }
 
-func (w *WorkerIdentity) load(ctx context.Context) (*tls.Certificate, *x509.CertPool, map[[sha256.Size]byte]bool, error) {
+func (w *WorkerIdentity) load(ctx context.Context) (*tls.Certificate, *x509.CertPool, map[string][sha256.Size]byte, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.pair != nil && time.Since(w.loaded) < reloadAfter {
