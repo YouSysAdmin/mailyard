@@ -279,19 +279,37 @@ func TestAnUnscopedReportOnASharedMessageSuppressesNobody(t *testing.T) {
 	}
 }
 
-// A scoped reporter is vouched for and still suppresses on a shared
-// message.
-func TestAScopedReportOnASharedMessageStillSuppresses(t *testing.T) {
-	sent := &emailmodel.Email{
+// A tenant node's MX is open to anyone too, so its scope narrows the
+// project a report may touch but does not let a shared message
+// suppress. A single-recipient message still does.
+func TestAScopedReportOnASharedMessageSuppressesNobody(t *testing.T) {
+	shared := &emailmodel.Email{
 		ID: "e-1", ProjectID: "tenant-project",
 		Sender: "news@user.com", Recipients: []string{"alice@example.org", "bob@example.org"},
 	}
-	svc, _, sup := reportService(sent)
+	svc, bounces, sup := reportService(shared)
 
 	svc.processReport(t.Context(), arrival(),
 		dsnWith("bob@example.org", "X-Mailyard-Email-Id: e-1\nSubject: hi"), "tenant-project")
 
+	if len(bounces.rows) != 1 || bounces.rows[0].Recipient != "bob@example.org" {
+		t.Fatalf("bounce rows: %+v, want one for bob", bounces.rows)
+	}
+
+	if len(sup.recorded) != 0 {
+		t.Errorf("a scoped report on a shared message wrote %d suppression(s)", len(sup.recorded))
+	}
+
+	sole := &emailmodel.Email{
+		ID: "e-2", ProjectID: "tenant-project",
+		Sender: "news@user.com", Recipients: []string{"bob@example.org"},
+	}
+	svc, _, sup = reportService(sole)
+
+	svc.processReport(t.Context(), arrival(),
+		dsnWith("bob@example.org", "X-Mailyard-Email-Id: e-2\nSubject: hi"), "tenant-project")
+
 	if len(sup.recorded) != 1 {
-		t.Errorf("a scoped report wrote %d suppression(s), want 1", len(sup.recorded))
+		t.Errorf("a scoped report on a sole-recipient message wrote %d suppression(s), want 1", len(sup.recorded))
 	}
 }

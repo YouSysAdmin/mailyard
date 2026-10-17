@@ -528,6 +528,10 @@ func (s *Service) processReport(ctx context.Context, rec *imodel.Email, raw []by
 
 	intake := &bounce.Intake{
 		Emails: s.Emails, Bounces: s.Bounces, Suppressions: s.Suppressions, Log: s.Log,
+
+		// Anyone can write a DSN at an MX, a tenant node's included, so a
+		// co-recipient of a shared message cannot suppress the others.
+		SoleRecipientSuppresses: true,
 	}
 
 	// Through Intake.Allow rather than by looking the message up
@@ -544,10 +548,6 @@ func (s *Service) processReport(ctx context.Context, rec *imodel.Email, raw []by
 
 			return false, "the reporting node belongs to a different project than the message"
 		}
-	} else {
-		// Nothing vouches for an unscoped reporter, so a co-recipient
-		// of a shared message cannot suppress the others.
-		intake.SoleRecipientSuppresses = true
 	}
 
 	intake.Record(ctx, out)
