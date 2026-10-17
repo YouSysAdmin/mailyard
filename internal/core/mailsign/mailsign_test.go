@@ -511,6 +511,151 @@ func TestPGPImportRefusesAProtectionAboveTheMemoryCap(t *testing.T) {
 	}
 }
 
+// protectedPGP builds a key with extra signing subkeys beside the
+// primary and its encryption subkey, protects it with cfg, and
+// armors it. A nil cfg is go-crypto's default protection.
+func protectedPGP(t *testing.T, extraSubkeys int, cfg *packet.Config) string {
+	t.Helper()
+
+	m, err := GeneratePGP("Billing", "billing@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(m.Private))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for range extraSubkeys {
+		if err := ring[0].AddSigningSubkey(pgpConfig()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := ring[0].EncryptPrivateKeys([]byte("hunter2"), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	return armorPGPPrivate(t, ring[0])
+}
+
+func armorPGPPrivate(t *testing.T, e *openpgp.Entity) string {
+	t.Helper()
+
+	var out bytes.Buffer
+	w, _ := armor.Encode(&out, armorPrivate, nil)
+	if err := e.SerializePrivateWithoutSigning(w, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = w.Close()
+
+	return out.String()
+}
+
+func argon2Protection(passes uint8, memoryKiB uint32) *packet.Config {
+	return &packet.Config{
+		AEADConfig: &packet.AEADConfig{DefaultMode: packet.AEADModeOCB},
+		S2KConfig: &s2k.Config{
+			S2KMode: s2k.Argon2S2K,
+			Argon2Config: &s2k.Argon2Config{
+				NumberOfPasses: passes, DegreeOfParallelism: 1, Memory: memoryKiB,
+			},
+		},
+	}
+}
+
+// The derivation of one import is bounded in passes, in the number of
+// protected packets and in total, each read before anything runs, and
+// a key protected the way go-crypto protects one by default opens.
+func TestPGPImportBoundsTheWholeDerivation(t *testing.T) {
+	const addr = "billing@example.com"
+
+	if _, err := ImportPGP(protectedPGP(t, 0, argon2Protection(255, 64)), "hunter2", addr); !errors.Is(err, ErrKeyProtection) {
+		t.Errorf("255 argon2 passes: %v", err)
+	}
+
+	if _, err := ImportPGP(protectedPGP(t, 0, argon2Protection(maxArgon2Passes, 64)), "hunter2", addr); err != nil {
+		t.Errorf("argon2 passes at the cap: %v", err)
+	}
+
+	// Two packets at four passes over 64 MiB is twice the total.
+	if _, err := ImportPGP(protectedPGP(t, 0, argon2Protection(maxArgon2Passes, 1<<maxArgon2MemoryExp)), "hunter2", addr); !errors.Is(err, ErrKeyProtection) {
+		t.Errorf("a total above the budget: %v", err)
+	}
+
+	// The primary, the encryption subkey and the extras.
+	if _, err := ImportPGP(protectedPGP(t, maxPGPProtectedPackets-1, nil), "hunter2", addr); !errors.Is(err, ErrKeyProtection) {
+		t.Errorf("%d protected packets: %v", maxPGPProtectedPackets+1, err)
+	}
+
+	if _, err := ImportPGP(protectedPGP(t, maxPGPProtectedPackets-2, nil), "hunter2", addr); err != nil {
+		t.Errorf("%d protected packets: %v", maxPGPProtectedPackets, err)
+	}
+
+	if _, err := ImportPGP(protectedPGP(t, 0, nil), "hunter2", addr); err != nil {
+		t.Errorf("a key at go-crypto's default protection: %v", err)
+	}
+}
+
+// A key whose primary is open and whose subkey is protected is held to
+// the same bounds, and its subkey is opened with the passphrase.
+func TestPGPImportBoundsAProtectedSubkeyUnderAnOpenPrimary(t *testing.T) {
+	build := func(cfg *packet.Config) string {
+		m, err := GeneratePGP("Billing", "billing@example.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(m.Private))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := ring[0].Subkeys[0].PrivateKey.EncryptWithConfig([]byte("hunter2"), cfg); err != nil {
+			t.Fatal(err)
+		}
+
+		return armorPGPPrivate(t, ring[0])
+	}
+
+	if _, err := ImportPGP(build(argon2Protection(255, 64)), "hunter2", "billing@example.com"); !errors.Is(err, ErrKeyProtection) {
+		t.Errorf("a heavy subkey under an open primary: %v", err)
+	}
+
+	got, err := ImportPGP(build(argon2Protection(1, 64)), "hunter2", "billing@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(got.Private))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ring[0].Subkeys[0].PrivateKey.Encrypted {
+		t.Error("the protected subkey was stored still protected")
+	}
+}
+
+// A key naming another address is refused before any derivation: with
+// a wrong passphrase and a protection above the caps it is still the
+// address that is reported.
+func TestPGPImportChecksTheAddressBeforeTheProtection(t *testing.T) {
+	heavy := protectedPGP(t, 0, argon2Protection(255, 64))
+	if _, err := ImportPGP(heavy, "wrong", "someone-else@example.com"); err == nil ||
+		!strings.Contains(err.Error(), "no user id") {
+		t.Errorf("another address under a heavy protection: %v", err)
+	}
+
+	light := protectedPGP(t, 0, nil)
+	if _, err := ImportPGP(light, "wrong", "someone-else@example.com"); err == nil ||
+		!strings.Contains(err.Error(), "no user id") {
+		t.Errorf("another address under a wrong passphrase: %v", err)
+	}
+}
+
 // A .p12 names its own KDF round count, and one above the cap is
 // refused by the decoder before a single round runs.
 func TestPKCS12ImportRefusesAnIterationCountAboveTheCap(t *testing.T) {

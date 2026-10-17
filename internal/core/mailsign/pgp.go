@@ -67,18 +67,19 @@ func ImportPGP(armored, passphrase, email string) (Material, error) {
 		return Material{}, err
 	}
 
-	if entity.PrivateKey.Encrypted {
-		if err := checkPGPProtection(armored); err != nil {
-			return Material{}, err
-		}
-
-		if err := entity.DecryptPrivateKeys([]byte(passphrase)); err != nil {
-			return Material{}, ErrPassphrase
-		}
-	}
-
+	// Every refusal that needs no passphrase runs before a derivation.
 	if !pgpNamesAddress(entity, email) {
 		return Material{}, fmt.Errorf("mailsign: the key carries no user id for %s", email)
+	}
+
+	if err := checkPGPProtection(armored); err != nil {
+		return Material{}, err
+	}
+
+	// Opens the primary and every subkey that is protected, and does
+	// nothing for a key with none.
+	if err := entity.DecryptPrivateKeys([]byte(passphrase)); err != nil {
+		return Material{}, ErrPassphrase
 	}
 
 	if _, ok := entity.SigningKey(time.Now()); !ok {
@@ -88,14 +89,29 @@ func ImportPGP(armored, passphrase, email string) (Material, error) {
 	return pgpMaterial(entity)
 }
 
-// maxArgon2MemoryExp bounds the memory an Argon2-protected key may ask
-// for before it is opened: 2^16 KiB, 64 MiB, the memory-constrained
-// profile of RFC 9580. The cost is read from the key itself and
-// go-crypto accepts anything up to 2^31 KiB, two terabytes, which the
-// Argon2 implementation allocates in one piece before the first pass.
-// A key is imported by any project member, so the ceiling is what
-// keeps one of them from taking the node down with three bytes.
-const maxArgon2MemoryExp = 16
+// The passphrase derivation of one import is bounded, and every bound
+// is read from the key before anything is derived. go-crypto derives
+// once per protected packet, the primary and each subkey, so a packet
+// count and a total stand beside the per-packet bounds. A key is
+// imported by any project member, so these are what keep one of them
+// from taking the node down.
+const (
+	// maxArgon2MemoryExp is 2^16 KiB, 64 MiB, the memory-constrained
+	// profile of RFC 9580. go-crypto accepts up to 2^31 KiB and
+	// allocates it in one piece before the first pass.
+	maxArgon2MemoryExp = 16
+
+	// maxArgon2Passes admits the three passes RFC 9580 recommends.
+	maxArgon2Passes = 4
+
+	// maxPGPProtectedPackets is the primary plus a handful of subkeys.
+	maxPGPProtectedPackets = 8
+
+	// maxPGPDerivationWork is the bytes one import may run through its
+	// derivations, four passes over 64 MiB. Argon2 counts passes times
+	// its memory, the iterated S2K the octets it hashes.
+	maxPGPDerivationWork = maxArgon2Passes << (maxArgon2MemoryExp + 10)
+)
 
 // ErrKeyProtection is a protected key whose passphrase derivation asks
 // for more than an import may spend.
@@ -107,21 +123,28 @@ const (
 	tagSecretSubkey = 7
 )
 
+// S2K specifier modes that cost more than one hash, RFC 9580 3.7.1.
+const (
+	s2kIterated = 3
+	s2kArgon2   = 4
+)
+
 // checkPGPProtection reads the string-to-key parameters of every
-// secret key packet in the block and refuses an Argon2 cost above
-// maxArgon2MemoryExp. go-crypto keeps those parameters to itself, so
-// they are read off the packet bytes: the public portion is sized by
-// serializing it, and what follows is the S2K usage octet, the cipher,
-// the AEAD mode where usage is 253, the v6 length octet, then the S2K
-// specifier whose fourth mode is Argon2 - salt, passes, parallelism,
-// memory exponent. Anything that cannot be read is refused, never
-// opened: a key this cannot parse is not one the decrypt may run on.
+// secret key packet in the block and refuses a key whose derivations
+// exceed the bounds above, per packet and in total. go-crypto keeps
+// those parameters to itself, so they are read off the packet bytes:
+// the public portion is sized by serializing it, and what follows is
+// the S2K usage octet, the cipher, the AEAD mode where usage is 253,
+// the v6 length octet, then the S2K specifier. Anything that cannot be
+// read is refused, never opened: a key this cannot parse is not one
+// the decrypt may run on.
 func checkPGPProtection(armored string) error {
 	block, err := armor.Decode(strings.NewReader(armored))
 	if err != nil {
 		return fmt.Errorf("mailsign: not an armored openpgp key: %w", err)
 	}
 
+	var packets, work int64
 	r := packet.NewOpaqueReader(block.Body)
 	for {
 		op, err := r.Next()
@@ -137,42 +160,55 @@ func checkPGPProtection(armored string) error {
 			continue
 		}
 
-		if err := checkSecretKeyPacket(op); err != nil {
+		encrypted, cost, err := secretKeyPacketCost(op)
+		if err != nil {
 			return err
+		}
+
+		if !encrypted {
+			continue
+		}
+
+		packets++
+		work += cost
+		if packets > maxPGPProtectedPackets || work > maxPGPDerivationWork {
+			return ErrKeyProtection
 		}
 	}
 }
 
-func checkSecretKeyPacket(op *packet.OpaquePacket) error {
+// secretKeyPacketCost reports whether a secret key packet is protected
+// and the bytes its derivation runs through.
+func secretKeyPacketCost(op *packet.OpaquePacket) (bool, int64, error) {
 	parsed, err := op.Parse()
 	if err != nil {
-		return fmt.Errorf("mailsign: parse secret key packet: %w", err)
+		return false, 0, fmt.Errorf("mailsign: parse secret key packet: %w", err)
 	}
 
 	pk, ok := parsed.(*packet.PrivateKey)
 	if !ok {
-		return errors.New("mailsign: secret key packet did not parse as one")
+		return false, 0, errors.New("mailsign: secret key packet did not parse as one")
 	}
 
 	if !pk.Encrypted {
-		return nil
+		return false, 0, nil
 	}
 
 	// The public portion as the packet carries it, measured through
 	// the signature-hash form, which is a fixed prefix plus that body.
 	var prefix, hashed bytes.Buffer
 	if err := pk.SerializeSignaturePrefix(&prefix); err != nil {
-		return err
+		return false, 0, err
 	}
 
 	if err := pk.SerializeForHash(&hashed); err != nil {
-		return err
+		return false, 0, err
 	}
 
 	rest := op.Contents
 	i := hashed.Len() - prefix.Len()
 	if i < 0 || i >= len(rest) {
-		return ErrKeyProtection
+		return false, 0, ErrKeyProtection
 	}
 
 	usage := rest[i]
@@ -194,22 +230,38 @@ func checkSecretKeyPacket(op *packet.OpaquePacket) error {
 		i++
 	}
 
-	// The specifier: mode, and for Argon2 a 16 octet salt, passes,
-	// parallelism and the memory exponent.
-	const argon2Mode, argon2MemoryOffset = 4, 1 + 16 + 1 + 1
 	if i >= len(rest) {
-		return ErrKeyProtection
+		return false, 0, ErrKeyProtection
 	}
 
-	if rest[i] != argon2Mode {
-		return nil
+	// The specifier opens with its mode. The iterated mode follows it
+	// with a hash id, an 8 octet salt and the encoded count, Argon2
+	// with a 16 octet salt, passes, parallelism and the memory exponent.
+	const iteratedCountOffset = 1 + 1 + 8
+	const argon2PassesOffset, argon2MemoryOffset = 1 + 16, 1 + 16 + 1 + 1
+	switch rest[i] {
+	case s2kIterated:
+		if i+iteratedCountOffset >= len(rest) {
+			return false, 0, ErrKeyProtection
+		}
+
+		c := int64(rest[i+iteratedCountOffset])
+
+		return true, (16 + c&15) << (c>>4 + 6), nil
+	case s2kArgon2:
+		if i+argon2MemoryOffset >= len(rest) {
+			return false, 0, ErrKeyProtection
+		}
+
+		passes, memoryExp := rest[i+argon2PassesOffset], rest[i+argon2MemoryOffset]
+		if passes > maxArgon2Passes || memoryExp > maxArgon2MemoryExp {
+			return false, 0, ErrKeyProtection
+		}
+
+		return true, int64(passes) << (memoryExp + 10), nil
 	}
 
-	if i+argon2MemoryOffset >= len(rest) || rest[i+argon2MemoryOffset] > maxArgon2MemoryExp {
-		return ErrKeyProtection
-	}
-
-	return nil
+	return true, 0, nil
 }
 
 // readPGPPrivate parses an armored key ring and picks the first entity

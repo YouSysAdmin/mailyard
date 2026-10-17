@@ -54,8 +54,10 @@ The certificate is checked at import, because every one of these would otherwise
 **Generate key** mints an Ed25519 signing key with a Curve25519 encryption subkey and the address as its single user id.
 **Import** takes an armored private key block, opened with its passphrase, as long as one of its user ids is the
 address. The passphrase is removed on import and the key is stored encrypted at rest, like every secret here. A key
-protected with Argon2 asking for more than 64 MiB of memory is refused before it is opened: export it with a lighter
-protection or without a passphrase, which costs nothing since the stored copy is sealed either way.
+whose passphrase protection is heavier than an import may run is refused before it is opened: Argon2 asking for more
+than 64 MiB of memory or more than 4 passes, more than 8 protected keys and subkeys, or a total over all of them above
+four passes over 64 MiB. Export it with a lighter protection or without a passphrase, which costs nothing since the
+stored copy is sealed either way.
 
 With **Attach the public key** on, which is the default, every message carries an `Autocrypt` header and an
 `OpenPGP_0x....asc` file inside the signed body. Thunderbird and other Autocrypt clients learn the key from the first
