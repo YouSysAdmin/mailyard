@@ -8,9 +8,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/models/permission"
+	smodel "github.com/yousysadmin/mailyard/internal/models/setting"
 )
 
 // The tenant authorization vocabulary: a group names its resource, a
@@ -223,4 +225,21 @@ func refusePermission(c fiber.Ctx, r permission.Resource, a permission.Action) e
 	}
 
 	return response.Forbidden(c, "permission "+string(permission.Of(r, a))+" required")
+}
+
+// platformMailDelivery keeps a write to the delivery path of the
+// platform mail project with platform administrators. That project
+// carries every account's password resets, so its servers, groups and
+// relay nodes decide where those land. The setting is read per request
+// and an empty one guards nothing.
+func platformMailDelivery(rt *env.Runtime) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		rc := domain.GetRequestContext(c)
+		platform := rt.Settings.String(smodel.KeyPlatformMailProject)
+		if platform == "" || rc == nil || rc.Project == nil || rc.Project.ID != platform || rc.IsPlatformAdmin() {
+			return c.Next()
+		}
+
+		return response.Forbidden(c, domain.PlatformMailManaged)
+	}
 }

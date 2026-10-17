@@ -482,12 +482,15 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	smtp := v1.Group("/smtp-servers", permOn(perm.ResourceSMTP))
 	smtp.Get("/", permRead, sh.List)
 	smtp.Get("/:id", permRead, sh.Get)
-	smtp.Post("/", permWrite, sh.Create)
-	smtp.Patch("/:id", permWrite, sh.Update)
-	smtp.Delete("/:id", permDelete, sh.Delete)
+	// The platform mail project's delivery path is changed only by a
+	// platform administrator. A test only dials, so it stays open.
+	platformMail := platformMailDelivery(rt)
+	smtp.Post("/", permWrite, platformMail, sh.Create)
+	smtp.Patch("/:id", permWrite, platformMail, sh.Update)
+	smtp.Delete("/:id", permDelete, platformMail, sh.Delete)
 	smtp.Post("/:id/test", permWrite, sh.Test)
-	smtp.Post("/:id/enable", permWrite, sh.Enable)
-	smtp.Post("/:id/disable", permWrite, sh.Disable)
+	smtp.Post("/:id/enable", permWrite, platformMail, sh.Enable)
+	smtp.Post("/:id/disable", permWrite, platformMail, sh.Disable)
 
 	// Server groups: the named pools a send is routed to, and the unit
 	// failover happens within. Same tier as the servers themselves -
@@ -496,9 +499,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 	groups := v1.Group("/smtp-server-groups", permOn(perm.ResourceSMTP))
 	groups.Get("/", permRead, gh.List)
 	groups.Get("/:id", permRead, gh.Get)
-	groups.Post("/", permWrite, gh.Create)
-	groups.Patch("/:id", permWrite, gh.Update)
-	groups.Delete("/:id", permDelete, gh.Delete)
+	groups.Post("/", permWrite, platformMail, gh.Create)
+	groups.Patch("/:id", permWrite, platformMail, gh.Update)
+	groups.Delete("/:id", permDelete, platformMail, gh.Delete)
 
 	// The platform-owned SMTP pool: the fallback used by projects that
 	// own no server at all. Platform admin, and deliberately not under
@@ -524,9 +527,9 @@ func registerRoutes(app *fiber.App, rt *env.Runtime, healthOnly bool) {
 		// swallowed by it.
 		mine := v1.Group("/my/relay-nodes", permOn(perm.ResourceSMTP))
 		mine.Get("/", permRead, rnAdmin.ListMine)
-		mine.Post("/:id/approve", permWrite, rnAdmin.ApproveMine)
-		mine.Post("/:id/suspend", permWrite, rnAdmin.SuspendMine)
-		mine.Delete("/:id", permDelete, rnAdmin.DeleteMine)
+		mine.Post("/:id/approve", permWrite, platformMail, rnAdmin.ApproveMine)
+		mine.Post("/:id/suspend", permWrite, platformMail, rnAdmin.SuspendMine)
+		mine.Delete("/:id", permDelete, platformMail, rnAdmin.DeleteMine)
 
 		nodes := adm.Group("/relay-nodes")
 		nodes.Get("/", rnAdmin.List)

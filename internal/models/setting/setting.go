@@ -344,7 +344,7 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyPlatformMailProject, Type: TypeString, Default: "", Ref: RefProject,
-		Description: "The project platform mail is sent as. Its SMTP servers, SES, relay nodes and DKIM key carry invitations, password resets and alerts as system mail, which skips the project's quota, suppressions, tracking, default headers, webhooks, live feed and email log. The platform mail address must be on a domain this project has verified. Platform mail is off until both this and platform_mail_from are set.",
+		Description: "The project platform mail is sent as. Its SMTP servers, SES, relay nodes and DKIM key carry invitations, password resets and alerts as system mail, which skips the project's quota, suppressions, tracking, default headers, webhooks, live feed and email log. Its delivery configuration is managed by platform administrators: only they may change its SMTP servers, server groups and relay nodes, since those decide where every password reset is delivered. The platform mail address must be on a domain this project has verified. Platform mail is off until both this and platform_mail_from are set.",
 	},
 	{
 		Key: KeySecurityAlertsEnabled, Type: TypeBool, Default: "true",

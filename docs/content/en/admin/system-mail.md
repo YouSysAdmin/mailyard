@@ -19,6 +19,14 @@ its default headers, sent to its webhooks, or shown in its email log and dashboa
 Most installations already have such a project, because the platform sends its own marketing from the same domain.
 That is why there is no separate platform DKIM key to publish: the project's domain verification covers both.
 
+{{< callout type="warning" title="Its delivery is managed by platform administrators" >}}
+Whoever decides where that project's mail goes decides where every account's password reset lands. So in the project
+named by `platform_mail_project`, only a platform administrator or a platform API key may create, edit, enable, disable
+or delete its SMTP servers and server groups, approve, suspend or delete its relay nodes, or enrol a relay node with the
+project's API key. Its members keep reading the configuration and testing a server. Changing the setting moves this rule
+to the new project at once.
+{{< /callout >}}
+
 ## Setup
 
 Everything is at runtime - no restart, nothing in the config file.

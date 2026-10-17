@@ -19,6 +19,10 @@ import (
 // per-request *RequestContext under.
 const ContextKey = "AppReqContext"
 
+// PlatformMailManaged refuses a change to the delivery path of the
+// platform mail project by anyone but a platform administrator.
+const PlatformMailManaged = "the platform mail project's delivery is managed by platform administrators"
+
 // RequestContext provides per-request scoped values required for HTTP
 // handlers: app identity for building absolute URLs, client/request
 // metadata for logging, and the authenticated user once requireAuth

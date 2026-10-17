@@ -23,9 +23,11 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
+	"github.com/yousysadmin/mailyard/internal/domain"
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	nodemodel "github.com/yousysadmin/mailyard/internal/models/relaynode"
+	settingmodel "github.com/yousysadmin/mailyard/internal/models/setting"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
 )
 
@@ -442,6 +444,12 @@ func (h *Handler) enrolmentScope(c fiber.Ctx, token string) (string, error, bool
 
 	if strings.HasPrefix(token, akmodel.Prefix) {
 		if projID, ok := h.projectForKey(c, token); ok {
+			// A project key is never a platform administrator, so it
+			// enrols nothing into the platform mail project.
+			if projID == h.Runtime.Settings.String(settingmodel.KeyPlatformMailProject) {
+				return "", response.Forbidden(c, domain.PlatformMailManaged), false
+			}
+
 			return projID, nil, true
 		}
 	}
