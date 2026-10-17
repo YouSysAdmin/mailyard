@@ -30,6 +30,21 @@ curl -X POST http://localhost:3000/api/v1/webhooks \
 | `events`  | Required. Between 1 and 10 [event types](/docs/webhooks/event-types), or `*` for all |
 | `filters` | Optional. Up to 20 sender addresses or domain patterns                               |
 
+## Who may subscribe
+
+A webhook sends a copy of what an event describes to a URL of your choosing, so subscribing to an event takes the
+permission to read it, on top of `webhooks:write`:
+
+| Events             | Also needs                                       |
+|--------------------|--------------------------------------------------|
+| `email.*`          | `emails:read`                                    |
+| `inbound.received` | `inbound:read`                                   |
+| `campaign.*`       | `campaigns:read`                                 |
+| `*`                | `emails:read`, `inbound:read`, `campaigns:read`  |
+
+A create or an edit naming an event the caller may not read is refused with `403`. The check is made when the event list
+is written: a webhook created before it keeps the events it has.
+
 {{< callout type="warning" title="The signing secret is returned once" >}}
 Mailyard generates it and puts it in the **create response only**. Every later read omits it, and there is no route that
 will show it to you again — losing it means deleting the webhook and creating another.

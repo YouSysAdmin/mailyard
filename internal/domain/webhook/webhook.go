@@ -11,7 +11,9 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/domain"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
+	"github.com/yousysadmin/mailyard/internal/models/permission"
 	whmodel "github.com/yousysadmin/mailyard/internal/models/webhook"
 )
 
@@ -368,6 +371,10 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		return response.BadRequest(c, refusal)
 	}
 
+	if refusal := unreadableEvent(rc.Permissions, in.Events); refusal != "" {
+		return response.Forbidden(c, refusal)
+	}
+
 	if refusal := h.refuseTarget(c, in.URL); refusal != "" {
 		return response.BadRequest(c, refusal)
 	}
@@ -437,6 +444,36 @@ func validEvents(events []string) string {
 	return ""
 }
 
+// unreadableEvent says which subscription the caller may not hold, or
+// nothing. An event is delivered only to a subscriber with read on the
+// resource it describes, and the wildcard needs read on every one.
+func unreadableEvent(perms permission.Set, events []string) string {
+	for _, e := range events {
+		names := []string{e}
+		if e == "*" {
+			names = slices.Sorted(maps.Keys(whmodel.ValidEvents))
+		}
+
+		for _, name := range names {
+			if !canReadEvent(perms, name) {
+				res, _ := permission.EventResource(name)
+
+				return "subscribing to " + e + " needs the " + string(permission.Of(res, permission.ActionRead)) + " permission"
+			}
+		}
+	}
+
+	return ""
+}
+
+// canReadEvent reports whether perms may read what an event describes.
+// An event describing no resource, the test post, is readable.
+func canReadEvent(perms permission.Set, event string) bool {
+	res, ok := permission.EventResource(event)
+
+	return !ok || perms.Has(res, permission.ActionRead)
+}
+
 // Get serves GET /api/v1/webhooks/:id.
 func (h *Handler) Get(c fiber.Ctx) error {
 	rc := domain.GetRequestContext(c)
@@ -483,6 +520,10 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	if len(in.Events) > 0 {
 		if refusal := validEvents(in.Events); refusal != "" {
 			return response.BadRequest(c, refusal)
+		}
+
+		if refusal := unreadableEvent(rc.Permissions, in.Events); refusal != "" {
+			return response.Forbidden(c, refusal)
 		}
 
 		hook.Events = in.Events
@@ -602,6 +643,12 @@ func (h *Handler) Redeliver(c fiber.Ctx) error {
 
 	if prior == nil {
 		return response.NotFound(c, "delivery not found")
+	}
+
+	if !canReadEvent(rc.Permissions, prior.Event) {
+		res, _ := permission.EventResource(prior.Event)
+
+		return response.Forbidden(c, "redelivering "+prior.Event+" needs the "+string(permission.Of(res, permission.ActionRead))+" permission")
 	}
 
 	if prior.Payload == "" {
@@ -737,6 +784,13 @@ func (h *Handler) Deliveries(c fiber.Ctx) error {
 
 	if page == nil {
 		page = []*whmodel.Delivery{}
+	}
+
+	// A body is shown only to a caller who may read what it describes.
+	for _, d := range page {
+		if !canReadEvent(rc.Permissions, d.Event) {
+			d.Payload = ""
+		}
 	}
 
 	return response.Success(c, DeliveriesResponse{Deliveries: page, NextCursor: next})

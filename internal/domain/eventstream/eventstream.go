@@ -137,21 +137,10 @@ func (h *Handler) Stream(c fiber.Ctx) error {
 	})
 }
 
-// eventResource names the resource whose read permission an event
-// type needs. A type missing here is never forwarded.
-var eventResource = map[string]permission.Resource{
-	eventbus.TypeEmailQueued:      permission.ResourceEmails,
-	eventbus.TypeEmailSent:        permission.ResourceEmails,
-	eventbus.TypeEmailFailed:      permission.ResourceEmails,
-	eventbus.TypeInboundReceived:  permission.ResourceInbound,
-	eventbus.TypeCampaignProgress: permission.ResourceCampaigns,
-	eventbus.TypeNotification:     permission.ResourceNotifications,
-}
-
 // visible reports whether perms may read what an event of this type
-// describes.
+// describes. A type describing nothing is never forwarded.
 func visible(perms permission.Set, eventType string) bool {
-	res, ok := eventResource[eventType]
+	res, ok := permission.EventResource(eventType)
 
 	return ok && perms.Has(res, permission.ActionRead)
 }

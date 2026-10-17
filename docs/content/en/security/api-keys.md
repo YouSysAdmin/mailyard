@@ -108,10 +108,15 @@ the audit trail or the export.
 | Transactional sender                        | `emails:write`, `emails:read`                   |
 | Sender that also honours opt-outs           | add `suppressions:read`, `suppressions:write`   |
 | Reporting / dashboard integration           | `analytics:read`, `emails:read`, `bounces:read` |
-| Webhook manager                             | `webhooks:read`, `webhooks:write`               |
+| Webhook manager                             | `webhooks:read`, `webhooks:write`, see below    |
 | Backup / compliance job                     | `data:read`                                     |
 | Relay node enrolment                        | `relay:write`                                   |
 | Everything, including resources added later | `*`                                             |
+
+A webhook copies what its events describe to a URL, so a webhook manager also needs read on what its hooks carry:
+`emails:read` for `email.*`, `inbound:read` for `inbound.received`, `campaigns:read` for `campaign.*`. Without it,
+subscribing to those events is refused and their bodies are left out of the delivery log. See
+[who may subscribe](/docs/webhooks/overview#who-may-subscribe).
 
 {{< callout type="warning" title="An empty permission list grants nothing" >}}
 A key created with no `permissions` field can do **nothing**. A key can reach the whole project surface, so an unstated

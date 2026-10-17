@@ -51,6 +51,9 @@ curl "http://localhost:3000/api/v1/webhooks/0198f6a1-3c7e-7b21-9f4d-2a5c8e0b1d33
 **One row per attempt.** A message that took three tries leaves three rows, so a webhook that eventually succeeded looks
 like two failures followed by a success — read `attempt` alongside `status` before concluding anything is broken.
 
+`payload` is also left out of a row whose event describes something you may not read: an `email.*` row needs
+`emails:read` on top of `webhooks:read`, `inbound.received` needs `inbound:read`, `campaign.*` needs `campaigns:read`.
+
 `http_status` being absent is the interesting case: it means no HTTP response came back at all. A timeout, a refused
 connection, a TLS failure, or a target the SSRF guard would not dial. `error_message` says which.
 
@@ -83,7 +86,7 @@ POST /api/v1/webhooks/{id}/deliveries/{deliveryId}/redeliver
 Posts the body that attempt sent, again, now, and answers with the new attempt as a row of this same log. One try,
 during the request, no retry and no disabling: a person is watching and will act on the answer. A row recorded
 before bodies were kept answers `409`, because the record is what the receiver was sent and nothing rebuilt now would
-be.
+be. A row whose event you may not read - an `email.*` row without `emails:read`, and so on - answers `403`.
 
 ## Testing an endpoint
 

@@ -21,7 +21,10 @@ func APIDocs() []apidoc.Route {
 			Summary:    "Create an outgoing webhook",
 			Description: "The response carries the signing secret, which appears there and " +
 				"on a rotation, nowhere else. Deliveries are signed with it, so a receiver " +
-				"can tell our POST from anyone else's.",
+				"can tell our POST from anyone else's. Each event needs read on what it " +
+				"describes - `emails:read` for `email.*`, `inbound:read` for " +
+				"`inbound.received`, `campaigns:read` for `campaign.*`, all three for `*` - " +
+				"and is refused with 403 otherwise.",
 			Request: createInput{},
 			Responses: []apidoc.Response{
 				apidoc.Created("The webhook, with its secret.", CreateResponse{}),
@@ -44,7 +47,8 @@ func APIDocs() []apidoc.Route {
 			Description: "Each of `url`, `events` and `filters` is changed only when sent. " +
 				"`filters: []` clears the list. The signing secret is untouched, so a " +
 				"receiver keeps verifying through the edit - rotate it separately if " +
-				"the endpoint changed hands.",
+				"the endpoint changed hands. A new event list needs read on what each " +
+				"event describes, as on create.",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
 			Request:    updateInput{},
 			Responses: []apidoc.Response{
@@ -126,7 +130,8 @@ func APIDocs() []apidoc.Route {
 			Permission: "webhooks:read",
 			Summary:    "Delivery log of one webhook",
 			Description: "Cursor paged. The log belongs to one webhook, so its id is part of the path. " +
-				"Each row carries the body it posted, so a failed one can be read and sent again.",
+				"Each row carries the body it posted, so a failed one can be read and sent again - " +
+				"left out of a row whose event describes something the caller may not read.",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}},
 			Query: []apidoc.Param{
 				{Name: "status", Enum: []string{"success", "failed"}},
@@ -147,7 +152,8 @@ func APIDocs() []apidoc.Route {
 			Description: "Posts the body that attempt sent, again, now, as a new attempt in the " +
 				"log. One try, during this request. A delivery recorded before bodies were " +
 				"kept answers 409, because the record is what the receiver was sent and " +
-				"nothing else would be.",
+				"nothing else would be. A delivery whose event describes something the " +
+				"caller may not read answers 403.",
 			PathParams: []apidoc.Param{{Name: "id", Format: "uuid"}, {Name: "deliveryId", Format: "uuid"}},
 			Responses: []apidoc.Response{
 				apidoc.OK("The new attempt.", DeliveryResponse{}),
