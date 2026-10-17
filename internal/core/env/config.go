@@ -442,6 +442,12 @@ type SendingConfig struct {
 	// placed those, and they often are private.
 	AllowPrivateSMTPTargets bool `mapstructure:"allow_private_smtp_targets"`
 
+	// SMTPConversationTimeout bounds one conversation with a server a
+	// project owns, connect to QUIT, whatever the peer keeps sending.
+	// Kept well under worker.attempt_timeout so a tenant's peer cannot
+	// hold a delivery goroutine for the whole attempt.
+	SMTPConversationTimeout time.Duration `mapstructure:"smtp_conversation_timeout"`
+
 	// SPFInclude is the host tenants name in their SPF record, e.g.
 	// "_spf.mail.example.com". Only this installation knows it, so the
 	// default is empty and the console asks for it rather than
@@ -907,6 +913,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("sending.max_total_attachment_size", 25*1024*1024)
 	v.SetDefault("sending.auto_suppress_on_reject", true)
 	v.SetDefault("sending.allow_private_smtp_targets", false)
+	v.SetDefault("sending.smtp_conversation_timeout", "2m")
 	v.SetDefault("sending.spf_include", "")
 	v.SetDefault("sending.bounce_address", "")
 	v.SetDefault("sending.dkim_key_cache", false)
@@ -1292,6 +1299,10 @@ func (c *Config) Validate() error {
 	// reads as a promise the total silently overrides.
 	if c.Sending.MaxTotalAttachmentSize > 0 && c.Sending.MaxAttachmentSize > c.Sending.MaxTotalAttachmentSize {
 		return fmt.Errorf("sending.max_attachment_size must not exceed sending.max_total_attachment_size")
+	}
+
+	if c.Sending.SMTPConversationTimeout <= 0 {
+		return fmt.Errorf("sending.smtp_conversation_timeout must be positive")
 	}
 
 	if c.EmailVerify.Enabled {

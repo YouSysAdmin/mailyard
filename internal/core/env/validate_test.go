@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // load writes the YAML to a temp file, runs it through Load and then
@@ -162,6 +163,25 @@ func TestTheProjectShareOfThePool(t *testing.T) {
 
 	if c.Worker.MaxPerProject != 0 {
 		t.Errorf("env 0: max_per_project %d, want 0", c.Worker.MaxPerProject)
+	}
+}
+
+// The conversation deadline for a project's server defaults to two
+// minutes and must be positive.
+func TestTheSMTPConversationTimeout(t *testing.T) {
+	const auth = "auth:\n  jwt_secret: 0123456789abcdef0123456789abcdef\n"
+	c, err := load(t, minimalConfig+auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c.Sending.SMTPConversationTimeout != 2*time.Minute {
+		t.Fatalf("default %s, want 2m", c.Sending.SMTPConversationTimeout)
+	}
+
+	_, err = load(t, minimalConfig+auth+"sending:\n  smtp_conversation_timeout: 0s\n")
+	if err == nil || !strings.Contains(err.Error(), "sending.smtp_conversation_timeout") {
+		t.Fatalf("zero: got %v, want it refused", err)
 	}
 }
 

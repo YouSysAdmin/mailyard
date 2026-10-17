@@ -66,6 +66,12 @@ type Processor struct {
 	// the shared pool and relay nodes never had it.
 	AllowPrivateSMTP bool
 
+	// ConversationTimeout is sending.smtp_conversation_timeout, applied
+	// to a server a project owns. Its peer is a tenant's choice, and
+	// without it a peer that keeps talking holds the attempt for the
+	// whole worker.attempt_timeout.
+	ConversationTimeout time.Duration
+
 	// PlatformProject returns the platform_mail_project setting. That
 	// project's servers, like the shared pool, may sign SES calls with
 	// this machine's own credentials. Nil means no project may.
@@ -368,6 +374,10 @@ func (p *Processor) Process(ctx context.Context, e *emailmodel.Email) queue.Outc
 		spec := srv.Spec(nodeTLS)
 		if p.AllowPrivateSMTP {
 			spec.GuardPrivate = false
+		}
+
+		if srv.ProjectID != "" {
+			spec.ConversationTimeout = p.ConversationTimeout
 		}
 
 		if p.PlatformProject != nil && srv.ProjectID != "" && srv.ProjectID == p.PlatformProject() {

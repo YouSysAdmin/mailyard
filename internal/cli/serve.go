@@ -411,17 +411,18 @@ func runServe(cmd *cobra.Command, r role) error {
 	// places a node is dialled from: the worker, the console's Test
 	// button (see smtpserver.testTransport) and platform mail.
 	processor := &email.Processor{
-		Store:            st,
-		Log:              log,
-		AutoSuppress:     cfg.Sending.AutoSuppressOnReject,
-		AllowPrivateSMTP: cfg.Sending.AllowPrivateSMTPTargets,
-		PlatformProject:  func() string { return rt.Settings.String(smodel.KeyPlatformMailProject) },
-		Blob:             rt.Blob,
-		Attachments:      rt.Attachments,
-		DKIMKeys:         dkimKeyCache(cfg.Sending.DKIMKeyCache),
-		BounceAddress:    strings.TrimSpace(cfg.Sending.BounceAddress),
-		RelayClient:      relayClient,
-		Notify:           func() *notify.Raiser { return rt.Notify },
+		Store:               st,
+		Log:                 log,
+		AutoSuppress:        cfg.Sending.AutoSuppressOnReject,
+		AllowPrivateSMTP:    cfg.Sending.AllowPrivateSMTPTargets,
+		ConversationTimeout: cfg.Sending.SMTPConversationTimeout,
+		PlatformProject:     func() string { return rt.Settings.String(smodel.KeyPlatformMailProject) },
+		Blob:                rt.Blob,
+		Attachments:         rt.Attachments,
+		DKIMKeys:            dkimKeyCache(cfg.Sending.DKIMKeyCache),
+		BounceAddress:       strings.TrimSpace(cfg.Sending.BounceAddress),
+		RelayClient:         relayClient,
+		Notify:              func() *notify.Raiser { return rt.Notify },
 	}
 	worker := queue.NewWorker(st.Email, processor, queue.Config{
 		Concurrency:    cfg.Worker.Concurrency,

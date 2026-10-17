@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/smtpclient"
 )
@@ -78,6 +79,10 @@ type Spec struct {
 	// relay node, both placed by an operator, and cleared by the
 	// operator's sending.allow_private_smtp_targets.
 	GuardPrivate bool
+
+	// ConversationTimeout bounds one SMTP conversation end to end. Set
+	// by the delivery path for a row a project owns, zero elsewhere.
+	ConversationTimeout time.Duration
 
 	// AmbientCredentials lets a provider with no key on the row sign
 	// with this machine's own credentials - an instance role or the

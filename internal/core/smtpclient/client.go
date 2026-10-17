@@ -54,6 +54,11 @@ type ServerConfig struct {
 	// banner in the answer. Zero for the shared pool and relay nodes,
 	// which an operator placed and which often ARE on this network.
 	GuardPrivate bool
+
+	// ConversationTimeout bounds the whole conversation, connect to
+	// QUIT. IdleTimeout alone does not, since every byte resets it.
+	// Zero leaves only the caller's context.
+	ConversationTimeout time.Duration
 }
 
 func (c ServerConfig) addr() string { return fmt.Sprintf("%s:%d", c.Host, c.Port) }
@@ -150,8 +155,15 @@ func TestConnection(ctx context.Context, cfg ServerConfig) error {
 // Send delivers msg through the server. Returns a *SendError for
 // stage failures so the caller can branch on Permanent().
 //
-// The conversation is bounded by ctx and by IdleTimeout - see bound.
+// The conversation is bounded by ctx, by cfg.ConversationTimeout and by
+// IdleTimeout - see bound.
 func Send(ctx context.Context, cfg ServerConfig, msg *Message) error {
+	if cfg.ConversationTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.ConversationTimeout)
+		defer cancel()
+	}
+
 	client, err := dial(ctx, cfg)
 	if err != nil {
 		return err

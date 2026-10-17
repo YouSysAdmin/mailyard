@@ -43,3 +43,46 @@ func TestASilentPeerIsCutByTheContext(t *testing.T) {
 		t.Errorf("send returned only after %s", took)
 	}
 }
+
+// A peer that keeps talking never trips the idle cut, so the
+// conversation deadline is what ends it, well before the caller's own.
+func TestAPeerThatKeepsTalkingIsCutByTheConversationDeadline(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+
+		defer func() { _ = conn.Close() }()
+		for range 100 {
+			if _, err := conn.Write([]byte("220-still here\r\n")); err != nil {
+				return
+			}
+
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	cfg := ServerConfig{
+		Host: "127.0.0.1", Port: ln.Addr().(*net.TCPAddr).Port, Encryption: EncryptionNone,
+		ConversationTimeout: 300 * time.Millisecond,
+	}
+	start := time.Now()
+	err = Send(ctx, cfg, &Message{From: "s@example.com", To: []string{"r@example.com"}, Text: "x"})
+	if err == nil {
+		t.Fatal("send against a tarpit succeeded")
+	}
+
+	if took := time.Since(start); took > 2*time.Second {
+		t.Errorf("send returned only after %s, want the conversation deadline", took)
+	}
+}

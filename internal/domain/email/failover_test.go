@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/textproto"
 	"testing"
+	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/notify"
 	"github.com/yousysadmin/mailyard/internal/core/queue"
@@ -34,6 +35,7 @@ type scriptedSend struct {
 	envelopes []string
 	providers []string
 	ambient   []bool
+	deadlines []time.Duration
 }
 
 func (s *scriptedSend) fn(_ context.Context, spec transport.Spec, msg *smtpclient.Message) error {
@@ -47,6 +49,7 @@ func (s *scriptedSend) fn(_ context.Context, spec transport.Spec, msg *smtpclien
 	// signature or the return path.
 	s.providers = append(s.providers, spec.Provider)
 	s.ambient = append(s.ambient, spec.AmbientCredentials)
+	s.deadlines = append(s.deadlines, spec.ConversationTimeout)
 
 	return s.byHost[spec.Host]
 }
@@ -276,5 +279,25 @@ func TestOnlyThePlatformProjectBorrowsTheMachineCredentials(t *testing.T) {
 		if len(script.ambient) != 1 || script.ambient[0] != tc.want {
 			t.Errorf("platform %q: ambient %v, want %v", tc.platform, script.ambient, tc.want)
 		}
+	}
+}
+
+// A server the project owns is held to the conversation deadline, since
+// its peer is the tenant's choice. The shared pool is the operator's
+// and keeps only the attempt timeout.
+func TestAProjectServerGetsTheConversationDeadline(t *testing.T) {
+	script := &scriptedSend{byHost: map[string]error{"own": transient()}}
+	p := failoverProcessor(t, []*ssmodel.Server{
+		srv("own", func(s *ssmodel.Server) { s.Host = "own" }),
+		srv("pool", func(s *ssmodel.Server) { s.Host = "pool"; s.ProjectID = "" }),
+	}, script)
+	p.ConversationTimeout = 2 * time.Minute
+
+	if out := p.Process(t.Context(), delivery()); out.Kind != queue.KindDone {
+		t.Fatalf("outcome %v, want done: %v", out.Kind, out.Err)
+	}
+
+	if len(script.deadlines) != 2 || script.deadlines[0] != 2*time.Minute || script.deadlines[1] != 0 {
+		t.Fatalf("deadlines %v, want [2m0s 0s]", script.deadlines)
 	}
 }

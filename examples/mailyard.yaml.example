@@ -277,6 +277,9 @@ sending:
   max_attachment_size: 10485760
   max_total_attachment_size: 26214400
   auto_suppress_on_reject: true
+  # Ceiling on one conversation with a server a project owns, connect
+  # to QUIT, however much the peer keeps sending.
+  smtp_conversation_timeout: 2m
   # Return path for mail leaving through the shared platform pool only,
   # where the sending IPs are ours. A project using its own SMTP server
   # sets its own address in Project settings.
