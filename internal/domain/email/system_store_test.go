@@ -62,7 +62,7 @@ func TestASystemRowIsNotTheProjects(t *testing.T) {
 	}
 
 	// The queue claims both, and the flag rides along the RETURNING.
-	claimed, err := s.ClaimDue(ctx, time.Now().UTC(), 10)
+	claimed, err := s.ClaimDue(ctx, time.Now().UTC(), 10, 0)
 	if err != nil || len(claimed) != 2 {
 		t.Fatalf("ClaimDue = %d rows, %v, want 2", len(claimed), err)
 	}

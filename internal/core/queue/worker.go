@@ -29,6 +29,10 @@ type Config struct {
 	// AttemptTimeout bounds one delivery attempt end to end. Zero means
 	// unbounded, for tests. ClaimTimeout must sit above it.
 	AttemptTimeout time.Duration
+
+	// MaxPerProject caps the rows one project may hold in processing,
+	// so a single tenant cannot fill the pool. Zero means no cap.
+	MaxPerProject int
 }
 
 // Worker drains the email queue: one poll loop feeding Concurrency
@@ -236,7 +240,7 @@ func (w *Worker) pollOnce(ctx context.Context) {
 		return
 	}
 
-	claimed, err := w.src.ClaimDue(ctx, now, free)
+	claimed, err := w.src.ClaimDue(ctx, now, free, w.cfg.MaxPerProject)
 	if err != nil {
 		if ctx.Err() != nil {
 			return

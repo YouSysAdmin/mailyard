@@ -268,6 +268,9 @@ worker:
   # Must be longer than attempt_timeout, or a running attempt is
   # requeued and sent twice.
   claim_timeout: 15m
+  # Rows one project may have in delivery at once, across every node.
+  # Unset means half of concurrency rounded up, 0 turns the cap off.
+  # max_per_project: 2
 
 sending:
   max_recipients: 50

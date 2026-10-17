@@ -109,8 +109,10 @@ type Processor interface {
 type Source interface {
 	// ClaimDue atomically claims up to limit due rows (status queued
 	// or scheduled, next_attempt_at <= now) and returns them with
-	// status processing and attempts already incremented.
-	ClaimDue(ctx context.Context, now time.Time, limit int) ([]*emailmodel.Email, error)
+	// status processing and attempts already incremented. A project
+	// already holding perProject rows in processing gets none, and no
+	// batch takes it past that. 0 means no cap.
+	ClaimDue(ctx context.Context, now time.Time, limit, perProject int) ([]*emailmodel.Email, error)
 
 	// Requeue returns a transiently-failed row to the queue for a
 	// later attempt.

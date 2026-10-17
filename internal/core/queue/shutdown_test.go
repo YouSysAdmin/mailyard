@@ -35,7 +35,7 @@ func (s failingSource) RecoverStuck(ctx context.Context, _ time.Time) (int, erro
 	return 0, s.fail(ctx)
 }
 
-func (s failingSource) ClaimDue(ctx context.Context, _ time.Time, _ int) ([]*emailmodel.Email, error) {
+func (s failingSource) ClaimDue(ctx context.Context, _ time.Time, _, _ int) ([]*emailmodel.Email, error) {
 	return nil, s.fail(ctx)
 }
 

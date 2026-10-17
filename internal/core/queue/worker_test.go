@@ -30,7 +30,7 @@ func newMemSource(rows ...*emailmodel.Email) *memSource {
 	return s
 }
 
-func (s *memSource) ClaimDue(_ context.Context, now time.Time, limit int) ([]*emailmodel.Email, error) {
+func (s *memSource) ClaimDue(_ context.Context, now time.Time, limit, _ int) ([]*emailmodel.Email, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []*emailmodel.Email

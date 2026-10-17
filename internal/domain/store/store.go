@@ -865,7 +865,9 @@ type EmailStore interface {
 	PruneKeysBefore(ctx context.Context, before time.Time) (int64, error)
 	CountAllByStatus(ctx context.Context) (map[string]int, error)
 
-	ClaimDue(ctx context.Context, now time.Time, limit int) ([]*email.Email, error)
+	// ClaimDue holds each project to perProject rows in processing,
+	// 0 meaning no cap.
+	ClaimDue(ctx context.Context, now time.Time, limit, perProject int) ([]*email.Email, error)
 
 	// Requeue and Finalize write only while the row is still processing
 	// under claimedAt, and report whether it was - see the store method.

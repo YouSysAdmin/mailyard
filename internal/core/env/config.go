@@ -411,6 +411,11 @@ type WorkerConfig struct {
 	// failover walk included.
 	AttemptTimeout time.Duration `mapstructure:"attempt_timeout"`
 
+	// MaxPerProject caps the rows one project may hold in processing
+	// across the installation, so one tenant cannot occupy the whole
+	// pool. Unset means half of Concurrency rounded up, 0 means no cap.
+	MaxPerProject int `mapstructure:"max_per_project"`
+
 	// AttachmentCacheBytes bounds the memory holding template
 	// attachment and embedded image content between messages. 0 turns
 	// the cache off.
@@ -1009,6 +1014,10 @@ func Load(path string) (*Config, error) {
 	}
 
 	c.Source = source
+	if !v.IsSet("worker.max_per_project") {
+		c.Worker.MaxPerProject = (c.Worker.Concurrency + 1) / 2
+	}
+
 	// Captured here and nowhere else, because this is the only place the
 	// raw values are still visible: these keys no longer have a field to
 	// land in, so nothing about the parsed Config can show they were set.
@@ -1215,6 +1224,10 @@ func (c *Config) Validate() error {
 
 	if c.Worker.ClaimTimeout <= c.Worker.AttemptTimeout {
 		return fmt.Errorf("worker.claim_timeout must be longer than worker.attempt_timeout, or a running attempt is requeued and sent twice")
+	}
+
+	if c.Worker.MaxPerProject < 0 {
+		return fmt.Errorf("worker.max_per_project must not be negative, 0 turns the cap off")
 	}
 
 	if c.Worker.AttachmentCacheBytes < 0 {

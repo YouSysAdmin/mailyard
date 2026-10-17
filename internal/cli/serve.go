@@ -431,6 +431,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		RetryMaxDelay:  cfg.Worker.RetryMaxDelay,
 		ClaimTimeout:   cfg.Worker.ClaimTimeout,
 		AttemptTimeout: cfg.Worker.AttemptTimeout,
+		MaxPerProject:  cfg.Worker.MaxPerProject,
 	}, log)
 
 	worker.OnFinal = finalHook(rt, st, dispatcher, log)

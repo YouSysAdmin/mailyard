@@ -36,6 +36,9 @@ func TestTheClaimNamesTheStatusesItMeans(t *testing.T) {
 	}{
 		{"the claim looks for queued", claimDueSQL, emailmodel.StatusQueued},
 		{"the claim looks for scheduled", claimDueSQL, emailmodel.StatusScheduled},
+		{"the capped claim looks for queued", claimDueCappedSQL, emailmodel.StatusQueued},
+		{"the capped claim looks for scheduled", claimDueCappedSQL, emailmodel.StatusScheduled},
+		{"the capped claim counts processing", claimDueCappedSQL, emailmodel.StatusProcessing},
 		{"the recovery sweep looks for processing", recoverStuckSQL, emailmodel.StatusProcessing},
 	} {
 		if !strings.Contains(tc.sql, "'"+tc.status+"'") {
@@ -46,7 +49,7 @@ func TestTheClaimNamesTheStatusesItMeans(t *testing.T) {
 
 	// And no parameter placeholder is left where a status belongs, which
 	// is the shape that made the partial index unusable.
-	if strings.Contains(claimDueSQL, "status IN (?") {
+	if strings.Contains(claimDueSQL, "status IN (?") || strings.Contains(claimDueCappedSQL, "status IN (?") {
 		t.Error("the claim passes its statuses as parameters again, so the partial " +
 			"index cannot be proved to apply and every partition is scanned")
 	}

@@ -73,7 +73,7 @@ func TestClaimDueTakesOnlyDueQueuedRows(t *testing.T) {
 	insertQueued(t, s, "2fce3853-c525-415c-86e3-9d7c9a7ab5c3", emailmodel.StatusProcessing, past)
 	insertQueued(t, s, "d6decb7d-9e6c-4529-8fd4-c5b221c12bbc", emailmodel.StatusSent, past)
 
-	claimed, err := s.ClaimDue(t.Context(), now, 10)
+	claimed, err := s.ClaimDue(t.Context(), now, 10, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestClaimDueHonoursTheLimit(t *testing.T) {
 		insertQueued(t, s, ids.New(), emailmodel.StatusQueued, now.Add(-time.Minute))
 	}
 
-	claimed, err := s.ClaimDue(t.Context(), now, 2)
+	claimed, err := s.ClaimDue(t.Context(), now, 2, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestClaimDueSkipsRowsAnotherNodeHolds(t *testing.T) {
 	// rather than a wrong answer.
 	done := make(chan []*emailmodel.Email, 1)
 	go func() {
-		claimed, cerr := s.ClaimDue(t.Context(), now, 10)
+		claimed, cerr := s.ClaimDue(t.Context(), now, 10, 0)
 		if cerr != nil {
 			t.Errorf("claim while a peer holds a row: %v", cerr)
 		}
@@ -194,7 +194,7 @@ func TestClaimDueNeverHandsOneRowToTwoNodes(t *testing.T) {
 		wg.Go(func() {
 			<-start
 			for {
-				claimed, err := node.ClaimDue(t.Context(), now, perCall)
+				claimed, err := node.ClaimDue(t.Context(), now, perCall, 0)
 				if err != nil {
 					t.Errorf("concurrent claim: %v", err)
 
@@ -254,7 +254,7 @@ func TestAnOutcomeUnderAStaleClaimIsRefused(t *testing.T) {
 	id := "b1f0d3f5-6d0c-4c34-9a67-3d3f2d2f7d11"
 	insertQueued(t, s, id, emailmodel.StatusQueued, now.Add(-time.Minute))
 
-	first, err := s.ClaimDue(t.Context(), now, 1)
+	first, err := s.ClaimDue(t.Context(), now, 1, 0)
 	if err != nil || len(first) != 1 {
 		t.Fatalf("first claim: %v, %d rows", err, len(first))
 	}
@@ -265,7 +265,7 @@ func TestAnOutcomeUnderAStaleClaimIsRefused(t *testing.T) {
 		t.Fatalf("recover: %v, %d rows", err, n)
 	}
 
-	second, err := peer.ClaimDue(t.Context(), now.Add(time.Second), 1)
+	second, err := peer.ClaimDue(t.Context(), now.Add(time.Second), 1, 0)
 	if err != nil || len(second) != 1 {
 		t.Fatalf("second claim: %v, %d rows", err, len(second))
 	}

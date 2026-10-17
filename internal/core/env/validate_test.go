@@ -124,6 +124,47 @@ func TestTheAttachmentCacheSize(t *testing.T) {
 	}
 }
 
+// The per-project share of the pool defaults to half of the concurrency
+// rounded up, follows a concurrency set in the file or the environment,
+// 0 turns it off, and a negative cap is refused.
+func TestTheProjectShareOfThePool(t *testing.T) {
+	const auth = "auth:\n  jwt_secret: 0123456789abcdef0123456789abcdef\n"
+	for _, tc := range []struct {
+		yaml string
+		want int
+	}{
+		{"", 2},
+		{"worker:\n  concurrency: 5\n", 3},
+		{"worker:\n  concurrency: 1\n", 1},
+		{"worker:\n  max_per_project: 0\n", 0},
+		{"worker:\n  concurrency: 8\n  max_per_project: 7\n", 7},
+	} {
+		c, err := load(t, minimalConfig+auth+tc.yaml)
+		if err != nil {
+			t.Fatalf("%q: %v", tc.yaml, err)
+		}
+
+		if c.Worker.MaxPerProject != tc.want {
+			t.Errorf("%q: max_per_project %d, want %d", tc.yaml, c.Worker.MaxPerProject, tc.want)
+		}
+	}
+
+	_, err := load(t, minimalConfig+auth+"worker:\n  max_per_project: -1\n")
+	if err == nil || !strings.Contains(err.Error(), "worker.max_per_project") {
+		t.Fatalf("negative: got %v, want it refused", err)
+	}
+
+	t.Setenv("MAILYARD_WORKER_MAX_PER_PROJECT", "0")
+	c, err := load(t, minimalConfig+auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c.Worker.MaxPerProject != 0 {
+		t.Errorf("env 0: max_per_project %d, want 0", c.Worker.MaxPerProject)
+	}
+}
+
 // A value the repository publishes as an example is known to everyone
 // and is refused as either secret, whatever its length.
 func TestAPublishedExampleSecretIsRefused(t *testing.T) {

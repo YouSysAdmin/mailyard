@@ -102,6 +102,50 @@ WHERE id IN (
 )
 RETURNING ` + emailColumns
 
+// claimDueCappedSQL is claimDueSQL holding each project to a share of
+// the pool. busy counts what a project already has in processing, a
+// row with a live pull relay assignment excepted since it holds no
+// delivery goroutine. fair ranks each project's due rows and keeps the
+// ones that fit beside that count, which is what bounds a single batch
+// too: the processing count is read before this statement claims
+// anything. The ranking lives in its own CTE because Postgres refuses
+// FOR UPDATE beside a window function, and the locking select stays a
+// plain walk of idx_emails_queue. Statuses are literal for the reason
+// on claimDueSQL.
+const claimDueCappedSQL = `
+WITH busy AS MATERIALIZED (
+    SELECT b.project_id, count(*) AS n FROM emails b
+    WHERE b.status = 'processing'
+      AND NOT EXISTS (
+          SELECT 1 FROM relay_assignments ra
+          WHERE ra.email_id = b.id AND ra.expires_at > ?
+      )
+    GROUP BY b.project_id
+),
+fair AS MATERIALIZED (
+    SELECT d.id FROM (
+        SELECT q.id, q.project_id,
+               row_number() OVER (PARTITION BY q.project_id ORDER BY q.next_attempt_at, q.id) AS rn
+        FROM emails q
+        WHERE q.status IN ('queued', 'scheduled')
+          AND q.next_attempt_at <= ?
+    ) d
+    LEFT JOIN busy ON busy.project_id = d.project_id
+    WHERE d.rn + COALESCE(busy.n, 0) <= ?
+)
+UPDATE emails
+SET status = ?, claimed_at = ?, attempts = attempts + 1
+WHERE id IN (
+    SELECT e.id FROM emails e
+    WHERE e.status IN ('queued', 'scheduled')
+      AND e.next_attempt_at <= ?
+      AND e.id IN (SELECT fair.id FROM fair)
+    ORDER BY e.next_attempt_at ASC
+    LIMIT ?
+    FOR UPDATE OF e SKIP LOCKED
+)
+RETURNING ` + emailColumns
+
 // recoverStuckSQL returns rows abandoned in processing to the queue.
 //
 // The status it looks for is LITERAL, for the reason spelled out at
@@ -656,10 +700,22 @@ func (s *Store) CountByStatus(ctx context.Context, projID string, from, to *time
 // Not project-scoped: the worker drains every tenant.
 
 // ClaimDue takes up to limit due messages for this node in one
-// statement, leaving them locked to it. Never on a read replica.
-func (s *Store) ClaimDue(ctx context.Context, now time.Time, limit int) ([]*emailmodel.Email, error) {
-	rows, err := s.Query(ctx, claimDueSQL,
-		emailmodel.StatusProcessing, now, now, limit)
+// statement, leaving them locked to it. perProject caps how many rows
+// one project may hold in processing across the installation, 0 means
+// no cap. Never on a read replica.
+func (s *Store) ClaimDue(ctx context.Context, now time.Time, limit, perProject int) ([]*emailmodel.Email, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if perProject > 0 {
+		rows, err = s.Query(ctx, claimDueCappedSQL,
+			now, now, perProject, emailmodel.StatusProcessing, now, now, limit)
+	} else {
+		rows, err = s.Query(ctx, claimDueSQL,
+			emailmodel.StatusProcessing, now, now, limit)
+	}
+
 	if err != nil {
 		return nil, err
 	}

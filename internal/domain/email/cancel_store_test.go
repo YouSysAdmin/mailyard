@@ -80,7 +80,7 @@ func TestCancelTakesOnlyWhatNoWorkerHolds(t *testing.T) {
 		t.Errorf("cancelling through another project reported %v, %v", ok, err)
 	}
 
-	claimed, err := s.ClaimDue(ctx, time.Now().UTC().Add(time.Hour), 10)
+	claimed, err := s.ClaimDue(ctx, time.Now().UTC().Add(time.Hour), 10, 0)
 	if err != nil {
 		t.Fatalf("claim: %v", err)
 	}
