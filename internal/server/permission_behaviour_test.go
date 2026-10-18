@@ -190,7 +190,8 @@ func TestASandboxKeyCannotMintACredential(t *testing.T) {
 }
 
 // A sandbox key writes only to the sandbox and the two accepting
-// routes, and reads what its permissions allow. Every other write on
+// routes, and reads what its permissions allow, the POST previews
+// included. Every other write on
 // /api/v1 is refused however broad the key, and an ordinary key with
 // the same permissions is let through.
 func TestASandboxKeyWritesOnlyToTheSandbox(t *testing.T) {
@@ -243,6 +244,9 @@ func TestASandboxKeyWritesOnlyToTheSandbox(t *testing.T) {
 		{"DELETE", "/api/v1/suppressions"},
 		{"POST", "/api/v1/data/delete-contacts"},
 		{"POST", "/api/v1/Webhooks/"},
+		{"POST", "/api/v1/templates/" + id + "/versions"},
+		{"POST", "/api/v1/campaigns/" + id + "/duplicate"},
+		{"POST", "/api/v1/subscriber-lists"},
 	}
 	for _, r := range refused {
 		status, body := call(true, r[0], r[1])
@@ -261,6 +265,10 @@ func TestASandboxKeyWritesOnlyToTheSandbox(t *testing.T) {
 		{"POST", "/api/v1/sandbox/inboxes"},
 		{"POST", "/api/v1/sandbox/clear"},
 		{"GET", "/api/v1/templates"},
+		{"POST", "/api/v1/templates/preview"},
+		{"POST", "/api/v1/templates/" + id + "/versions/" + id + "/preview"},
+		{"POST", "/api/v1/campaigns/" + id + "/preview"},
+		{"POST", "/api/v1/subscriber-lists/preview-segment/"},
 	}
 	for _, r := range allowed {
 		if status, body := call(true, r[0], r[1]); status == fiber.StatusForbidden {

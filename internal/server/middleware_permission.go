@@ -143,11 +143,47 @@ func refuseSandboxCredential(c fiber.Ctx) error {
 	return c.Next()
 }
 
+// sandboxReadOnlyPosts are the POST routes that only render or look
+// something up and write nothing. A ":" segment stands for one path
+// parameter.
+var sandboxReadOnlyPosts = [][]string{
+	strings.Split("/api/v1/templates/preview", "/"),
+	strings.Split("/api/v1/templates/:/versions/:/preview", "/"),
+	strings.Split("/api/v1/campaigns/:/preview", "/"),
+	strings.Split("/api/v1/subscriber-lists/preview-segment", "/"),
+}
+
+// matchesRouteShape reports whether a folded path has exactly the
+// segments of shape, a ":" segment matching any one non-empty segment.
+func matchesRouteShape(path string, shape []string) bool {
+	segs := strings.Split(path, "/")
+	if len(segs) != len(shape) {
+		return false
+	}
+
+	for i, want := range shape {
+		if want == ":" {
+			if segs[i] == "" {
+				return false
+			}
+
+			continue
+		}
+
+		if segs[i] != want {
+			return false
+		}
+	}
+
+	return true
+}
+
 // confineSandboxCredential is the one rule for what a sandbox
 // credential may write on /api/v1: the sandbox itself and the two
 // accepting routes, whose mail is captured. Anything but GET or HEAD
-// elsewhere is refused, whatever permissions the key carries, and the
-// reads still answer to their own gates.
+// elsewhere is refused, whatever permissions the key carries, except
+// the POST routes that write nothing. Every read still answers to its
+// own gate.
 //
 // The path is folded the way the router folds it, so a spelling that
 // reaches a handler is the spelling judged here.
@@ -161,12 +197,21 @@ func confineSandboxCredential(c fiber.Ctx) error {
 		return c.Next()
 	}
 
-	switch path := normalizePath(c.Path()); {
+	path := normalizePath(c.Path())
+	switch {
 	case path == "/api/v1/emails/send",
 		path == "/api/v1/emails/send-template",
 		path == "/api/v1/sandbox",
 		strings.HasPrefix(path, "/api/v1/sandbox/"):
 		return c.Next()
+	}
+
+	if c.Method() == fiber.MethodPost {
+		for _, shape := range sandboxReadOnlyPosts {
+			if matchesRouteShape(path, shape) {
+				return c.Next()
+			}
+		}
 	}
 
 	return response.Forbidden(c, sandboxOnly)

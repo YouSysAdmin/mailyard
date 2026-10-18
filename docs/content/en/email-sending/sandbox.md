@@ -288,22 +288,28 @@ and `sandbox:delete` by itself - send, read back what was sent, clear between ru
 permission list and `"sandbox": true` works. Add permissions only if the application under test needs to read something
 beyond the sandbox.
 
-| Route                                    | A sandbox key                                     |
-|------------------------------------------|---------------------------------------------------|
-| `POST /emails/send`                      | captured                                          |
-| `POST /emails/send-template`             | captured                                          |
-| `/sandbox`                               | read, clear, delete, inboxes, sandbox credentials |
-| everything else under `/emails`          | **403**, reads included                           |
-| `/api-keys`, `/smtp-credentials`         | **403**, reads included                           |
-| any other `GET` on `/api/v1`             | only if you granted the permission                |
-| any other write on `/api/v1`             | **403**, whatever it holds                        |
-| `POST /api/relay-nodes/register`         | **401**, a sandbox key enrols no relay node       |
+| Route                                     | A sandbox key                                     |
+|-------------------------------------------|---------------------------------------------------|
+| `POST /emails/send`                       | captured                                          |
+| `POST /emails/send-template`              | captured                                          |
+| `/sandbox`                                | read, clear, delete, inboxes, sandbox credentials |
+| everything else under `/emails`           | **403**, reads included                           |
+| `/api-keys`, `/smtp-credentials`          | **403**, reads included                           |
+| any other `GET` on `/api/v1`              | only if you granted the permission                |
+| `POST /templates/preview`                 | only if you granted the permission                |
+| `POST /templates/:id/versions/:v/preview` | only if you granted the permission                |
+| `POST /campaigns/:id/preview`             | only if you granted the permission                |
+| `POST /subscriber-lists/preview-segment`  | only if you granted the permission                |
+| any other write on `/api/v1`              | **403**, whatever it holds                        |
+| `POST /api/relay-nodes/register`          | **401**, a sandbox key enrols no relay node       |
 
 A sandbox key writes nowhere but the sandbox and the two accepting routes. Members, invitations, roles, webhooks and
 their tests, SMTP servers, relay nodes, domains, senders, templates, campaigns, subscribers, suppressions, project
 settings, erasure and imports are all refused with `403 a sandbox key reaches only the sandbox, captured sends and
-reads`, even when the key was given those permissions. A `POST` that only renders, such as a template preview, is a
-write here too. The permissions you add can widen what it reads, never what it changes.
+reads`, even when the key was given those permissions. The four previews above are the exception: each is a `POST`
+that renders or counts and stores nothing, so it is treated as the read it is and answers to the same permission as
+one (`templates:read`, `campaigns:read`, `subscribers:read`). The permissions you add can widen what it reads, never
+what it changes.
 
 The delivery log, one message's detail, batch and retry all describe or touch real mail, so it is turned away from them
 by name, reads included. The same goes for the credential routes, where it could otherwise mint a credential that is not
