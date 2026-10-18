@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	nodemodel "github.com/yousysadmin/mailyard/internal/models/relaynode"
 )
 
 // Meta keys. The node's identity survives restarts in the spool, so a
@@ -164,15 +166,18 @@ func NewKeyAndCSR(host string) (csrPEM, keyPEM string, err error) {
 }
 
 func (c *Control) post(ctx context.Context, path string, in, out any) error {
-	client := c.HTTP
-	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
-	}
-
-	return c.postWith(ctx, client, path, in, out)
+	return c.postWith(ctx, c.client(), path, nil, in, out)
 }
 
-func (c *Control) postWith(ctx context.Context, client *http.Client, path string, in, out any) error {
+func (c *Control) client() *http.Client {
+	if c.HTTP != nil {
+		return c.HTTP
+	}
+
+	return &http.Client{Timeout: 30 * time.Second}
+}
+
+func (c *Control) postWith(ctx context.Context, client *http.Client, path string, hdr http.Header, in, out any) error {
 	body, err := json.Marshal(in, agentJSON)
 	if err != nil {
 		return err
@@ -182,6 +187,10 @@ func (c *Control) postWith(ctx context.Context, client *http.Client, path string
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err
+	}
+
+	for name, values := range hdr {
+		req.Header[name] = values
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -322,8 +331,13 @@ type InboundResult struct {
 // status field says what happened to the MAIL, the HTTP code what
 // happened to the request.
 func (c *Control) Inbound(ctx context.Context, nodeID, token string, m InboundMessage) (*InboundResult, error) {
+	// The credential in the header is what lets the platform buffer a
+	// body larger than its unauthenticated ceiling.
+	hdr := http.Header{}
+	hdr.Set(nodemodel.ControlHeader, nodeID+":"+token)
+
 	var out InboundResult
-	err := c.post(ctx, "/api/relay-nodes/inbound", inboundReq{
+	err := c.postWith(ctx, c.client(), "/api/relay-nodes/inbound", hdr, inboundReq{
 		NodeID: nodeID, Token: token,
 		EnvelopeFrom: m.EnvelopeFrom, EnvelopeTo: m.EnvelopeTo,
 		ClientIP: m.ClientIP, HELO: m.HELO,
@@ -417,7 +431,7 @@ func (c *Control) Claim(ctx context.Context, nodeID, token string, max int, wait
 	defer cancel()
 
 	var out claimRes
-	if err := c.postWith(ctx, client, "/api/relay-nodes/claim", claimReq{
+	if err := c.postWith(ctx, client, "/api/relay-nodes/claim", nil, claimReq{
 		NodeID: nodeID, Token: token, Max: max, WaitSeconds: int(wait.Seconds()), Holding: holding,
 	}, &out); err != nil {
 		return nil, err

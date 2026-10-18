@@ -17,6 +17,11 @@ package relaynode
 
 import "time"
 
+// ControlHeader carries a node's control credential as
+// "<node id>:<token>" beside the one in the body, so the server can
+// size a forwarded message's body before reading it.
+const ControlHeader = "X-Mailyard-Relay-Node"
+
 // Node is one enrolled relay node.
 type Node struct {
 	ID string `json:"id"`

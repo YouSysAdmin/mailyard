@@ -94,8 +94,9 @@ and carry `Retry-After: 1`. The probes, `/healthz` and `/readyz`, are never refu
 answers its orchestrator. A request naming no credential has 30 seconds to arrive, body included, so a stranger cannot
 hold a slot by sending a body a byte at a time. A body above 1 MiB needs a credential that is valid, not merely named:
 a request whose key or session does not verify is held to 1 MiB on every route, and on the routes that carry
-attachments it also gets the same 30 seconds. The one exception is `/api/relay-nodes/inbound`, which keeps 8 MiB because
-a relay node's token travels inside the body. See [Configuration](/docs/getting-started/configuration#server).
+attachments it also gets the same 30 seconds. The one exception is `/api/relay-nodes/inbound`: an approved relay node
+repeats its control credential in the `X-Mailyard-Relay-Node` header and is admitted up to
+`inbound.max_message_size`, and a forward without one keeps 8 MiB. See [Configuration](/docs/getting-started/configuration#server).
 
 ## SMTP Listener Limits
 

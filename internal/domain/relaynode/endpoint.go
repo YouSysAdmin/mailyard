@@ -389,22 +389,15 @@ func (h *Handler) Renew(c fiber.Ctx) error {
 // error return would be nil on the refusal path and the caller would
 // fall straight through it.
 func (h *Handler) authenticate(c fiber.Ctx, nodeID, token string) (*nodemodel.Node, *ssmodel.Shared, error) {
-	node, err := h.Runtime.Store.RelayNode.Get(c.Context(), nodeID)
+	node, ok, err := h.identify(c.Context(), nodeID, token)
 	if err != nil {
 		return nil, nil, response.Internal(c, err)
 	}
 
-	// Identical refusal for an unknown node and a wrong token, and a
-	// constant-time comparison for the token, so this cannot be used
-	// to learn which node ids exist.
-	if node == nil {
-		_ = subtle.ConstantTimeCompare([]byte(HashToken(token)), []byte(HashToken(token)))
-
-		return nil, nil, response.Unauthorized(c, "node id or token is not valid")
-	}
-
-	if subtle.ConstantTimeCompare([]byte(HashToken(token)), []byte(node.TokenHash)) != 1 {
-		h.log().Warn("relay node: bad control token", "node_id", nodeID, "client_ip", clientip.From(c))
+	if !ok {
+		if node != nil {
+			h.log().Warn("relay node: bad control token", "node_id", nodeID, "client_ip", clientip.From(c))
+		}
 
 		return nil, nil, response.Unauthorized(c, "node id or token is not valid")
 	}
@@ -422,6 +415,40 @@ func (h *Handler) authenticate(c fiber.Ctx, nodeID, token string) (*nodemodel.No
 	}
 
 	return node, srv, nil
+}
+
+// identify looks a node up and checks its control token. node is the
+// stored row whether or not the token matched, nil for an unknown id.
+// An unknown id and a wrong token cost the same constant-time
+// comparison, so this cannot be used to learn which node ids exist.
+func (h *Handler) identify(ctx context.Context, nodeID, token string) (node *nodemodel.Node, ok bool, err error) {
+	node, err = h.Runtime.Store.RelayNode.Get(ctx, nodeID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	want := HashToken(token)
+	if node != nil {
+		want = node.TokenHash
+	}
+
+	ok = subtle.ConstantTimeCompare([]byte(HashToken(token)), []byte(want)) == 1 && node != nil
+
+	return node, ok, nil
+}
+
+// VerifyControl reports whether nodeID and token are an approved node's
+// control credential. It sizes a request body before it is read, the
+// handlers still authenticate the credential in the body.
+func (h *Handler) VerifyControl(ctx context.Context, nodeID, token string) bool {
+	node, ok, err := h.identify(ctx, nodeID, token)
+	if err != nil || !ok {
+		return false
+	}
+
+	srv, err := h.serverFor(ctx, node)
+
+	return err == nil && srv != nil && srv.Status == ssmodel.StatusEnabled
 }
 
 // groupFor resolves the group a project node joins.

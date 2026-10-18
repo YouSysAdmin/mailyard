@@ -6,6 +6,8 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/smtp"
 	"os"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	nodemodel "github.com/yousysadmin/mailyard/internal/models/relaynode"
 )
 
 func receivedFixture(id string) *Received {
@@ -379,6 +382,45 @@ func TestASecondDomainInOneTransactionIsDeferred(t *testing.T) {
 
 	if got := due[0].Recipients; len(got) != 2 || got[0] != "alice@a.example" || got[1] != "carol@a.example" {
 		t.Errorf("recipients = %v, want only the first domain", got)
+	}
+}
+
+// A message the platform will not take must be refused while the sender
+// is still connected, never answered 250 and dropped at forward time.
+func TestAMessageAboveTheNodeLimitIsRefusedAtData(t *testing.T) {
+	a := &acceptList{}
+	a.replace([]string{"in.example.com"}, "etag-1")
+	addr, spool := testReceiveListener(t, a)
+
+	big := inboundFixture + strings.Repeat(strings.Repeat("x", 998)+"\r\n", 1100)
+	err := deliverTo(addr, "s@far.test", []string{"bounces@in.example.com"}, big)
+	if err == nil || !strings.Contains(err.Error(), "552") {
+		t.Fatalf("want a 552, got %v", err)
+	}
+
+	due, _ := spool.ReceivedDue(time.Now().UTC().Add(time.Minute), 10)
+	if len(due) != 0 {
+		t.Errorf("spooled %d messages after refusing one at DATA", len(due))
+	}
+}
+
+// The forward repeats the node credential in a header, which is what
+// the platform sizes the body by before reading it.
+func TestTheForwardCarriesTheNodeCredentialInAHeader(t *testing.T) {
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get(nodemodel.ControlHeader)
+		_, _ = w.Write([]byte(`{"status":"accepted"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := &Control{BaseURL: srv.URL, HTTP: srv.Client()}
+	if _, err := c.Inbound(t.Context(), "node-1", "secret", InboundMessage{Raw: []byte("x")}); err != nil {
+		t.Fatalf("Inbound: %v", err)
+	}
+
+	if got != "node-1:secret" {
+		t.Errorf("%s = %q, want node-1:secret", nodemodel.ControlHeader, got)
 	}
 }
 

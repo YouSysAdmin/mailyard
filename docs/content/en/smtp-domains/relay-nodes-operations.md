@@ -294,6 +294,10 @@ Nothing about whose mail it is. A node has no database, so:
     550. "I do not know yet" is not "no such domain", and a hard refusal would
          bounce good mail for the minutes between a node starting and its first
          heartbeat.
+- A message larger than `relay_node.inbound.max_message_size` is refused at
+  DATA with **552**. The node cannot see the platform's limit, so the platform's
+  `inbound.max_message_size` must be at least as large: a forward above it is
+  refused after the node has already answered 250, and that message is lost.
 - Everything else - suppression, SPF/DKIM/DMARC, dedup, whether a message is a
   delivery report - is decided by Mailyard when the message arrives, through the
   same pipeline the platform's own MX feeds.
@@ -384,7 +388,7 @@ it just files no bounce and suppresses nothing.
 | `relay_node.smtp_port`                      | `25`            | Destination port. Change it only for testing.                                                                                  |
 | `relay_node.inbound.enabled`                | `false`         | Run an MX on this node and forward what it receives.                                                                           |
 | `relay_node.inbound.addr`                   | `:25`           | Where the internet delivers. An MX record carries no port.                                                                     |
-| `relay_node.inbound.max_message_size`       | `26214400`      | Must not exceed the platform's `inbound.max_message_size`.                                                                     |
+| `relay_node.inbound.max_message_size`       | `26214400`      | Refused at DATA with 552 above it. Must not exceed the platform's `inbound.max_message_size`.                                  |
 | `relay_node.inbound.rate_per_minute`        | `120`           | Per-IP session budget. The one listener here whose rate strangers set.                                                         |
 | `relay_node.inbound.proxy_protocol.enabled` | `false`         | Read the real client address from a balancer in front of this port.                                                            |
 | `relay_node.inbound.proxy_protocol.trusted` |                 | Balancer addresses or CIDRs. Required when enabled - see [Rate Limiting](/docs/security/rate-limiting).                        |

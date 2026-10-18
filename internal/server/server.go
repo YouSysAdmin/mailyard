@@ -29,7 +29,9 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	authdomain "github.com/yousysadmin/mailyard/internal/domain/auth"
 	"github.com/yousysadmin/mailyard/internal/domain/eventstream"
+	"github.com/yousysadmin/mailyard/internal/domain/relaynode"
 	akmodel "github.com/yousysadmin/mailyard/internal/models/apikey"
+	nodemodel "github.com/yousysadmin/mailyard/internal/models/relaynode"
 )
 
 // Server is the HTTP listener and the routes mounted on it. New builds
@@ -88,9 +90,8 @@ func bodyLimitFor(cfg *env.Config) int {
 	// A relay node forwards a whole received message as base64 in a
 	// JSON body, so inbound.max_message_size lands here too. Left out,
 	// an operator raising that above the attachment ceiling gets a 413
-	// from fasthttp before any handler runs - and a 413 is not in
-	// ControlError.Fatal(), so the node would retry a message that can
-	// never fit, forever.
+	// from fasthttp before any handler runs, which the node treats as
+	// final and drops a message it already answered 250 for.
 	if cfg.RelayNodes.Enabled && cfg.Inbound.MaxMessageSize > total {
 		total = cfg.Inbound.MaxMessageSize
 	}
@@ -241,9 +242,11 @@ const streamWriteTimeout = eventstream.MaxStreamLife + 5*time.Minute
 // verifies, like the attachment ceiling above it.
 const apiBodyLimit = 8 * 1024 * 1024
 
-// relayInboundPath forwards a whole received message, and a node proves
-// itself by a token in the BODY, which the HeaderReceived hook cannot
-// read. An unverified request there keeps apiBodyLimit rather than
+// relayInboundPath forwards a whole received message. A node proves
+// itself to the handler by a token in the BODY, and to the
+// HeaderReceived hook by the same credential in
+// relaynode.ControlHeader, which lifts the ceiling to the server's. An
+// unverified request there keeps apiBodyLimit rather than
 // baseBodyLimit.
 const relayInboundPath = "/api/relay-nodes/inbound"
 
@@ -318,6 +321,16 @@ func perRequestLimits(verified func(*fasthttp.RequestHeader) bool) func(*fasthtt
 	}
 }
 
+// isRelayInbound reports whether the request is a relay node's forward.
+func isRelayInbound(h *fasthttp.RequestHeader) bool {
+	uri := string(h.RequestURI())
+	if i := strings.IndexAny(uri, "?#"); i >= 0 {
+		uri = uri[:i]
+	}
+
+	return normalizePath(uri) == relayInboundPath
+}
+
 // unverifiedBodyLimit is the ceiling for a request whose credential does
 // not verify: baseBodyLimit, except on the relay inbound route.
 func unverifiedBodyLimit(path string) int {
@@ -358,7 +371,9 @@ const credentialCheckTimeout = 5 * time.Second
 // platform key by prefix lookup, constant-time hash and IsValid, a
 // session token by its signature and claims. Session liveness and a
 // key's IP list are left to the gates, this decides only how much body
-// to accept. A bearer is judged alone, as extractToken judges it.
+// to accept. A bearer is judged alone, as extractToken judges it. On
+// the relay inbound route a node credential in relaynode.ControlHeader
+// is judged the way the relay handlers judge the one in the body.
 func credentialVerifier(rt *env.Runtime) func(*fasthttp.RequestHeader) bool {
 	sessionKey := crypto.DeriveKey(rt.Config.Auth.JWTSecret, crypto.KeySession)
 	sessionVerifies := func(raw string) bool {
@@ -367,9 +382,21 @@ func credentialVerifier(rt *env.Runtime) func(*fasthttp.RequestHeader) bool {
 		return err == nil
 	}
 
+	nodes := &relaynode.Handler{Runtime: rt}
+
 	return func(h *fasthttp.RequestHeader) bool {
 		if rt.Config.Auth.Disabled {
 			return true
+		}
+
+		if rt.Config.RelayNodes.Enabled && isRelayInbound(h) {
+			id, token, ok := strings.Cut(string(h.Peek(nodemodel.ControlHeader)), ":")
+			if ok {
+				ctx, cancel := context.WithTimeout(context.Background(), credentialCheckTimeout)
+				defer cancel()
+
+				return nodes.VerifyControl(ctx, id, token)
+			}
 		}
 
 		raw, _ := strings.CutPrefix(string(h.Peek(fiber.HeaderAuthorization)), "Bearer ")
