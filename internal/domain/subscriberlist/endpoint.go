@@ -12,6 +12,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/env"
 	"github.com/yousysadmin/mailyard/internal/core/paging"
+	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
@@ -370,6 +371,18 @@ func (h *Handler) Subscribe(c fiber.Ctx) error {
 	}
 
 	if sub == nil {
+		// A new address is a new subscriber and counts against the plan.
+		release, err := quota.HoldResource(c.Context(), h.Runtime.Store, rc.Project.ID, quota.ResSubscribers, 1)
+		if err != nil {
+			if qe, ok := errors.AsType[*quota.Error](err); ok {
+				return response.TooManyRequests(c, qe.Error())
+			}
+
+			return response.Internal(c, err)
+		}
+
+		defer release()
+
 		sub = &submodel.Subscriber{ProjectID: rc.Project.ID, Email: in.Email}
 	}
 
