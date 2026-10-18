@@ -22,5 +22,10 @@ export function safeReturnPath(next: unknown): string | null {
   if (url.origin !== window.location.origin) return null
   // Rebuild from the parsed parts rather than returning the input, so
   // whatever the caller navigates to is the thing that was checked.
-  return url.pathname + url.search + url.hash
+  const path = url.pathname + url.search + url.hash
+  // Dot segments can leave a pathname opening with "//", which reads as
+  // another host when navigated, so the rebuilt path must resolve to
+  // this origin too.
+  if (new URL(path, window.location.origin).origin !== window.location.origin) return null
+  return path
 }
