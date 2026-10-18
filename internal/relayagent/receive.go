@@ -58,20 +58,26 @@ type acceptList struct {
 // so a subdomain of a verified name is accepted here exactly as it
 // would be there.
 func (a *acceptList) covers(addr string) bool {
+	return a.coveringName(addr) != ""
+}
+
+// coveringName returns the most specific name in the list covering the
+// address's domain, or "" when none does.
+func (a *acceptList) coveringName(addr string) string {
 	_, host, ok := strings.CutLast(addr, "@")
 	if !ok || host == "" {
-		return false
+		return ""
 	}
 
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	for _, candidate := range dnsname.Covering(host) {
 		if a.names[candidate] {
-			return true
+			return candidate
 		}
 	}
 
-	return false
+	return ""
 }
 
 // domainScope is the node's OWN restriction, relay_node.domains.
@@ -243,6 +249,11 @@ type receiveSession struct {
 	helo    string
 	from    string
 	to      []string
+
+	// domain is the accept-list name the first recipient matched. One
+	// transaction carries one name, because the platform ingests one
+	// domain per message.
+	domain string
 }
 
 // AuthMechanisms implements smtp.Session and offers none - this is an
@@ -254,7 +265,11 @@ func (s *receiveSession) Auth(string) (sasl.Server, error) { return nil, smtp.Er
 
 // Reset implements smtp.Session, clearing the envelope between
 // messages on one connection.
-func (s *receiveSession) Reset() { s.from = ""; s.to = nil }
+func (s *receiveSession) Reset() {
+	s.from = ""
+	s.to = nil
+	s.domain = ""
+}
 
 // Logout implements smtp.Session.
 func (s *receiveSession) Logout() error { return nil }
@@ -323,6 +338,12 @@ func (s *receiveSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 		return &smtp.SMTPError{Code: 452, EnhancedCode: smtp.EnhancedCode{4, 5, 3}, Message: "too many recipients"}
 	}
 
+	name := s.backend.Accept.coveringName(addr)
+	if s.domain != "" && name != s.domain {
+		return &smtp.SMTPError{Code: 452, EnhancedCode: smtp.EnhancedCode{4, 5, 3}, Message: "recipients span domains, retry separately"}
+	}
+
+	s.domain = name
 	s.to = append(s.to, addr)
 
 	return nil

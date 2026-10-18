@@ -315,6 +315,73 @@ func TestRCPTIsPermanentlyRefusedForADomainNobodyVerified(t *testing.T) {
 	}
 }
 
+// The platform ingests one domain per message and refuses a mixed
+// envelope for good, so the node defers a second domain at RCPT rather
+// than acknowledging mail it cannot forward.
+func TestASecondDomainInOneTransactionIsDeferred(t *testing.T) {
+	a := &acceptList{}
+	a.replace([]string{"a.example", "b.example"}, "etag-1")
+	addr, spool := testReceiveListener(t, a)
+
+	c, err := smtp.Dial(addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer func() { _ = c.Close() }()
+
+	if err := c.Mail("s@far.test"); err != nil {
+		t.Fatalf("MAIL: %v", err)
+	}
+
+	if err := c.Rcpt("alice@a.example"); err != nil {
+		t.Fatalf("first RCPT: %v", err)
+	}
+
+	if err := c.Rcpt("carol@a.example"); err != nil {
+		t.Fatalf("same-domain RCPT: %v", err)
+	}
+
+	err = c.Rcpt("bob@b.example")
+	if err == nil || !strings.Contains(err.Error(), "452") {
+		t.Fatalf("second domain: want a 452, got %v", err)
+	}
+	w, err := c.Data()
+	if err != nil {
+		t.Fatalf("DATA: %v", err)
+	}
+
+	if _, err := w.Write([]byte(inboundFixture)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("end of data: %v", err)
+	}
+
+	// A new transaction on the same connection binds afresh.
+	if err := c.Mail("s@far.test"); err != nil {
+		t.Fatalf("second MAIL: %v", err)
+	}
+
+	if err := c.Rcpt("bob@b.example"); err != nil {
+		t.Fatalf("RCPT after reset: %v", err)
+	}
+	_ = c.Reset()
+
+	due, err := spool.ReceivedDue(time.Now().UTC().Add(time.Minute), 10)
+	if err != nil {
+		t.Fatalf("ReceivedDue: %v", err)
+	}
+
+	if len(due) != 1 {
+		t.Fatalf("spooled %d messages, want 1", len(due))
+	}
+
+	if got := due[0].Recipients; len(got) != 2 || got[0] != "alice@a.example" || got[1] != "carol@a.example" {
+		t.Errorf("recipients = %v, want only the first domain", got)
+	}
+}
+
 func TestForwardBackoffGrowsAndIsCapped(t *testing.T) {
 	prev := time.Duration(0)
 	for attempts := 1; attempts <= 20; attempts++ {
