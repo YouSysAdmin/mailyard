@@ -18,6 +18,7 @@ import (
 
 	"github.com/yousysadmin/mailyard/internal/core/clientip"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
+	"github.com/yousysadmin/mailyard/internal/core/quota"
 	"github.com/yousysadmin/mailyard/internal/core/relayca"
 	"github.com/yousysadmin/mailyard/internal/core/response"
 	"github.com/yousysadmin/mailyard/internal/core/safedial"
@@ -118,6 +119,21 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	port := in.Port
 	if port == 0 {
 		port = defaultNodePort
+	}
+
+	// A project node is a project server and counts against the plan,
+	// held until the node row is written.
+	if projID != "" {
+		release, qerr := quota.HoldResource(c.Context(), h.Runtime.Store, projID, quota.ResSMTPServers, 1)
+		if qerr != nil {
+			if qe, ok := errors.AsType[*quota.Error](qerr); ok {
+				return response.TooManyRequests(c, qe.Error())
+			}
+
+			return response.Internal(c, qerr)
+		}
+
+		defer release()
 	}
 
 	nodeID := ids.New()
