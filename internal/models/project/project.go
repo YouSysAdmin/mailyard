@@ -254,8 +254,13 @@ type InvitationLoad struct {
 	// invited.
 	PendingToAddress int
 
-	// CreatedSince is every invitation created since the window opened.
-	CreatedSince int
+	// SentSince is every invitation issued since the window opened,
+	// cancelled ones included.
+	SentSince int
+
+	// SentToAddress is the invitations issued to the address being
+	// invited since the window opened, cancelled ones included.
+	SentToAddress int
 
 	Pending int
 }

@@ -38,10 +38,12 @@ const (
 )
 
 // refuseInvitation turns down a second pending invitation to one
-// address and anything past the project's budget.
+// address, a second invitation to it within the window, and anything
+// past the project's budget.
 func refuseInvitation(load projmodel.InvitationLoad) bool {
 	return load.PendingToAddress > 0 ||
-		load.CreatedSince >= maxInvitationsPerHour ||
+		load.SentToAddress > 0 ||
+		load.SentSince >= maxInvitationsPerHour ||
 		load.Pending >= maxPendingInvitations
 }
 
@@ -787,8 +789,13 @@ func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 				"this project has too many pending invitations, cancel some or wait for them to expire")
 		}
 
+		if load.SentSince >= maxInvitationsPerHour {
+			return response.TooManyRequests(c,
+				"this project has sent too many invitations in the last hour, try again later")
+		}
+
 		return response.TooManyRequests(c,
-			"this project has sent too many invitations in the last hour, try again later")
+			"this address was invited less than an hour ago, try again later")
 	}
 
 	emailed := false

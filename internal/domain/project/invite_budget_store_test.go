@@ -133,6 +133,120 @@ func (r *inviteRig) seed(t *testing.T, n int, age time.Duration, expires time.Ti
 	}
 }
 
+// seedSends writes n entries to the send log, an age ago, to fresh
+// addresses unless email is given.
+func (r *inviteRig) seedSends(t *testing.T, n int, age time.Duration, email string) {
+	t.Helper()
+	for i := range n {
+		addr := email
+		if addr == "" {
+			addr = fmt.Sprintf("sent-%d-%s@example.invalid", i, ids.New())
+		}
+
+		if _, err := r.st.DB().ExecContext(t.Context(), `
+			INSERT INTO project_invitation_sends (id, project_id, email, created_at)
+			VALUES ($1, $2, $3, $4)`, ids.New(), r.proj, addr, time.Now().UTC().Add(-age)); err != nil {
+			t.Fatalf("seed send: %v", err)
+		}
+	}
+}
+
+// cancelAll deletes every invitation of the project, as the console's
+// cancel does.
+func (r *inviteRig) cancelAll(t *testing.T) {
+	t.Helper()
+	list, err := r.st.ListInvitations(t.Context(), r.proj)
+	if err != nil {
+		t.Fatalf("list invitations: %v", err)
+	}
+
+	for _, inv := range list {
+		if err := r.st.DeleteInvitation(t.Context(), r.proj, inv.ID); err != nil {
+			t.Fatalf("cancel invitation: %v", err)
+		}
+	}
+}
+
+func (r *inviteRig) sends(t *testing.T) int {
+	t.Helper()
+	var n int
+	if err := r.st.DB().QueryRowContext(t.Context(),
+		`SELECT COUNT(*) FROM project_invitation_sends WHERE project_id = $1`, r.proj).Scan(&n); err != nil {
+		t.Fatalf("count sends: %v", err)
+	}
+
+	return n
+}
+
+// Cancelling an invitation does not give its address a fresh mail.
+// The address has nothing pending, so the answer is the rate limit,
+// not the conflict.
+func TestACancelledInvitationStillCountsAgainstItsAddress(t *testing.T) {
+	r := newInviteRig(t)
+
+	if got := r.invite(t, "victim@example.invalid"); got != fiber.StatusCreated {
+		t.Fatalf("first invitation: %d, want 201", got)
+	}
+
+	r.cancelAll(t)
+
+	if got := r.invite(t, "Victim@Example.invalid"); got != fiber.StatusTooManyRequests {
+		t.Errorf("invitation after a cancel within the hour: %d, want 429", got)
+	}
+
+	if got := r.mails(t); got != 1 {
+		t.Errorf("platform mails queued: %d, want 1", got)
+	}
+}
+
+func TestAnAddressMayBeInvitedAgainAfterTheHour(t *testing.T) {
+	r := newInviteRig(t)
+	r.seedSends(t, 1, 2*time.Hour, "again@example.invalid")
+
+	if got := r.invite(t, "again@example.invalid"); got != fiber.StatusCreated {
+		t.Errorf("invitation an hour after the last one: %d, want 201", got)
+	}
+}
+
+func TestCancellingDoesNotRefundTheHourlyBudget(t *testing.T) {
+	r := newInviteRig(t)
+
+	for i := range maxInvitationsPerHour {
+		if got := r.invite(t, fmt.Sprintf("churn-%d@example.invalid", i)); got != fiber.StatusCreated {
+			t.Fatalf("invitation %d: %d, want 201", i+1, got)
+		}
+
+		r.cancelAll(t)
+	}
+
+	if got := r.invite(t, "one-too-many@example.invalid"); got != fiber.StatusTooManyRequests {
+		t.Errorf("invitation %d in an hour after cancels: %d, want 429", maxInvitationsPerHour+1, got)
+	}
+
+	if got := r.mails(t); got != maxInvitationsPerHour {
+		t.Errorf("platform mails queued: %d, want %d", got, maxInvitationsPerHour)
+	}
+}
+
+func TestPruneInvitationSendsDropsOnlyOldRows(t *testing.T) {
+	r := newInviteRig(t)
+	r.seedSends(t, 3, 4*24*time.Hour, "")
+	r.seedSends(t, 2, time.Hour, "")
+
+	n, err := r.st.PruneInvitationSendsBefore(t.Context(), time.Now().UTC().AddDate(0, 0, -3))
+	if err != nil {
+		t.Fatalf("prune: %v", err)
+	}
+
+	if n != 3 {
+		t.Errorf("pruned %d rows, want 3", n)
+	}
+
+	if got := r.sends(t); got != 2 {
+		t.Errorf("send log rows left: %d, want 2", got)
+	}
+}
+
 func TestASecondInvitationToAPendingAddressIsRefused(t *testing.T) {
 	r := newInviteRig(t)
 
@@ -212,7 +326,7 @@ func TestConcurrentInvitationsDoNotExceedTheHourlyBudget(t *testing.T) {
 	r := newInviteRig(t)
 
 	const head = 5
-	r.seed(t, maxInvitationsPerHour-head, time.Minute, time.Now().UTC().Add(24*time.Hour))
+	r.seedSends(t, maxInvitationsPerHour-head, time.Minute, "")
 
 	const racers = 12
 	stores := make([]*Store, racers)

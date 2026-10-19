@@ -275,6 +275,15 @@ func (s *Sweeper) Run(ctx context.Context) error {
 		s.Log.Info("retention: pruned email volume counters", "rows", n)
 	}
 
+	// The invitation send log, read over one hour by the invitation
+	// budget. Kept a few days, not governed by a retention setting for
+	// the same reason as the volume counter.
+	if n, err := s.Store.Project.PruneInvitationSendsBefore(ctx, now.AddDate(0, 0, -3)); err != nil {
+		note("invitation sends", err)
+	} else if n > 0 {
+		s.Log.Info("retention: pruned invitation sends", "rows", n)
+	}
+
 	// Idempotency keys outlive their retry window by nothing: a client
 	// retrying a send a day later is not retrying, and the key would
 	// otherwise answer with a message retention may already have taken.

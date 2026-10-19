@@ -505,9 +505,14 @@ type ProjectStore interface {
 
 	// PutInvitationWithin inserts a new invitation unless refuse says
 	// otherwise, judged on the project's load under a per-project lock
-	// held to the insert. It reports the load and whether it inserted.
+	// held to the insert, and logs the send in the same transaction. It
+	// reports the load and whether it inserted.
 	PutInvitationWithin(ctx context.Context, inv *project.Invitation, since time.Time,
 		refuse func(project.InvitationLoad) bool) (project.InvitationLoad, bool, error)
+
+	// PruneInvitationSendsBefore drops the invitation send log older
+	// than before, across every project.
+	PruneInvitationSendsBefore(ctx context.Context, before time.Time) (int64, error)
 	GetInvitationByToken(ctx context.Context, token string) (*project.Invitation, error)
 	ListInvitations(ctx context.Context, projID string) ([]*project.Invitation, error)
 	DeleteInvitation(ctx context.Context, projID, id string) error

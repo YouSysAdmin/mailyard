@@ -713,7 +713,8 @@ func (s *Store) PutInvitation(ctx context.Context, inv *projmodel.Invitation) er
 // PutInvitationWithin inserts a fresh invitation unless refuse turns it
 // down on the project's load. The load is read under a per-project
 // lock held to the insert, so concurrent requests and several nodes
-// cannot all pass one budget.
+// cannot all pass one budget. The send is logged in the same
+// transaction.
 func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitation, since time.Time,
 	refuse func(projmodel.InvitationLoad) bool,
 ) (projmodel.InvitationLoad, bool, error) {
@@ -737,13 +738,25 @@ func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitati
 
 	if err := tx.QueryRowContext(ctx, s.Q(`
         SELECT
-            COUNT(*) FILTER (WHERE status = 'pending' AND expires_at > ? AND LOWER(email) = LOWER(?)),
-            COUNT(*) FILTER (WHERE created_at >= ?),
-            COUNT(*) FILTER (WHERE status = 'pending' AND expires_at > ?)
+            COUNT(*) FILTER (WHERE LOWER(email) = LOWER(?)),
+            COUNT(*)
         FROM project_invitations
-        WHERE project_id = ?
-    `), inv.CreatedAt, inv.Email, since, inv.CreatedAt, inv.ProjectID).Scan(
-		&load.PendingToAddress, &load.CreatedSince, &load.Pending); err != nil {
+        WHERE project_id = ? AND status = 'pending' AND expires_at > ?
+    `), inv.Email, inv.ProjectID, inv.CreatedAt).Scan(
+		&load.PendingToAddress, &load.Pending); err != nil {
+		return load, false, err
+	}
+
+	// What was sent is read from the send log, which cancelling an
+	// invitation does not touch.
+	if err := tx.QueryRowContext(ctx, s.Q(`
+        SELECT
+            COUNT(*) FILTER (WHERE LOWER(email) = LOWER(?)),
+            COUNT(*)
+        FROM project_invitation_sends
+        WHERE project_id = ? AND created_at >= ?
+    `), inv.Email, inv.ProjectID, since).Scan(
+		&load.SentToAddress, &load.SentSince); err != nil {
 		return load, false, err
 	}
 
@@ -763,7 +776,24 @@ func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitati
 		return load, false, err
 	}
 
+	if _, err := tx.ExecContext(ctx, s.Q(`
+        INSERT INTO project_invitation_sends (id, project_id, email, created_at) VALUES (?, ?, ?, ?)
+    `), ids.New(), inv.ProjectID, inv.Email, inv.CreatedAt); err != nil {
+		return load, false, err
+	}
+
 	return load, true, tx.Commit()
+}
+
+// PruneInvitationSendsBefore drops send log rows older than any
+// invitation budget window reads.
+func (s *Store) PruneInvitationSendsBefore(ctx context.Context, before time.Time) (int64, error) {
+	res, err := s.Exec(ctx, `DELETE FROM project_invitation_sends WHERE created_at < ?`, before.UTC())
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
 }
 
 // GetInvitationByToken returns one invitation by the PLAINTEXT token a

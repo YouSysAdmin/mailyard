@@ -169,6 +169,19 @@ type fakeVerifyStore struct{ store.SignupVerifyStore }
 
 func (fakeVerifyStore) DeleteExpired(context.Context, time.Time) (int64, error) { return 0, nil }
 
+// fakeProjectStore records the cutoff the invitation send log is
+// pruned at.
+type fakeProjectStore struct {
+	store.ProjectStore
+	sendsCutoff time.Time
+}
+
+func (f *fakeProjectStore) PruneInvitationSendsBefore(_ context.Context, before time.Time) (int64, error) {
+	f.sendsCutoff = before
+
+	return 0, nil
+}
+
 // fakeBlob records the keys it was asked to remove.
 type fakeBlob struct {
 	deleted []string
@@ -219,6 +232,7 @@ func newSweeper(t *testing.T, email *fakeEmailStore, inbound *fakeInboundStore, 
 			Sandbox:       fakeSandboxStore{},
 			PasswordReset: fakeResetStore{},
 			SignupVerify:  fakeVerifyStore{},
+			Project:       &fakeProjectStore{},
 		},
 		Settings: set,
 		Blob:     bl,
@@ -347,6 +361,7 @@ func TestAnOutOfRangeWindowNeverReachesTheFuture(t *testing.T) {
 			Sandbox:       fakeSandboxStore{},
 			PasswordReset: fakeResetStore{},
 			SignupVerify:  fakeVerifyStore{},
+			Project:       &fakeProjectStore{},
 		},
 		Settings: set,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -434,6 +449,7 @@ func TestWithoutAWindowTheGraceHourIsTheCutoff(t *testing.T) {
 			Sandbox:       fakeSandboxStore{},
 			PasswordReset: fakeResetStore{},
 			SignupVerify:  fakeVerifyStore{},
+			Project:       &fakeProjectStore{},
 		},
 		Settings: set,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -503,6 +519,7 @@ func TestAZeroWindowKeepsUnusedBuilderImages(t *testing.T) {
 			Sandbox:       fakeSandboxStore{},
 			PasswordReset: fakeResetStore{},
 			SignupVerify:  fakeVerifyStore{},
+			Project:       &fakeProjectStore{},
 		},
 		Settings: set,
 		Blob:     bl,
@@ -518,5 +535,39 @@ func TestAZeroWindowKeepsUnusedBuilderImages(t *testing.T) {
 
 	if slices.Contains(calls, "asset:purge") || len(bl.deleted) != 0 {
 		t.Errorf("images were purged with retention_days 0: %v", calls)
+	}
+}
+
+// The invitation send log is pruned on every pass, whatever the
+// retention windows say, and kept a few days past the hour the
+// invitation budget reads.
+func TestTheInvitationSendLogIsPrunedOnEveryPass(t *testing.T) {
+	set := settings.New(loader{
+		smodel.KeyRetentionDays:                "0",
+		smodel.KeyWebhookDeliveryRetentionDays: "0",
+		smodel.KeyAuditLogRetentionDays:        "0",
+		smodel.KeyNotificationRetentionDays:    "0",
+		smodel.KeyTrackingEventRetentionDays:   "0",
+	})
+	if err := set.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	sw := newSweeper(t, &fakeEmailStore{log: &calls}, &fakeInboundStore{}, &fakeBlob{log: &calls})
+	sw.Settings = set
+	proj := &fakeProjectStore{}
+	sw.Store.Project = proj
+
+	if err := sw.Run(t.Context()); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	if proj.sendsCutoff.IsZero() {
+		t.Fatal("the sweep did not prune the invitation send log")
+	}
+
+	if want := time.Now().AddDate(0, 0, -3); proj.sendsCutoff.Sub(want).Abs() > time.Minute {
+		t.Errorf("send log cutoff %v, want about %v", proj.sendsCutoff, want)
 	}
 }

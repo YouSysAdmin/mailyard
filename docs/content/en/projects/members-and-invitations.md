@@ -125,8 +125,10 @@ Every invitation is a mail from the platform's own sender, so a project's invita
 
 - An address holds one pending invitation per project. Inviting it again while that one is unaccepted and unexpired
   answers `409` and sends nothing. Cancel the pending invitation first to issue a new one.
-- A project creates at most **50** invitations an hour and holds at most **200** pending ones. Past either limit the
-  request answers `429`.
+- An address is sent at most one invitation an hour per project. Cancelling an invitation does not give its address
+  a fresh one: inviting it again within the hour answers `429`.
+- A project creates at most **50** invitations an hour and holds at most **200** pending ones. Cancelled invitations
+  still count toward the hourly limit. Past either limit the request answers `429`.
 
 Response (`201`):
 
