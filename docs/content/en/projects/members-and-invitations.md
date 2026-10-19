@@ -121,6 +121,13 @@ them (see below).
 A pending invitation is created with a unique token, valid for **7 days**, and an invitation email is sent to the
 address with an accept link of the form `/<app>/invitations?token=<token>`.
 
+Every invitation is a mail from the platform's own sender, so a project's invitations are budgeted:
+
+- An address holds one pending invitation per project. Inviting it again while that one is unaccepted and unexpired
+  answers `409` and sends nothing. Cancel the pending invitation first to issue a new one.
+- A project creates at most **50** invitations an hour and holds at most **200** pending ones. Past either limit the
+  request answers `429`.
+
 Response (`201`):
 
 ```json

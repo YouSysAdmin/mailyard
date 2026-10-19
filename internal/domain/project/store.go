@@ -710,6 +710,62 @@ func (s *Store) PutInvitation(ctx context.Context, inv *projmodel.Invitation) er
 	return err
 }
 
+// PutInvitationWithin inserts a fresh invitation unless refuse turns it
+// down on the project's load. The load is read under a per-project
+// lock held to the insert, so concurrent requests and several nodes
+// cannot all pass one budget.
+func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitation, since time.Time,
+	refuse func(projmodel.InvitationLoad) bool,
+) (projmodel.InvitationLoad, bool, error) {
+	var load projmodel.InvitationLoad
+	if inv.CreatedAt.IsZero() {
+		inv.CreatedAt = time.Now().UTC()
+	}
+
+	tx, err := s.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return load, false, err
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		s.Q(`SELECT pg_advisory_xact_lock(hashtext('project_invitations'), hashtext(?::text))`),
+		inv.ProjectID); err != nil {
+		return load, false, err
+	}
+
+	if err := tx.QueryRowContext(ctx, s.Q(`
+        SELECT
+            COUNT(*) FILTER (WHERE status = 'pending' AND expires_at > ? AND LOWER(email) = LOWER(?)),
+            COUNT(*) FILTER (WHERE created_at >= ?),
+            COUNT(*) FILTER (WHERE status = 'pending' AND expires_at > ?)
+        FROM project_invitations
+        WHERE project_id = ?
+    `), inv.CreatedAt, inv.Email, since, inv.CreatedAt, inv.ProjectID).Scan(
+		&load.PendingToAddress, &load.CreatedSince, &load.Pending); err != nil {
+		return load, false, err
+	}
+
+	if refuse(load) {
+		return load, false, nil
+	}
+
+	if _, err := tx.ExecContext(ctx, s.Q(`
+        INSERT INTO project_invitations (
+            id, project_id, email, role_id, token, status, invited_by, expires_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+		inv.ID, inv.ProjectID, inv.Email, database.NullStr(inv.RoleID),
+		projmodel.HashInvitationToken(inv.Token),
+		inv.Status, inv.InvitedBy, inv.ExpiresAt, inv.CreatedAt,
+	); err != nil {
+		return load, false, err
+	}
+
+	return load, true, tx.Commit()
+}
+
 // GetInvitationByToken returns one invitation by the PLAINTEXT token a
 // link presented, or nil when there is no such row. The stored column
 // is the hash - see HashInvitationToken.

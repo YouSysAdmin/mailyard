@@ -30,6 +30,21 @@ import (
 // redeemable.
 const invitationTTL = 7 * 24 * time.Hour
 
+// Invitation budget per project. Every invitation is a platform mail
+// to an address the project chooses, so both are bounded.
+const (
+	maxInvitationsPerHour = 50
+	maxPendingInvitations = 200
+)
+
+// refuseInvitation turns down a second pending invitation to one
+// address and anything past the project's budget.
+func refuseInvitation(load projmodel.InvitationLoad) bool {
+	return load.PendingToAddress > 0 ||
+		load.CreatedSince >= maxInvitationsPerHour ||
+		load.Pending >= maxPendingInvitations
+}
+
 // Handler owns the /api/projects surface. Routes are mounted behind
 // requireAuth only - permission checks happen per handler via
 // loadWithMember because these routes address the project by path id.
@@ -741,6 +756,7 @@ func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 		invitedBy = rc.User.ID
 	}
 
+	now := time.Now().UTC()
 	inv := &projmodel.Invitation{
 		ID:        ids.New(),
 		ProjectID: w.ID,
@@ -749,10 +765,30 @@ func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 		Token:     token,
 		Status:    projmodel.InvitationPending,
 		InvitedBy: invitedBy,
-		ExpiresAt: time.Now().UTC().Add(invitationTTL),
+		ExpiresAt: now.Add(invitationTTL),
+		CreatedAt: now,
 	}
-	if err := h.Runtime.Store.Project.PutInvitation(c.Context(), inv); err != nil {
+
+	// Each invitation is one platform mail, so creating one is what the
+	// budget counts.
+	load, created, err := h.Runtime.Store.Project.PutInvitationWithin(c.Context(), inv,
+		now.Add(-time.Hour), refuseInvitation)
+	if err != nil {
 		return response.Internal(c, err)
+	}
+
+	if !created {
+		if load.PendingToAddress > 0 {
+			return response.Conflict(c, "an invitation to this address is already pending")
+		}
+
+		if load.Pending >= maxPendingInvitations {
+			return response.TooManyRequests(c,
+				"this project has too many pending invitations, cancel some or wait for them to expire")
+		}
+
+		return response.TooManyRequests(c,
+			"this project has sent too many invitations in the last hour, try again later")
 	}
 
 	emailed := false

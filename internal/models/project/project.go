@@ -245,3 +245,17 @@ func HashInvitationToken(token string) string {
 
 	return hex.EncodeToString(sum[:])
 }
+
+// InvitationLoad is what a project's invitation budget is judged on.
+// Pending counts only invitations still redeemable, status pending and
+// not yet expired.
+type InvitationLoad struct {
+	// PendingToAddress is the pending invitations to the address being
+	// invited.
+	PendingToAddress int
+
+	// CreatedSince is every invitation created since the window opened.
+	CreatedSince int
+
+	Pending int
+}

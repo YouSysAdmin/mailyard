@@ -502,6 +502,12 @@ type ProjectStore interface {
 	SetPlan(ctx context.Context, projID, planID string) (bool, error)
 
 	PutInvitation(ctx context.Context, inv *project.Invitation) error
+
+	// PutInvitationWithin inserts a new invitation unless refuse says
+	// otherwise, judged on the project's load under a per-project lock
+	// held to the insert. It reports the load and whether it inserted.
+	PutInvitationWithin(ctx context.Context, inv *project.Invitation, since time.Time,
+		refuse func(project.InvitationLoad) bool) (project.InvitationLoad, bool, error)
 	GetInvitationByToken(ctx context.Context, token string) (*project.Invitation, error)
 	ListInvitations(ctx context.Context, projID string) ([]*project.Invitation, error)
 	DeleteInvitation(ctx context.Context, projID, id string) error
