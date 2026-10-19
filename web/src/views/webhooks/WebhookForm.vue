@@ -5,11 +5,12 @@
 // with the row and shown once. Changing the URL of a live subscription
 // silently redirects signed events at a host the secret was never given
 // to, so a new destination is a new webhook.
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { webhooksApi } from '../../api/webhooks'
 import { apiErrorMessage } from '../../api/client'
-import { WEBHOOK_EVENTS } from '../../api/types'
+import { WEBHOOK_EVENTS, WEBHOOK_EVENT_PERMISSION } from '../../api/types'
 import { useNotificationStore } from '../../stores/notification'
+import { useProjectStore } from '../../stores/project'
 import { useFieldErrors } from '../../composables/fieldErrors'
 import BaseModal from '../../components/BaseModal.vue'
 import FormField from '../../components/FormField.vue'
@@ -22,12 +23,18 @@ const emit = defineEmits<{
 }>()
 
 const notify = useNotificationStore()
+const projStore = useProjectStore()
 const { capture, clear } = useFieldErrors()
 
 const url = ref('')
 const events = ref<string[]>([])
 const filtersText = ref('')
 const creating = ref(false)
+
+// Only events the member may read are offered, the server refuses the rest.
+const offered = computed(() =>
+  WEBHOOK_EVENTS.filter((e) => projStore.can(WEBHOOK_EVENT_PERMISSION[e])),
+)
 
 function toggle(event: string) {
   const i = events.value.indexOf(event)
@@ -78,8 +85,11 @@ async function create() {
     </FormField>
 
     <FormField label="Events" field="events">
-      <div class="event-list">
-        <label v-for="event in WEBHOOK_EVENTS" :key="event" class="checkbox-label">
+      <p v-if="offered.length === 0" class="text-muted">
+        Subscribing needs read access to emails, campaigns or inbound mail in this project.
+      </p>
+      <div v-else class="event-list">
+        <label v-for="event in offered" :key="event" class="checkbox-label">
           <input type="checkbox" :checked="events.includes(event)" @change="toggle(event)" />
           {{ event }}
         </label>

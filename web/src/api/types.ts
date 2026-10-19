@@ -484,6 +484,19 @@ export const WEBHOOK_EVENTS = [
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number]
 
+// The permission a subscriber needs to receive each event: read on the
+// resource it describes, the same mapping the server refuses on.
+export const WEBHOOK_EVENT_PERMISSION: Record<WebhookEvent, string> = {
+  'email.queued': 'emails:read',
+  'email.sent': 'emails:read',
+  'email.failed': 'emails:read',
+  'email.suppressed': 'emails:read',
+  'email.cancelled': 'emails:read',
+  'campaign.started': 'campaigns:read',
+  'campaign.completed': 'campaigns:read',
+  'inbound.received': 'inbound:read',
+}
+
 export interface Webhook {
   id: string
   project_id: string
