@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/domain/relaynode"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
@@ -197,7 +198,7 @@ func (s *SharedStore) RecordTest(ctx context.Context, id, testErr string) (strin
             validation_error = ?, validated_at = now()
         WHERE id = ?
         RETURNING status
-    `, testErr == "", testErr, id).Scan(&status)
+    `, testErr == "", safetext.RemoteText(testErr), id).Scan(&status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}

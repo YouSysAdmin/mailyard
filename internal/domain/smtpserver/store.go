@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/crypto"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/database"
 	"github.com/yousysadmin/mailyard/internal/domain/relaynode"
 	ssmodel "github.com/yousysadmin/mailyard/internal/models/smtpserver"
@@ -197,6 +198,7 @@ func (s *Store) SetStatus(ctx context.Context, projID, id, status, validationErr
 }
 
 // RecordTest files a connection test and returns the status it left.
+// The remote reply in testErr is kept to safetext.RemoteTextMax bytes.
 // A passing test puts an invalid server back to enabled and a failing
 // one marks an enabled server invalid. A disabled server stays
 // disabled either way - the operator switched it off, a test does not
@@ -211,7 +213,7 @@ func (s *Store) RecordTest(ctx context.Context, projID, id, testErr string) (str
             validation_error = ?, validated_at = now()
         WHERE project_id = ? AND id = ?
         RETURNING status
-    `, testErr == "", testErr, projID, id).Scan(&status)
+    `, testErr == "", safetext.RemoteText(testErr), projID, id).Scan(&status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -233,13 +235,14 @@ func (s *Store) NoteSettingsChanged(ctx context.Context, projID, id string) erro
 
 // MarkInvalid takes an enabled server out of rotation, reporting
 // whether it moved. A disabled one stays disabled, and of two workers
-// failing on the same server only one sees true.
+// failing on the same server only one sees true. The reason is kept to
+// safetext.RemoteTextMax bytes.
 func (s *Store) MarkInvalid(ctx context.Context, projID, id, reason string) (bool, error) {
 	res, err := s.Exec(ctx, `
         UPDATE smtp_servers
         SET status = 'invalid', validation_error = ?, validated_at = now()
         WHERE project_id = ? AND id = ? AND status = 'enabled'
-    `, reason, projID, id)
+    `, safetext.RemoteText(reason), projID, id)
 	if err != nil {
 		return false, err
 	}

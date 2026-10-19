@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/yousysadmin/mailyard/internal/core/safego"
+	"github.com/yousysadmin/mailyard/internal/core/validation"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 )
@@ -51,6 +52,9 @@ type Recipients interface {
 	// UserEmail is one account's address, empty when it is disabled or
 	// gone.
 	UserEmail(ctx context.Context, userID string) (string, error)
+
+	// ProjectSlug is the project's slug, empty when it is gone.
+	ProjectSlug(ctx context.Context, projectID string) (string, error)
 }
 
 // collapseWindow is how long one (audience, event type) pair stays quiet
@@ -148,7 +152,8 @@ func (n *Notifier) OnNotification(note *nmodel.Notification) {
 			return
 		}
 
-		subject, html, text := Message(note.Title, note.Body, "", "",
+		// The note's own title and body stay in the console.
+		subject, html, text := Message(noteAlert(note.Type), n.projectSlug(ctx, note.ProjectID), "", "",
 			n.link("/notifications"))
 		n.Mail.SendAsync(to, subject, html, text)
 		n.Log.Info("alertmail: project alert mailed",
@@ -190,14 +195,16 @@ func (n *Notifier) deliver(ctx context.Context, a Alert, e *amodel.Event) {
 		return
 	}
 
-	actor := cmp.Or(e.ActorEmail, e.ActorID)
+	// The request that produced the event. Detail is never mailed: it
+	// carries names and remote text the trail keeps for the console.
+	action := strings.TrimSpace(e.Method + " " + e.Path)
 
-	// The request that produced the event, or for an event nothing
-	// requested - the dispatcher disabling a webhook - the detail
-	// that says which one and why.
-	action := cmp.Or(strings.TrimSpace(e.Method+" "+e.Path), e.Detail)
+	project := ""
+	if a.Tier == TierProject {
+		project = n.projectSlug(ctx, e.ProjectID)
+	}
 
-	subject, html, text := Message(a.Heading, a.Note, actor, action, n.trailLink(a.Tier))
+	subject, html, text := Message(a, project, actorOf(e), action, n.trailLink(a.Tier))
 	n.Mail.SendAsync(to, subject, html, text)
 
 	n.Log.Info("alertmail: sent", "type", e.Type, "recipients", len(to))
@@ -260,6 +267,42 @@ func (n *Notifier) claim(key string) bool {
 	return true
 }
 
+// actorOf names who caused an event: an account by its address. A
+// credential is named by whoever made it, so the mail says only that one
+// acted and the trail names it.
+func actorOf(e *amodel.Event) string {
+	if e.ActorID != "" {
+		return cmp.Or(e.ActorEmail, e.ActorID)
+	}
+
+	if e.ActorEmail != "" {
+		return "an API key, named in the audit trail"
+	}
+
+	return ""
+}
+
+// projectSlug names a project in a mail by its slug, which is held to
+// lowercase letters, digits and dashes. Empty when it cannot be read.
+func (n *Notifier) projectSlug(ctx context.Context, projectID string) string {
+	if projectID == "" {
+		return ""
+	}
+
+	slug, err := n.Recipients.ProjectSlug(ctx, projectID)
+	if err != nil {
+		n.Log.Warn("alertmail: project slug", "project_id", projectID, "err", err)
+
+		return ""
+	}
+
+	if !validation.ValidSlug(slug) {
+		return ""
+	}
+
+	return slug
+}
+
 // link builds a console URL, empty when this installation does not know
 // its own address.
 func (n *Notifier) link(path string) string {
@@ -281,8 +324,16 @@ func (n *Notifier) trailLink(t Tier) string {
 
 // Message renders one alert. Exported so the wording can be read in a
 // test without a Notifier, a mailer or a database.
-func Message(heading, note, actor, action, linkURL string) (subject, html, text string) {
+//
+// The heading and the note come from an Alert, so the prose of every
+// alert mail is written in this package. What else it shows is the
+// project slug, the acting account and the request line.
+func Message(a Alert, project, actor, action, linkURL string) (subject, html, text string) {
 	var detail []string
+	if project != "" {
+		detail = append(detail, "Project: "+project)
+	}
+
 	if actor != "" {
 		detail = append(detail, "Who: "+actor)
 	}
@@ -293,5 +344,5 @@ func Message(heading, note, actor, action, linkURL string) (subject, html, text 
 
 	detail = append(detail, fmt.Sprintf("When: %s", time.Now().UTC().Format(time.RFC1123)))
 
-	return heading, alertHTML(heading, note, detail, linkURL), alertText(heading, note, detail, linkURL)
+	return a.Heading, alertHTML(a.Heading, a.Note, detail, linkURL), alertText(a.Heading, a.Note, detail, linkURL)
 }

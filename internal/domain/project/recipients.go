@@ -135,6 +135,17 @@ func (s *AlertRecipients) UserEmail(ctx context.Context, userID string) (string,
 	return strings.TrimSpace(addr), nil
 }
 
+// ProjectSlug is how an alert names the project, empty when it is gone.
+func (s *AlertRecipients) ProjectSlug(ctx context.Context, projectID string) (string, error) {
+	var slug string
+	err := s.QueryRow(ctx, `SELECT slug FROM projects WHERE id = ?`, projectID).Scan(&slug)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+
+	return slug, err
+}
+
 // addRecipient appends an address once, lowercased. An owner who is also
 // the alert address must not get two copies.
 func addRecipient(out *[]string, seen map[string]bool, addr string) {

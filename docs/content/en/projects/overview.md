@@ -135,7 +135,9 @@ grants `notifications:read` sees the same list, and marking one read clears it f
 | Signing certificate expiring    | warning / error  | A sender's S/MIME or PGP key is within 30 days of expiry, or past it  |
 
 Warnings and errors are also mailed to the project's owners and its alert address. A webhook switched off and an
-expiring signing key already send a mail of their own, so their notification stays in the console.
+expiring signing key already send a mail of their own, so their notification stays in the console. The mail says what
+kind of thing happened and names the project by its slug. The names your project chose and what a remote server
+replied stay in the console and the audit trail.
 
 ## API usage
 

@@ -9,6 +9,7 @@ import (
 
 	coreaudit "github.com/yousysadmin/mailyard/internal/core/audit"
 	"github.com/yousysadmin/mailyard/internal/core/notify"
+	"github.com/yousysadmin/mailyard/internal/core/safetext"
 	"github.com/yousysadmin/mailyard/internal/domain/store"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
@@ -49,6 +50,7 @@ func (s *DispatchSink) RecordDelivery(ctx context.Context, d *whmodel.Delivery) 
 // the hook records and raises - every delivery in flight on a dead
 // endpoint ends here, and one disable is one event.
 func (s *DispatchSink) Disable(ctx context.Context, h *whmodel.Webhook, reason string) error {
+	reason = safetext.RemoteText(reason)
 	changed, err := s.Store.Disable(ctx, h.ProjectID, h.ID, reason)
 	if err != nil || !changed {
 		return err

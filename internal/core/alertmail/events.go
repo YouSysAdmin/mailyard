@@ -4,6 +4,7 @@ package alertmail
 
 import (
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
+	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 )
 
 // Tier is who hears about an event.
@@ -25,7 +26,9 @@ const (
 	TierPlatform
 )
 
-// Alert describes one mailable event.
+// Alert describes one mailable event. Heading and Note are the only prose
+// a mail carries, and both are written here, never by whatever raised
+// the event.
 type Alert struct {
 	Tier Tier
 
@@ -122,7 +125,7 @@ var alerts = map[string]Alert{
 		"Roles decide what a member may reach, and an owner holds everything a role can grant plus deleting the project. Review it under Project -> Members."},
 	amodel.TypeWebhookDisabled: {TierProject,
 		"A webhook in your project was disabled",
-		"Every delivery attempt to it failed, so it was taken out of rotation and no more events will be sent to it. Fix the endpoint, then re-enable it under Developers -> Webhooks."},
+		"Every delivery attempt to it failed, so it was taken out of rotation and no more events will be sent to it. The console names the endpoint and its last error. Fix the endpoint, then re-enable it under Developers -> Webhooks."},
 	"domain.deleted": {TierProject,
 		"A sending domain was removed from your project",
 		"Mail from addresses on that domain is refused until it is verified again."},
@@ -161,6 +164,43 @@ var alerts = map[string]Alert{
 	"admin.updated": {TierPlatform,
 		"Something was changed on this installation",
 		"Platform administration, not a project. The path below says what."},
+}
+
+// notes is the wording of a mailed project notification, by its type.
+//
+// The notification's own title and body are never mailed: they carry
+// names the project chose and text a remote server sent, and the alert
+// address is one the project merely typed. Those stay in the console,
+// and the mail says what kind of thing happened and where to look.
+var notes = map[string]Alert{
+	nmodel.TypeBounceRate: {TierProject,
+		"The bounce rate in your project is over the threshold",
+		"Too many recently sent messages failed. Check the bounces list for the reasons, and pause sending if the addresses are stale."},
+	nmodel.TypeSMTPInvalid: {TierProject,
+		"An SMTP server in your project was taken out of rotation",
+		"It refused its credentials or its certificate, so mail no longer goes through it. The console names the server and its reply. Test the connection to put it back."},
+	nmodel.TypeCampaignHeld: {TierProject,
+		"A campaign in your project is held by the plan limit",
+		"Sending resumes on its own once the plan's sending window allows it. The console names the campaign."},
+	nmodel.TypeQuota: {TierProject,
+		"Your project is at or near its sending limit",
+		"Once the window is full, sends are refused until it rolls - the API answers 429 and SMTP submission a temporary 452. Raise the plan or spread the load."},
+}
+
+// noteFallback is the wording for a notification type with no entry in
+// notes, so a new producer is mailed without its own text reaching the
+// mail.
+var noteFallback = Alert{TierProject,
+	"Something in your project needs attention",
+	"Open the notifications in the console to see what."}
+
+// noteAlert is the wording a notification of this type is mailed with.
+func noteAlert(noteType string) Alert {
+	if a, ok := notes[noteType]; ok {
+		return a
+	}
+
+	return noteFallback
 }
 
 // Lookup reports whether an event is mailed, and how.

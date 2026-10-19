@@ -997,6 +997,7 @@ type AlertRecipientStore interface {
 	ProjectAlert(ctx context.Context, projectID string) ([]string, error)
 	PlatformAdmins(ctx context.Context) ([]string, error)
 	UserEmail(ctx context.Context, userID string) (string, error)
+	ProjectSlug(ctx context.Context, projectID string) (string, error)
 }
 
 // BounceStore persists delivery failure records.

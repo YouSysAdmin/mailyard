@@ -10,7 +10,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/safego"
 	amodel "github.com/yousysadmin/mailyard/internal/models/audit"
 	nmodel "github.com/yousysadmin/mailyard/internal/models/notification"
 )
@@ -46,6 +48,7 @@ type fakeRecipients struct {
 	project  []string
 	admins   []string
 	user     string
+	slug     string
 	projCall int
 }
 
@@ -54,8 +57,9 @@ func (f *fakeRecipients) ProjectAlert(context.Context, string) ([]string, error)
 
 	return f.project, nil
 }
-func (f *fakeRecipients) PlatformAdmins(context.Context) ([]string, error)  { return f.admins, nil }
-func (f *fakeRecipients) UserEmail(context.Context, string) (string, error) { return f.user, nil }
+func (f *fakeRecipients) PlatformAdmins(context.Context) ([]string, error)    { return f.admins, nil }
+func (f *fakeRecipients) UserEmail(context.Context, string) (string, error)   { return f.user, nil }
+func (f *fakeRecipients) ProjectSlug(context.Context, string) (string, error) { return f.slug, nil }
 
 func testNotifier(m *fakeMail, r *fakeRecipients) *Notifier {
 	return &Notifier{
@@ -63,6 +67,7 @@ func testNotifier(m *fakeMail, r *fakeRecipients) *Notifier {
 		Recipients: r,
 		ConsoleURL: "https://mail.example.com/app",
 		Log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Background: &safego.Group{},
 	}
 }
 
@@ -236,7 +241,7 @@ func TestTheMailNamesTheActorAndTheAction(t *testing.T) {
 
 	a, _ := Lookup("apikey.created")
 	n.deliver(t.Context(), a, &amodel.Event{
-		Type: "apikey.created", ProjectID: "p1",
+		Type: "apikey.created", ProjectID: "p1", ActorID: "u1",
 		ActorEmail: "dev@example.com", Method: "POST", Path: "/api/v1/api-keys/",
 	})
 	sent := mail.all()
@@ -305,4 +310,137 @@ func TestLoginEventsAreNotMailed(t *testing.T) {
 	if _, ok := Lookup(amodel.TypeLoginSucceeded); ok {
 		t.Error("auth.login.succeeded is mailed - one mail per sign-in trains people to filter the channel")
 	}
+}
+
+// lure is text a tenant or a remote server chose, written to read like a
+// message from the platform.
+const lure = "URGENT verify your Example Bank account at https://evil.example/verify"
+
+// noLure fails when a mailed part carries the lure or a piece of it.
+func noLure(t *testing.T, m sentMail) {
+	t.Helper()
+
+	for _, part := range []string{m.subject, m.text} {
+		for _, bit := range []string{"URGENT", "evil.example", "Example Bank"} {
+			if strings.Contains(part, bit) {
+				t.Errorf("the mail carries %q:\n%s\n%s", bit, m.subject, m.text)
+			}
+		}
+	}
+}
+
+// A notification's title and body hold the server name the project chose
+// and the reply its server sent. The mail is the platform's own wording,
+// naming the project by its slug, and the detail stays in the console.
+func TestANotificationIsMailedInThePlatformsWords(t *testing.T) {
+	mail := &fakeMail{enabled: true}
+	n := testNotifier(mail, &fakeRecipients{
+		project: []string{"owner@example.com", "victim@third-party.example"},
+		slug:    "acme-mail",
+	})
+
+	n.OnNotification(&nmodel.Notification{
+		ProjectID: "p1", Type: nmodel.TypeSMTPInvalid, Severity: nmodel.SeverityError,
+		Title: `SMTP server "Example Bank Security Team" was taken out of rotation`,
+		Body:  "smtp auth failed: 535 " + lure + ". Test the connection to put it back.",
+	})
+	n.Background.Wait(5 * time.Second)
+
+	sent := mail.all()
+	if len(sent) != 1 {
+		t.Fatalf("sent %d mails, want 1", len(sent))
+	}
+
+	noLure(t, sent[0])
+
+	if want := notes[nmodel.TypeSMTPInvalid].Heading; sent[0].subject != want {
+		t.Errorf("subject %q, want %q", sent[0].subject, want)
+	}
+
+	if !strings.Contains(sent[0].text, "Project: acme-mail") {
+		t.Errorf("the mail does not name the project:\n%s", sent[0].text)
+	}
+}
+
+// A notification type with no wording of its own is still mailed, and
+// still without its title or body.
+func TestAnUnlistedNotificationIsMailedInTheFallbackWords(t *testing.T) {
+	mail := &fakeMail{enabled: true}
+	n := testNotifier(mail, &fakeRecipients{project: []string{"owner@example.com"}})
+
+	n.OnNotification(&nmodel.Notification{
+		ProjectID: "p1", Type: "something_new", Severity: nmodel.SeverityWarning,
+		Title: lure, Body: lure,
+	})
+	n.Background.Wait(5 * time.Second)
+
+	sent := mail.all()
+	if len(sent) != 1 {
+		t.Fatalf("sent %d mails, want 1", len(sent))
+	}
+
+	noLure(t, sent[0])
+
+	if sent[0].subject != noteFallback.Heading {
+		t.Errorf("subject %q, want %q", sent[0].subject, noteFallback.Heading)
+	}
+}
+
+// A webhook disabled by the dispatcher has no request behind it, and its
+// detail is the endpoint URL and the endpoint's own error. Neither is
+// mailed. Nor is the name of an API key, which its creator chose.
+func TestAnAuditDetailIsNeverMailed(t *testing.T) {
+	mail := &fakeMail{enabled: true}
+	n := testNotifier(mail, &fakeRecipients{
+		project: []string{"victim@third-party.example"},
+		slug:    "acme-mail",
+	})
+
+	disabled, _ := Lookup(amodel.TypeWebhookDisabled)
+	n.deliver(t.Context(), disabled, &amodel.Event{
+		Type: amodel.TypeWebhookDisabled, ProjectID: "p1",
+		Detail: "https://evil.example/verify?msg=URGENT - " + lure,
+	})
+
+	created, _ := Lookup("apikey.created")
+	n.deliver(t.Context(), created, &amodel.Event{
+		Type: "apikey.created", ProjectID: "p1", Method: "POST", Path: "/api/v1/api-keys",
+		ActorEmail: "api key " + lure, Detail: "via api key " + lure,
+	})
+
+	sent := mail.all()
+	if len(sent) != 2 {
+		t.Fatalf("sent %d mails, want 2", len(sent))
+	}
+
+	for _, m := range sent {
+		noLure(t, m)
+
+		if !strings.Contains(m.text, "Project: acme-mail") {
+			t.Errorf("the mail does not name the project:\n%s", m.text)
+		}
+	}
+
+	if !strings.Contains(sent[1].text, "Who: an API key") {
+		t.Errorf("the mail does not say an API key acted:\n%s", sent[1].text)
+	}
+}
+
+// A project is named only in the shape a slug is held to.
+func TestOnlyASlugShapedProjectIsNamed(t *testing.T) {
+	mail := &fakeMail{enabled: true}
+	n := testNotifier(mail, &fakeRecipients{
+		project: []string{"owner@example.com"},
+		slug:    "evil.example/verify",
+	})
+
+	a, _ := Lookup("apikey.created")
+	n.deliver(t.Context(), a, &amodel.Event{Type: "apikey.created", ProjectID: "p1"})
+
+	sent := mail.all()
+	if len(sent) != 1 {
+		t.Fatalf("sent %d mails, want 1", len(sent))
+	}
+
+	noLure(t, sent[0])
 }

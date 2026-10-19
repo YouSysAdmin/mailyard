@@ -68,3 +68,27 @@ func Clamp(s string, max int) string {
 
 	return s
 }
+
+// RemoteTextMax is how many bytes of a remote party's own words - an
+// SMTP reply, a webhook endpoint's error - are kept.
+const RemoteTextMax = 512
+
+// RemoteText bounds text a remote server chose before it is stored or
+// shown: at most RemoteTextMax bytes, invalid UTF-8 dropped, and the cut
+// on a rune boundary so the result is always storable.
+func RemoteText(s string) string {
+	if !utf8.ValidString(s) {
+		s = strings.ToValidUTF8(s, "")
+	}
+
+	if len(s) <= RemoteTextMax {
+		return s
+	}
+
+	cut := RemoteTextMax
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+
+	return s[:cut]
+}

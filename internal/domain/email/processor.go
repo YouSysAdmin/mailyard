@@ -442,7 +442,8 @@ func (p *Processor) takeOutOfRotation(ctx context.Context, srv *ssmodel.Server, 
 		return
 	}
 
-	moved, err := p.Store.SMTPServer.MarkInvalid(ctx, srv.ProjectID, srv.ID, cause.Error())
+	reason := safetext.RemoteText(cause.Error())
+	moved, err := p.Store.SMTPServer.MarkInvalid(ctx, srv.ProjectID, srv.ID, reason)
 	if err != nil {
 		p.Log.Error("email: could not mark the smtp server invalid",
 			"server", srv.Name, "project_id", srv.ProjectID, "err", err)
@@ -461,7 +462,7 @@ func (p *Processor) takeOutOfRotation(ctx context.Context, srv *ssmodel.Server, 
 		Type:      nmodel.TypeSMTPInvalid,
 		Severity:  nmodel.SeverityError,
 		Title:     fmt.Sprintf("SMTP server %q was taken out of rotation", srv.Name),
-		Body:      cause.Error() + ". Test the connection to put it back.",
+		Body:      reason + ". Test the connection to put it back.",
 		Link:      "/smtp-servers/" + srv.ID,
 		DedupeKey: "smtp_invalid:" + srv.ID + ":" + strconv.FormatInt(time.Now().Unix(), 10),
 	})

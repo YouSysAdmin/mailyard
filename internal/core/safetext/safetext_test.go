@@ -35,3 +35,28 @@ func TestClampAlwaysYieldsStorableText(t *testing.T) {
 		}
 	}
 }
+
+// A remote reply is kept to a fixed number of bytes and never split
+// inside a character.
+func TestRemoteTextIsCappedOnARuneBoundary(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want int
+	}{
+		{"short text passes through", "535 bad credentials", 19},
+		{"a megabyte is cut to the cap", strings.Repeat("a", 1<<20), RemoteTextMax},
+		{"a straddling rune is left out", strings.Repeat("a", RemoteTextMax-1) + "日", RemoteTextMax - 1},
+		{"invalid bytes are dropped", "535\xff\xfe no", 6},
+	}
+	for _, tc := range cases {
+		got := RemoteText(tc.in)
+		if len(got) != tc.want {
+			t.Errorf("%s: %d bytes, want %d", tc.name, len(got), tc.want)
+		}
+
+		if !utf8.ValidString(got) {
+			t.Errorf("%s: result is not valid UTF-8", tc.name)
+		}
+	}
+}
