@@ -81,7 +81,8 @@ type Spec struct {
 	GuardPrivate bool
 
 	// ConversationTimeout bounds one SMTP conversation end to end. Set
-	// by the delivery path for a row a project owns, zero elsewhere.
+	// for a row a project owns, by delivery and by the connection test
+	// alike, zero elsewhere.
 	ConversationTimeout time.Duration
 
 	// AmbientCredentials lets a provider with no key on the row sign

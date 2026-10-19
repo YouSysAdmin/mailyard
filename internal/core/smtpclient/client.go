@@ -134,8 +134,15 @@ func wrapSendError(stage, recipient string, err error) *SendError {
 }
 
 // TestConnection verifies that the server is reachable and, when
-// credentials are configured, that authentication succeeds.
+// credentials are configured, that authentication succeeds. It is
+// bounded the way Send is.
 func TestConnection(ctx context.Context, cfg ServerConfig) error {
+	if cfg.ConversationTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.ConversationTimeout)
+		defer cancel()
+	}
+
 	client, err := dial(ctx, cfg)
 	if err != nil {
 		return err

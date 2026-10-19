@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/yousysadmin/mailyard/internal/core/ids"
@@ -341,7 +342,8 @@ func (h *Handler) Test(c fiber.Ctx) error {
 	// means for it: a dial and an AUTH for SMTP, an account read for an
 	// API. Neither sends anything.
 	testErr := testTransport(c.Context(), srv, h.Runtime.RelayNodeTLS,
-		h.Runtime.Config.Sending.AllowPrivateSMTPTargets, platformProject(h.Runtime))
+		h.Runtime.Config.Sending.AllowPrivateSMTPTargets, platformProject(h.Runtime),
+		h.Runtime.Config.Sending.SMTPConversationTimeout)
 	reason := ""
 	if testErr != nil {
 		reason = testErr.Error()
@@ -468,33 +470,15 @@ func (h *Handler) invalidateSESTopics() {
 // allowPrivate is the operator's sending.allow_private_smtp_targets,
 // applied the way the delivery worker applies it, and platformProject
 // the platform_mail_project setting, whose rows may use the machine's
-// own credentials as the delivery worker lets them.
+// own credentials as the delivery worker lets them. conversation is
+// sending.smtp_conversation_timeout, held to a row a project owns as
+// the delivery worker holds it.
 func testTransport(ctx context.Context, srv *ssmodel.Server,
-	nodeTLS func(context.Context, string, string) (*tls.Config, error), allowPrivate bool, platformProject string) error {
-	var dialTLS *tls.Config
-	if srv.IsNode() {
-		if nodeTLS == nil {
-			// Same answer as the delivery path: dialling without the
-			// certificate would fail at the handshake anyway, and much
-			// less clearly.
-			return fmt.Errorf("server %s is a relay node but no client identity is configured", srv.Name)
-		}
-
-		built, err := nodeTLS(ctx, srv.NodeID, srv.Host)
-		if err != nil {
-			return err
-		}
-
-		dialTLS = built
-	}
-
-	spec := srv.Spec(dialTLS)
-	if allowPrivate {
-		spec.GuardPrivate = false
-	}
-
-	if srv.ProjectID != "" && srv.ProjectID == platformProject {
-		spec.AmbientCredentials = true
+	nodeTLS func(context.Context, string, string) (*tls.Config, error), allowPrivate bool, platformProject string,
+	conversation time.Duration) error {
+	spec, err := testSpec(ctx, srv, nodeTLS, allowPrivate, platformProject, conversation)
+	if err != nil {
+		return err
 	}
 
 	t, err := transport.Open(spec)
@@ -506,6 +490,44 @@ func testTransport(ctx context.Context, srv *ssmodel.Server,
 	}
 
 	return t.Test(ctx)
+}
+
+// testSpec decides the transport a connection test dials, the way
+// email.Processor decides it for a delivery.
+func testSpec(ctx context.Context, srv *ssmodel.Server,
+	nodeTLS func(context.Context, string, string) (*tls.Config, error), allowPrivate bool, platformProject string,
+	conversation time.Duration) (transport.Spec, error) {
+	var dialTLS *tls.Config
+	if srv.IsNode() {
+		if nodeTLS == nil {
+			// Same answer as the delivery path: dialling without the
+			// certificate would fail at the handshake anyway, and much
+			// less clearly.
+			return transport.Spec{}, fmt.Errorf("server %s is a relay node but no client identity is configured", srv.Name)
+		}
+
+		built, err := nodeTLS(ctx, srv.NodeID, srv.Host)
+		if err != nil {
+			return transport.Spec{}, err
+		}
+
+		dialTLS = built
+	}
+
+	spec := srv.Spec(dialTLS)
+	if allowPrivate {
+		spec.GuardPrivate = false
+	}
+
+	if srv.ProjectID != "" {
+		spec.ConversationTimeout = conversation
+	}
+
+	if srv.ProjectID != "" && srv.ProjectID == platformProject {
+		spec.AmbientCredentials = true
+	}
+
+	return spec, nil
 }
 
 // platformProject is the platform_mail_project setting, "" when unset.
@@ -549,7 +571,8 @@ func testNode(c fiber.Ctx, rt *env.Runtime, srv *ssmodel.Server) error {
 	}
 
 	if testErr := testTransport(c.Context(), srv, rt.RelayNodeTLS,
-		rt.Config.Sending.AllowPrivateSMTPTargets, platformProject(rt)); testErr != nil {
+		rt.Config.Sending.AllowPrivateSMTPTargets, platformProject(rt),
+		rt.Config.Sending.SMTPConversationTimeout); testErr != nil {
 		return response.Success(c, TestResponse{Ok: false, Error: testErr.Error()})
 	}
 
