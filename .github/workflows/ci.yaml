@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
-        with: { go-version: '1.27' }
+        with: { go-version: '1.27.3' }
 
       - uses: actions/setup-node@v4
         with:
@@ -35,12 +35,13 @@ jobs:
       # PREBUILT release binary on the PATH. Pinned, because a linter
       # that changes its mind between runs fails builds nobody broke.
       #
-      # THE PIN MOVES WITH THE GO VERSION IN go.mod. A golangci-lint
-      # binary refuses a target newer than the Go it was built with, and
-      # `go version -m` on the release binary says which that is.
+      # THE PIN MOVES WITH THE GO VERSION. golangci-lint reads the
+      # standard library's export data through its own x/tools, and one
+      # too old for the Go in use fails every package as typecheck.
+      # `go version -m` on the release binary names its x/tools.
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13.1
+          version: v2.15.0
           install-only: true
 
       # vet, golangci-lint, tests, gofmt, vue-tsc and prettier. The store
@@ -69,7 +70,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
-        with: { go-version: '1.27' }
+        with: { go-version: '1.27.3' }
 
       # -race here and not in task check: it multiplies the run time,
       # and the store tests are the ones with real concurrency in them.

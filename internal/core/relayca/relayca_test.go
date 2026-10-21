@@ -407,17 +407,13 @@ func handshake(t *testing.T, serverCfg, clientCfg *tls.Config) error {
 
 	conn, err := tls.Dial("tcp", ln.Addr().String(), clientCfg)
 	if err != nil {
-		<-serverErr
-
-		return err
+		return errors.Join(err, <-serverErr)
 	}
 	defer func() { _ = conn.Close() }()
 
 	buf := make([]byte, 2)
 	if _, rerr := io.ReadFull(conn, buf); rerr != nil {
-		<-serverErr
-
-		return rerr
+		return errors.Join(rerr, <-serverErr)
 	}
 
 	return <-serverErr

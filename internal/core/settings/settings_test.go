@@ -265,7 +265,10 @@ func TestASlowReloadDoesNotOverwriteANewerOne(t *testing.T) {
 	}
 
 	select {
-	case <-fresh:
+	case err := <-fresh:
+		if err != nil {
+			t.Fatal(err)
+		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the second reload never finished")
 	}
