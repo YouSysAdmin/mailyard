@@ -419,7 +419,7 @@ func TestADeletedTemplateAttachmentGoesOnlyWhenUnreferenced(t *testing.T) {
 
 	// The candidates are past the 30 day attachment window, which the
 	// metadata window sets here.
-	if want := time.Now().AddDate(0, 0, -30); tpl.cutoff.After(want.Add(time.Minute)) {
+	if want := time.Now().UTC().AddDate(0, 0, -30); tpl.cutoff.After(want.Add(time.Minute)) {
 		t.Errorf("cutoff %v, want the attachment window %v", tpl.cutoff, want)
 	}
 }
@@ -481,7 +481,7 @@ func TestUnusedBuilderImagesFollowTheEmailLogWindow(t *testing.T) {
 		t.Error("the sweep did not mark unused images")
 	}
 
-	if want := time.Now().AddDate(0, 0, -30); tpl.assetCutoff.Sub(want).Abs() > time.Minute {
+	if want := time.Now().UTC().AddDate(0, 0, -30); tpl.assetCutoff.Sub(want).Abs() > time.Minute {
 		t.Errorf("asset cutoff %v, want the 30 day email log window %v", tpl.assetCutoff, want)
 	}
 
@@ -567,7 +567,7 @@ func TestTheInvitationSendLogIsPrunedOnEveryPass(t *testing.T) {
 		t.Fatal("the sweep did not prune the invitation send log")
 	}
 
-	if want := time.Now().AddDate(0, 0, -3); proj.sendsCutoff.Sub(want).Abs() > time.Minute {
+	if want := time.Now().UTC().AddDate(0, 0, -3); proj.sendsCutoff.Sub(want).Abs() > time.Minute {
 		t.Errorf("send log cutoff %v, want about %v", proj.sendsCutoff, want)
 	}
 }
