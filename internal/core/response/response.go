@@ -107,6 +107,12 @@ func Unavailable(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": msg})
 }
 
+// UnsupportedMediaType refuses a request body in an encoding the server
+// does not take.
+func UnsupportedMediaType(c fiber.Ctx, msg string) error {
+	return c.Status(fiber.StatusUnsupportedMediaType).JSON(fiber.Map{"error": msg})
+}
+
 // Coded answers with an explicit status and message, for the ONE caller
 // that cannot name the status at compile time: the app-wide error handler,
 // which repeats the status Fiber chose for an error it raised itself.

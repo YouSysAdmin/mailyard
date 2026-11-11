@@ -197,6 +197,7 @@ func New(opts Options) (*Server, error) {
 	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(opts.Runtime))
 
 	app.Use(safeRecover)
+	app.Use(refuseContentEncoding)
 
 	// script-src is built once, from the hashes of whatever inline scripts
 	// the embedded documentation actually contains.
@@ -539,6 +540,24 @@ func (s *Server) Shutdown(timeout time.Duration) error {
 	}
 
 	return err
+}
+
+// refuseContentEncoding answers 415 to a request body in any encoding but
+// identity, before a handler reads it. Fiber and fasthttp inflate a
+// compressed body against the app-wide BodyLimit, which is sized for
+// attachments, so the per-path ceilings in perRequestLimits bound only
+// the bytes on the wire. No client of this server compresses a request
+// body, and a browser never does.
+func refuseContentEncoding(c fiber.Ctx) error {
+	for _, v := range c.Request().Header.PeekAll(fiber.HeaderContentEncoding) {
+		for part := range strings.SplitSeq(string(v), ",") {
+			if p := strings.TrimSpace(part); p != "" && !strings.EqualFold(p, "identity") {
+				return response.UnsupportedMediaType(c, "a compressed request body is not accepted")
+			}
+		}
+	}
+
+	return c.Next()
 }
 
 // safeRecover catches panics inside any downstream handler, logs the
