@@ -12,12 +12,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with: { go-version: '1.27.4' }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
@@ -27,7 +27,7 @@ jobs:
         run: npm ci
         working-directory: web
 
-      - uses: go-task/setup-task@v1
+      - uses: go-task/setup-task@70f2430ad412f838533de8c0515c749ffb2b8bd3 # v1
         with: { version: '3.x' }
 
       # install-only, so the gate stays `task check` and CI cannot
@@ -39,7 +39,7 @@ jobs:
       # standard library's export data through its own x/tools, and one
       # too old for the Go in use fails every package as typecheck.
       # `go version -m` on the release binary names its x/tools.
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.15.0
           install-only: true
@@ -67,9 +67,9 @@ jobs:
           --health-cmd "pg_isready -U mailyard"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with: { go-version: '1.27.4' }
 
       # -race here and not in task check: it multiplies the run time,
