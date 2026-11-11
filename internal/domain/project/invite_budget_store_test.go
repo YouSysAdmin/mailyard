@@ -52,6 +52,8 @@ func (r *recordingProject) count() int {
 type inviteRig struct {
 	st     *Store
 	proj   string
+	other  string
+	owner  string
 	app    *fiber.App
 	mail   *recordingProject
 	queued *safego.Group
@@ -59,8 +61,11 @@ type inviteRig struct {
 
 func newInviteRig(t *testing.T) *inviteRig {
 	t.Helper()
-	st, proj, _ := roleFixture(t)
+	st, proj, other := roleFixture(t)
 	owner := addRoleMember(t, st, proj, true)
+	if err := st.PutMember(t.Context(), &projmodel.Member{ProjectID: other, UserID: owner, Owner: true}); err != nil {
+		t.Fatalf("own the second project: %v", err)
+	}
 
 	log := slog.New(slog.DiscardHandler)
 	rec := &recordingProject{}
@@ -86,13 +91,19 @@ func newInviteRig(t *testing.T) *inviteRig {
 	})
 	app.Post("/projects/:id/invitations", h.CreateInvitation)
 
-	return &inviteRig{st: st, proj: proj, app: app, mail: rec, queued: sender.Background}
+	return &inviteRig{st: st, proj: proj, other: other, owner: owner, app: app, mail: rec, queued: sender.Background}
 }
 
 func (r *inviteRig) invite(t *testing.T, email string) int {
 	t.Helper()
+
+	return r.inviteTo(t, r.proj, email)
+}
+
+func (r *inviteRig) inviteTo(t *testing.T, proj, email string) int {
+	t.Helper()
 	body := `{"email":"` + email + `"}`
-	req := httptest.NewRequest(fiber.MethodPost, "/projects/"+r.proj+"/invitations", strings.NewReader(body))
+	req := httptest.NewRequest(fiber.MethodPost, "/projects/"+proj+"/invitations", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	res, err := r.app.Test(req)
 	if err != nil {
@@ -149,6 +160,24 @@ func (r *inviteRig) seedSends(t *testing.T, n int, age time.Duration, email stri
 			t.Fatalf("seed send: %v", err)
 		}
 	}
+}
+
+// ownProject adds a project the rig's owner owns, as a self-service
+// account creates one.
+func (r *inviteRig) ownProject(t *testing.T) string {
+	t.Helper()
+	id := ids.New()
+	if _, err := r.st.DB().ExecContext(t.Context(), `
+		INSERT INTO projects (id, name, slug, owner_id, created_at)
+		VALUES ($1, $2, $3, NULL, now())`, id, "own "+id, id); err != nil {
+		t.Fatalf("insert project: %v", err)
+	}
+
+	if err := r.st.PutMember(t.Context(), &projmodel.Member{ProjectID: id, UserID: r.owner, Owner: true}); err != nil {
+		t.Fatalf("own project: %v", err)
+	}
+
+	return id
 }
 
 // cancelAll deletes every invitation of the project, as the console's
@@ -368,5 +397,68 @@ func TestConcurrentInvitationsDoNotExceedTheHourlyBudget(t *testing.T) {
 
 	if created != head {
 		t.Errorf("concurrent invitations created: %d, want %d", created, head)
+	}
+}
+
+// An account that owns many projects does not own many budgets for one
+// address: the address is bounded across every project.
+func TestAnAddressIsBoundedAcrossProjects(t *testing.T) {
+	r := newInviteRig(t)
+
+	projects := []string{r.proj, r.other, r.ownProject(t), r.ownProject(t)}
+	want := []int{fiber.StatusCreated, fiber.StatusCreated, fiber.StatusCreated, fiber.StatusTooManyRequests}
+	for i, p := range projects {
+		if got := r.inviteTo(t, p, "victim@example.invalid"); got != want[i] {
+			t.Errorf("invitation from project %d: %d, want %d", i+1, got, want[i])
+		}
+	}
+
+	if got := r.mails(t); got != maxAddressInvitationsPerHour {
+		t.Errorf("platform mails queued to one address: %d, want %d", got, maxAddressInvitationsPerHour)
+	}
+}
+
+// The inviting account is bounded across its projects, so the project
+// budget is not multiplied by creating more of them.
+func TestAnInviterIsBoundedAcrossProjects(t *testing.T) {
+	r := newInviteRig(t)
+
+	for i := range maxInviterInvitationsPerHour {
+		if _, err := r.st.DB().ExecContext(t.Context(), `
+			INSERT INTO project_invitation_sends (id, project_id, email, invited_by, created_at)
+			VALUES ($1, $2, $3, $4, $5)`, ids.New(), r.other, fmt.Sprintf("by-%d@example.invalid", i),
+			r.owner, time.Now().UTC().Add(-time.Minute)); err != nil {
+			t.Fatalf("seed send: %v", err)
+		}
+	}
+
+	if got := r.invite(t, "fresh@example.invalid"); got != fiber.StatusTooManyRequests {
+		t.Errorf("invitation past the inviter's hourly budget: %d, want 429", got)
+	}
+
+	if got := r.mails(t); got != 0 {
+		t.Errorf("platform mails queued: %d, want 0", got)
+	}
+}
+
+// Deleting a project keeps its sends, so delete and recreate does not
+// refund the address's budget.
+func TestDeletingAProjectKeepsItsSends(t *testing.T) {
+	r := newInviteRig(t)
+	gone := r.ownProject(t)
+
+	for range maxAddressInvitationsPerHour {
+		p := r.ownProject(t)
+		if got := r.inviteTo(t, p, "victim@example.invalid"); got != fiber.StatusCreated {
+			t.Fatalf("invitation: %d, want 201", got)
+		}
+
+		if err := r.st.Delete(t.Context(), p); err != nil {
+			t.Fatalf("delete project: %v", err)
+		}
+	}
+
+	if got := r.inviteTo(t, gone, "victim@example.invalid"); got != fiber.StatusTooManyRequests {
+		t.Errorf("invitation after deleting the projects that sent: %d, want 429", got)
 	}
 }

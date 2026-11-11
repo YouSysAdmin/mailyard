@@ -30,21 +30,28 @@ import (
 // redeemable.
 const invitationTTL = 7 * 24 * time.Hour
 
-// Invitation budget per project. Every invitation is a platform mail
-// to an address the project chooses, so both are bounded.
+// Invitation budget. Every invitation is a platform mail to an address
+// the inviter chooses, so the project, the address and the inviting
+// account are each bounded. The last two count across every project,
+// since an account may own as many projects as it likes.
 const (
-	maxInvitationsPerHour = 50
-	maxPendingInvitations = 200
+	maxInvitationsPerHour        = 50
+	maxPendingInvitations        = 200
+	maxAddressInvitationsPerHour = 3
+	maxInviterInvitationsPerHour = 50
 )
 
 // refuseInvitation turns down a second pending invitation to one
-// address, a second invitation to it within the window, and anything
-// past the project's budget.
+// address, a second invitation to it from this project within the
+// window, and anything past the project's, the address's or the
+// inviter's budget.
 func refuseInvitation(load projmodel.InvitationLoad) bool {
 	return load.PendingToAddress > 0 ||
 		load.SentToAddress > 0 ||
 		load.SentSince >= maxInvitationsPerHour ||
-		load.Pending >= maxPendingInvitations
+		load.Pending >= maxPendingInvitations ||
+		load.SentToAddressAnywhere >= maxAddressInvitationsPerHour ||
+		load.SentByInviter >= maxInviterInvitationsPerHour
 }
 
 // Handler owns the /api/projects surface. Routes are mounted behind
@@ -794,6 +801,13 @@ func (h *Handler) CreateInvitation(c fiber.Ctx) error {
 				"this project has sent too many invitations in the last hour, try again later")
 		}
 
+		if load.SentByInviter >= maxInviterInvitationsPerHour {
+			return response.TooManyRequests(c,
+				"your account has sent too many invitations in the last hour, try again later")
+		}
+
+		// Another project's invitations to the address answer the same
+		// as this project's, so the refusal says nothing about them.
 		return response.TooManyRequests(c,
 			"this address was invited less than an hour ago, try again later")
 	}

@@ -711,10 +711,10 @@ func (s *Store) PutInvitation(ctx context.Context, inv *projmodel.Invitation) er
 }
 
 // PutInvitationWithin inserts a fresh invitation unless refuse turns it
-// down on the project's load. The load is read under a per-project
-// lock held to the insert, so concurrent requests and several nodes
-// cannot all pass one budget. The send is logged in the same
-// transaction.
+// down on the load. The load is read under locks on the project, the
+// address and the inviting account, taken in that order and held to
+// the insert, so concurrent requests and several nodes cannot all pass
+// one budget. The send is logged in the same transaction.
 func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitation, since time.Time,
 	refuse func(projmodel.InvitationLoad) bool,
 ) (projmodel.InvitationLoad, bool, error) {
@@ -734,6 +734,20 @@ func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitati
 		s.Q(`SELECT pg_advisory_xact_lock(hashtext('project_invitations'), hashtext(?::text))`),
 		inv.ProjectID); err != nil {
 		return load, false, err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		s.Q(`SELECT pg_advisory_xact_lock(hashtext('project_invitation_address'), hashtext(LOWER(?::text)))`),
+		inv.Email); err != nil {
+		return load, false, err
+	}
+
+	if inv.InvitedBy != "" {
+		if _, err := tx.ExecContext(ctx,
+			s.Q(`SELECT pg_advisory_xact_lock(hashtext('project_invitation_inviter'), hashtext(?::text))`),
+			inv.InvitedBy); err != nil {
+			return load, false, err
+		}
 	}
 
 	if err := tx.QueryRowContext(ctx, s.Q(`
@@ -760,6 +774,19 @@ func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitati
 		return load, false, err
 	}
 
+	// The address and the inviter across every project. A NULL
+	// inviter matches no row.
+	if err := tx.QueryRowContext(ctx, s.Q(`
+        SELECT
+            COUNT(*) FILTER (WHERE LOWER(email) = LOWER(?)),
+            COUNT(*) FILTER (WHERE invited_by = ?::uuid)
+        FROM project_invitation_sends
+        WHERE created_at >= ?
+    `), inv.Email, database.NullStr(inv.InvitedBy), since).Scan(
+		&load.SentToAddressAnywhere, &load.SentByInviter); err != nil {
+		return load, false, err
+	}
+
 	if refuse(load) {
 		return load, false, nil
 	}
@@ -777,8 +804,9 @@ func (s *Store) PutInvitationWithin(ctx context.Context, inv *projmodel.Invitati
 	}
 
 	if _, err := tx.ExecContext(ctx, s.Q(`
-        INSERT INTO project_invitation_sends (id, project_id, email, created_at) VALUES (?, ?, ?, ?)
-    `), ids.New(), inv.ProjectID, inv.Email, inv.CreatedAt); err != nil {
+        INSERT INTO project_invitation_sends (id, project_id, email, invited_by, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    `), ids.New(), inv.ProjectID, inv.Email, database.NullStr(inv.InvitedBy), inv.CreatedAt); err != nil {
 		return load, false, err
 	}
 

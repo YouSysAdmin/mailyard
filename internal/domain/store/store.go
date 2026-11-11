@@ -504,9 +504,10 @@ type ProjectStore interface {
 	PutInvitation(ctx context.Context, inv *project.Invitation) error
 
 	// PutInvitationWithin inserts a new invitation unless refuse says
-	// otherwise, judged on the project's load under a per-project lock
-	// held to the insert, and logs the send in the same transaction. It
-	// reports the load and whether it inserted.
+	// otherwise, judged on the load of the project, the address and the
+	// inviting account under locks held to the insert, and logs the send
+	// in the same transaction. It reports the load and whether it
+	// inserted.
 	PutInvitationWithin(ctx context.Context, inv *project.Invitation, since time.Time,
 		refuse func(project.InvitationLoad) bool) (project.InvitationLoad, bool, error)
 

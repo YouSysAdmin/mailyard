@@ -262,5 +262,14 @@ type InvitationLoad struct {
 	// invited since the window opened, cancelled ones included.
 	SentToAddress int
 
+	// SentToAddressAnywhere is SentToAddress across every project, a
+	// deleted one included.
+	SentToAddressAnywhere int
+
+	// SentByInviter is the invitations the inviting account issued
+	// since the window opened, across every project. Zero when no
+	// account invites.
+	SentByInviter int
+
 	Pending int
 }

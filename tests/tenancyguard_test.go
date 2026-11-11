@@ -127,6 +127,7 @@ var crossProjectByDesign = map[string]string{
 	"internal/domain/email/store.go PurgeOlderThan":               "retention sweep",
 	"internal/domain/email/store.go PruneVolumeBefore":            "retention sweep, drops volume counters no window can read",
 	"internal/domain/project/store.go PruneInvitationSendsBefore": "retention sweep, drops invitation sends no budget window can read",
+	"internal/domain/project/store.go PutInvitationWithin":        "invitation budget, counts sends to one address and by one account across projects, reads no row back",
 	"internal/domain/email/store.go PruneKeysBefore":              "retention sweep, drops idempotency keys past their retry window",
 	"internal/domain/analytics/rollup.go RecomputeDaily":          "maintenance sweep, rebuilds the trend rollup for every project in one scan",
 	"internal/domain/email/store.go ClearBodiesOlderThan":         "retention sweep",
