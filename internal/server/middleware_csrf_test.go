@@ -71,3 +71,43 @@ func TestACookieRequestFromAnotherOriginIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// The request-host form reads the Host header, never X-Forwarded-Host,
+// even from a trusted proxy: a proxy that appends to it leaves the first
+// value to the caller, who could then name any origin as its own.
+func TestTheRequestHostIsNotTakenFromAForwardedHeader(t *testing.T) {
+	rt := &env.Runtime{Config: &env.Config{}}
+	rt.Config.Server.PublicURL = "https://mail.example.com"
+
+	app := fiber.New(fiber.Config{
+		TrustProxy:       true,
+		TrustProxyConfig: fiber.TrustProxyConfig{Proxies: []string{"0.0.0.0"}},
+	})
+	app.Use(refuseCrossSite(rt))
+	app.Post("/x", func(c fiber.Ctx) error { return c.SendString("ok") })
+
+	for _, tc := range []struct {
+		name    string
+		headers map[string]string
+		want    int
+	}{
+		{"origin named in X-Forwarded-Host", map[string]string{"Origin": "http://evil.example", "X-Forwarded-Host": "evil.example"}, 403},
+		{"origin matching the Host header", map[string]string{"Origin": "http://example.com"}, 200},
+	} {
+		req := httptest.NewRequest("POST", "http://example.com/x", nil)
+		req.AddCookie(&http.Cookie{Name: authdomain.SessionCookieHost, Value: "s"})
+		for k, v := range tc.headers {
+			req.Header.Set(k, v)
+		}
+
+		res, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+
+		_ = res.Body.Close()
+		if res.StatusCode != tc.want {
+			t.Errorf("%s: answered %d, want %d", tc.name, res.StatusCode, tc.want)
+		}
+	}
+}

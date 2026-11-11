@@ -32,14 +32,16 @@ import (
 // neither - curl, an SDK - is not a browser and has no ambient cookie to
 // forge with.
 //
-// Ours is: the origin of server.public_url, whatever host this request
-// arrived on (so an installation reachable under a second name keeps
-// working), and every cors.allowed_origins entry, since a browser app
-// there was let in with credentials on purpose. The request-host form
-// uses c.Scheme(), which behind a TLS-terminating proxy is "http" until
-// server.trusted_proxies names the proxy - the same setting the Secure
-// cookie already needs there, and server.public_url covers it either
-// way.
+// Ours is: the origin of server.public_url, the Host header this
+// request arrived with (so an installation reachable under a second name
+// keeps working), and every cors.allowed_origins entry, since a browser
+// app there was let in with credentials on purpose. The request-host
+// form reads the Host header itself and never X-Forwarded-Host, which a
+// proxy that appends rather than overwrites leaves in the caller's
+// hands. Its scheme is c.Scheme(), which behind a TLS-terminating proxy
+// is "http" until server.trusted_proxies names the proxy - the same
+// setting the Secure cookie already needs there, and server.public_url
+// covers it either way.
 //
 // Scoped to the COOKIE: a request carrying a bearer is let through,
 // since extractToken then judges it on the bearer. Any other
@@ -80,7 +82,7 @@ func refuseCrossSite(rt *env.Runtime) fiber.Handler {
 			return c.Next()
 		}
 
-		if allowed[origin] || origin == c.Scheme()+"://"+strings.ToLower(c.Host()) {
+		if allowed[origin] || origin == c.Scheme()+"://"+strings.ToLower(string(c.Request().Host())) {
 			return c.Next()
 		}
 
