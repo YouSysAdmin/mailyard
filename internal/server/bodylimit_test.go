@@ -60,7 +60,7 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 	// Off the attachment routes naming a credential keeps the server's
 	// read timeout, but a body above baseBodyLimit still needs it to
 	// verify. One declared within baseBodyLimit is not checked at all.
-	limits := perRequestLimits(unverified)
+	limits := perRequestLimits(unverified, true)
 	var h fasthttp.RequestHeader
 	h.SetRequestURI("/api/v1/templates")
 	h.Set(fiber.HeaderAuthorization, "Bearer x")
@@ -74,7 +74,7 @@ func TestTheBodyCeilingIsDecidedByPath(t *testing.T) {
 		t.Errorf("a chunked body with an unverified credential = %d, want baseBodyLimit", got)
 	}
 
-	if got := perRequestLimits(verifiedAlways)(&h).MaxRequestBodySize; got != apiBodyLimit {
+	if got := perRequestLimits(verifiedAlways, true)(&h).MaxRequestBodySize; got != apiBodyLimit {
 		t.Errorf("templates with a verified credential = %d, want apiBodyLimit", got)
 	}
 
@@ -153,7 +153,7 @@ func newCredentials(t *testing.T) credentials {
 // enough.
 func TestOnlyAVerifiedCredentialLiftsTheBodyCeiling(t *testing.T) {
 	cr := newCredentials(t)
-	limits := perRequestLimits(credentialVerifier(cr.rt))
+	limits := perRequestLimits(credentialVerifier(cr.rt), true)
 
 	revoked := &akmodel.Key{ID: "k2", Revoked: true}
 	revokedToken, revokedPrefix, revokedHash, err := akmodel.Generate()
@@ -258,7 +258,7 @@ func TestALargeBodyIsRefusedOffTheAttachmentRoutes(t *testing.T) {
 	const serverLimit = 4 * apiBodyLimit
 	app := fiber.New(fiber.Config{BodyLimit: serverLimit, ErrorHandler: errorHandler})
 	cr := newCredentials(t)
-	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(cr.rt))
+	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(cr.rt), true)
 	ok := func(c fiber.Ctx) error { return c.SendString("ok") }
 	app.Post("/api/v1/emails/send", ok)
 	app.Post("/api/v1/templates", ok)
@@ -361,4 +361,45 @@ func post(t *testing.T, addr net.Addr, path string, size int, headers ...string)
 	}
 
 	return status
+}
+
+// A verified caller cannot spell a path into a tier its route does not
+// have: the ceiling is the narrower of the raw and the routed spelling.
+func TestAPathCannotBeSpelledIntoALargerCeiling(t *testing.T) {
+	limits := perRequestLimits(verifiedAlways, true)
+
+	for _, tc := range []struct {
+		path string
+		want int
+	}{
+		{"/api/v1/templates/0190a0b0-0000-7000-8000-000000000001/attachments", 0},
+		{"/api/v1/templates/../attachments", apiBodyLimit},
+		{"/api/v1/templates/%2e%2e/attachments", apiBodyLimit},
+		{"/api/v1/emails/send/../../templates", apiBodyLimit},
+		{"/app/api/auth/../templates", baseBodyLimit},
+	} {
+		var h fasthttp.RequestHeader
+		h.SetRequestURI(tc.path)
+		h.Set(fiber.HeaderAuthorization, "Bearer x")
+		h.SetContentLength(2 * apiBodyLimit)
+		if got := limits(&h).MaxRequestBodySize; got != tc.want {
+			t.Errorf("%s: ceiling %d, want %d", tc.path, got, tc.want)
+		}
+	}
+}
+
+// Without relay nodes nothing is mounted on the inbound route, so an
+// unverified request there gets baseBodyLimit like any other.
+func TestTheRelayInboundExceptionNeedsRelayNodes(t *testing.T) {
+	var h fasthttp.RequestHeader
+	h.SetRequestURI(relayInboundPath)
+	h.SetContentLength(2 * baseBodyLimit)
+
+	if got := perRequestLimits(unverified, false)(&h).MaxRequestBodySize; got != baseBodyLimit {
+		t.Errorf("relay inbound with relay nodes off: %d, want baseBodyLimit", got)
+	}
+
+	if got := perRequestLimits(unverified, true)(&h).MaxRequestBodySize; got != apiBodyLimit {
+		t.Errorf("relay inbound with relay nodes on: %d, want apiBodyLimit", got)
+	}
 }

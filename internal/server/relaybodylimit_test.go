@@ -73,7 +73,7 @@ func TestAVerifiedRelayNodeForwardsAMessageAboveTheAPICeiling(t *testing.T) {
 	}
 
 	app := fiber.New(fiber.Config{BodyLimit: bodyLimitFor(rt.Config), ErrorHandler: errorHandler})
-	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(rt))
+	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(rt), rt.Config.RelayNodes.Enabled)
 	app.Post(relayInboundPath, func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "accepted"})
 	})

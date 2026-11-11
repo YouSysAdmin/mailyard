@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -194,7 +196,8 @@ func New(opts Options) (*Server, error) {
 	}
 
 	app := fiber.New(fiberCfg)
-	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(opts.Runtime))
+	app.Server().HeaderReceived = perRequestLimits(credentialVerifier(opts.Runtime),
+		opts.Runtime.Config.RelayNodes.Enabled)
 
 	app.Use(safeRecover)
 	app.Use(refuseContentEncoding)
@@ -269,9 +272,9 @@ var LargeBodyPaths = []string{
 	// A template export bundle carries every version, each up to a
 	// template's own size.
 	"/api/v1/templates/import",
-	// Mounted only where relay_nodes.enabled is set, but a path is a
-	// string and an installation with no route here pays nothing for
-	// the entry.
+	// Mounted only where relay_nodes.enabled is set. Without it the
+	// path answers 404, and the unverified exception in
+	// unverifiedBodyLimit is off too.
 	relayInboundPath,
 }
 
@@ -280,9 +283,10 @@ var LargeBodyPaths = []string{
 // per request.
 //
 // A zero field in the returned config means "honor the server's own
-// value". The URI here is the RAW request target, so the path is
-// normalized the same way the router normalizes it before matching -
-// see normalizePath.
+// value". The URI here is the RAW request target, while the router
+// matches it with dot segments removed and escapes decoded, so the
+// ceiling is the narrower of the two spellings' - a path cannot be
+// spelled into a tier its route does not have.
 //
 // Anything above baseBodyLimit goes only to a request whose credential
 // verifies, because fasthttp allocates the body buffer from the declared
@@ -290,23 +294,25 @@ var LargeBodyPaths = []string{
 // baseBodyLimit is not checked, since the ceiling cannot refuse it. On
 // LargeBodyPaths the server's read timeout also waits on a verified
 // credential, and elsewhere naming one is enough to keep it.
-func perRequestLimits(verified func(*fasthttp.RequestHeader) bool) func(*fasthttp.RequestHeader) fasthttp.RequestConfig {
+func perRequestLimits(verified func(*fasthttp.RequestHeader) bool,
+	relayNodes bool,
+) func(*fasthttp.RequestHeader) fasthttp.RequestConfig {
 	return func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		uri := string(h.RequestURI())
 		if i := strings.IndexAny(uri, "?#"); i >= 0 {
 			uri = uri[:i]
 		}
 
-		limit := bodyLimitForPath(uri)
+		limit := narrowest(bodyLimitForPath(uri), bodyLimitForPath(routedPath(uri)))
 		credential := carriesCredential(h)
 		switch {
 		case limit == 0:
 			credential = verified(h)
 			if !credential {
-				limit = unverifiedBodyLimit(uri)
+				limit = unverifiedBodyLimit(uri, relayNodes)
 			}
 		case limit > baseBodyLimit && declaresMoreThan(h, baseBodyLimit) && !verified(h):
-			limit = unverifiedBodyLimit(uri)
+			limit = unverifiedBodyLimit(uri, relayNodes)
 		}
 
 		cfg := fasthttp.RequestConfig{MaxRequestBodySize: limit}
@@ -333,13 +339,53 @@ func isRelayInbound(h *fasthttp.RequestHeader) bool {
 }
 
 // unverifiedBodyLimit is the ceiling for a request whose credential does
-// not verify: baseBodyLimit, except on the relay inbound route.
-func unverifiedBodyLimit(path string) int {
-	if normalizePath(path) == relayInboundPath {
+// not verify: baseBodyLimit, except on the relay inbound route where
+// relay nodes are enabled.
+func unverifiedBodyLimit(path string, relayNodes bool) int {
+	if relayNodes && normalizePath(path) == relayInboundPath {
 		return apiBodyLimit
 	}
 
 	return baseBodyLimit
+}
+
+// narrowest is the smaller of two body ceilings, where 0 is the
+// server's own and so the largest.
+func narrowest(a, b int) int {
+	switch {
+	case a == 0:
+		return b
+	case b == 0:
+		return a
+	}
+
+	return min(a, b)
+}
+
+// routedPath is a raw request path the way the router reads it: escapes
+// of unreserved characters decoded and dot segments removed.
+func routedPath(raw string) string {
+	var b strings.Builder
+	for i := 0; i < len(raw); i++ {
+		if raw[i] == '%' && i+2 < len(raw) {
+			if v, err := strconv.ParseUint(raw[i+1:i+3], 16, 8); err == nil && unreserved(byte(v)) {
+				b.WriteByte(byte(v))
+				i += 2
+
+				continue
+			}
+		}
+
+		b.WriteByte(raw[i])
+	}
+
+	return path.Clean("/" + b.String())
+}
+
+// unreserved reports an RFC 3986 unreserved character.
+func unreserved(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
+		c == '-' || c == '.' || c == '_' || c == '~'
 }
 
 // declaresMoreThan reports whether the body may exceed n bytes: a
