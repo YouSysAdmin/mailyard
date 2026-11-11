@@ -400,6 +400,14 @@ func TestNodesAreListedByProject(t *testing.T) {
 	s, ns := testStores(t)
 	newNode(t, s, ns, "platform1", ssmodel.StatusEnabled, new(time.Now().UTC()))
 
+	// A project node needs its project, which it cascades from.
+	if _, err := s.DB().ExecContext(t.Context(), `
+		INSERT INTO projects (id, name, slug, owner_id, created_at)
+		VALUES ($1, 'tenant', $2, NULL, now())`,
+		"34a784af-436d-4faa-8fbe-dab57a87930c", "tenant"); err != nil {
+		t.Fatalf("insert project: %v", err)
+	}
+
 	tenant := &nodemodel.Node{
 		ID: ids.New(), ProjectID: "34a784af-436d-4faa-8fbe-dab57a87930c", ServerID: ids.New(),
 		TokenHash: relaynode.HashToken("t"), Name: "tenant-node",
