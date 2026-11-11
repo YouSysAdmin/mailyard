@@ -47,7 +47,11 @@ func TestAMissingChunkIsNotTheHTMLShell(t *testing.T) {
 		{env.ConsolePath + "/assets/SmtpServers-BBBB.js", 200, "export const b = 2"},
 		{env.ConsolePath + "/assets/SmtpServers-STALE.js", 404, ""},
 		{env.ConsolePath + "/assets/", 404, ""},
-		{env.ConsolePath + "/assets/../index.html", 404, ""},
+		{env.ConsolePath + "/assets/..%2findex.html", 404, ""},
+
+		// A dot segment is cleaned before routing, so this is the shell
+		// at the console root and not a traversal out of /assets.
+		{env.ConsolePath + "/assets/../index.html", 200, "<div id=app>"},
 
 		// Not an asset: a deep link the router resolves client-side.
 		{env.ConsolePath + "/smtp-servers", 200, "<div id=app>"},
