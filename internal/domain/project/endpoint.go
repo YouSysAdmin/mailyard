@@ -21,6 +21,7 @@ import (
 	"github.com/yousysadmin/mailyard/internal/core/systemmail"
 	"github.com/yousysadmin/mailyard/internal/core/validation"
 	"github.com/yousysadmin/mailyard/internal/domain"
+	certmodel "github.com/yousysadmin/mailyard/internal/models/certificate"
 	perm "github.com/yousysadmin/mailyard/internal/models/permission"
 	projmodel "github.com/yousysadmin/mailyard/internal/models/project"
 	usermodel "github.com/yousysadmin/mailyard/internal/models/user"
@@ -467,11 +468,36 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 		}
 	}
 
+	// The project's relay nodes cascade away with it, but the
+	// certificate each was issued is named by the node id alone, so
+	// nothing would find it again and it would expire into a daily
+	// alert. Dropped first, under the same refuse-and-retry rule.
+	if err := h.forgetRelayCertificates(ctx, w.ID); err != nil {
+		return response.Internal(c, err)
+	}
+
 	if err := h.Runtime.Store.Project.Delete(ctx, w.ID); err != nil {
 		return response.Internal(c, err)
 	}
 
 	return response.NoContent(c)
+}
+
+// forgetRelayCertificates drops the certificate record of every relay
+// node the project enrolled.
+func (h *Handler) forgetRelayCertificates(ctx context.Context, projID string) error {
+	nodes, err := h.Runtime.Store.RelayNode.List(ctx, projID)
+	if err != nil {
+		return err
+	}
+
+	for _, n := range nodes {
+		if err := h.Runtime.Store.Certificate.Delete(ctx, certmodel.ScopeRelayNode, n.ID); err != nil {
+			return fmt.Errorf("forget relay node certificate %s: %w", n.ID, err)
+		}
+	}
+
+	return nil
 }
 
 // ListMembers returns the membership roster. Any member may see it.
