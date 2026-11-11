@@ -1401,9 +1401,11 @@ func auditWrites(rt *env.Runtime) fiber.Handler {
 
 		rc := domain.GetRequestContext(c)
 		ev := &amodel.Event{
+			// Folded the way the router folds, so every spelling that
+			// reaches one handler gets one type, and with it one alert.
 			// The console prefix is dropped so a route keeps its type
 			// whichever surface it is mounted on.
-			Type:   coreaudit.RouteType(c.Method(), strings.TrimPrefix(c.Path(), env.ConsolePath)),
+			Type:   coreaudit.RouteType(c.Method(), strings.TrimPrefix(normalizePath(c.Path()), env.ConsolePath)),
 			Method: c.Method(),
 			Path:   auditPath(c),
 			Status: status,
