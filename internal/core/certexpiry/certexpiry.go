@@ -10,9 +10,9 @@
 // handshake fails.
 //
 // So the sweep is loud on purpose: a log line at a level that matches
-// how close it is, and mail to the platform admins once a day while it
-// is inside the window. Silence is the failure mode this exists to
-// prevent.
+// how close it is, and mail to the platform admins at two weeks, at one
+// week, and then every day from three days out. Silence is the failure
+// mode this exists to prevent.
 package certexpiry
 
 import (
@@ -42,14 +42,38 @@ type Mailer interface {
 // Admins answers who should hear about it.
 type Admins func(ctx context.Context) ([]string, error)
 
-// Window is how far ahead the sweep looks. Thirty days is chosen to
-// sit outside ACME's own renewal point (autocert aims for thirty), so
-// an ACME certificate inside this window means renewal is FAILING
-// rather than pending - which is the thing worth waking somebody for.
+// Window is how far ahead the sweep looks and logs. Thirty days is
+// chosen to sit outside ACME's own renewal point (autocert aims for
+// thirty), so an ACME certificate inside this window means renewal is
+// FAILING rather than pending - which is the thing worth waking
+// somebody for.
 const Window = 30 * 24 * time.Hour
 
 // Critical is when the tone changes from a warning to an error.
 const Critical = 7 * 24 * time.Hour
+
+// MailFrom is when a certificate is first mailed about. Between Window
+// and MailFrom it is only logged, so a renewal that runs late but runs
+// costs nobody an email.
+const MailFrom = 14 * 24 * time.Hour
+
+// DailyFrom is when the mail becomes daily.
+const DailyFrom = 3 * 24 * time.Hour
+
+// stage is how far a certificate has come towards expiry, for mail:
+// 0 is not yet mailed about, 1 is two weeks, 2 is one week, 3 is daily.
+func stage(left time.Duration) int {
+	switch {
+	case left > MailFrom:
+		return 0
+	case left > Critical:
+		return 1
+	case left > DailyFrom:
+		return 2
+	default:
+		return 3
+	}
+}
 
 // Checker is the sweep, registered as a scheduled job.
 type Checker struct {
@@ -58,13 +82,15 @@ type Checker struct {
 	Admins Admins
 	Log    *slog.Logger
 
-	// lastMailed collapses the daily mail. The job runs more often
-	// than once a day so a certificate that lands inside the window at
-	// noon is not first reported the following morning, and nobody
-	// wants that frequency in their inbox.
+	// mailed is the stage each certificate was last mailed at, keyed by
+	// scope and name, and lastDaily when the last daily mail went. A
+	// certificate is mailed again only when it reaches a later stage,
+	// or once a day in the last one. The job runs more often than that
+	// so a certificate that crosses a stage at noon is not first
+	// reported the following morning.
 	//
-	// IN-PROCESS, so "one a day" means one a day PER NODE, and a restart
-	// inside the window sends another. Written down because it looks like
+	// IN-PROCESS, so the cadence holds PER NODE, and a restart sends
+	// the current stage again. Written down because it looks like
 	// an oversight and is the same trade the whole alert path makes -
 	// alertmail's collapse window is an in-process map too, and cron
 	// runs every job on every node with no leader election by design.
@@ -72,7 +98,8 @@ type Checker struct {
 	// Making this one durable would mean giving a single job shared state
 	// that no other job has. If the duplication ever matters it should be
 	// solved for the alert path as a whole, not here.
-	lastMailed time.Time
+	mailed    map[string]int
+	lastDaily time.Time
 }
 
 // Run reports everything expiring inside the window.
@@ -87,6 +114,8 @@ func (c *Checker) Run(ctx context.Context) error {
 	}
 
 	if len(rows) == 0 {
+		clear(c.mailed)
+
 		return nil
 	}
 
@@ -116,13 +145,58 @@ func (c *Checker) Run(ctx context.Context) error {
 	return nil
 }
 
-// mail sends one digest a day while anything is inside the window.
+// mail sends a digest of what is inside MailFrom when a certificate
+// has reached a stage it was not yet mailed at, or once a day while
+// any is in the last stage.
 func (c *Checker) mail(ctx context.Context, rows []*certmodel.Certificate) {
 	if c.Mail == nil || !c.Mail.Enabled() || c.Admins == nil {
 		return
 	}
 
-	if time.Since(c.lastMailed) < 24*time.Hour {
+	if c.mailed == nil {
+		c.mailed = map[string]int{}
+	}
+
+	now := map[string]int{}
+	var listed []*certmodel.Certificate
+	due, daily := false, false
+	for _, r := range rows {
+		s := stage(time.Until(*r.NotAfter))
+		if s == 0 {
+			continue
+		}
+
+		k := r.Scope + "\x00" + r.Name
+		now[k] = s
+		listed = append(listed, r)
+
+		// A lower stage than last mailed is a renewed certificate,
+		// which starts over.
+		if prev, ok := c.mailed[k]; ok && s < prev {
+			delete(c.mailed, k)
+		}
+
+		if s > c.mailed[k] {
+			due = true
+		}
+
+		if s == 3 {
+			daily = true
+		}
+	}
+
+	// A certificate that left the list was renewed or removed.
+	for k := range c.mailed {
+		if _, ok := now[k]; !ok {
+			delete(c.mailed, k)
+		}
+	}
+
+	if daily && time.Since(c.lastDaily) >= 24*time.Hour {
+		due = true
+	}
+
+	if !due {
 		return
 	}
 
@@ -131,7 +205,7 @@ func (c *Checker) mail(ctx context.Context, rows []*certmodel.Certificate) {
 		return
 	}
 
-	subject, html, text := digest(rows)
+	subject, html, text := digest(listed)
 	if err := c.Mail.Send(ctx, to, subject, html, text); err != nil {
 		// Not fatal, and not silent: the log above already carries
 		// every line of this, so the sweep has done its job even when
@@ -141,7 +215,13 @@ func (c *Checker) mail(ctx context.Context, rows []*certmodel.Certificate) {
 		return
 	}
 
-	c.lastMailed = time.Now()
+	for k, s := range now {
+		c.mailed[k] = s
+	}
+
+	if daily {
+		c.lastDaily = time.Now()
+	}
 }
 
 // digest renders the message. Plain and short - it exists to get
