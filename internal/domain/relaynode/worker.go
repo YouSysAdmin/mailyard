@@ -114,6 +114,33 @@ func (w *WorkerIdentity) issuedNow(ctx context.Context, nodeID string, sum [sha2
 	return issued[nodeID] == sum
 }
 
+// Renew reissues the shared worker pair when it nears expiry, for the
+// scheduled job.
+//
+// Authority.Client is reached only from a dial, so an installation
+// whose relay nodes carry no outbound mail lets the pair expire in
+// place. No handshake fails over it, because none is attempted - but
+// the expiry sweep then mails the platform admins about a certificate
+// they have no way to renew. Whether anything is issued stays Client's
+// decision, so this does nothing outside the renewal window.
+func (w *WorkerIdentity) Renew(ctx context.Context) error {
+	if w.Authority == nil {
+		return nil
+	}
+
+	if _, err := w.Authority.Client(ctx); err != nil {
+		return err
+	}
+
+	// Drop the loaded pair so the next dial presents what was just
+	// issued instead of waiting out the reload interval.
+	w.mu.Lock()
+	w.loaded = time.Time{}
+	w.mu.Unlock()
+
+	return nil
+}
+
 func (w *WorkerIdentity) load(ctx context.Context) (*tls.Certificate, *x509.CertPool, map[string][sha256.Size]byte, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

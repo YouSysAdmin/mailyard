@@ -24,7 +24,7 @@ import (
 // The worker role runs the sweeps, every role refreshes its settings.
 // Partition maintenance also runs once here, on ctx, before the first
 // tick.
-func registerJobs(ctx context.Context, r role, rt *env.Runtime, st *store.Store, db database.Database, log *slog.Logger) {
+func registerJobs(ctx context.Context, r role, rt *env.Runtime, st *store.Store, db database.Database, log *slog.Logger, relayClient *relaynode.WorkerIdentity) {
 	// The assignment sweep, on worker nodes: a pull node that stopped
 	// claiming loses its messages to the next candidate.
 	if r.worker {
@@ -103,6 +103,26 @@ func registerJobs(ctx context.Context, r role, rt *env.Runtime, st *store.Store,
 			Schedule: cron.EveryInterval(6 * time.Hour),
 			Run:      keys.Run,
 		})
+	}
+
+	// The shared relay worker certificate renews itself on a dial, and
+	// an installation whose nodes only RECEIVE never dials one - so the
+	// pair runs out and the sweep above reports an expiry nobody can
+	// clear. On the same cadence, because the decision is the same one.
+	if r.worker && relayClient != nil {
+		rt.Cron.Register(cron.Job{
+			Name:     "relay-client-renew",
+			Schedule: cron.EveryInterval(6 * time.Hour),
+			Run:      relayClient.Renew,
+		})
+
+		// Once at boot as well, so a pair that ran out while nothing
+		// dialled a node is replaced by a restart rather than at the
+		// first tick six hours later. Not fatal: delivery renews it on
+		// its own the moment a node is dialled.
+		if err := relayClient.Renew(ctx); err != nil {
+			log.Warn("relay client certificate renewal failed at startup", "err", err)
+		}
 	}
 
 	if r.worker {

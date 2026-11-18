@@ -296,8 +296,14 @@ func runServe(cmd *cobra.Command, r role) error {
 	// delivery processor takes it directly, the console's Test button
 	// reads it off the Runtime.
 	relayClient := relayClientSource(cfg, st)
+
+	// relaySource and not relayClient on the processor: an interface
+	// field holding a nil pointer is not nil, and the processor asks
+	// whether it has a relay identity at all before dialling a node.
+	var relaySource email.RelayClientSource
 	if relayClient != nil {
 		rt.RelayNodeTLS = relayClient.WorkerTLS
+		relaySource = relayClient
 	}
 
 	// Platform mail (invitations, password resets, signup
@@ -421,7 +427,7 @@ func runServe(cmd *cobra.Command, r role) error {
 		Attachments:         rt.Attachments,
 		DKIMKeys:            dkimKeyCache(cfg.Sending.DKIMKeyCache),
 		BounceAddress:       strings.TrimSpace(cfg.Sending.BounceAddress),
-		RelayClient:         relayClient,
+		RelayClient:         relaySource,
 		Notify:              func() *notify.Raiser { return rt.Notify },
 	}
 	worker := queue.NewWorker(st.Email, processor, queue.Config{
@@ -585,7 +591,7 @@ func runServe(cmd *cobra.Command, r role) error {
 	// event - nobody made a request, a job noticed something.
 	rt.Notify = &notify.Raiser{Store: st, Bus: rt.Events, Log: log, Alerts: rt.Alerts}
 
-	registerJobs(cmd.Context(), r, rt, st, db, log)
+	registerJobs(cmd.Context(), r, rt, st, db, log, relayClient)
 
 	// The worker and the runner are CONSTRUCTED on every role, and only
 	// STARTED on a worker one. An api node still hands rt.Queue to the

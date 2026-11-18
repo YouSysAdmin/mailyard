@@ -8,7 +8,9 @@ import (
 	"crypto/x509"
 	"net"
 	"testing"
+	"time"
 
+	"github.com/yousysadmin/mailyard/internal/core/relayca"
 	certmodel "github.com/yousysadmin/mailyard/internal/models/certificate"
 	"github.com/yousysadmin/mailyard/internal/relayagent"
 )
@@ -139,5 +141,73 @@ func TestARenewedNodeCertificateIsAccepted(t *testing.T) {
 	renewed := enrolNode(t, a, "node-c", host)
 	if err := dialNode(t, a, w, "node-c", host, renewed); err != nil {
 		t.Fatalf("the renewed certificate was refused: %v", err)
+	}
+}
+
+// The shared worker pair is renewed without anything dialling a node,
+// which is the state an installation whose nodes only receive sits in.
+func TestTheWorkerPairIsRenewedWithoutADial(t *testing.T) {
+	ctx := context.Background()
+	caPEM, caKey, err := relayca.Generate("test ca", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ca, err := relayca.Load(caPEM, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Issued a hundred days ago, so the ninety day leaf ran out ten
+	// days back and nothing asked for a new one.
+	certPEM, keyPEM, err := ca.IssuePair(relayca.RoleClient, "mailyard-worker", nil,
+		time.Now().Add(-100*24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	store := memCerts{
+		[2]string{certmodel.ScopeRelayCA, ""}:     {Scope: certmodel.ScopeRelayCA, CertPEM: caPEM, Data: caKey},
+		[2]string{certmodel.ScopeRelayClient, ""}: {Scope: certmodel.ScopeRelayClient, CertPEM: certPEM, Data: keyPEM},
+	}
+
+	w := &WorkerIdentity{Authority: &Authority{Store: store}}
+	if err := w.Renew(ctx); err != nil {
+		t.Fatalf("renew: %v", err)
+	}
+
+	stored := store[[2]string{certmodel.ScopeRelayClient, ""}]
+	if stored.CertPEM == certPEM {
+		t.Fatal("the expired pair is still the one on record")
+	}
+
+	crt, err := relayca.ParseCertificate(stored.CertPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !crt.NotAfter.After(time.Now()) {
+		t.Fatalf("the stored pair still expires at %s", crt.NotAfter)
+	}
+}
+
+// A pair with most of its life left is left alone, so the job is free
+// to run as often as the sweep beside it.
+func TestARenewalLeavesAHealthyWorkerPairAlone(t *testing.T) {
+	ctx := context.Background()
+	store := memCerts{}
+	a := &Authority{Store: store}
+	first, err := a.Client(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := &WorkerIdentity{Authority: a}
+	if err := w.Renew(ctx); err != nil {
+		t.Fatalf("renew: %v", err)
+	}
+
+	if store[[2]string{certmodel.ScopeRelayClient, ""}].CertPEM != first.CertPEM {
+		t.Fatal("a pair that is nowhere near expiry was reissued")
 	}
 }
